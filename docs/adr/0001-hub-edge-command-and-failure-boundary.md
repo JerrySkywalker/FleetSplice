@@ -438,25 +438,40 @@ command boundary independently of any UI or transport.
     issued/no-consume slots become `ISSUED_NO_EFFECT`; the selected slot has its
     exact Edge reservation even if later terminal; and every extra issued slot
     is in the permanent no-consume set. Gaps, forks, rollback, mismatch, or extra
-    consume reject. Authenticated activation binds all local latches, cut,
-    consistency, classifications, high-waters, and digests. An incomplete
+    consume reject. Authenticated activation binds the candidate, exact anchor
+    acknowledgement, all local latches, applicable cut and consistency receipt,
+    high-waters, and digests. An incomplete
     latch/cut/map, gap, fork, rollback, selected-ID mismatch, unlisted issue,
     extra consume, or ambiguity about the selected identity blocks activation.
     Once that immutable evidence establishes `NONE` or one exact selected
     identity, activation binds `productiveBoundaryClassification` as `NONE` or
-    `SELECTED_EFFECT_POSSIBLE`, the current `productiveOutcomeState` when
-    present, and the independent `safetyDeliveryClassification`. An exact
-    selected productive outcome may remain `PENDING`,
+    `SELECTED_EFFECT_POSSIBLE` and the current `productiveOutcomeState` snapshot
+    when present. It also binds immutable `controlDeliveryParticipantId` with
+    role `DELIVERY_OWNER`, the delivery gate, `transportRouteDigest`, native/
+    process identity, closed action, one-use `controlDeliverySlotId`, the
+    safety-delivery classification schema/domain, and
+    `safetyDeliveryInitialState=UNDELIVERED`; it does not bind or
+    predict a resulting `safetyDeliveryClassification`. An exact selected
+    productive outcome may remain `PENDING`,
     `CONSUMED_EFFECT_POSSIBLE`, or `AMBIGUOUS_EFFECT` while the bound
     reduction-only control activates and delivers; this is outcome uncertainty,
     not selected-identity uncertainty.
 
-    Only `DELIVERY_OWNER` may cross the final native boundary. It journal-CASes
-    `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE`, binding activation, route, action,
-    native/process identity, both classification domains, and slot before first
-    emission. Relays never cross that boundary; exact replay returns the receipt
-    without re-emission, and owner/route failure, safety-delivery ambiguity, or
-    disqualification has no fallback owner.
+    Only `DELIVERY_OWNER` may cross the final native boundary. On an emission
+    attempt it CASes `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and durably writes
+    `SafetyControlDeliveryReceipt` with activation, productive snapshot, route,
+    action, native/process identity, schema/domain, and slot before first
+    emission. Qualified pre-emission `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or
+    `UNSUPPORTED` evidence atomically records that classification in an
+    immutable `SafetyControlDeliveryReceipt` under the same slot without
+    emission. A qualified post-attempt result or `AMBIGUOUS_EFFECT`
+    appends an immutable `SafetyControlOutcomeReceipt` under the same
+    slot/receipt lineage. Only these later immutable
+    receipts establish the resulting `safetyDeliveryClassification`; activation
+    and earlier receipts never change. Relays never cross the final boundary;
+    exact replay returns the existing receipt/state without re-emission, a
+    changed tuple conflicts, and owner/route failure, safety-delivery ambiguity,
+    or disqualification has no fallback owner.
 
     The safety namespace is excluded from productive admin reservation drain.
     Both productive issue and consume gates check chain eligibility, no
@@ -476,11 +491,13 @@ command boundary independently of any UI or transport.
     It cannot retarget, start/resume/retry work, steer, approve, write, migrate,
     renew, change binding/scope/lease/controller, or carry arbitrary arguments.
     A replacement runtime cannot acquire the target unless it was already the
-    exact qualified supervisor. Completion versus stop is locally linearized,
-    with separate productive-boundary and safety-delivery classifications. The
-    safety domain distinguishes `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`,
-    `DELIVERY_EFFECT_POSSIBLE`, `UNSUPPORTED`, and `AMBIGUOUS_EFFECT`; it never
-    reclassifies the productive boundary. Delivery is not productive outcome,
+    exact qualified supervisor. Completion versus stop is locally linearized.
+    Activation freezes the productive classification/outcome snapshot and
+    safety-delivery schema/domain with an `UNDELIVERED` initial state, but only
+    later delivery/outcome receipts classify safety delivery as
+    `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, `DELIVERY_EFFECT_POSSIBLE`,
+    `UNSUPPORTED`, or `AMBIGUOUS_EFFECT`; they never reclassify the productive
+    boundary. Delivery is not productive outcome,
     terminality, rollback, or barrier proof. Exact replay returns the receipt
     without native re-emission. Productive-outcome ambiguity and safety-delivery
     ambiguity remain distinct; neither resolves the other. The productive target
@@ -516,8 +533,11 @@ command boundary independently of any UI or transport.
   remaining safety-deliverable, selected-identity ambiguity still blocking,
   separate productive/safety ambiguity classifications with no outcome or
   barrier inference, Edge-issued/no-consume classification,
-  latch/cut/consistency crash/replay/expiry, one delivery owner/FENCE_ONLY roles,
-  no replay emission or fallback, transport/final-boundary separation,
+  latch/cut/consistency crash/replay/expiry, activation-before-delivery with
+  `UNDELIVERED` and no predicted result, later delivery/outcome classification,
+  response-loss exact replay with no rewrite or emission, changed-tuple
+  rejection, one delivery owner/FENCE_ONLY roles, no fallback,
+  transport/final-boundary separation,
   stop-revision CAS, unsupported delivery and crash ambiguity; and
   same-executor renewal crash/replay at `A`, every `R_i`, `B`, every general
   `X_i`, admin-specialized `X_C` then `X_E`, abort and final activation,

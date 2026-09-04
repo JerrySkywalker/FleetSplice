@@ -3,7 +3,7 @@
 ## Status and authority
 
 - Baseline: `0.1`
-- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_11_CHANGE_REQUIRED`
+- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_12_CHANGE_REQUIRED`
 - Drafting Goal: `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001` (`G01`)
 - Initial reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
 - Round-2 reviewed draft: `b82df67d5a045d31b04b0efb3fb5c0a2cb9de571`
@@ -16,14 +16,15 @@
 - Round-9 reviewed draft: `690f822d6da054a6f65080cd74c90e61526e484e`
 - Round-10 reviewed draft: `0669ca707143cde2266c502971d5936622d5e64e`
 - Round-11 reviewed draft: `1a646e76fcf092ac5a02521cfd276aee297032f0`
-- Evidence cut: 2026-09-05 round-11 review and bounded correction
+- Round-12 reviewed draft: `82f44ff7dcb10a28acea14fe8042bdda6c768672`
+- Evidence cut: 2026-09-05 round-12 review and bounded correction
 - `ARCHITECTURE_0_1_READY=false`
 - `IMPLEMENTATION_AUTHORIZED=false`
 - `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`
 
 This is a formal architecture draft, not an accepted baseline and not product
 implementation authority. Independent G02 reviews of the original draft and
-its first ten corrections returned
+its first eleven corrections have final controlling dispositions of
 [`CHANGE_REQUIRED`](../train/receipts/G02.md),
 [round-2 `CHANGE_REQUIRED`](../train/receipts/G02-r2.md),
 [round-3 `CHANGE_REQUIRED`](../train/receipts/G02-r3.md),
@@ -35,8 +36,11 @@ its first ten corrections returned
 [round-9 `CHANGE_REQUIRED`](../train/receipts/G02-r9.md), with its
 [ordering erratum](../train/receipts/G02-r9-erratum.md), and
 [round-10 `CHANGE_REQUIRED`](../train/receipts/G02-r10.md), and
-[round-11 `CHANGE_REQUIRED`](../train/receipts/G02-r11.md), respectively. This
-revision contains only their bounded corrections and has not received a fresh
+[round-11 `CHANGE_REQUIRED`](../train/receipts/G02-r11.md), and
+[round-12 `CHANGE_REQUIRED`](../train/receipts/G02-r12.md), respectively. The
+round-12 review's initial `PASS` was explicitly superseded by its full reviewer
+after focused finding and reassessment; it is not an operative gate result. This
+revision contains only the bounded corrections and has not received a fresh
 independent PASS. It does not supersede [Baseline 0.0](baseline-0.0.md) until a
 fresh review and the owner-controlled G03 acceptance gate both pass. Only G03
 may change `ARCHITECTURE_0_1_READY`, and this draft deliberately leaves every
@@ -1052,19 +1056,35 @@ Safety control uses this ordering:
    activation and delivery. Once the complete immutable evidence establishes
    `NONE` or one exact selected identity, activation separately binds
    `productiveBoundaryClassification` as `NONE` or
-   `SELECTED_EFFECT_POSSIBLE`, the selected boundary's current
-   `productiveOutcomeState` when present, and the SafetyControl's independent
-   `safetyDeliveryClassification`. An exact selected productive boundary may
-   remain `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or `AMBIGUOUS_EFFECT` without
-   blocking the bound reduction-only activation or delivery; none of those
-   states proves a productive outcome, target termination, rollback, or barrier
-   completion.
+   `SELECTED_EFFECT_POSSIBLE` and the selected boundary's current
+   `productiveOutcomeState` snapshot when present. It also binds the exact
+   candidate-precommitted `controlDeliveryParticipantId` and `DELIVERY_OWNER`
+   role, delivery gate, `transportRouteDigest`, native/process identity, closed
+   action, one-use `controlDeliverySlotId`, delivery-classification schema and
+   domain, and explicit initial slot state
+   `safetyDeliveryInitialState=UNDELIVERED`. Activation MUST NOT bind or predict
+   a resulting `safetyDeliveryClassification`; that result does not yet exist.
+   An exact selected productive boundary may remain `PENDING`,
+   `CONSUMED_EFFECT_POSSIBLE`, or `AMBIGUOUS_EFFECT` without blocking the bound
+   reduction-only activation or delivery; none of those states proves a
+   productive outcome, target termination, rollback, or barrier completion.
 6. Only the bound `DELIVERY_OWNER` may approach the final native control
-   boundary. At the exact delivery gate it atomically changes its one-use slot
-   `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and journals a receipt binding all
-   activation, cut/consistency, both separately named classification domains,
-   route, action, and native/process evidence before first native emission.
-   Exact replay returns that receipt and never re-emits.
+   boundary. When emission is attempted, one CAS at the exact delivery gate
+   changes its one-use slot `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and durably
+   writes a `SafetyControlDeliveryReceipt` before first native emission. That
+   later receipt, not activation, first establishes
+   `safetyDeliveryClassification=DELIVERY_EFFECT_POSSIBLE` and binds activation,
+   cut/consistency, the productive snapshot, route, action, and native/process
+   evidence. If qualified pre-emission evidence instead establishes
+   `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or `UNSUPPORTED`, one CAS records
+   that terminal/no-effect classification in an immutable
+   `SafetyControlDeliveryReceipt` under the same slot without emission. A
+   qualified post-attempt result or `AMBIGUOUS_EFFECT`
+   appends an immutable `SafetyControlOutcomeReceipt` under that same slot and
+   receipt lineage; it never rewrites activation or an earlier receipt. Exact
+   replay returns the current receipt/state and never re-emits; a changed
+   activation, owner, gate, route, identity, action, slot, or other bound field
+   conflicts without effect.
    Owner crash, response loss, safety-delivery ambiguity, outage,
    disqualification, or route failure has no fallback owner and keeps the target
    quarantined until reconciliation. Transport acceptance or relay handoff and
@@ -1102,14 +1122,16 @@ write, migrate, renew a permit, change binding/scope/lease/controller, or carry
 arbitrary shell, path, method, or provider arguments. A replacement runtime may
 not acquire the target merely to deliver control; it must already be the named,
 qualified supervisor of that exact target and creation identity. Target
-completion versus stop is linearized in the supervising local journal. Receipts
-carry independent `productiveBoundaryClassification` and
-`safetyDeliveryClassification` fields: productive pending, effect-possible, or
-ambiguous state is never reclassified by a safety attempt, while the safety
-delivery domain distinguishes `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`,
-`DELIVERY_EFFECT_POSSIBLE`, `UNSUPPORTED`, and `AMBIGUOUS_EFFECT`. Delivery is
-never proof of productive outcome, terminality, rollback, predecessor
-termination, or barrier completion.
+completion versus stop is linearized in the supervising local journal.
+Activation carries the independent `productiveBoundaryClassification` and
+`productiveOutcomeState` snapshot plus the safety-delivery schema/domain and
+`UNDELIVERED` initial state, but no resulting
+`safetyDeliveryClassification`. Only later delivery/outcome receipts carry that
+result and distinguish `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`,
+`DELIVERY_EFFECT_POSSIBLE`, `UNSUPPORTED`, and `AMBIGUOUS_EFFECT`. Productive
+pending, effect-possible, or ambiguous state is never reclassified by a safety
+attempt. Delivery is never proof of productive outcome, terminality, rollback,
+predecessor termination, or barrier completion.
 
 Exact replay returns the existing local-latch, cut, consistency, delivery, or
 outcome receipt as applicable and never re-emits the native control. Changed
@@ -1833,11 +1855,15 @@ implementation/capability gates, not current PASS claims:
   productive boundary remains reduction-only safety-deliverable while its target
   and aliases stay quarantined. Verify productive-outcome and safety-delivery
   classifications and ambiguities remain separate with no terminal, rollback,
-  or barrier inference. Prove one bound delivery owner, all others `FENCE_ONLY`,
-  durable `DELIVERY_EFFECT_POSSIBLE` before emission,
-  transport-versus-native-boundary
-  separation, exact replay without re-emission, and no fallback on owner or
-  route failure.
+  or barrier inference. Prove activation-before-delivery binds the immutable
+  owner/gate/route/native/action/slot, classification schema/domain, and
+  `safetyDeliveryInitialState=UNDELIVERED` without a resulting delivery
+  classification. Prove one bound delivery owner, all others `FENCE_ONLY`,
+  durable `SafetyControlDeliveryReceipt` and `DELIVERY_EFFECT_POSSIBLE` before
+  emission, pre-emission terminal/no-effect/unsupported classification without
+  emission, later immutable outcome append, transport-versus-native-boundary
+  separation, response-loss exact replay without re-emission or rewrite,
+  changed-tuple rejection, and no fallback on owner or route failure.
 
 ## Required capability and owner gates retained
 
@@ -1902,11 +1928,13 @@ They remain `Proposed` while this baseline is a draft:
 ## Review disposition
 
 G02 reviewed the exact original draft and the exact round-1, round-2, round-3,
-round-4, round-5, round-6, round-7, round-8, round-9, and round-10 corrections;
-all eleven reviews returned `CHANGE_REQUIRED`. The round-9 receipt's safety-race
-ordering is corrected by its immutable erratum. This revision applies only those
-bounded
-findings, but the Implementer has not reviewed or approved its own corrections.
+round-4, round-5, round-6, round-7, round-8, round-9, round-10, and round-11
+corrections; all twelve final controlling dispositions are `CHANGE_REQUIRED`.
+Round 12 initially returned `PASS`, but its full reviewer explicitly superseded
+that result after focused finding and reassessment. The round-9 receipt's
+safety-race ordering is corrected by its immutable erratum. This revision
+applies only those bounded findings, but the Implementer has not reviewed or
+approved its own corrections.
 It has not received a fresh independent review and makes no claim that G02 or
 G03 has passed.
 

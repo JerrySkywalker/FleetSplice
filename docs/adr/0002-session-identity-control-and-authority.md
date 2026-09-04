@@ -183,19 +183,34 @@ lease or enterprise authorization system.
    Incomplete latches/cut/map, selected-ID mismatch, unlisted issue, extra
    consume, or selected-identity ambiguity blocks activation. Once complete
    immutable evidence establishes `NONE` or one exact selected identity,
-   activation binds `productiveBoundaryClassification` as `NONE` or
-   `SELECTED_EFFECT_POSSIBLE`, the current `productiveOutcomeState` when
-   present, and the independent `safetyDeliveryClassification`. An exact
-   selected productive outcome that is `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or
+   `SafetyControlActivation` binds the candidate, exact anchor acknowledgement,
+   complete local-latch set, applicable cut and consistency receipt, high-waters/
+   digests, and `productiveBoundaryClassification` as `NONE` or
+   `SELECTED_EFFECT_POSSIBLE` and the current `productiveOutcomeState` snapshot
+   when present. It also freezes `controlDeliveryParticipantId` with role
+   `DELIVERY_OWNER`, delivery gate, `transportRouteDigest`, native/process
+   identity, closed action, one-use `controlDeliverySlotId`, safety-delivery
+   classification schema/domain, and
+   `safetyDeliveryInitialState=UNDELIVERED`; it never binds or predicts a
+   resulting `safetyDeliveryClassification`. An exact selected productive
+   outcome that is `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or
    `AMBIGUOUS_EFFECT` remains eligible for the bound reduction-only activation
    and delivery; it is not identity ambiguity.
 
    Candidate and activation bind exactly one `DELIVERY_OWNER`, delivery
    gate/route/native identity/action and one-use slot; all others are
-   `FENCE_ONLY`. The owner journals `DELIVERY_EFFECT_POSSIBLE`, binding both
-   classification domains, before first emission. Relays cannot cross the final
-   native boundary, replay never re-emits, and owner/route failure or
-   safety-delivery ambiguity has no fallback. Latches and receipts survive
+   `FENCE_ONLY`. On emission attempt the owner CASes
+   `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and writes the immutable
+   `SafetyControlDeliveryReceipt` before first emission. Qualified pre-emission
+   `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or `UNSUPPORTED` evidence atomically
+   records its result in an immutable `SafetyControlDeliveryReceipt` under the
+   same slot without emission; a later qualified result or `AMBIGUOUS_EFFECT`
+   appends an immutable `SafetyControlOutcomeReceipt` under the same
+   slot/receipt lineage. Only those later receipts establish
+   `safetyDeliveryClassification`; activation and prior receipts never change.
+   Relays cannot cross the final native boundary, exact replay returns existing
+   state without re-emission, a changed tuple conflicts, and owner/route failure
+   or safety-delivery ambiguity has no fallback. Latches and receipts survive
    crash/replay/expiry and never reopen. Acceptance, anchor ack, local latches,
    cut, consistency, activation, transport, delivery boundary, productive
    outcome, and termination are distinct. Productive-outcome and safety-delivery
@@ -253,8 +268,10 @@ lease or enterprise authorization system.
   ambiguous productive outcome remaining safety-deliverable, identity ambiguity
   still blocking, separate productive/safety-delivery classifications with no
   outcome or barrier inference, selected terminal progress,
-  latch/cut/consistency crash/replay/expiry, unique delivery
-  owner/FENCE_ONLY roles, no fallback or replay emission, transport-versus-native
+  latch/cut/consistency crash/replay/expiry, activation-before-delivery with
+  `UNDELIVERED` and no predicted result, later one-slot delivery/outcome receipt,
+  response-loss exact replay/no rewrite/no emission and changed-tuple rejection,
+  unique delivery owner/FENCE_ONLY roles, no fallback, transport-versus-native
   boundary, completion-versus-stop, unsupported delivery, and ambiguity without
   treating delivery as terminality. Resource
   replacement, Hub-only and Edge-only restore, and same-generation runtime

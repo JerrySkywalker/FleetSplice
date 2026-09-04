@@ -321,19 +321,35 @@ storage needs.
    rollback, mismatch, or extra consume reject. Incomplete latches/cut/map,
    selected-ID mismatch, unlisted issue, extra consume, or selected-identity
    ambiguity blocks activation. Once complete immutable evidence establishes
-   `NONE` or one exact selected identity, activation binds
+   `NONE` or one exact selected identity, `SafetyControlActivation` binds the
+   candidate, exact anchor acknowledgement, complete local-latch set, applicable
+   cut and consistency receipt, high-waters/digests, and
    `productiveBoundaryClassification` as `NONE` or
-   `SELECTED_EFFECT_POSSIBLE`, the current `productiveOutcomeState` when present,
-   and the independent `safetyDeliveryClassification`. An exact selected
-   productive outcome that is `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or
+   `SELECTED_EFFECT_POSSIBLE` and the current `productiveOutcomeState` snapshot
+   when present. It also freezes `controlDeliveryParticipantId` with role
+   `DELIVERY_OWNER`, delivery gate, `transportRouteDigest`, native/process
+   identity, closed action, one-use `controlDeliverySlotId`, safety-delivery
+   classification schema/domain, and
+   `safetyDeliveryInitialState=UNDELIVERED`; it never binds or predicts a
+   resulting `safetyDeliveryClassification`. An exact selected productive
+   outcome that is `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or
    `AMBIGUOUS_EFFECT` remains eligible for the bound reduction-only activation
    and delivery; this outcome uncertainty is not identity ambiguity.
 
    Candidate/activation bind one `DELIVERY_OWNER`, exact gate/route/native
-   identity/action and one-use slot; all others are `FENCE_ONLY`. The owner CASes
-   `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE`, binding both classification
-   domains, before emission. Relays do not cross the final boundary, replay never
-   re-emits, and owner/route failure or safety-delivery ambiguity has no fallback.
+   identity/action and one-use slot; all others are `FENCE_ONLY`. On emission
+   attempt the owner CASes `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and writes
+   the immutable `SafetyControlDeliveryReceipt` before emission. Qualified
+   pre-emission `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or `UNSUPPORTED`
+   evidence atomically records its result in an immutable
+   `SafetyControlDeliveryReceipt` under the same slot without emission; a
+   qualified later result or `AMBIGUOUS_EFFECT` appends an immutable
+   `SafetyControlOutcomeReceipt` under the same slot/receipt lineage. Only those
+   later receipts establish
+   `safetyDeliveryClassification`; activation and earlier receipts never change.
+   Relays do not cross the final boundary, exact replay returns existing state
+   without re-emission, a changed tuple conflicts, and owner/route failure or
+   safety-delivery ambiguity has no fallback.
    Every receipt/latch survives crash/replay/expiry. Acceptance, anchor ack,
    latches, cut, consistency, activation, transport, final delivery, productive
    outcome, and termination are distinct.
@@ -458,11 +474,12 @@ storage needs.
   issue, issued-no-effect, selected-slot terminal progress, gaps, forks,
   rollback, mismatches, and extra consumes; incomplete/identity-ambiguous maps
   blocking while an exact selected pending/effect-possible/ambiguous productive
-  outcome remains safety-deliverable; separately bound productive-outcome and
-  safety-delivery classifications and ambiguity with no outcome/barrier
-  inference; activation binding every immutable receipt; and exactly one
-  delivery owner journaling
-  `DELIVERY_EFFECT_POSSIBLE` before native emission. Crash, response loss,
+  outcome remains safety-deliverable; activation-bound productive classification/
+  outcome kept separate from later receipt-bound safety-delivery classification/
+  ambiguity with no outcome/barrier inference; activation binding initial
+  `UNDELIVERED` without predicting the delivery result; later one-slot delivery/
+  outcome receipts; and exactly one delivery owner journaling
+  `DELIVERY_EFFECT_POSSIBLE` before native emission. Crash, response-loss exact
   replay, expiry, owner/route failure, unsupported delivery, attempted fallback,
   relay-versus-final-boundary confusion, and any second emission must fail
   closed without rewriting a receipt or reopening a latch.

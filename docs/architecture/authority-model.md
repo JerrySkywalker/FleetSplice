@@ -105,22 +105,38 @@ the Edge records a distinct immutable gap-free reservation-to-cut consistency
 receipt. Incomplete latches/cut/map, a gap/fork/rollback, selected-ID mismatch,
 unlisted issue, extra consume, or selected-identity ambiguity blocks activation.
 Once those immutable receipts establish `NONE` or one exact selected identity,
-activation binds `productiveBoundaryClassification` as `NONE` or
-`SELECTED_EFFECT_POSSIBLE`, the current `productiveOutcomeState` when present,
-and the independent `safetyDeliveryClassification`. It may deliver
-reduction-only control while an exact selected productive outcome is `PENDING`,
-`CONSUMED_EFFECT_POSSIBLE`, or `AMBIGUOUS_EFFECT`. Anchor acknowledgement is not
-a local fence, and companion cut precedence never delays the Edge latch.
+`SafetyControlActivation` binds the candidate, exact anchor acknowledgement,
+complete local-latch set, applicable cut and consistency receipt, high-waters/
+digests, and `productiveBoundaryClassification` as `NONE` or
+`SELECTED_EFFECT_POSSIBLE` and the current `productiveOutcomeState` snapshot when
+present. It also freezes `controlDeliveryParticipantId` with role
+`DELIVERY_OWNER`, the delivery gate, `transportRouteDigest`, native/process
+identity, closed action, one-use `controlDeliverySlotId`, the safety-delivery
+classification schema/domain, and
+`safetyDeliveryInitialState=UNDELIVERED`; it never binds or predicts a resulting
+`safetyDeliveryClassification`. It may deliver reduction-only control while an
+exact selected productive outcome is `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or
+`AMBIGUOUS_EFFECT`. Anchor acknowledgement is not a local fence, and companion
+cut precedence never delays the Edge latch.
 
 Exactly one candidate-bound participant is `DELIVERY_OWNER`; all others are
-`FENCE_ONLY`. The owner journals `DELIVERY_EFFECT_POSSIBLE` in a one-use slot
-before native emission. Relays cannot cross the final boundary, exact replay
-never re-emits, and owner/route failure or safety-delivery ambiguity has no
-fallback. Productive-outcome and safety-delivery ambiguity remain distinct;
-delivery resolves neither, proves no outcome/termination/rollback/barrier, and
-the productive target and aliases stay quarantined until independent
-reconciliation. Latches and receipts survive crash/replay and do not expire; a
-safety stop-revision advance invalidates admin renewal.
+`FENCE_ONLY`. On an emission attempt the owner CASes
+`UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and durably writes the later
+`SafetyControlDeliveryReceipt` before native emission. Qualified pre-emission
+`ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or `UNSUPPORTED` evidence atomically
+records its classification in an immutable `SafetyControlDeliveryReceipt`
+under the same one-use slot without emission; a qualified later result or
+`AMBIGUOUS_EFFECT` appends an immutable `SafetyControlOutcomeReceipt` in that
+same slot/receipt lineage. Only those later receipts establish the resulting
+`safetyDeliveryClassification`; activation and earlier receipts never change.
+Relays cannot cross the final boundary, exact replay returns the existing state
+without re-emission, a changed tuple conflicts, and owner/route failure or
+safety-delivery ambiguity has no fallback. Productive-outcome and
+safety-delivery ambiguity remain distinct; delivery resolves neither, proves no
+outcome/termination/rollback/barrier, and the productive target and aliases stay
+quarantined until independent reconciliation. Latches and receipts survive
+crash/replay and do not expire; a safety stop-revision advance invalidates admin
+renewal.
 
 ## Inference authority
 

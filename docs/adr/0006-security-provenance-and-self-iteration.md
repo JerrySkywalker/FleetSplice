@@ -52,10 +52,13 @@ activation decision were mutable from inside that work.
    resulting sequence/digest. Successor genesis is the deterministic canonical
    combination of that core and exact authenticated old receipt/link; its
    digest follows from those inputs, and no descendant is admitted before the
-   genesis is durable. Participants verify the whole link and repin. Changed or
-   noncanonical core/registry/receipt/ID, a missing link, a reused transition,
-   or any second genesis rejects. Crash, loss, and ambiguity at every boundary
-   permit exact-ID lookup/retry only, never an alternate successor. Unprovable
+   genesis is durable. Participants verify the whole link and repin. Reuse of a
+   transition identity with a changed or noncanonical core, registry, link,
+   receipt, or other bound field, a missing link, or any second genesis rejects.
+   Byte-identical replay under the same exact transition identity returns the
+   existing receipt without another append or alternate genesis. Crash, loss,
+   and ambiguity at every boundary permit only that exact-ID lookup/retry, never
+   an alternate successor. Unprovable
    lineage creates a fresh incomparable
    Fleet/deployment/anchor and resource/credential namespace, effect-inactive,
    with qualified Path-1 predecessor termination/exclusive-control
@@ -105,6 +108,7 @@ activation decision were mutable from inside that work.
   denial, participant pins, rollback/fork/clone/loss, lifecycle-writer
   exclusivity, competing successor cores/registries/IDs, atomic old terminal
   append and closure, deterministic genesis and participant repinning,
+  byte-identical exact replay versus changed-core/link/receipt reuse,
   crash/loss/replay before and after every rollover boundary with no alternate,
   and incomparable reset. Security/update review evidence remains non-authority.
 

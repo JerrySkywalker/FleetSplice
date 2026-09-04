@@ -59,14 +59,18 @@ lease or enterprise authorization system.
    fail-closed reduction remains. Planned rollover is owner-attended and only
    the preexisting external lifecycle writer may authorize it. The immutable
    old candidate precommits stable rollover/genesis IDs and one complete
-   canonical successor-genesis core with old/successor tuples, same Fleet/fresh
-   anchor/monotonic epoch, canonical/digest rules, successor root and receipt
-   verification material, complete closed writer registry/scopes, lifecycle
-   authorization, custody/mechanism/pin/policy digests, predecessor closure, and
-   every random ID/configuration field. The core excludes only the future old
+   canonical successor-genesis core. It binds the full old lineage tuple and
+   exact expected predecessor plus every successor tuple input, explicitly
+   excluding the derived successor
+   `genesisDigest`: the same `fleetId`, fresh `anchorId`, successor
+   `trustRootDigest`, monotonic `epoch`, canonical/digest rules,
+   receipt-verification material, complete closed writer registry/scopes,
+   lifecycle authorization, custody/mechanism/pin/policy digests, predecessor
+   closure, and every random ID/configuration field. The core excludes only the
+   future old
    terminal receipt. One CAS atomically appends `ROLLOVER_TERMINAL` and closes
-   old append; successor genesis is deterministic from core plus its exact old
-   receipt/link.
+   old append; the successor `genesisDigest` is derived exactly once from the
+   canonical core plus its exact authenticated old receipt/link.
    Changed variants/second genesis reject, participants verify/repin, and crash
    recovery uses only exact-ID retry. No successor root, Hub, or ordinary writer
    may authorize it. Unprovable lineage creates a fresh
@@ -176,18 +180,29 @@ lease or enterprise authorization system.
    consistency mapping: plain `NONE`, issued/no-consume as `ISSUED_NO_EFFECT`, or
    the exact selected compatible reservation, with any extra issue in the
    no-consume set. Gaps, forks, rollback, mismatch, or extra consume reject.
-   Activation binds all latches, cut, consistency, classifications/high-waters/
-   digests; pending/ambiguous stays latched with no delivery or barrier proof.
+   Incomplete latches/cut/map, selected-ID mismatch, unlisted issue, extra
+   consume, or selected-identity ambiguity blocks activation. Once complete
+   immutable evidence establishes `NONE` or one exact selected identity,
+   activation binds `productiveBoundaryClassification` as `NONE` or
+   `SELECTED_EFFECT_POSSIBLE`, the current `productiveOutcomeState` when
+   present, and the independent `safetyDeliveryClassification`. An exact
+   selected productive outcome that is `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or
+   `AMBIGUOUS_EFFECT` remains eligible for the bound reduction-only activation
+   and delivery; it is not identity ambiguity.
 
    Candidate and activation bind exactly one `DELIVERY_OWNER`, delivery
    gate/route/native identity/action and one-use slot; all others are
-   `FENCE_ONLY`. The owner journals `DELIVERY_EFFECT_POSSIBLE` before first
-   emission. Relays cannot cross the final native boundary, replay never
-   re-emits, and owner/route failure has no fallback. Latches and receipts
-   survive crash/replay/expiry and never reopen. Acceptance, anchor ack, local
-   latches, cut, consistency, activation, transport, delivery boundary, and
-   termination are distinct. Stop advance invalidates admin renewal and cannot
-   enter its delta. Safety grants no productive authority or barrier proof.
+   `FENCE_ONLY`. The owner journals `DELIVERY_EFFECT_POSSIBLE`, binding both
+   classification domains, before first emission. Relays cannot cross the final
+   native boundary, replay never re-emits, and owner/route failure or
+   safety-delivery ambiguity has no fallback. Latches and receipts survive
+   crash/replay/expiry and never reopen. Acceptance, anchor ack, local latches,
+   cut, consistency, activation, transport, delivery boundary, productive
+   outcome, and termination are distinct. Productive-outcome and safety-delivery
+   ambiguity remain separate; neither resolves the other. The target and aliases
+   stay quarantined until independent reconciliation. Stop advance invalidates
+   admin renewal and cannot enter its delta. Safety grants no productive
+   authority and proves no productive outcome, termination, rollback, or barrier.
 9. One immutable, allow-only `AuthorityGrant` revision is evaluated per
    FleetCommand. The grant binds the exact Hub recovery generation that issued
    it. Explicit lineage entries, command families, provider/model, approval,
@@ -229,11 +244,16 @@ lease or enterprise authorization system.
   crash/ambiguity at every authority-transition anchor boundary, pending-state
   non-use, revocation quiescence, exact-idempotency retry, scoped writers,
   pinned ancestry, rollback/fork/clone/loss, lifecycle-writer-only rollover,
-  competing genesis cores/registries, atomic old closure, deterministic genesis,
-  repin crash/replay, and incomparable fresh-namespace reset. Safety-control
-  tests cover immediate independent latches, `r1`/`r2`/fence non-barging,
-  companion cut and every Edge consistency classification/rejection, selected
-  terminal progress, latch/cut/consistency crash/replay/expiry, unique delivery
+  a self-reference scan across successor-core summaries, competing genesis
+  cores/registries, atomic old closure, deterministic genesis, byte-identical
+  exact replay versus changed-core/link reuse, repin crash/replay, and
+  incomparable fresh-namespace reset. Safety-control tests cover immediate
+  independent latches, `r1`/`r2`/fence non-barging, companion cut and every Edge
+  consistency classification/rejection, exact selected pending/effect-possible/
+  ambiguous productive outcome remaining safety-deliverable, identity ambiguity
+  still blocking, separate productive/safety-delivery classifications with no
+  outcome or barrier inference, selected terminal progress,
+  latch/cut/consistency crash/replay/expiry, unique delivery
   owner/FENCE_ONLY roles, no fallback or replay emission, transport-versus-native
   boundary, completion-versus-stop, unsupported delivery, and ambiguity without
   treating delivery as terminality. Resource

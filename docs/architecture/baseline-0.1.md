@@ -3,7 +3,7 @@
 ## Status and authority
 
 - Baseline: `0.1`
-- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_10_CHANGE_REQUIRED`
+- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_11_CHANGE_REQUIRED`
 - Drafting Goal: `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001` (`G01`)
 - Initial reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
 - Round-2 reviewed draft: `b82df67d5a045d31b04b0efb3fb5c0a2cb9de571`
@@ -15,14 +15,15 @@
 - Round-8 reviewed draft: `35c4c1a815930642c723bf0916a531b73c18e6d2`
 - Round-9 reviewed draft: `690f822d6da054a6f65080cd74c90e61526e484e`
 - Round-10 reviewed draft: `0669ca707143cde2266c502971d5936622d5e64e`
-- Evidence cut: 2026-09-05 round-10 review and bounded correction
+- Round-11 reviewed draft: `1a646e76fcf092ac5a02521cfd276aee297032f0`
+- Evidence cut: 2026-09-05 round-11 review and bounded correction
 - `ARCHITECTURE_0_1_READY=false`
 - `IMPLEMENTATION_AUTHORIZED=false`
 - `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`
 
 This is a formal architecture draft, not an accepted baseline and not product
 implementation authority. Independent G02 reviews of the original draft and
-its first nine corrections returned
+its first ten corrections returned
 [`CHANGE_REQUIRED`](../train/receipts/G02.md),
 [round-2 `CHANGE_REQUIRED`](../train/receipts/G02-r2.md),
 [round-3 `CHANGE_REQUIRED`](../train/receipts/G02-r3.md),
@@ -33,7 +34,8 @@ its first nine corrections returned
 [round-8 `CHANGE_REQUIRED`](../train/receipts/G02-r8.md), and
 [round-9 `CHANGE_REQUIRED`](../train/receipts/G02-r9.md), with its
 [ordering erratum](../train/receipts/G02-r9-erratum.md), and
-[round-10 `CHANGE_REQUIRED`](../train/receipts/G02-r10.md), respectively. This
+[round-10 `CHANGE_REQUIRED`](../train/receipts/G02-r10.md), and
+[round-11 `CHANGE_REQUIRED`](../train/receipts/G02-r11.md), respectively. This
 revision contains only their bounded corrections and has not received a fresh
 independent PASS. It does not supersede [Baseline 0.0](baseline-0.0.md) until a
 fresh review and the owner-controlled G03 acceptance gate both pass. Only G03
@@ -1042,18 +1044,32 @@ Safety control uses this ordering:
 5. An authenticated `SafetyControlActivation` binds the candidate, anchor
    acknowledgement, complete ordered local-latch receipts, authoritative admin
    boundary cut and Edge consistency receipt when applicable, all exact
-   high-waters/digests, and the reconciled boundary classification. A pending or
-   ambiguous selected boundary stays latched and permits neither control delivery
-   nor barrier/termination proof until qualified reconciliation.
+   high-waters/digests, and the reconciled boundary classification. Admission
+   distinguishes cut/map/selected-identity integrity from the selected
+   productive boundary's outcome. Any incomplete local latch, cut, or map;
+   sequence gap, fork, or rollback; selected-ID mismatch; unlisted issue; extra
+   consume; or ambiguity about which productive boundary was selected blocks
+   activation and delivery. Once the complete immutable evidence establishes
+   `NONE` or one exact selected identity, activation separately binds
+   `productiveBoundaryClassification` as `NONE` or
+   `SELECTED_EFFECT_POSSIBLE`, the selected boundary's current
+   `productiveOutcomeState` when present, and the SafetyControl's independent
+   `safetyDeliveryClassification`. An exact selected productive boundary may
+   remain `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or `AMBIGUOUS_EFFECT` without
+   blocking the bound reduction-only activation or delivery; none of those
+   states proves a productive outcome, target termination, rollback, or barrier
+   completion.
 6. Only the bound `DELIVERY_OWNER` may approach the final native control
    boundary. At the exact delivery gate it atomically changes its one-use slot
    `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and journals a receipt binding all
-   activation, cut/consistency, route, action, and native/process evidence before
-   first native emission. Exact replay returns that receipt and never re-emits.
-   Owner crash, response loss, ambiguity, outage, disqualification, or route
-   failure has no fallback owner and keeps the target quarantined until
-   reconciliation. Transport acceptance or relay handoff and the final native
-   effect boundary are distinct receipts; only this owner can cross the latter.
+   activation, cut/consistency, both separately named classification domains,
+   route, action, and native/process evidence before first native emission.
+   Exact replay returns that receipt and never re-emits.
+   Owner crash, response loss, safety-delivery ambiguity, outage,
+   disqualification, or route failure has no fallback owner and keeps the target
+   quarantined until reconciliation. Transport acceptance or relay handoff and
+   the final native effect boundary are distinct receipts; only this owner can
+   cross the latter.
 
 The `SafetyControl` reservation namespace is disjoint from every productive
 admin reservation namespace and is excluded from productive reservation drain.
@@ -1072,12 +1088,14 @@ removes a latch or reopens a boundary.
 
 Hub acceptance, anchor acknowledgement, each participant-local safety
 registration, companion boundary cut, Edge consistency, safety activation,
-transport handoff, final native delivery boundary, and target termination are
-distinct facts. Safety never waits before local latching, grants productive
-authority, satisfies `X_C` or `X_E`, proves termination, completes a barrier, or
-authorizes transfer. Its `stopRevision` advance invalidates a prepared admin
-renewal; no latch, cut, consistency, `STOP_PENDING`, or delivery transition is
-eligible for the admin-specialized high-water delta.
+transport handoff, final native delivery boundary, productive-boundary outcome,
+and target termination are distinct facts. Safety never waits before local
+latching or for productive drain once the selected identity and map are exact.
+It grants no productive authority, satisfies neither `X_C` nor `X_E`, proves no
+productive outcome or termination, completes no barrier, and authorizes no
+transfer. Its `stopRevision` advance invalidates a prepared admin renewal; no
+latch, cut, consistency, `STOP_PENDING`, or delivery transition is eligible for
+the admin-specialized high-water delta.
 
 `SafetyControl` cannot retarget, start, resume, retry new work, steer, approve,
 write, migrate, renew a permit, change binding/scope/lease/controller, or carry
@@ -1085,18 +1103,22 @@ arbitrary shell, path, method, or provider arguments. A replacement runtime may
 not acquire the target merely to deliver control; it must already be the named,
 qualified supervisor of that exact target and creation identity. Target
 completion versus stop is linearized in the supervising local journal. Receipts
-distinguish `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`,
-`DELIVERY_EFFECT_POSSIBLE`,
-`UNSUPPORTED`, and `AMBIGUOUS_EFFECT`; delivery is never proof of terminality,
-rollback, predecessor termination, or barrier completion.
+carry independent `productiveBoundaryClassification` and
+`safetyDeliveryClassification` fields: productive pending, effect-possible, or
+ambiguous state is never reclassified by a safety attempt, while the safety
+delivery domain distinguishes `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`,
+`DELIVERY_EFFECT_POSSIBLE`, `UNSUPPORTED`, and `AMBIGUOUS_EFFECT`. Delivery is
+never proof of productive outcome, terminality, rollback, predecessor
+termination, or barrier completion.
 
 Exact replay returns the existing local-latch, cut, consistency, delivery, or
 outcome receipt as applicable and never re-emits the native control. Changed
-identity, owner, route, slot, or action is a no-effect conflict. Response or
-crash ambiguity keeps the
-target and every alias in the unresolved transitive predecessor set and
-quarantines conflicting successors until reconciled. Only a qualified terminal
-outcome plus complete final journal/native/effect-boundary reconciliation may
+identity, owner, route, slot, or action is a no-effect conflict. Safety-delivery
+ambiguity and selected productive-outcome ambiguity are recorded separately;
+neither resolves the other. The productive target and every alias remain in the
+unresolved transitive predecessor set and quarantine conflicting successors
+until independently reconciled. Only a qualified terminal outcome plus complete
+final journal/native/effect-boundary reconciliation may
 feed Path 1 of the ordinary barrier; candidate, delivery, activation, or fence
 receipt alone never does. Timer, connectivity, or authority uncertainty still
 causes separate local fail-closed quiescence; that local response grants no
@@ -1775,10 +1797,14 @@ implementation/capability gates, not current PASS claims:
   clone or standby; complete outage; durable loss; and attempted Hub, Edge,
   database, or backup substitution. Every case must block new activation while
   admitting only the explicitly bounded old-work drain and reduction paths.
-- **Anchor lifecycle:** external lifecycle-writer admission; two changed genesis
-  cores/registries/IDs competing for one predecessor; crash before terminal
-  append, after atomic append/closure before response, during deterministic
-  successor-genesis commit, and before participant repin; exact-ID replay;
+- **Anchor lifecycle:** external lifecycle-writer admission; static scan proving
+  no successor-genesis core recursively contains its derived `genesisDigest`;
+  two changed genesis cores/registries/IDs competing for one predecessor; crash
+  before terminal append, after atomic append/closure before response, during
+  deterministic successor-genesis commit, and before participant repin;
+  byte-identical exact-ID
+  replay returning the existing receipt without append; changed-core/link/
+  receipt reuse rejection;
   terminal old-epoch append rejection; missing/mismatched old link; descendant
   before durable genesis; attempted dual-root use; and catastrophic
   unprovable-lineage reset to a fresh
@@ -1801,8 +1827,15 @@ implementation/capability gates, not current PASS claims:
   slot with later terminal progress; extra issued no-consume slots; gap, fork,
   mismatch, rollback, and extra consume; proven-disjoint chains; latch/cut/
   consistency crash and exact replay; expiry; and acknowledgement without a
-  local latch. Prove one bound delivery owner, all others `FENCE_ONLY`, durable
-  `DELIVERY_EFFECT_POSSIBLE` before emission, transport-versus-native-boundary
+  local latch. Prove incomplete latch/cut/map, selected-ID ambiguity, gaps,
+  forks, rollback, unlisted issue, and extra consume block activation; prove an
+  exact selected `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or `AMBIGUOUS_EFFECT`
+  productive boundary remains reduction-only safety-deliverable while its target
+  and aliases stay quarantined. Verify productive-outcome and safety-delivery
+  classifications and ambiguities remain separate with no terminal, rollback,
+  or barrier inference. Prove one bound delivery owner, all others `FENCE_ONLY`,
+  durable `DELIVERY_EFFECT_POSSIBLE` before emission,
+  transport-versus-native-boundary
   separation, exact replay without re-emission, and no fallback on owner or
   route failure.
 
@@ -1869,9 +1902,10 @@ They remain `Proposed` while this baseline is a draft:
 ## Review disposition
 
 G02 reviewed the exact original draft and the exact round-1, round-2, round-3,
-round-4, round-5, round-6, round-7, round-8, and round-9 corrections; all ten
-reviews returned `CHANGE_REQUIRED`. The round-9 receipt's safety-race ordering
-is corrected by its immutable erratum. This revision applies only those bounded
+round-4, round-5, round-6, round-7, round-8, round-9, and round-10 corrections;
+all eleven reviews returned `CHANGE_REQUIRED`. The round-9 receipt's safety-race
+ordering is corrected by its immutable erratum. This revision applies only those
+bounded
 findings, but the Implementer has not reviewed or approved its own corrections.
 It has not received a fresh independent review and makes no claim that G02 or
 G03 has passed.

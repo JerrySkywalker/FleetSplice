@@ -163,16 +163,18 @@ storage needs.
 
    Planned rollover is owner-attended and only the preexisting external
    lifecycle writer may authorize it. The old candidate precommits stable
-   rollover/genesis IDs and one complete immutable successor-genesis core:
-   canonical/digest rules, old/successor tuples, same Fleet/fresh anchor/
-   monotonic epoch, successor root and verification material, full closed writer
-   registry with credential generations/scope revisions/kinds/resource/effect
-   scopes, lifecycle authorization, custody/mechanism/pin/policy digests,
-   predecessor closure, and all random IDs/configuration. The core excludes only
-   the future old terminal receipt. One CAS atomically appends
-   `ROLLOVER_TERMINAL` and closes old append to lookup/export. Successor genesis
-   is deterministic from the core plus its exact old receipt/link; changed
-   variant or second genesis rejects.
+   rollover/genesis IDs and one complete immutable successor-genesis core. It
+   binds canonical/digest rules, the full old lineage tuple and exact expected
+   predecessor, plus every successor tuple input, explicitly excluding the
+   derived successor `genesisDigest`: the same `fleetId`, fresh `anchorId`,
+   successor `trustRootDigest`, monotonic `epoch`, receipt-verification material, full
+   closed writer registry with credential generations/scope revisions/kinds/
+   resource/effect scopes, lifecycle authorization, custody/mechanism/pin/policy
+   digests, predecessor closure, and all random IDs/configuration. The core
+   excludes only the future old terminal receipt. One CAS atomically appends
+   `ROLLOVER_TERMINAL` and closes old append to lookup/export. The successor
+   `genesisDigest` is derived exactly once from the canonical core plus its exact
+   authenticated old receipt/link; changed variant or second genesis rejects.
    Participants verify and repin, and crashes use only exact-ID retry. No
    successor root, Hub/Edge, or ordinary writer may authorize it. Unprovable
    lineage creates a fresh
@@ -316,29 +318,41 @@ storage needs.
    latch, Edge emits a separate immutable gap-free non-forked consistency map:
    plain `NONE`, issued/no-consume as `ISSUED_NO_EFFECT`, or exact selected Edge
    reservation, with extra issue allowed only in the no-consume set. Gaps, forks,
-   rollback, mismatch, or extra consume reject. Activation binds every latch,
-   cut, consistency classification, high-water, and digest; pending/ambiguous
-   stays latched without delivery or barrier proof.
+   rollback, mismatch, or extra consume reject. Incomplete latches/cut/map,
+   selected-ID mismatch, unlisted issue, extra consume, or selected-identity
+   ambiguity blocks activation. Once complete immutable evidence establishes
+   `NONE` or one exact selected identity, activation binds
+   `productiveBoundaryClassification` as `NONE` or
+   `SELECTED_EFFECT_POSSIBLE`, the current `productiveOutcomeState` when present,
+   and the independent `safetyDeliveryClassification`. An exact selected
+   productive outcome that is `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or
+   `AMBIGUOUS_EFFECT` remains eligible for the bound reduction-only activation
+   and delivery; this outcome uncertainty is not identity ambiguity.
 
    Candidate/activation bind one `DELIVERY_OWNER`, exact gate/route/native
    identity/action and one-use slot; all others are `FENCE_ONLY`. The owner CASes
-   `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` before emission. Relays do not cross
-   the final boundary, replay never re-emits, and owner/route failure has no
-   fallback. Every receipt/latch survives crash/replay/expiry. Acceptance,
-   anchor ack, latches, cut, consistency, activation, transport, final delivery,
-   and termination are distinct.
+   `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE`, binding both classification
+   domains, before emission. Relays do not cross the final boundary, replay never
+   re-emits, and owner/route failure or safety-delivery ambiguity has no fallback.
+   Every receipt/latch survives crash/replay/expiry. Acceptance, anchor ack,
+   latches, cut, consistency, activation, transport, final delivery, productive
+   outcome, and termination are distinct.
 
    The safety namespace is excluded from productive reservation drain. Both
    productive gates check chain eligibility, no `STOP_PENDING`, and at most one
    unresolved. A boundary already linearized at observation may finish; safety
    is next and rejects all later conflicts. Proven-disjoint chains may continue.
-   Safety never waits for productive drain, grants productive authority,
-   satisfies `X`, proves termination, or completes a barrier. Its stop-revision
+   Safety never waits for productive drain after selected identity/map integrity
+   is established, grants productive authority, satisfies `X`, proves a
+   productive outcome or termination, or completes a barrier. Its stop-revision
    change invalidates admin renewal and cannot enter the renewal delta.
    It cannot retarget, start/resume/retry, steer, approve, write, migrate, renew,
-   or alter scope/binding/lease/controller. Delivery is not terminality,
-   rollback, or barrier completion; ambiguity retains target/aliases and blocks
-   successors until qualified outcome plus final-boundary reconciliation.
+   or alter scope/binding/lease/controller. Productive-outcome and
+   safety-delivery classifications and ambiguities remain separate. Delivery
+   proves neither productive outcome nor terminality, rollback, or barrier
+   completion; the productive target/aliases remain quarantined and block
+   successors until independent qualified outcome plus final-boundary
+   reconciliation.
 7. At receipt, Edge persists the effective expiry as the tighter of the absolute
    Hub deadline adjusted for declared uncertainty and a local monotonic deadline
    derived from authenticated remaining budget, bound to the exact Edge
@@ -417,9 +431,11 @@ storage needs.
 - AuthorityAnchor gates include pre/post-CAS crash, lost acknowledgement and
   exact-ID lookup, competing predecessor, writer-scope denial, participant pin
   restart, outage/loss, rollback/fork/clone/standby rejection, lifecycle-writer
-  exclusivity, competing successor cores/registries/IDs, atomic terminal append
-  plus old-lineage closure, deterministic successor genesis and participant
-  repinning, crash/loss at every rollover boundary with no alternate genesis,
+  exclusivity, self-reference scans over successor-core summaries, competing
+  successor cores/registries/IDs, atomic terminal append plus old-lineage
+  closure, deterministic successor genesis, exact replay versus changed-core/
+  link reuse, participant repinning, and crash/loss at every rollover boundary
+  with no alternate genesis,
   and incomparable fresh-namespace reset with qualified Path-1 predecessor
   proof. The concrete single-active storage/custody choice is G04 work; none of
   these cases is a current PASS.
@@ -440,8 +456,12 @@ storage needs.
   non-barging across `r1`/`r2`/fence orders; companion authoritative `NONE` or
   one-slot cut and permanent no-consume set; Edge gap-free consistency for no
   issue, issued-no-effect, selected-slot terminal progress, gaps, forks,
-  rollback, mismatches, and extra consumes; activation binding every immutable
-  receipt; and exactly one delivery owner journaling
+  rollback, mismatches, and extra consumes; incomplete/identity-ambiguous maps
+  blocking while an exact selected pending/effect-possible/ambiguous productive
+  outcome remains safety-deliverable; separately bound productive-outcome and
+  safety-delivery classifications and ambiguity with no outcome/barrier
+  inference; activation binding every immutable receipt; and exactly one
+  delivery owner journaling
   `DELIVERY_EFFECT_POSSIBLE` before native emission. Crash, response loss,
   replay, expiry, owner/route failure, unsupported delivery, attempted fallback,
   relay-versus-final-boundary confusion, and any second emission must fail

@@ -87,9 +87,12 @@ command boundary independently of any UI or transport.
    Planned rollover is owner-attended and only the preexisting external
    lifecycle writer may authorize it; no successor root/Hub/Edge or ordinary
    writer may do so. Its immutable old-lineage candidate precommits stable
-   rollover/genesis IDs and one complete canonical successor-genesis core:
-   canonical/digest rules, full old and successor tuples, same Fleet/fresh anchor/
-   monotonic epoch, successor trust and receipt-verification material, full
+   rollover/genesis IDs and one complete canonical successor-genesis core. The
+   core binds canonical/digest rules, the full old lineage tuple and exact
+   expected predecessor, plus every successor tuple input, explicitly excluding
+   the derived successor `genesisDigest`: the same `fleetId`, fresh `anchorId`,
+   successor
+   `trustRootDigest`, monotonic `epoch`, receipt-verification material, full
    closed writer registry with credential generations/scope revisions/kinds/
    resource/effect scopes, lifecycle authorization, custody/mechanism/pin/policy
    digests, predecessor closure, and every random ID/configuration field. The
@@ -97,11 +100,11 @@ command boundary independently of any UI or transport.
 
    One exact-predecessor CAS atomically appends `ROLLOVER_TERMINAL` and closes old
    append to lookup/export only. The old terminal link binds all IDs/core and the
-   exact resulting sequence/digest. Successor genesis and its digest are
-   deterministic from that core plus the exact authenticated old receipt/link;
-   no descendant precedes durable genesis. Participants verify all fields and
-   repin. Changed core/registry/receipt/ID, second genesis, missing link, or
-   non-canonical encoding rejects. Crash/loss at every append, close, genesis,
+   exact resulting sequence/digest. The successor `genesisDigest` is derived exactly
+   once from the canonical core plus the exact authenticated old
+   receipt/link. No descendant precedes durable genesis. Participants verify all
+   fields and repin. Changed core/registry/receipt/ID, second genesis, missing
+   link, or non-canonical encoding rejects. Crash/loss at every append, close, genesis,
    and repin boundary uses only exact-ID lookup/retry, never an alternate.
 
    Unprovable lineage instead creates a fresh
@@ -436,14 +439,24 @@ command boundary independently of any UI or transport.
     exact Edge reservation even if later terminal; and every extra issued slot
     is in the permanent no-consume set. Gaps, forks, rollback, mismatch, or extra
     consume reject. Authenticated activation binds all local latches, cut,
-    consistency, classifications, high-waters, and digests. Pending/ambiguous
-    selection stays latched with no delivery or barrier proof.
+    consistency, classifications, high-waters, and digests. An incomplete
+    latch/cut/map, gap, fork, rollback, selected-ID mismatch, unlisted issue,
+    extra consume, or ambiguity about the selected identity blocks activation.
+    Once that immutable evidence establishes `NONE` or one exact selected
+    identity, activation binds `productiveBoundaryClassification` as `NONE` or
+    `SELECTED_EFFECT_POSSIBLE`, the current `productiveOutcomeState` when
+    present, and the independent `safetyDeliveryClassification`. An exact
+    selected productive outcome may remain `PENDING`,
+    `CONSUMED_EFFECT_POSSIBLE`, or `AMBIGUOUS_EFFECT` while the bound
+    reduction-only control activates and delivers; this is outcome uncertainty,
+    not selected-identity uncertainty.
 
     Only `DELIVERY_OWNER` may cross the final native boundary. It journal-CASes
     `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE`, binding activation, route, action,
-    native/process identity, and slot before first emission. Relays never cross
-    that boundary; exact replay returns the receipt without re-emission, and
-    owner/route failure, ambiguity, or disqualification has no fallback owner.
+    native/process identity, both classification domains, and slot before first
+    emission. Relays never cross that boundary; exact replay returns the receipt
+    without re-emission, and owner/route failure, safety-delivery ambiguity, or
+    disqualification has no fallback owner.
 
     The safety namespace is excluded from productive admin reservation drain.
     Both productive issue and consume gates check chain eligibility, no
@@ -455,19 +468,24 @@ command boundary independently of any UI or transport.
     acceptance, anchor acknowledgement, each local latch, boundary cut, Edge
     consistency, activation, transport, final native boundary, and termination
     remain distinct.
-    Safety never waits for productive drain, grants productive authority,
-    satisfies renewal `X`, proves termination, or completes a barrier. Its
-    changed `stopRevision` invalidates renewal and is never an admin delta record.
+    Safety never waits for productive drain once identity/map integrity is
+    established, grants productive authority, satisfies renewal `X`, proves a
+    productive outcome or termination, or completes a barrier. Its changed
+    `stopRevision` invalidates renewal and is never an admin delta record.
 
     It cannot retarget, start/resume/retry work, steer, approve, write, migrate,
     renew, change binding/scope/lease/controller, or carry arbitrary arguments.
     A replacement runtime cannot acquire the target unless it was already the
     exact qualified supervisor. Completion versus stop is locally linearized,
-    with `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, `DELIVERY_EFFECT_POSSIBLE`,
-    `UNSUPPORTED`, and `AMBIGUOUS_EFFECT` distinguished. Delivery is not
+    with separate productive-boundary and safety-delivery classifications. The
+    safety domain distinguishes `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`,
+    `DELIVERY_EFFECT_POSSIBLE`, `UNSUPPORTED`, and `AMBIGUOUS_EFFECT`; it never
+    reclassifies the productive boundary. Delivery is not productive outcome,
     terminality, rollback, or barrier proof. Exact replay returns the receipt
-    without native re-emission. Ambiguity retains the target and aliases as unresolved and
-    quarantines successors. Only qualified terminal and complete final-boundary
+    without native re-emission. Productive-outcome ambiguity and safety-delivery
+    ambiguity remain distinct; neither resolves the other. The productive target
+    and aliases remain unresolved and quarantine successors until independent
+    reconciliation. Only qualified terminal and complete final-boundary
     reconciliation evidence can later satisfy the ordinary barrier. Independent
     local fail-closed quiescence under timer/connectivity uncertainty grants no
     general control authority.
@@ -494,7 +512,10 @@ command boundary independently of any UI or transport.
   existing barrier; and stale permit/decision/proof rejection. It must cover
   safety-control acknowledgement-versus-immediate independent local latches,
   `r1`/`r2`/fence non-barging, companion cut cases, Edge gap-free consistency
-  mapping, selected outcome progress, Edge-issued/no-consume classification,
+  mapping, exact selected pending/effect-possible/ambiguous productive outcomes
+  remaining safety-deliverable, selected-identity ambiguity still blocking,
+  separate productive/safety ambiguity classifications with no outcome or
+  barrier inference, Edge-issued/no-consume classification,
   latch/cut/consistency crash/replay/expiry, one delivery owner/FENCE_ONLY roles,
   no replay emission or fallback, transport/final-boundary separation,
   stop-revision CAS, unsupported delivery and crash ambiguity; and
@@ -507,8 +528,10 @@ command boundary independently of any UI or transport.
 - Anchor qualification must cover pre/post-commit crash, lost acknowledgement
   and exact-ID recovery, competing CAS, scoped-writer rejection, participant
   pin/restart, outage/loss, rollback/fork/clone/standby rejection, lifecycle
-  writer authorization, competing successor cores/registries, atomic terminal
-  append/old closure, deterministic genesis, crash/replay through participant
+  writer authorization, a self-reference scan over every successor-core summary,
+  competing successor cores/registries, atomic terminal append/old closure,
+  deterministic genesis, exact replay versus changed-core/link reuse,
+  crash/replay through participant
   repin, and incomparable fresh-namespace reset with
   Path-1 predecessor proof. None is a current PASS.
 - Exact framing, transport, enrollment keys, clock source, admissible

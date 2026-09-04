@@ -34,12 +34,40 @@ lease or enterprise authorization system.
    idempotency identity. It is synchronously committed outside rollback domains
    and durably authenticated by the external anchor before terminal publication
    or use. Pending generations are unusable; evidence invalidating an old
-   generation closes its local scope while the replacement is pending.
+   generation closes admission at each reachable participant while the
+   replacement is pending, without claiming that a disconnected predecessor
+   has stopped.
+
+   For every Host, Environment, or Workspace replacement, anchor acknowledgement
+   creates only an effect-inactive pending successor. The named
+   `PredecessorNoOverlapBarrier` binds the exact predecessor and successor,
+   smallest potentially conflicting scope, affected predecessor participants,
+   and maximum externally anchor-acknowledged predecessor permit/deadline
+   horizons. Its completion proof is itself anchor-acknowledged before the
+   successor becomes current/usable or can authorize or activate a potentially
+   conflicting permit. Completion proves either that every affected predecessor
+   participant observed the fence, durably closed old-generation admission,
+   quiesced, and reconciled final effect/journal/receipt/tombstone boundaries,
+   or that trusted continuous time passed every bound horizon plus uncertainty
+   margin while unreachable predecessors remain quarantined. Without that time
+   proof, or for a command family without enforceable lease-end quiescence,
+   only acknowledged quiescence/reconciliation is valid; an unreachable
+   predecessor then keeps the potentially conflicting successor scope blocked.
+   A Workspace successor additionally requires Edge-local closure and
+   reconciliation of old path, process, native-session, journal, receipt,
+   tombstone, and effect boundaries. An old predecessor must observe the
+   current generation and reconcile before re-entry; proven-disjoint scope may
+   continue.
 5. Runtime reincarnation is separate: every OS boot, Edge start, and
    Environment/companion start creates a fresh boot or instance ID and stream.
-   Old-instance streams are fenced. A WSL Environment also binds distribution
-   install identity, Linux UID/root status, and mount/interop policy; reinstall
-   or configuration changes generation, while restart changes instance.
+   Old-instance streams are rejected for new admission and by every observer of
+   the successor. That local rejection is not proof that an already activated,
+   disconnected effect has stopped; it remains bounded by its valid witnessed
+   monotonic permit and requires reconciliation before re-entry. The
+   `PredecessorNoOverlapBarrier` additionally applies when a durable resource
+   generation is replaced. A WSL Environment also binds distribution install
+   identity, Linux UID/root status, and mount/interop policy; reinstall or
+   configuration changes generation, while restart changes instance.
 6. Environment is a principal/process/path/credential/lifecycle authority, not
    a label. Edge resolves and authorizes actual paths.
 7. Each SessionLane has at most one causal controller
@@ -75,9 +103,9 @@ lease or enterprise authorization system.
     acknowledgement retains quarantine and retries only the exact revocation
     identity. Hub restore invalidates every prior-generation grant,
     including one absent from a rolled-back database, and permits fresh issuance
-    only after the affected restore reconciliation/activation barrier and its
-    own anchor gate. High-risk/admin effects require live Hub contact, a current
-    watermark, short deadline, and fresh human decision at the final boundary.
+    only after the affected `PredecessorNoOverlapBarrier` and its own anchor
+    gate. High-risk/admin effects require live Hub contact, a current watermark,
+    short deadline, and fresh human decision at the final boundary.
 11. A normal-user grant or approval cannot become admin authority. General
     delegation, inherited roles, policy DSLs, and enterprise RBAC are deferred.
 
@@ -92,8 +120,11 @@ lease or enterprise authorization system.
 - Hub CAS, Edge epoch order, revocation propagation, expired delivery, and admin
   generation behavior require fault-injection acceptance. Tests must cover
   crash/ambiguity at every authority-transition anchor boundary, pending-state
-  non-use, revocation quiescence, and exact-idempotency retry. Restore must also
-  prove prior-generation grant invalidation and gated fresh issuance.
+  non-use, revocation quiescence, and exact-idempotency retry. Ordinary Host,
+  Environment, and Workspace replacement must prove the exact predecessor
+  barrier, disconnected-predecessor drain/re-entry, and Workspace Edge-local
+  boundary closure. Restore must also prove prior-generation grant invalidation
+  and gated fresh issuance through that same barrier.
 
 ## Evidence
 

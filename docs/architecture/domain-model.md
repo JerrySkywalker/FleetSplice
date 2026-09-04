@@ -144,4 +144,12 @@ never reused. Host reenrollment/identity discontinuity, Environment
 principal/trust/configuration/installation changes, and Workspace
 root/containment identity changes bump their respective generations. Runtime
 restart changes only its boot/instance/stream ID unless a durable fact changed.
-Every stale generation or old-instance stream fails closed.
+Every stale durable generation fails closed for new admission and for observers
+that have seen its successor. This does not claim an already activated
+disconnected predecessor has stopped: it may drain only within its valid permit
+under the baseline's `PredecessorNoOverlapBarrier`, and it must observe the
+current generation and reconcile before re-entry. An old-instance stream is
+likewise rejected for new admission and by successor observers; already
+activated work remains bounded by its valid witnessed monotonic permit and
+reconciliation, while the named barrier applies when a durable resource
+generation is replaced.

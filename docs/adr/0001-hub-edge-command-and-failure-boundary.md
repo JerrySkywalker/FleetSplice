@@ -56,7 +56,27 @@ command boundary independently of any UI or transport.
    candidate outside every affected database/backup rollback domain and waits
    for durable authenticated external-anchor acknowledgement before terminal or
    success publication or use to authorize an effect. Pending authority is
-   unusable. Revocation starts fail-closed quiescence immediately at every
+   unusable. For a Host, Environment, or Workspace generation replacement,
+   anchor acknowledgement creates only a visible, effect-inactive pending
+   successor. The named `PredecessorNoOverlapBarrier` additionally binds exact
+   predecessor/successor generations, smallest potentially conflicting scope,
+   affected predecessor participants, and maximum externally
+   anchor-acknowledged predecessor permit/deadline horizons. Its completion
+   proof is anchor-acknowledged before the successor becomes current/usable or
+   authorizes a potentially conflicting permit. It proves either every
+   affected predecessor participant observed the fence, durably closed old
+   admission, quiesced, and reconciled final effect/journal/receipt/tombstone
+   boundaries, or trusted continuous time passed every bound predecessor
+   horizon plus uncertainty margin while unreachable predecessors remain
+   quarantined. Without trusted time, or for a family without enforceable
+   lease-end quiescence, only acknowledged quiescence/reconciliation is valid.
+   When only that path is valid, an unreachable predecessor keeps the
+   potentially conflicting successor scope blocked. A Workspace proof also
+   requires Edge-local closure and reconciliation of its old path, process,
+   native-session, journal, receipt, tombstone, and effect boundaries.
+   A predecessor must observe the successor and reconcile before re-entry;
+   proven-disjoint scope remains available and no placement right is implied.
+   Revocation starts fail-closed quiescence immediately at every
    participant that observes the pending transition, keeps the affected scope
    blocked, and has no terminal claim until its exact fence/tombstone is
    anchor-acknowledged. Crash or ambiguous acknowledgement retains quarantine
@@ -66,7 +86,8 @@ command boundary independently of any UI or transport.
    anchor-predecessor sequence/digest; FleetCommand ID/intent; resolution,
    complete plan manifest, step, EdgeCommand, target, and execution binding;
    grant/decision and lane fences; Hub/Edge recovery and resource generations;
-   applicable instances; target Edge boot/timer epoch; absolute
+   every applicable `barrierProofId`/`barrierProofDigest`; applicable instances;
+   target Edge boot/timer epoch; absolute
    `effectLeaseNotAfter` no later than every applicable Hub-evaluated
    Edge-admission time bound; Hub-authenticated `remainingBudget` for that same
    conservative horizon; declared clock/skew uncertainty; and
@@ -90,8 +111,10 @@ command boundary independently of any UI or transport.
    consume the fixed horizon. The anchored maximum horizon never lags an
    activated permit; asynchronous anchor lag is prohibited across every effect.
    Missing, stale, mismatched, unverifiable, inactive, unjournaled, or expired
-   evidence rejects with no effect. At receipt, Edge persists the effective
-   expiry as the tighter of the absolute Hub
+   or barrier-incomplete evidence rejects with no effect. Immediately before
+   activation and effect, Edge verifies every resource generation is current
+   and every applicable barrier proof covers the exact conflict scope. At
+   receipt, Edge persists the effective expiry as the tighter of the absolute Hub
    `effectLeaseNotAfter` adjusted for declared uncertainty and a local
    monotonic deadline derived from authenticated remaining budget, bound to the
    exact Edge boot/timer epoch. It rechecks immediately before effect. Clock
@@ -107,8 +130,9 @@ command boundary independently of any UI or transport.
    digest tombstones prevent forgotten duplicates. Exact replay preserves the
    Hub and target-Edge recovery generations. Hub and every Edge that has
    observed the current Hub generation reject pre-recovery identity or
-   generation mismatch before effect; a disconnected Edge is contained by the
-   restore barrier rather than presumed immediately fenced.
+   generation mismatch before effect. A disconnected predecessor is contained
+   by the applicable `PredecessorNoOverlapBarrier`, including during restore,
+   rather than presumed immediately fenced.
 9. HCP carries exact Edge commands, observations, snapshots, journal/event
    watermarks, receipts, and reconnect repair over an outbound authenticated
    Edge connection. Agent protocols and transport mechanics do not define HCP
@@ -123,24 +147,20 @@ command boundary independently of any UI or transport.
     effect/idempotency class, reconciler, and admissible evidence. The affected
     lane/resource is quarantined until append-only `RESOLVED_SUCCEEDED` or
     `RESOLVED_NO_EFFECT` evidence permits bounded re-entry without new rights.
-12. The external anchor records a maximum old-generation effect-lease/deadline
+12. The external anchor records a maximum predecessor effect-lease/deadline
     horizon that never lags an activated permit, plus its conservative
-    clock/skew uncertainty. A restore's exact higher recovery-generation
-    transition is anchor-acknowledged before it is published or used. No
-    potentially conflicting new-generation effect dispatch occurs until every
-    affected Edge acknowledges/quiesces and completes final-boundary
-    reconciliation, or trusted time-continuity evidence with bounded known
-    uncertainty proves the current time is past every anchored maximum horizon
-    plus margin while unreachable Edges remain quarantined. Without that time
-    proof, per-Edge acknowledgement/reconciliation is required and a conflicting
-    scope with an unreachable Edge cannot activate. Old disconnected work may
-    drain only inside its valid witnessed monotonic lease; no conflicting
-    recovered work overlaps it. An unreachable Edge cannot rejoin or effect
-    until it observes the current generation and reconciles. Grants bind their
-    issuing Hub recovery generation; restore invalidates prior-generation
-    grants, and each fresh issuance waits for reconciliation and passes its own
-    authority-transition anchor gate. A family without enforceable lease-end
-    quiescence requires the acknowledgement/reconciliation path.
+    clock/skew uncertainty. Hub restore uses the same
+    `PredecessorNoOverlapBarrier`, with every Edge in the recovered scope treated
+    as an affected predecessor; it is not a weaker restore-only exception. A
+    restore's higher recovery-generation transition is anchor-acknowledged but
+    remains effect-inactive until the shared barrier completes. Old disconnected
+    work may drain only inside its valid witnessed monotonic lease; no
+    potentially conflicting successor or recovered work overlaps it. An
+    unreachable predecessor cannot rejoin or effect until it observes the
+    current generation and reconciles. Grants bind their issuing Hub recovery
+    generation; restore invalidates prior-generation grants, and each fresh
+    issuance waits for the barrier and passes its own authority-transition
+    anchor gate.
 13. Deadline, cancellation, interruption, compensation, and rollback remain
     separate concepts. None silently undoes a completed external effect.
 
@@ -153,9 +173,10 @@ command boundary independently of any UI or transport.
   effectively-once claim.
 - Finite multi-step behavior remains a typed command-family contract, not a
   general DAG engine.
-- Restore can delay potentially conflicting recovered work until a truthful
-  activation/quiescence barrier completes; generation advance alone is not a
-  remote kill or an immediate fence of a disconnected Edge.
+- Every resource-generation successor, including restore, delays potentially
+  conflicting work until its `PredecessorNoOverlapBarrier` completes;
+  generation advance alone is not a remote kill or an immediate fence of a
+  disconnected predecessor.
 - Exact framing, transport, enrollment keys, clock source, admissible
   uncertainty thresholds, and the minimal composite-family list remain bounded
   implementation decisions; fail-closed monotonic lease semantics do not.

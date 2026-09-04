@@ -47,10 +47,12 @@ Privilege and OS execution contexts must be explicit resources. `SKYFORGE-01/win
 If the Hub or network disappears, already-running native sessions should
 continue under the Edge Runtime within their externally witnessed effect lease.
 Reconnection should report truth and replay durable events, not restart work
-merely to recover central state. Restore-generation advance is not an immediate
-fence of a disconnected Edge: old work drains only within its witnessed lease,
-and potentially conflicting recovered work waits for the baseline's
-activation/quiescence barrier.
+merely to recover central state. Any Host, Environment, or Workspace
+resource-generation successor, including restore, does not immediately fence a
+disconnected predecessor: old work drains only within its valid witnessed
+monotonic lease, and potentially conflicting successor work waits for the
+[baseline's named `PredecessorNoOverlapBarrier`](baseline-0.1.md#identity-generation-and-incarnation-model).
+Proven-disjoint scope may continue.
 
 ## Non-goal
 

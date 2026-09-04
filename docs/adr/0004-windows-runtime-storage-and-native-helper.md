@@ -35,22 +35,43 @@ storage needs.
 5. Use separate, one-writer patched SQLite databases for Hub and each Edge.
    Authority data uses local-filesystem WAL and `synchronous=FULL`, with a
    supported engine containing the SQLite 3.51.3 WAL-reset fix or later.
-6. Restore requires an externally anchored monotonic recovery generation or
-   full authority reset and reenrollment/fencing with higher externally
-   witnessed generations. The anchor commits Hub/Edge recovery generations and
-   a monotonic completeness watermark or digest over accepted commands,
-   immutable plans and frozen step manifests, Edge commands, receipts, and
-   tombstones. Its advance fences all pre-restore commands, plans, steps,
-   streams, and stale instances even if restored databases lost newer rows.
-   Restore creates fresh instance IDs, and no resolution, replay, or dispatch
-   resumes until monotonic proof and reconciliation show rollback gaps cannot
-   resurrect authority or duplicate effects.
-7. Publish content-addressed blobs before database visibility only after a
+6. Require a rollback-resistant external authority anchor outside every
+   database/backup rollback domain. Before the first effect-bearing EdgeCommand
+   of a resolution is sent, the Hub synchronously commits and receives durable
+   authenticated acknowledgement for an anchor sequence/digest covering the
+   accepted FleetCommand ID/intent, resolution ID/revision, complete immutable
+   ordered plan/step manifest and all EdgeCommand IDs/bindings, AuthorityGrant
+   issuance/revocation state plus issuance/revocation high-water marks and
+   tombstones, lane epochs/revisions, Host/Environment/Workspace
+   durable-generation high-water marks, Hub/Edge
+   recovery generations, and command/receipt/tombstone completeness. The
+   resulting authenticated `DispatchPermit` binds that exact anchor evidence to
+   the command, manifest, step, recovery/resource generations, grant, fences,
+   and bounded effect lease/deadline plus clock/skew bound. Edge verifies and
+   durably journals it before effect. Asynchronous anchor lag across first
+   effect is prohibited.
+7. Restore requires proven anchor lineage or full authority reset and
+   reenrollment with higher externally witnessed generations. The anchor also
+   records the maximum issued old-generation effect-lease/deadline horizon and
+   conservative clock/skew bound. Restore advances the recovery generation and
+   creates fresh instances, but cannot claim that this immediately fences a
+   disconnected Edge. No potentially conflicting new-generation effect
+   dispatch occurs until every affected Edge acknowledges/quiesces and
+   completes final-boundary reconciliation, or every witnessed old lease and
+   deadline expires plus the skew margin while unreachable Edges remain
+   quarantined. Old disconnected work may drain only within its permit lease;
+   an unreachable Edge cannot rejoin or effect until it observes the current
+   generation and reconciles, and no conflicting recovered work overlaps it.
+   AuthorityGrants bind their issuing Hub recovery generation; restore
+   invalidates prior-generation grants and fresh issuance waits for the
+   affected reconciliation barrier. A family without enforceable lease-end
+   quiescence must use acknowledgement and final-boundary reconciliation.
+8. Publish content-addressed blobs before database visibility only after a
    platform-proven durable data/rename-metadata barrier or equivalent two-phase
    recoverable protocol. GC and backup use durable manifest/reachability
    watermarks and mutual fencing so crashes cannot delete a visible or backed-up
    blob.
-8. Prefer admitted Node 24 `node:sqlite`; retain `better-sqlite3` as a bounded
+9. Prefer admitted Node 24 `node:sqlite`; retain `better-sqlite3` as a bounded
    fallback after exact package/native-binary qualification. Database APIs do
    not leak into product contracts.
 
@@ -63,6 +84,9 @@ storage needs.
   WSL lifecycle, and startup-at-logon remain owner-attended or targeted tests.
 - Power loss, reader/writer pressure, WAL growth, blob crash gaps, schema
   downgrade, and full restore remain storage acceptance gates.
+- Anchor acknowledgement, bounded lease expiry, unreachable-Edge quarantine,
+  final-boundary reconciliation, and post-restore grant reissuance remain
+  fault-injection acceptance gates.
 
 ## Evidence
 

@@ -10,6 +10,15 @@ Working model: append-oriented normalized events keyed to a logical session, wit
 
 Native agent history remains host/runtime-owned truth where the agent supports it. FleetSplice history is a normalized durable view, not a promise to reproduce private vendor state.
 
+The proposed [Architecture Baseline 0.1](baseline-0.1.md) selects separate,
+one-writer patched SQLite authority databases for Hub and Edges plus
+content-addressed filesystem blobs for large outputs and artifacts. Canonical
+history, receipts, checkpoints, and blob manifests are Hub authority data;
+Edge-local journals, native/effect identities, and outbound spool remain Edge
+authority data. This supersedes the earlier storage-engine/blob-selection
+candidate wording, while remaining a Proposed architecture choice rather than
+an accepted baseline or implementation authority.
+
 ## Context tiers
 
 Research should evaluate a layered context strategy:
@@ -42,4 +51,8 @@ Candidate contents:
 
 ## Open implementation questions
 
-Storage engine, chunk/blob format, compression, indexing, retrieval policy, checkpoint triggers, privacy/redaction, retention, and maximum handoff size are all research topics, not frozen decisions.
+Exact admitted SQLite binding, blob chunk encoding, compression, indexing,
+retrieval policy, checkpoint triggers, privacy/redaction, retention, and maximum
+handoff size remain bounded implementation or owner-policy questions. They do
+not reopen the Proposed SQLite plus content-addressed-blob architecture
+selection.

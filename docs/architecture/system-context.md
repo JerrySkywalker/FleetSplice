@@ -3,13 +3,19 @@
 ## Primary actors and systems
 
 - **Human operator** — uses the unified WebUI/API for interactive work.
-- **External orchestrator** — initially Coordination Loop/CLF or another automation client.
+- **External Fleet client** — a CLI, script, automation process, or future
+  third-party client using the ordinary FleetCommand and observation surfaces.
 - **Central Control Plane** — owns global catalog, logical-session metadata, desired commands, normalized history, and public API/WebUI state.
 - **Edge Runtime** — runs on each admitted host/environment boundary and owns real execution state.
 - **Agent Driver** — adapts FleetSplice operations to Codex app-server, ACP, a permissive compatibility backend, or another structured interface.
 - **Native Agent** — Codex, an ACP-speaking agent, OpenCode, or later another coding agent.
 - **Inference Provider** — cloud API, local Ollama/vLLM-style endpoint, gateway, or another model-serving resource.
 - **Transport** — carries control/events but is not the source of product semantics.
+
+Coordination Loop/CLF is not an initial orchestrator or a FleetSplice
+dependency. A future CLF adapter may act as one ordinary external Fleet client
+with no privileged contract or mutation path. FleetSplice remains architecturally
+complete and operable if that optional integration is never created.
 
 ## Working planes
 

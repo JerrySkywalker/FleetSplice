@@ -441,11 +441,11 @@ G05 / M0 Single-host Walking Skeleton
   real Browser -> Hub -> SKYFORGE-01 Edge -> Codex -> Browser
 
 G06 / M1 Two-host Minimum Fleet Loop
-  W4 Session Index
   two Hosts visible and selectable
   exact Host/Environment identity across Edge reconnect
 
 G07 / M2 Daily-use Control
+  W4 Session Index
   W2 Approval Attention
   interrupt/resume/controller state
   browser close/reopen projection without duplicate effect

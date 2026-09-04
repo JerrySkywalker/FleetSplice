@@ -18,9 +18,21 @@ Each admitted machine should run a small Edge Runtime that keeps execution autho
 - secret references and host-local authentication boundaries;
 - controlled self-update only after architecture/security design.
 
-## Local persistence hypothesis
+## Proposed local persistence
 
-A small durable local store such as SQLite/WAL is a candidate for command journal, native-session bindings, cursors, and event spool. This is not yet a technology decision.
+The proposed [Architecture Baseline 0.1](baseline-0.1.md) selects a separate,
+one-writer patched SQLite authority database for each Edge, using local-filesystem
+WAL and `synchronous=FULL` where loss is unacceptable. It holds the local
+command/idempotency journal, native and effect identities, resource bindings,
+cursors, acknowledgement watermarks, and outbound event spool. Large tool
+output, terminal chunks, native payloads, diffs, and artifacts use
+content-addressed filesystem blobs with database manifests and the baseline's
+durable publication, garbage-collection, backup, and restore fences.
+
+This supersedes the earlier SQLite/WAL candidate wording, but remains a Proposed
+architecture selection rather than an accepted decision or implementation
+authority. The exact admitted SQLite binding and later storage-policy defaults
+remain bounded implementation/acceptance choices.
 
 ## Connectivity hypothesis
 
@@ -32,7 +44,13 @@ Privilege and OS execution contexts must be explicit resources. `SKYFORGE-01/win
 
 ## Failure requirement
 
-If the Hub or network disappears, already-running native sessions should continue under the Edge Runtime. Reconnection should report truth and replay durable events, not restart work merely to recover central state.
+If the Hub or network disappears, already-running native sessions should
+continue under the Edge Runtime within their externally witnessed effect lease.
+Reconnection should report truth and replay durable events, not restart work
+merely to recover central state. Restore-generation advance is not an immediate
+fence of a disconnected Edge: old work drains only within its witnessed lease,
+and potentially conflicting recovered work waits for the baseline's
+activation/quiescence barrier.
 
 ## Non-goal
 

@@ -46,17 +46,21 @@ lease or enterprise authorization system.
    stops work. Exact safety interrupt and approval resolution may be separately
    authorized.
 9. One immutable, allow-only `AuthorityGrant` revision is evaluated per
-   FleetCommand. Explicit lineage entries, command families, provider/model,
-   approval, authentication, time, and revocation bounds intersect with Hub and
-   Edge policy. Omitted scope is never wildcard and multiple grants never union
-   for one command.
+   FleetCommand. The grant binds the exact Hub recovery generation that issued
+   it. Explicit lineage entries, command families, provider/model, approval,
+   authentication, time, and revocation bounds intersect with Hub and Edge
+   policy. Omitted scope is never wildcard and multiple grants never union for
+   one command.
 10. Edge admission requires a Hub-authenticated decision snapshot containing
-    exact grant/digests/generations, expiry, and a monotonic revocation
-    watermark. Edge rejects expired or older snapshots. High-risk/admin effects
-    require live Hub contact, a current watermark, short deadline, and fresh
-    human decision at the final boundary.
+    exact grant/digests/generations, the grant's issuing Hub recovery
+    generation, expiry, and a monotonic revocation watermark. Edge rejects
+    expired or older snapshots. Hub restore invalidates every prior-generation
+    grant, including one absent from a rolled-back database, and permits fresh
+    issuance only after the affected restore reconciliation/activation barrier.
+    High-risk/admin effects require live Hub contact, a current watermark, short
+    deadline, and fresh human decision at the final boundary.
 11. A normal-user grant or approval cannot become admin authority. General
-   delegation, inherited roles, policy DSLs, and enterprise RBAC are deferred.
+    delegation, inherited roles, policy DSLs, and enterprise RBAC are deferred.
 
 ## Consequences
 
@@ -67,7 +71,8 @@ lease or enterprise authorization system.
 - External native input degrades control until reviewed adoption, fork, or
   proven reattachment.
 - Hub CAS, Edge epoch order, revocation propagation, expired delivery, and admin
-  generation behavior require fault-injection acceptance.
+  generation behavior require fault-injection acceptance. Restore must also
+  prove prior-generation grant invalidation and gated fresh issuance.
 
 ## Evidence
 

@@ -96,11 +96,38 @@ lease or enterprise authorization system.
    closes local admission immediately while its exact transition is anchored;
    inability to obtain anchor or Edge acknowledgement leaves takeover pending
    and the affected scope blocked. Disconnect itself grants bounded grace and
-   never stops work. Exact safety interrupt and approval resolution may be
-   separately authorized. The acknowledged Edge fence satisfies the generic
+   never stops work. Approval resolution may be separately authorized. The
+   acknowledged Edge fence satisfies the generic
    successor trigger only after old-epoch admission closes and every
    potentially conflicting final boundary is reconciled; unresolved old effects
    still require the transitive barrier or exact disjointness proof.
+
+   Exact interrupt, cancellation, or derived local delivery of an already
+   admitted grant revocation uses the closed one-shot, reduction-only
+   `DispatchPermit` specialization `SafetyControl`, not a new command family or
+   controller epoch. It passes ordinary actor/grant, live decision/watermark,
+   expiry and Edge-ceiling checks, binds the target's admitted generations and
+   lane fences, and requires unrelated generations/fences current. Only the
+   named target may be non-current solely for reduction, and prior quiescence
+   may be omitted only for that exact existing target. Its anchor-acknowledged inert candidate
+   binds the target command/turn/native operation, predecessor permit and
+   activation, admitted control epoch/lane-mutation revision, process creation
+   identity, executor/binding, generations,
+   runtimes/attachment, scope/aliases/transitive digest, closed action, stable
+   fence-plan identity, idempotency identity, and monotonic `stopRevision`.
+   The already qualified supervising participant atomically closes later
+   non-safety target boundaries and journals a one-use
+   `SafetyControlFenceReceipt` as the composite `PermitPreparationReceipt` with
+   all ordinary preparation evidence and its preparation/closure acknowledgement;
+   authenticated activation binds that receipt
+   before exact control delivery. This is not takeover, transfer, disjointness,
+   barrier or termination proof, and cannot retarget, start/resume/retry, steer,
+   approve, write, migrate, renew, widen a lease, or carry arbitrary arguments.
+   Completion races are locally linearized; delivery remains pending evidence,
+   and ambiguity retains the target/aliases as unresolved and quarantines
+   successors. Only qualified terminal plus full final-boundary reconciliation
+   may feed the ordinary barrier. Timer/connectivity uncertainty may still
+   trigger separate local quiescence but grants no remote authority.
 9. One immutable, allow-only `AuthorityGrant` revision is evaluated per
    FleetCommand. The grant binds the exact Hub recovery generation that issued
    it. Explicit lineage entries, command families, provider/model, approval,
@@ -140,14 +167,20 @@ lease or enterprise authorization system.
 - Hub CAS, Edge epoch order, revocation propagation, expired delivery, and admin
   generation behavior require fault-injection acceptance. Tests must cover
   crash/ambiguity at every authority-transition anchor boundary, pending-state
-  non-use, revocation quiescence, and exact-idempotency retry. Resource
+  non-use, revocation quiescence, and exact-idempotency retry. Safety-control
+  tests cover completion-versus-stop races, monotonic stop-revision CAS,
+  duplicate and unsupported delivery, supervisor-identity change, and crash or
+  response ambiguity without treating delivery as terminality. Resource
   replacement, Hub-only and Edge-only restore, and same-generation runtime
   replacement must prove the exact predecessor barrier, qualified termination
   rather than socket/stream/PID absence, disconnected-predecessor drain/re-entry,
   Workspace Edge-local boundary closure, transitive successor chains,
   successor-grant permits, and same- versus changed-executor permit renewal.
+  Same-executor renewal additionally covers every `A/R_i/B/X_i` and final
+  activation crash/replay boundary, abort exclusivity, stop-revision race, and
+  partial Edge/companion transfer as safe unavailability rather than effect.
   Hub restore must also prove prior-generation grant invalidation and gated
-  fresh issuance through that same barrier.
+  fresh issuance through that same barrier. None of these are current live PASS.
 
 ## Evidence
 

@@ -250,9 +250,9 @@ These are views over one product model, not separate subsystems.
 
 The architecture should not force all eight views to exist before FleetSplice becomes usable.
 
-### P0 - minimum useful loop
+### P0 - minimum useful v0.1 loop
 
-Required for the first two-host daily-use loop:
+Required for the eventual two-host daily-use v0.1 loop:
 
 - Session Workspace;
 - basic Approval Attention;
@@ -260,7 +260,24 @@ Required for the first two-host daily-use loop:
 - Host / Environment / Workspace Explorer;
 - shared connection/status presentation.
 
-The first implementation milestone should be able to open the WebUI, select a registered Workspace on one of two Hosts, create/continue a LogicalSession, start native Codex, submit a prompt, receive streaming output, resolve a harmless approval, and preserve history across browser reopen.
+The train reaches this loop in deliberately named slices:
+
+- **G05 / M0 Walking Skeleton is single-host.** It proves a real
+  Browser -> Hub -> SKYFORGE-01 Edge -> native Codex -> Browser round trip with
+  minimal W1 and W5 surfaces. It is the first product slice, not the accepted
+  minimum-useful v0.1 product.
+- **G06 / M1 Minimum Fleet Loop is two-host.** It adds ZenBook Duo so the same
+  WebUI can select either Host and preserve Fleet history across browser reopen.
+- G07-G09 add the approval, interrupt, takeover, reconnect, durable recovery,
+  ambiguity, and explicit provider-migration behavior required for daily use.
+- G10 accepts the hardened minimum-useful two-host v0.1 product only after its
+  exact-head recovery, storage, update, security, and UI gates pass.
+
+The minimum-useful v0.1 acceptance should therefore be able to open the WebUI,
+select a registered Workspace on either of two Hosts, create/continue a
+LogicalSession, start native Codex, submit a prompt, receive streaming output,
+resolve a harmless approval, and preserve history across browser reopen. G05
+alone deliberately proves only the single-host subset.
 
 ### P1 - early daily-use hardening
 

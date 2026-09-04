@@ -1,0 +1,63 @@
+# ADR-0003: Agent Driver, compatibility, and provider binding
+
+- Status: Proposed
+- Baseline: [Architecture Baseline 0.1 DRAFT](../architecture/baseline-0.1.md)
+- `IMPLEMENTATION_AUTHORIZED=false`
+
+## Context
+
+Agent lifecycle/tool authority and inference service placement are different.
+Codex exposes a high-fidelity native service API; ACP provides a negotiated
+generic local Agent protocol. Both evolve quickly, and a version string or an
+OpenAI-shaped endpoint does not establish behavioral compatibility.
+
+## Proposed decision
+
+1. Keep `AgentBinding`, `ExecutionBinding`, and `ProviderBinding` as distinct
+   identities and capability records.
+2. Use an Edge-owned Codex native driver over explicit
+   `app-server --stdio`. Do not use experimental app-server WebSocket/daemon as
+   HCP and do not force Codex through a third-party ACP adapter.
+3. Use a capability-negotiated ACP driver for Agents that faithfully implement
+   the required stable capabilities, with the Edge as ACP Client. Filesystem,
+   terminal, permissions, cwd, credentials, cancellation, and recovery stay
+   host-near.
+4. Admit behavior against an exact semantic fingerprint: Fleet Driver build,
+   installed Agent/runtime artifact, generated schema, protocol, required
+   capability set, Environment/profile, and disposable conformance evidence.
+   Compatibility is capability-scoped, not one global pass bit.
+5. Use explicit dispositions: `QUALIFIED`, `QUALIFIED_WITH_LIMITS`,
+   `UNKNOWN_UNQUALIFIED`, `UNSUPPORTED`, `QUARANTINED`, and `MISSING`.
+   Active segments stay pinned to their exact record across upgrades.
+6. Fleet owns provider-profile metadata and redacted CredentialRefs; the target
+   Environment owns credentials and applies agent-native provider configuration.
+   Fleet does not implement a universal model gateway.
+7. v0.x migration is suggested only after binding, authority, network, privacy,
+   tool, context, and compatibility probes, then explicitly user-confirmed.
+   It creates a new NativeSegment and normally a new native session with
+   reconstructed continuity. Transparent failover is prohibited.
+
+## Consequences
+
+- Unknown approval, terminal, ambiguity, or capability behavior fails only the
+  affected command family closed.
+- New bytes/schema create a new installation generation and targeted
+  requalification; they do not silently replace an active segment.
+- Rollback selects a retained qualified artifact for future work but cannot
+  undo native turns, tools, provider requests, or data migrations.
+- OpenCode 1.18.16 isolated ACP results and local Ollama metadata are
+  architecture evidence only. Real provider/auth, active-loss, terminal/fs,
+  concurrent-client, and cross-host provider tests remain open.
+
+## Evidence
+
+- [Codex app-server audit](../research/wave-01/codex-app-server.md)
+- [ACP audit](../research/wave-01/acp.md)
+- [Upgrade compatibility](../research/wave-02/upgrade-compatibility.md)
+- [ACP conformance](../research/wave-02/acp-conformance.md)
+- [Provider migration](../research/wave-02/provider-migration.md)
+
+## Acceptance gate
+
+This ADR remains Proposed until G02 exact-head review and G03 owner acceptance.
+Each runtime capability still requires its named conformance gate after G04.

@@ -3,22 +3,24 @@
 ## Status and authority
 
 - Baseline: `0.1`
-- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_3_CHANGE_REQUIRED`
+- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_4_CHANGE_REQUIRED`
 - Drafting Goal: `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001` (`G01`)
 - Initial reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
 - Round-2 reviewed draft: `b82df67d5a045d31b04b0efb3fb5c0a2cb9de571`
 - Round-3 reviewed draft: `1c825052a255dce2bc4edc1c0d962fd66d358fa9`
-- Evidence cut: 2026-09-04 research and owner correction
+- Round-4 reviewed draft: `aa9ecbfb082954be431b9a939d14d88643b71f56`
+- Evidence cut: 2026-09-05 round-4 review and bounded correction
 - `ARCHITECTURE_0_1_READY=false`
 - `IMPLEMENTATION_AUTHORIZED=false`
 - `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`
 
 This is a formal architecture draft, not an accepted baseline and not product
-implementation authority. Independent G02 reviews of the original draft, the
-round-1 correction, and the round-2 correction returned
+implementation authority. Independent G02 reviews of the original draft and
+its first three corrections returned
 [`CHANGE_REQUIRED`](../train/receipts/G02.md),
-[round-2 `CHANGE_REQUIRED`](../train/receipts/G02-r2.md), and
-[round-3 `CHANGE_REQUIRED`](../train/receipts/G02-r3.md), respectively. This
+[round-2 `CHANGE_REQUIRED`](../train/receipts/G02-r2.md),
+[round-3 `CHANGE_REQUIRED`](../train/receipts/G02-r3.md), and
+[round-4 `CHANGE_REQUIRED`](../train/receipts/G02-r4.md), respectively. This
 revision contains only their bounded corrections and has not received a fresh
 independent PASS. It does not supersede [Baseline 0.0](baseline-0.0.md) until a
 fresh review and the owner-controlled G03 acceptance gate both pass. Only G03
@@ -142,6 +144,7 @@ Fleet
     Edge authority store (monotonic edgeRecoveryGeneration)
     hostBootId (new on every OS boot)
     edgeInstanceId (new on every Edge process start)
+    edgeTimerEpoch (new whenever monotonic timer continuity/provenance resets)
     Environment (stable ID + Hub-owned durable configuration generation)
       environmentInstanceId (new on every companion/runtime start)
       Workspace (stable ID + Edge-owned durable resolved-root generation)
@@ -161,6 +164,14 @@ credential boundary, path/interop policy, companion trust/configuration, or
 installation-identity change bumps it. Ordinary OS, Edge, or companion restart
 changes only its runtime instance identity unless one of those durable facts
 also changed.
+
+Every allocation, bump, recovery advance, and tombstone is a monotonic authority
+transition subject to the rollback-resistant acknowledgement gate below. A
+candidate generation is pending and unusable until its exact transition is
+anchor-acknowledged; it cannot be published as current or authorize an effect.
+Evidence that invalidates an old generation closes that local scope immediately
+while the replacement transition is pending, rather than allowing the old or
+unacknowledged new identity to remain usable.
 
 An `Environment` is not a platform tag or privilege toggle. It names an exact
 principal, process namespace, path system, credential-resolution boundary,
@@ -331,41 +342,93 @@ a similar new command.
 
 ### Rollback-resistant pre-effect dispatch
 
-Before the Hub sends the first effect-bearing `EdgeCommand` for an immutable
-resolution, it synchronously commits the complete authority and execution
-identity to an external rollback-resistant anchor and waits for authenticated,
-durable acknowledgement. The acknowledged anchor sequence and digest cover:
+Rollback resistance applies both to authority publication and to every permit
+activation. Every monotonic authority transition is first a fully formed,
+immutable candidate with a stable idempotency identity, exact predecessor, and
+resulting high-water mark. These transitions include:
 
-- the accepted `FleetCommand` ID and `fleetCommandIntentDigest`;
-- the `resolutionId + resolutionRevision` and the complete immutable ordered
-  plan/step manifest, including every `stepKey`, `edgeCommandId`, dependency,
-  required/optional classification, exact target, and full execution binding;
-- AuthorityGrant issuance and revocation state, including the issuing Hub
-  recovery generation, exact grant revisions/digests, issuance/revocation
-  high-water marks, and grant/revocation tombstones;
-- lane `controlEpoch` and `laneMutationRevision` high-water marks;
-- non-reusable Host, Environment, and Workspace durable-generation high-water
-  marks and Hub/Edge recovery generations; and
-- append-only completeness high-water marks or digests for commands, receipts,
-  and tombstones through that anchor sequence.
+- AuthorityGrant issuance, revocation, and tombstones;
+- lane `controlEpoch` and `laneMutationRevision` advances;
+- Host, Environment, and Workspace durable-generation allocations, advances,
+  and tombstones;
+- Hub and Edge recovery-generation advances; and
+- any equivalent transition whose high-water mark fences authority or replay.
 
-Only that acknowledgement may produce an authenticated, verifiable
-`DispatchPermit`. The permit binds the exact anchor sequence/digest,
-FleetCommand intent, resolution revision, complete plan-manifest digest,
-step/EdgeCommand identity and binding, issuing grant and Hub recovery
-generation, target Hub/Edge recovery generations, Host/Environment/Workspace
-durable generations, applicable runtime instances and lane fences, and a
-bounded `effectLeaseNotAfter` with its declared clock/skew bound. An Edge must
-verify the permit against the exact command and current local state and durably
-journal it before crossing the effect boundary. Missing, mismatched, stale,
-unverifiable, or expired evidence is a no-effect rejection.
+The authoritative participant synchronously commits the exact candidate
+transition to an external rollback-resistant anchor outside every affected
+database and backup rollback domain and waits for durable authenticated
+acknowledgement. Only that acknowledgement may make the transition current,
+publish it as successful or terminal, or allow it to authorize an effect.
+Pending grant, control, generation, recovery, or equivalent state is unusable.
+If a crash or acknowledgement ambiguity prevents proof, the smallest affected
+scope remains quarantined and retry uses the exact transition idempotency
+identity; a similar replacement transition is not minted.
 
-The Hub may not send an effect-bearing EdgeCommand while the anchor commit or
-acknowledgement is pending, and the Edge may not infer a permit from Hub or
-database state. Asynchronous/write-behind anchor lag is never allowed across a
-first effect. Later receipt, revocation, and tombstone advances remain
-monotonic anchor inputs and cannot be treated as rollback-resistant evidence
-before their acknowledgement.
+Revocation begins local fail-closed quiescence immediately at each participant
+that observes the pending transition: the Hub closes new admission and every
+reachable Edge closes new local effect admission in the affected scope while
+the required fence is established. The scope stays blocked and no terminal
+revocation claim is published until the exact revocation fence and tombstone are
+anchor-acknowledged. That local closure does not pretend to have stopped a
+disconnected Edge; any already activated work on that Edge remains bounded by
+the valid witnessed monotonic lease and the restore/quiescence rules below.
+
+Every `DispatchPermit` is likewise fully formed as an immutable candidate before
+activation or release. Its canonical candidate contains:
+
+- a unique `permitId`, canonical `permitDigest`, and the exact external-anchor
+  predecessor sequence/digest it extends, plus a reserved target sequence or
+  record identity when the anchor protocol assigns one before commit;
+- the accepted `FleetCommand` ID and `fleetCommandIntentDigest`,
+  `resolutionId + resolutionRevision`, complete immutable plan-manifest digest,
+  exact `stepKey`, `edgeCommandId`, dependencies, target, and full execution
+  binding;
+- the exact AuthorityGrant/decision identity and watermark, lane fences, Hub
+  and target-Edge recovery generations, resource generations, applicable
+  runtime instances, and target Edge `hostBootId` and `edgeTimerEpoch`;
+- an absolute `effectLeaseNotAfter` no later than the earliest FleetCommand
+  deadline, authority-decision or grant expiry, qualification expiry, lease
+  policy horizon, or other applicable Hub-evaluated bound that forbids the next
+  Edge effect; the declared clock/skew uncertainty and bound; and a
+  Hub-authenticated `remainingBudget` for that same conservative horizon; and
+- append-only completeness high-water marks or digests for the command,
+  resolution, receipts, authority transitions, and tombstones through the
+  predecessor anchor plus this exact candidate.
+
+The Hub synchronously commits the exact candidate permit and its complete
+horizon to the external rollback-resistant anchor and receives its durable
+authenticated acknowledgement. That resulting acknowledgement has an exact
+anchor sequence and record digest covering the `permitId`, `permitDigest`, full
+horizon, completeness state, and predecessor; it is not a self-referential
+input to `permitDigest`. Every target Edge may then durably receive and prepare
+that exact candidate plus resulting anchor acknowledgement, but must acknowledge
+it and must not cross an effect boundary yet. Only after the anchor and every
+target Edge have acknowledged that exact candidate may an authenticated
+activation/release make it effect-bearing. The immutable activation has its own
+`activationId` and `activationDigest` bound to the `permitId`, `permitDigest`,
+resulting anchor sequence/digest, exact target-Edge acknowledgement identities,
+and a horizon/budget that may narrow but never widen the anchored candidate.
+Immediately before an effect, the Edge verifies the exact activation, command
+and binding, current local state, and effective-expiry evidence below, then
+durably journals the candidate and verified activation under that stable
+identity as an immutable activation receipt before crossing the boundary.
+Missing, mismatched, stale, unverifiable, inactive, unjournaled, or expired
+evidence is a no-effect rejection.
+
+Every initial permit, renewal, replacement, and later composite-step permit
+follows this same ordering. A renewal is a new permit with a new identity,
+candidate, anchor record, acknowledgements, and activation; it never mutates or
+silently extends an older permit. Replay or redelivery preserves the original
+candidate, resulting anchor acknowledgement, target-Edge acknowledgements,
+activation identity, monotonic deadline, and remaining budget; it never
+replenishes time. Anchor, transport, preparation, and activation delay consume
+the fixed absolute horizon, and activation may only narrow the candidate budget.
+The external anchor updates its maximum witnessed permit horizon as part of
+acknowledging the exact candidate, so that maximum can never lag an activated
+permit. The Hub may not release an effect-bearing EdgeCommand while any required
+acknowledgement is pending, and an Edge may not infer activation from Hub or
+database state. Asynchronous or write-behind anchor lag is prohibited across
+every effect, not only the first effect of a resolution.
 
 ### Observation is never mutation authority
 
@@ -428,12 +491,28 @@ cancellation. Cancellation and interruption are separately identified,
 best-effort commands that race completion and never claim rollback.
 
 `effectLeaseNotAfter` bounds how long an Edge may start or continue
-effect-bearing work without a newer permit. Ordinary transient disconnection
-may drain already admitted work only inside that witnessed lease. Lease expiry
-does not undo a completed effect; it requires local quiescence and closes every
-later effect boundary. A command family whose boundary cannot be locally
-quiesced at the witnessed horizon is ineligible for the lease-expiry restore
-path and requires acknowledged quiescence plus final-boundary reconciliation.
+effect-bearing work without a newer permit. At candidate receipt, the Edge
+computes and durably records the effective expiry as the tighter of (a) the
+absolute Hub `effectLeaseNotAfter`, conservatively adjusted for the declared
+clock/skew uncertainty, and (b) a local monotonic deadline derived from the
+Hub-authenticated `remainingBudget`. That deadline is bound to the candidate's
+exact Edge `hostBootId` and `edgeTimerEpoch`; it is rechecked with the activation
+immediately before every effect boundary and while deciding whether work may
+continue.
+
+A wall-clock rollback or forward anomaly beyond the declared bound,
+excessive or unknown uncertainty, suspend/resume or sleep/hibernate
+discontinuity, Edge-process or Host reboot, monotonic-clock reset, or loss of
+timer provenance invalidates the permit. It requires current-generation
+resynchronization and a freshly anchored and activated permit before another
+effect. Interruption or uncertainty never pauses, replenishes, or extends the
+remaining budget or either deadline. Ordinary transient disconnection may drain
+already admitted work only inside this valid, witnessed monotonic lease. Lease
+expiry or invalidation does not undo a completed effect; it requires local
+quiescence and closes every later effect boundary. A command family whose
+boundary cannot be locally quiesced at that horizon is ineligible for the
+lease-expiry restore path and requires acknowledged quiescence plus
+final-boundary reconciliation.
 
 Reconnect uses snapshots, stream identities/sequences, journal watermarks, and
 durable receipt/event cursors. Socket loss is not process death. PID alone is
@@ -448,22 +527,29 @@ Each SessionLane has at most one northbound causal controller
 `laneMutationRevision` provides compare-and-swap admission for causal
 mutations. Browser tabs, phone sessions, TUI instances, and automation
 processes have distinct client-instance identities even for the same actor.
+Creating or advancing either fence is a monotonic authority transition. Its
+exact candidate and predecessor are anchor-acknowledged before the new value is
+published as current or used to admit a command; a pending value grants no
+control or mutation authority.
 
 Every causal EdgeCommand carries the exact admitted `controlEpoch` and
 `laneMutationRevision`. Edge journals the highest fenced epoch per lane and
 rejects any lower epoch before another effect boundary. Release, reconnect-grace
 expiry, suspend/archive, external-writer detection, and takeover all advance
-the epoch and must be fenced at Edge before effects from a new controller may
-start. External-writer detection immediately closes local admission while the
-Hub records the transition. If the Edge cannot acknowledge the fence, the Hub
-reports a pending reconciliation and admits no new-controller effect there.
+the epoch. A safety event such as external-writer detection immediately closes
+local admission while the exact transition is anchored; after anchor
+acknowledgement, the epoch must also be fenced at Edge before effects from a new
+controller may start. If the anchor or Edge cannot acknowledge the fence, the
+Hub reports a pending reconciliation and admits no new-controller effect there.
 
 Disconnect enters bounded reconnect grace without releasing control or
-stopping native work. Authorized takeover raises the epoch, pauses automation,
-waits for the Edge fence, exposes in-flight work, and never interrupts
-implicitly. Approval resolution and exact safety interruption may be separately
-authorized without taking lane control. Unexpected native input creates a
-contested/degraded lane until reviewed adoption, fork, or reattachment.
+stopping native work. Authorized takeover creates a pending higher epoch and
+pauses automation; only after the exact epoch transition is anchor-acknowledged
+does it wait for the Edge fence, expose in-flight work, and become usable by the
+new controller. It never interrupts implicitly. Approval resolution and exact
+safety interruption may be separately authorized without taking lane control.
+Unexpected native input creates a contested/degraded lane until reviewed
+adoption, fork, or reattachment.
 
 An `AuthorityGrant` is an immutable, allow-only capability record whose identity
 binds the exact Hub recovery generation that issued it. One command uses one
@@ -472,7 +558,10 @@ actor, audience, command families, explicit resource-lineage tuples,
 provider/model constraints, approval classes/decisions, time, authentication
 conditions, and revocation state. Omitted scope is never wildcard. General
 delegation, inherited roles, deny-rule languages, and enterprise RBAC are
-deferred.
+deferred. Issuance is a monotonic authority transition: the fully formed grant,
+revision, digest, tombstone lineage, and idempotency identity are
+anchor-acknowledged before success is published or the grant can be evaluated
+for an effect. A pending grant is never usable.
 
 The Hub evaluates `notBefore`, expiry, revision, revocation, actor state, and a
 monotonic revocation watermark. Every EdgeCommand carries a Hub-authenticated,
@@ -480,12 +569,19 @@ non-reusable decision snapshot bound to actor, grant revision/digest and issuing
 Hub recovery generation, FleetCommand and EdgeCommand intent digests, exact
 resource generations, decision expiry, and that watermark. Edge persists its
 highest accepted watermark, rejects older or expired decisions, and rechecks
-immediately before effect. Revocation blocks new Hub admission and advances the
-Edge watermark. Previously started effects are not undone. A disconnected Edge
-may use an unexpired snapshot only for a family whose policy explicitly permits
-it and only within its witnessed `DispatchPermit` lease; high-risk and admin
-families require live Hub contact, a current watermark, short deadline, and
-fresh human decision at the final effect boundary.
+immediately before effect. Accepted revocation immediately closes new local Hub
+admission and, at every reachable Edge that observes it, new local effect
+admission, but remains pending: the affected scope stays blocked and the Hub
+publishes no terminal revocation until the exact revocation fence, watermark,
+and tombstone are anchor-acknowledged. Only then may the acknowledged watermark
+become current. A crash or ambiguous acknowledgement retains quarantine and
+retries that exact revocation identity.
+Previously started effects are not undone, and no remote fence is claimed until
+observed. A disconnected Edge may use an unexpired snapshot only for a family
+whose policy explicitly permits it and only within its valid witnessed
+monotonic `DispatchPermit` lease; high-risk and admin families require live Hub
+contact, a current watermark, short deadline, and fresh human decision at the
+final effect boundary.
 
 Effective authority is the intersection of authenticated actor, exact active
 grant, command schema, resource lineage, provider/model policy, lane control or
@@ -602,14 +698,18 @@ identity, outbound spool, and Hub acknowledgement watermarks.
 Backup and restore cannot move authority, generation, revocation, or
 idempotency time backward. Each authority store binds commands and streams to a
 monotonic `recoveryGeneration` anchored outside the rollback domain. The
-external anchor uses the complete pre-effect coverage defined above and also
-records, for each affected scope, the maximum issued
-`effectLeaseNotAfter`/effect deadline and its admitted conservative clock/skew
-bound. Restore is admissible only when the anchor and retained evidence prove
-lineage. It first advances the affected recovery generation and creates new
-Hub/Edge, Environment, and event-stream instance identities. That advance
-fences a participant only after the participant observes it; it cannot truthfully
-claim to have immediately fenced a disconnected Edge.
+external anchor uses the authority-transition and per-permit activation gates
+defined above. For each affected scope it also records the maximum
+anchor-acknowledged permit `effectLeaseNotAfter`/effect deadline and its
+admitted conservative clock/skew uncertainty; this maximum may conservatively
+include a candidate that never activates but can never lag an activated permit.
+Restore is admissible only when the anchor and retained evidence prove lineage.
+It first forms the exact higher recovery-generation transition and
+synchronously anchor-acknowledges it before publishing that generation as
+current or using it, then creates new Hub/Edge, Environment, and event-stream
+instance identities. That acknowledged advance fences a participant only after
+the participant observes it; it cannot truthfully claim to have immediately
+fenced a disconnected Edge.
 
 After Hub restore and recovery-generation advance, the affected scope remains
 in recovery activation/quiescence. The Hub may not issue a potentially
@@ -619,12 +719,18 @@ proved against the external anchor:
 1. every affected Edge has observed the new recovery generation, acknowledged
    old-generation quiescence, and completed final-boundary reconciliation of
    its command journal, receipts, tombstones, effects, and stream watermarks; or
-2. every externally witnessed old-generation effect lease/deadline has expired
-   plus the conservative clock/skew margin, and every unreachable Edge is
-   quarantined in the new generation.
+2. trusted time-continuity evidence with bounded known uncertainty proves the
+   current time is past every externally anchored maximum old-generation
+   effect-lease/deadline horizon plus its conservative margin, and every
+   unreachable Edge is quarantined in the new generation.
 
-During that drain, old disconnected work may continue only within its exact
-witnessed permit and enforceable lease. No overlapping or potentially
+The time-based barrier is unavailable if time continuity is absent, unknown, or
+outside the admitted uncertainty, including across rollback, suspend/hibernate,
+reboot, or timer-provenance loss. The Hub must then use per-Edge acknowledged
+quiescence and reconciliation under barrier 1; an unreachable Edge remains
+quarantined and its potentially conflicting scope cannot activate. During that
+drain, old disconnected work may continue only within its exact activated
+permit and valid witnessed monotonic lease. No overlapping or potentially
 conflicting recovered work may begin. An Edge that was unreachable cannot
 rejoin, admit, resume, or effect work until it observes the current recovery
 generation, proves its own current Edge recovery generation, and reconciles its
@@ -635,17 +741,19 @@ valid for that family.
 Every AuthorityGrant binds its issuing Hub recovery generation. A Hub recovery
 advance invalidates all prior-generation grants in restored authority state,
 including grants absent from the rolled-back database, and fresh grants may be
-issued only after the affected reconciliation/activation barrier completes.
-This logical invalidation cannot retroactively stop a disconnected Edge; any
-remaining old-generation effect is contained by the externally witnessed
-permit lease and the no-overlap barrier above.
+issued only after the affected reconciliation/activation barrier completes and
+each issuance passes its own authority-transition anchor gate. This logical
+invalidation cannot retroactively stop a disconnected Edge; any remaining
+old-generation effect is contained by the externally witnessed monotonic permit
+lease and the no-overlap barrier above.
 
 If anchored completeness cannot be proved, all affected authority and
 Hosts/Environments require a full reset and reenrollment that establishes
 higher externally witnessed recovery and durable resource generations, revokes
 old connections and grants, and reconciles journals and remote receipts under
-the same activation/quiescence barrier. No command resolution, replay, or
-effect-bearing dispatch resumes merely because a database was restored.
+the same authority-transition and activation/quiescence gates. No command
+resolution, replay, or effect-bearing dispatch resumes merely because a
+database was restored.
 
 Large tool output, terminal chunks, native payloads, diffs, and artifacts use
 content-addressed filesystem blobs. A blob is written to a same-filesystem
@@ -858,10 +966,10 @@ No item in this table is a current PASS unless the cited report says exactly so.
 | Codex native driver | isolated no-auth lifecycle, known-ID recovery, interrupt, response-loss ambiguity, and model-transition observations | authenticated stream; successful harmless turn; pending approval/disconnect; active-turn loss; provider transition; Windows process containment |
 | generic ACP driver | OpenCode 1.18.16 isolated loopback prompt/tool/approval/cancel/load/resume/list evidence | real provider/auth; active process loss; filesystem/terminal delegation; different endpoint migration; concurrent clients |
 | driver/update admission | exact artifact/schema/capability model and bounded conformance evidence | implemented suite, retained artifact packaging, canary, downgrade/data compatibility, rollback proof |
-| lane control and grants | closed epoch/CAS/grant/watermark semantics | concurrent Hub CAS, Edge fence ordering, live-Hub/admin snapshot validation, revocation propagation, expired delivery, external-writer and admin-generation fault injection |
-| Windows user Edge | safe medium-integrity/same-user process, pipe, loopback, and WSL discovery evidence | principal/session attestation plus owner-attended logout/relogin, reboot, sleep/network loss, startup-at-logon, UAC/admin companion, cross-principal pipe ACL, ConPTY, active WSL stop/restart, WSL-after-reboot |
+| lane control and grants | closed epoch/CAS/grant/watermark semantics | concurrent Hub CAS, authority-transition anchor crash/ambiguity and pending-state non-use, Edge fence ordering, live-Hub/admin snapshot validation, revocation quiescence/propagation, expired delivery, external-writer and admin-generation fault injection |
+| Windows user Edge | safe medium-integrity/same-user process, pipe, loopback, and WSL discovery evidence | principal/session attestation plus owner-attended logout/relogin, reboot, sleep/network loss, timer-epoch/clock-uncertainty discontinuity, startup-at-logon, UAC/admin companion, cross-principal pipe ACL, ConPTY, active WSL stop/restart, WSL-after-reboot |
 | native helper | Node gap and required primitive boundary identified | disposable DACL, token/process, Job, handle identity, DPAPI, ConPTY, WinVerifyTrust, reparse containment, crash, and slow-consumer tests |
-| SQLite and blobs | one-host disposable 1M/FTS, journal, WAL, backup, crash/reopen, migration, and integrity fixture | real power/storage fault; monotonic restore fencing; concurrency/WAL pressure; durable blob publication/GC/backup fencing; encryption/retention; schema forward/downgrade; full database-plus-blob restore |
+| SQLite and blobs | one-host disposable 1M/FTS, journal, WAL, backup, crash/reopen, migration, and integrity fixture | real power/storage fault; monotonic restore fencing with trusted-time or per-Edge quiescence proof; concurrency/WAL pressure; durable blob publication/GC/backup fencing; encryption/retention; schema forward/downgrade; full database-plus-blob restore |
 | WebUI reuse | pinned source/import/package analysis | synthetic browser stream/tool/approval/10k virtualization, prepend/anchor, reconnect, blob auth, lane/tab isolation, accessibility, hostile-output qualification |
 | cross-host provider binding | same-host Ollama metadata reachability and static Codex/OpenCode adapter evidence | real enrolled remote Host reachability, TLS/auth/firewall/proxy/privacy, live inference, streaming/tool/context/cancel/approval, response-loss behavior |
 | browser/owner policy | authority model and security requirements closed | bootstrap, remote authentication/recovery, sensitive remote data classes, reconnect grace, persistent-approval default |
@@ -910,10 +1018,11 @@ They remain `Proposed` while this baseline is a draft:
 
 ## Review disposition
 
-G02 reviewed the exact original draft and the exact round-1 and round-2
-corrections; all three reviews returned `CHANGE_REQUIRED`. This revision applies
-only their bounded findings, but the Implementer has not reviewed or approved
-its own corrections. It makes no claim that a fresh review or G03 has passed.
+G02 reviewed the exact original draft and the exact round-1, round-2, and
+round-3 corrections; all four reviews returned `CHANGE_REQUIRED`. This revision
+applies only their bounded findings, but the Implementer has not reviewed or
+approved its own corrections. It makes no claim that a fresh review or G03 has
+passed.
 
 ```text
 ARCHITECTURE_0_1_READY=false

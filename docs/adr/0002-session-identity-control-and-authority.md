@@ -29,6 +29,12 @@ lease or enterprise authorization system.
    Workspace resolved-root generation. Reenrollment/identity discontinuity,
    Environment principal/trust/config/install changes, and Workspace
    root/containment identity changes respectively bump them.
+   Every allocation, advance, and tombstone is a fully formed immutable
+   authority-transition candidate with an exact predecessor and stable
+   idempotency identity. It is synchronously committed outside rollback domains
+   and durably authenticated by the external anchor before terminal publication
+   or use. Pending generations are unusable; evidence invalidating an old
+   generation closes its local scope while the replacement is pending.
 5. Runtime reincarnation is separate: every OS boot, Edge start, and
    Environment/companion start creates a fresh boot or instance ID and stream.
    Old-instance streams are fenced. A WSL Environment also binds distribution
@@ -39,26 +45,39 @@ lease or enterprise authorization system.
 7. Each SessionLane has at most one causal controller
    `(actorId, clientInstanceId)`, fenced by a monotonic `controlEpoch` and a
    separate compare-and-swap `laneMutationRevision`. Viewers may be concurrent.
+   Every epoch or revision advance follows the same authority-transition anchor
+   gate before it becomes current, terminal, or usable; a pending value grants
+   no control or mutation authority.
 8. Every causal EdgeCommand carries both lane fences. Release, grace expiry,
    suspend/archive, external-writer detection, and takeover advance and fence
-   the old epoch at Edge before new-controller effects; inability to acknowledge
-   leaves takeover pending. Disconnect itself grants bounded grace and never
-   stops work. Exact safety interrupt and approval resolution may be separately
-   authorized.
+   the old epoch at Edge before new-controller effects. A safety observation
+   closes local admission immediately while its exact transition is anchored;
+   inability to obtain anchor or Edge acknowledgement leaves takeover pending
+   and the affected scope blocked. Disconnect itself grants bounded grace and
+   never stops work. Exact safety interrupt and approval resolution may be
+   separately authorized.
 9. One immutable, allow-only `AuthorityGrant` revision is evaluated per
    FleetCommand. The grant binds the exact Hub recovery generation that issued
    it. Explicit lineage entries, command families, provider/model, approval,
    authentication, time, and revocation bounds intersect with Hub and Edge
    policy. Omitted scope is never wildcard and multiple grants never union for
-   one command.
+   one command. Grant issuance, revocation, and tombstone are exact monotonic
+   authority transitions; their complete candidate revision/digest, predecessor,
+   high-water mark, and idempotency identity are anchor-acknowledged before
+   terminal publication or use. A pending grant is never usable.
 10. Edge admission requires a Hub-authenticated decision snapshot containing
     exact grant/digests/generations, the grant's issuing Hub recovery
     generation, expiry, and a monotonic revocation watermark. Edge rejects
-    expired or older snapshots. Hub restore invalidates every prior-generation
-    grant, including one absent from a rolled-back database, and permits fresh
-    issuance only after the affected restore reconciliation/activation barrier.
-    High-risk/admin effects require live Hub contact, a current watermark, short
-    deadline, and fresh human decision at the final boundary.
+    expired or older snapshots. Revocation starts local fail-closed quiescence
+    immediately at every participant that observes the pending transition,
+    blocks the affected scope, and is not published as terminal until its exact
+    fence/watermark/tombstone is anchor-acknowledged. A crash or ambiguous
+    acknowledgement retains quarantine and retries only the exact revocation
+    identity. Hub restore invalidates every prior-generation grant,
+    including one absent from a rolled-back database, and permits fresh issuance
+    only after the affected restore reconciliation/activation barrier and its
+    own anchor gate. High-risk/admin effects require live Hub contact, a current
+    watermark, short deadline, and fresh human decision at the final boundary.
 11. A normal-user grant or approval cannot become admin authority. General
     delegation, inherited roles, policy DSLs, and enterprise RBAC are deferred.
 
@@ -71,7 +90,9 @@ lease or enterprise authorization system.
 - External native input degrades control until reviewed adoption, fork, or
   proven reattachment.
 - Hub CAS, Edge epoch order, revocation propagation, expired delivery, and admin
-  generation behavior require fault-injection acceptance. Restore must also
+  generation behavior require fault-injection acceptance. Tests must cover
+  crash/ambiguity at every authority-transition anchor boundary, pending-state
+  non-use, revocation quiescence, and exact-idempotency retry. Restore must also
   prove prior-generation grant invalidation and gated fresh issuance.
 
 ## Evidence

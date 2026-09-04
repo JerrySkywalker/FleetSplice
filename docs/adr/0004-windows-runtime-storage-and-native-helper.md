@@ -36,36 +36,71 @@ storage needs.
    Authority data uses local-filesystem WAL and `synchronous=FULL`, with a
    supported engine containing the SQLite 3.51.3 WAL-reset fix or later.
 6. Require a rollback-resistant external authority anchor outside every
-   database/backup rollback domain. Before the first effect-bearing EdgeCommand
-   of a resolution is sent, the Hub synchronously commits and receives durable
-   authenticated acknowledgement for an anchor sequence/digest covering the
-   accepted FleetCommand ID/intent, resolution ID/revision, complete immutable
-   ordered plan/step manifest and all EdgeCommand IDs/bindings, AuthorityGrant
-   issuance/revocation state plus issuance/revocation high-water marks and
-   tombstones, lane epochs/revisions, Host/Environment/Workspace
-   durable-generation high-water marks, Hub/Edge
-   recovery generations, and command/receipt/tombstone completeness. The
-   resulting authenticated `DispatchPermit` binds that exact anchor evidence to
-   the command, manifest, step, recovery/resource generations, grant, fences,
-   and bounded effect lease/deadline plus clock/skew bound. Edge verifies and
-   durably journals it before effect. Asynchronous anchor lag across first
-   effect is prohibited.
-7. Restore requires proven anchor lineage or full authority reset and
-   reenrollment with higher externally witnessed generations. The anchor also
-   records the maximum issued old-generation effect-lease/deadline horizon and
-   conservative clock/skew bound. Restore advances the recovery generation and
-   creates fresh instances, but cannot claim that this immediately fences a
-   disconnected Edge. No potentially conflicting new-generation effect
-   dispatch occurs until every affected Edge acknowledges/quiesces and
-   completes final-boundary reconciliation, or every witnessed old lease and
-   deadline expires plus the skew margin while unreachable Edges remain
-   quarantined. Old disconnected work may drain only within its permit lease;
-   an unreachable Edge cannot rejoin or effect until it observes the current
-   generation and reconciles, and no conflicting recovered work overlaps it.
+   database/backup rollback domain. Every monotonic grant
+   issue/revoke/tombstone, lane epoch/revision advance, resource-generation
+   allocation/tombstone, recovery-generation advance, and equivalent authority
+   high-water is a fully formed immutable candidate with exact predecessor and
+   idempotency identity. It is synchronously anchor-committed and durably
+   acknowledged before terminal/success publication or use to authorize an
+   effect. Pending authority is unusable. Revocation begins local fail-closed
+   quiescence immediately at every participant that observes the pending
+   transition and keeps its scope blocked without a terminal claim until the
+   exact fence/tombstone is acknowledged; crash or ambiguous acknowledgement
+   retains quarantine and exact-identity retry.
+
+   Every `DispatchPermit` is also fully formed and inert before activation. Its
+   unique ID/digest binds the exact anchor-predecessor sequence/digest;
+   FleetCommand, resolution, complete manifest, step, EdgeCommand, target, and
+   binding; grant/decision and lane fences; Hub/Edge recovery and resource
+   generations; applicable instances and Edge boot/timer epoch; absolute
+   `effectLeaseNotAfter` no later than every applicable Hub-evaluated
+   Edge-admission time bound; Hub-authenticated `remainingBudget` for that same
+   conservative horizon; declared clock/skew uncertainty; and completeness
+   high-waters. The Hub synchronously commits that exact candidate and horizon
+   to the anchor. Its durable acknowledgement returns the resulting exact
+   sequence/digest covering the candidate rather than becoming a
+   self-referential permit-digest input. Every target Edge may durably prepare
+   the candidate and resulting acknowledgement, but must acknowledge that exact
+   evidence before the Hub issues an authenticated activation/release. The
+   activation has a stable ID/digest, binds the exact permit, anchor, and Edge
+   acknowledgements, and may narrow but never widen the horizon/budget. Edge
+   must not cross an effect boundary until it verifies and durably journals the
+   candidate and activation as an immutable stable-identity activation receipt.
+   Initial, renewed, replacement, and later-step permits all use new exact
+   anchor records; renewal never extends an older permit. Replay/redelivery
+   preserves the candidate, acknowledgements, activation, monotonic deadline,
+   and budget and never replenishes time. Anchor, transport, preparation, and
+   activation delay consume the fixed horizon. The anchored maximum never lags
+   an activated permit, and asynchronous anchor lag is prohibited across every
+   effect.
+7. At receipt, Edge persists the effective expiry as the tighter of the absolute
+   Hub deadline adjusted for declared uncertainty and a local monotonic deadline
+   derived from authenticated remaining budget, bound to the exact Edge
+   boot/timer epoch. It rechecks immediately before effect. Clock anomaly beyond
+   the bound, excessive/unknown uncertainty, suspend/resume or sleep/hibernate
+   discontinuity, process/Host reboot, monotonic reset, or lost timer provenance
+   invalidates the permit and requires current-generation resynchronization and
+   a freshly anchored permit. Interruption or uncertainty never extends a lease;
+   disconnected work continues only inside a valid witnessed monotonic lease.
+
+   Restore requires proven anchor lineage or full authority reset and
+   reenrollment with higher externally witnessed generations. The restore
+   recovery-generation transition itself is anchor-acknowledged before
+   publication or use. The anchor records a maximum permit horizon that cannot
+   lag activation and its conservative uncertainty. No potentially conflicting
+   new-generation effect dispatch occurs until every affected Edge
+   acknowledges/quiesces and completes final-boundary reconciliation, or trusted
+   time-continuity evidence with bounded known uncertainty proves the current
+   time is past every anchored maximum old-generation horizon plus margin while
+   unreachable Edges remain quarantined. Without that proof, per-Edge
+   acknowledgement/reconciliation is mandatory and a conflicting scope with an
+   unreachable Edge cannot activate. An unreachable Edge cannot rejoin or
+   effect until it observes the current generation and reconciles.
    AuthorityGrants bind their issuing Hub recovery generation; restore
-   invalidates prior-generation grants and fresh issuance waits for the
-   affected reconciliation barrier. A family without enforceable lease-end
-   quiescence must use acknowledgement and final-boundary reconciliation.
+   invalidates prior-generation grants and each fresh issuance waits for the
+   affected reconciliation barrier and passes its own anchor gate. A family
+   without enforceable lease-end quiescence must use acknowledgement and
+   final-boundary reconciliation.
 8. Publish content-addressed blobs before database visibility only after a
    platform-proven durable data/rename-metadata barrier or equivalent two-phase
    recoverable protocol. GC and backup use durable manifest/reachability
@@ -80,13 +115,16 @@ storage needs.
 - Rust is a plausible helper implementation, not a frozen architecture choice.
 - Database-plus-blob backup/restore, integrity, migration, checkpoint, quota,
   encryption, and retention policies are part of acceptance.
-- User logout/reboot/sleep, UAC/admin IPC, cross-principal ACLs, ConPTY, active
-  WSL lifecycle, and startup-at-logon remain owner-attended or targeted tests.
+- User logout/reboot/sleep, monotonic timer/clock discontinuity, UAC/admin IPC,
+  cross-principal ACLs, ConPTY, active WSL lifecycle, and startup-at-logon
+  remain owner-attended or targeted tests.
 - Power loss, reader/writer pressure, WAL growth, blob crash gaps, schema
   downgrade, and full restore remain storage acceptance gates.
-- Anchor acknowledgement, bounded lease expiry, unreachable-Edge quarantine,
-  final-boundary reconciliation, and post-restore grant reissuance remain
-  fault-injection acceptance gates.
+- Every authority-transition and permit-activation acknowledgement boundary,
+  pending-state non-use, bounded monotonic lease expiry, trusted-time restore,
+  unreachable-Edge quarantine, exact-idempotency retry, final-boundary
+  reconciliation, and post-restore grant reissuance remain fault-injection
+  acceptance gates.
 
 ## Evidence
 

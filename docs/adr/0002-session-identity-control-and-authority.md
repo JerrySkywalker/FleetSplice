@@ -23,22 +23,39 @@ lease or enterprise authorization system.
    or `unknown`, each backed by evidence. A Handoff Capsule never claims to
    carry hidden reasoning, credentials, opaque vendor state, or in-flight
    effects.
-4. Host, Environment, Workspace, and optional WorktreeBinding retain independent
-   IDs and generations. Environment is a principal/process/path/credential/
-   lifecycle authority, not a label. Edge resolves and authorizes actual paths.
-5. Each SessionLane has at most one causal controller
+4. Stable resource IDs and durable generations are monotonic, tombstoned, and
+   never reused. Hub enrollment owns Host generation; Hub Environment catalog
+   owns Environment generation after companion proof; Edge owns the local
+   Workspace resolved-root generation. Reenrollment/identity discontinuity,
+   Environment principal/trust/config/install changes, and Workspace
+   root/containment identity changes respectively bump them.
+5. Runtime reincarnation is separate: every OS boot, Edge start, and
+   Environment/companion start creates a fresh boot or instance ID and stream.
+   Old-instance streams are fenced. A WSL Environment also binds distribution
+   install identity, Linux UID/root status, and mount/interop policy; reinstall
+   or configuration changes generation, while restart changes instance.
+6. Environment is a principal/process/path/credential/lifecycle authority, not
+   a label. Edge resolves and authorizes actual paths.
+7. Each SessionLane has at most one causal controller
    `(actorId, clientInstanceId)`, fenced by a monotonic `controlEpoch` and a
    separate compare-and-swap `laneMutationRevision`. Viewers may be concurrent.
-6. Disconnect grants bounded reconnect grace without stopping work. Takeover
-   raises the epoch, pauses automation, waits for Edge fencing, and never
-   interrupts implicitly. Exact safety interrupt and approval resolution may be
-   separately authorized.
-7. One immutable, allow-only `AuthorityGrant` revision is evaluated per
+8. Every causal EdgeCommand carries both lane fences. Release, grace expiry,
+   suspend/archive, external-writer detection, and takeover advance and fence
+   the old epoch at Edge before new-controller effects; inability to acknowledge
+   leaves takeover pending. Disconnect itself grants bounded grace and never
+   stops work. Exact safety interrupt and approval resolution may be separately
+   authorized.
+9. One immutable, allow-only `AuthorityGrant` revision is evaluated per
    FleetCommand. Explicit lineage entries, command families, provider/model,
    approval, authentication, time, and revocation bounds intersect with Hub and
    Edge policy. Omitted scope is never wildcard and multiple grants never union
    for one command.
-8. A normal-user grant or approval cannot become admin authority. General
+10. Edge admission requires a Hub-authenticated decision snapshot containing
+    exact grant/digests/generations, expiry, and a monotonic revocation
+    watermark. Edge rejects expired or older snapshots. High-risk/admin effects
+    require live Hub contact, a current watermark, short deadline, and fresh
+    human decision at the final boundary.
+11. A normal-user grant or approval cannot become admin authority. General
    delegation, inherited roles, policy DSLs, and enterprise RBAC are deferred.
 
 ## Consequences

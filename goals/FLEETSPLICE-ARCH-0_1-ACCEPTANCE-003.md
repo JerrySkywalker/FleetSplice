@@ -11,6 +11,7 @@ Converge the Architecture 0.1 draft against G02 findings and, only after a fresh
 3. Obtain a fresh independent Sol Ultra review of the corrected exact head.
 4. Repeat only while findings are bounded and architecture remains coherent.
 5. On PASS, set `ARCHITECTURE_0_1_READY=true` in the accepted baseline and update `AGENTS.md` so future implementation Goals may proceed only by citing that accepted baseline.
+6. In a receipt-only follow-up, publish the literal accepted architecture commit SHA, tree, and baseline path for every later Goal to cite.
 
 ## Hard stop
 

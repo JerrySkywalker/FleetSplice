@@ -27,6 +27,19 @@ Running the root train Goal constitutes owner authorization to execute its liste
 
 The train may continue automatically through PASS gates. It must stop or isolate the affected lane on `CHANGE_REQUIRED`, `BLOCKED`, `AMBIGUOUS_EFFECT`, unsafe privilege transitions, or owner-attended operations that cannot be safely automated.
 
+G04 authority is limited to G05-G10. The same root Goal independently authorizes
+its listed G11-G16 only after the accepted Architecture 0.1 commit is cited,
+G10/Station B has passed on an exact head, and each manifest dependency, child
+Goal, owner-attended operation, and independent-review gate is satisfied. No
+second owner approval is implied or required unless a child Goal explicitly
+requires one; no unlisted mutation is authorized.
+
+G03 records the immutable architecture citation in a receipt-only follow-up to
+the accepted architecture commit: literal `ACCEPTED_ARCHITECTURE_HEAD`, tree,
+and baseline path. G04 and every later product-mutation receipt cite that
+identifier; a branch name or `SELF` placeholder is not an accepted-baseline
+citation.
+
 ## Goal order
 
 1. `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001`

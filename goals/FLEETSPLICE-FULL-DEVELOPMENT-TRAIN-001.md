@@ -43,8 +43,19 @@ G01-G04 are mandatory before product implementation.
 - G01 drafts Architecture 0.1 only.
 - G02 is independent/adversarial and may not self-approve its own fixes.
 - G03 may declare `ARCHITECTURE_0_1_READY=true` only after a fresh PASS review. If review finds architecture-invalidating issues, remediate narrowly and re-run an independent review until PASS or BLOCKED.
-- G04 freezes v0.1 scope/quality/repository layout and explicitly authorizes only the listed implementation train.
-- No product source tree may be created before G03 PASS and G04 admission.
+- G04 freezes v0.1 scope/quality/repository layout and explicitly authorizes
+  only G05-G10.
+- No product source, package manifest, runtime dependency, service, deployment,
+  CI workflow, or other product mutation may be created before G03 PASS and
+  exact-head G04 `PASS_V0_1_IMPLEMENTATION_CONTRACT`; admission to or execution
+  of G04 is not implementation authority.
+
+G04 authorizes only G05-G10. Running this owner-authored root Goal separately
+authorizes its listed G11-G16 after the accepted Architecture 0.1 commit is
+cited, G10 and Station B pass on exact heads, and every manifest dependency,
+child-Goal gate, owner-attended ceremony, and independent-review requirement is
+satisfied. This post-v0.1 authority does not widen G04 or authorize unlisted
+scope.
 
 ## Fast-track policy
 
@@ -96,7 +107,9 @@ G15 requires G13 and G14 and must also reconcile any interaction-surface changes
 - durable LogicalSession/SessionLane/NativeSegment history and recovery.
 - SQLite + content-addressed blobs.
 - explicit ambiguity/reconciliation semantics.
-- suggested + owner-confirmed provider migration; no transparent failover.
+- provider-migration gate ending in either a real qualified owner-confirmed
+  migration or a verified, visible, fail-closed `NO_QUALIFIED_TARGET`; every
+  activated target requires confirmation and transparent failover is forbidden.
 - fault injection, backup/restore, upgrade compatibility, long-history UI qualification.
 
 ### Required after v0.1 in this train
@@ -144,7 +157,7 @@ A reviewer reports findings first and does not modify the reviewed head. Fixes l
 
 ## Child Goals
 
-Execute the 16 Goal files in `train-manifest.v1.json`. Treat each file as authoritative for its local scope and acceptance criteria. This root Goal is authoritative for train order, stop conditions, model selection, and cross-goal scope.
+Execute the 16 Goal files in `train-manifest.v1.json`. Treat each file as authoritative for its local scope and acceptance criteria. This root Goal is authoritative for train order, stop conditions, model selection, and cross-goal scope. No child admission or local wording bypasses the accepted-architecture citation, exact-head G04 PASS, or its manifest dependencies.
 
 ## Final disposition
 

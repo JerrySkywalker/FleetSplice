@@ -429,45 +429,55 @@ All eight wireframes must preserve these architecture rules:
 9. **Ambiguity is visible.** `AMBIGUOUS_EFFECT` is not presented as retrying, failed, or succeeded until evidence exists.
 10. **Donor libraries are renderers.** assistant-ui/OpenHands/T3 state cannot replace Fleet IDs, receipts, history, authority, or projection semantics.
 
-# v0.1 implementation order implied by the wireframes
+# Development-train order implied by the wireframes
 
-The wireframes are intentionally broader than the first implementation milestone.
+The wireframes span G05-G16 and are intentionally broader than the first
+implementation milestone.
 
 ```text
-M0 Walking Skeleton
+G05 / M0 Single-host Walking Skeleton
   W1 minimal Session Workspace
   W5 minimal Host/Workspace selection
-  real Browser -> Hub -> Edge -> Codex -> Browser
+  real Browser -> Hub -> SKYFORGE-01 Edge -> Codex -> Browser
 
-M1 Minimum Fleet Loop
+G06 / M1 Two-host Minimum Fleet Loop
   W4 Session Index
   two Hosts visible and selectable
   durable history across browser reopen
 
-M2 Daily-use Control
+G07 / M2 Daily-use Control
   W2 Approval Attention
   interrupt/resume/controller state
 
-M3 Durable Session
+G08 / M3 Durable Session
   W7 History/Checkpoint/Continuity
 
-M4 Second Agent
-  same W1/W2/W7 surfaces through ACP/OpenCode
-
-M5 Provider Migration
+G09 / M4 Provider Migration
   W3 Migration Review
 
-M6 Environment Expansion
+G10 / v0.1 Hardening and Acceptance
+  recovery/storage/update/security/UI gates
+
+G11 / v0.2 ACP Second Agent
+  same W1/W2/W7 surfaces through ACP/OpenCode
+
+G12 / v0.2 Environment Expansion
   admin/WSL states in W5
 
-M7 Coding Workspace UX
+G13 / v0.2 Coding Workspace UX
   W6 Files/Diff/Git/Terminal
 
-Later
+G14 / v0.2 First-party Remote TUI
   W8 full first-party remote TUI
+
+G15 / v0.2 WebUI/TUI Semantic Parity
+  shared backend resources, commands, statuses, and dogfood
+
+G16 / Stable-N Self-hosting Proof
+  separate N+1 worktree/canary, external activation, rollback
 ```
 
-No later wireframe is allowed to delay the first real two-host Fleet session loop.
+No later wireframe is allowed to delay the G06 two-host Fleet session loop.
 
 # Owner review checklist
 

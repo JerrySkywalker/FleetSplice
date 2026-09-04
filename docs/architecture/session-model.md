@@ -1,13 +1,22 @@
 # Session Model
 
-## Two session identities
+`ARCHITECTURE_0_1_READY=false`
+
+## Fleet session chain and native identity
 
 FleetSplice must not equate a vendor-native conversation with the user's durable work session.
 
 - **LogicalSession** — user-facing work identity, durable history, objectives, checkpoints, and continuity.
-- **NativeSession** — actual Codex thread, ACP session, OpenCode session, process, or another runtime-owned identity.
+- **SessionLane** — one causal branch and sequential mutation authority, with a
+  controller epoch, mutation revision, and ordered segments.
+- **NativeSegment** — one stable Agent/Execution/Provider/capability binding
+  epoch on a lane.
+- **NativeSession** — actual Codex thread, ACP/OpenCode session, process, or
+  another runtime-owned identity referenced by a segment.
 
-A `NativeSegment` records when one native session served one logical session.
+The normative hierarchy is
+`LogicalSession -> SessionLane -> NativeSegment -> NativeSession reference`.
+Native identity never replaces Fleet identity.
 
 ## Why segmentation exists
 
@@ -22,9 +31,14 @@ A segment boundary may occur because of:
 
 FleetSplice should never claim an in-place hot switch when an agent actually requires a new native session.
 
+Any changed Agent/Driver, Host, Environment, Workspace/Worktree, provider,
+model/reasoning contract, compatibility record, or relevant capability opens a
+new NativeSegment even if the native thread ID survives. Every segment binds
+the exact durable generations and current runtime instance identities.
+
 ## Provider switching capability
 
-Provider behavior should be capability-driven, with concepts such as:
+Provider behavior is capability-driven, with outcomes such as:
 
 - bind at native-session creation;
 - bind at resume;
@@ -32,20 +46,27 @@ Provider behavior should be capability-driven, with concepts such as:
 - migrate only through a new native segment;
 - unsupported.
 
-The exact capability names remain provisional.
+Migration quiesces/fences the source lane or explicitly forks it. Pending
+commands and approvals remain source-bound. Target activation requires exact
+proposal confirmation and current qualification; it normally opens a new
+native session with reconstructed continuity and never occurs as transparent
+failover.
 
 ## Logical state
 
-A logical session may need states such as active, waiting, paused, degraded, completed, or archived, but the state machine is not frozen. Native observed state remains separate.
+A LogicalSession lifecycle is separate from command, turn, lane-control,
+NativeSegment, process, and observed-state lifecycles. Native observed state
+remains timestamped evidence; `STALE` or `UNKNOWN` never implies stopped or
+completed.
 
 ## Human-visible transition
 
 When FleetSplice creates a new native segment, the WebUI should expose the transition: old/new host, environment, agent, provider/model, native identity, and what context was transferred.
 
-## Open questions
+## Bounded open questions
 
-- whether multiple native sessions may simultaneously contribute to one logical session;
-- subagent representation;
+- exact subagent promotion criteria; durable, causally observed subagents become
+  child lanes while opaque subagents remain native detail;
 - how to reconcile agent-native forks with FleetSplice logical forks;
-- which native metadata is durable versus diagnostic;
-- how approvals and in-flight turns behave across disconnect and migration.
+- which additional native metadata is durable versus diagnostic; and
+- retention and presentation policy for inactive or archived lanes.

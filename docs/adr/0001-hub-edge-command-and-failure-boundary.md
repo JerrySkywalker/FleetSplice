@@ -25,21 +25,36 @@ command boundary independently of any UI or transport.
 3. Every external mutation is a typed, closed, versioned `FleetCommand` through
    the Hub. Read resources, projections, receipts, events, history, search, and
    subscriptions are observation only.
-4. `FleetCommand`, immutable `ResolvedExecutionPlan`, and exact generation-bound
-   `EdgeCommand` have correlated but different identities. Once an Edge effect
-   may have started, resolution freezes and retry cannot retarget.
-5. HCP carries exact Edge commands, observations, snapshots, journal/event
+4. `FleetCommand`, immutable `ResolvedExecutionPlan`, and exact fenced
+   `EdgeCommand` have correlated but different identities. The client persists
+   `commandId` before send. Hub recomputes separate canonical payload and
+   semantic-intent digests, assigns `resolutionId + resolutionRevision`, and
+   derives one `stepKey + edgeCommandId` per frozen step with parent links,
+   dependencies, target, generations/instances, causal fences, authority and
+   qualification revisions, and payload digest.
+5. A composite is finite and schema-declared before first dispatch. Every step
+   owns an idempotency row and receipt; no wildcard expands later, no cross-Edge
+   atomicity or rollback is claimed, and the terminal receipt carries an
+   ordered step manifest. Once an effect may have started, retry cannot retarget.
+6. The client recovers response loss by receipt lookup or exact canonical
+   replay. Hub derives idempotency scope from actor/grant/family/logical target;
+   same identity aliases, changed intent conflicts without effect, and retained
+   digest tombstones prevent forgotten duplicates.
+7. HCP carries exact Edge commands, observations, snapshots, journal/event
    watermarks, receipts, and reconnect repair over an outbound authenticated
    Edge connection. Agent protocols and transport mechanics do not define HCP
    semantics.
-6. Accepted, Hub-admitted/resolved, Edge-admitted, effect-started,
+8. Accepted, Hub-admitted/resolved, Edge-admitted, effect-started,
    native-started, command-terminal, turn-terminal, and session-terminal are
    distinct facts.
-7. Generation mismatch, changed command/idempotency fingerprint, unsupported
+9. Generation mismatch, changed command/idempotency fingerprint, unsupported
    schema, or expired-before-effect work rejects with no effect. If an opaque
    effect may have crossed its boundary and cannot be reconciled, the immutable
-   result is `AMBIGUOUS_EFFECT`; no blind retry occurs.
-8. Deadline, cancellation, interruption, compensation, and rollback remain
+   result is `AMBIGUOUS_EFFECT`; no blind retry occurs. Each family defines its
+   effect/idempotency class, reconciler, and admissible evidence. The affected
+   lane/resource is quarantined until append-only `RESOLVED_SUCCEEDED` or
+   `RESOLVED_NO_EFFECT` evidence permits bounded re-entry without new rights.
+10. Deadline, cancellation, interruption, compensation, and rollback remain
    separate concepts. None silently undoes a completed external effect.
 
 ## Consequences
@@ -49,8 +64,8 @@ command boundary independently of any UI or transport.
 - `STALE` and `UNKNOWN` never mean stopped.
 - Only named, discoverable, or natively idempotent effects may make a bounded
   effectively-once claim.
-- Finite multi-step behavior must be declared by a typed command family with a
-  frozen step set and per-step receipts; Fleet core is not a general DAG engine.
+- Finite multi-step behavior remains a typed command-family contract, not a
+  general DAG engine.
 - Exact framing, transport, enrollment keys, clock-skew handling, and the
   minimal composite-family list remain bounded implementation decisions.
 

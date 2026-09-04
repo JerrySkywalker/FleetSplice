@@ -9,10 +9,11 @@ The records below are proposals produced with
 
 `IMPLEMENTATION_AUTHORIZED=false`
 
-`Proposed` means the decision is ready for independent architecture review. It
-does not mean accepted, implementation-ready, or product-authorized. G02 must
-review the exact draft head; only G03 may accept the baseline and promote these
-records. Product mutation then requires exact-head G04 PASS.
+`Proposed` means the decision is subject to independent architecture review. It
+does not mean accepted, implementation-ready, or product-authorized. G02
+reviewed the original exact draft and returned `CHANGE_REQUIRED`; the corrected
+records require a fresh independent exact-head PASS before G03 may accept the
+baseline and promote them. Product mutation then requires exact-head G04 PASS.
 
 ## Proposed records
 

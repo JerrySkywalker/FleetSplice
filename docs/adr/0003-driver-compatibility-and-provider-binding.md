@@ -34,8 +34,12 @@ OpenAI-shaped endpoint does not establish behavioral compatibility.
    Fleet does not implement a universal model gateway.
 7. v0.x migration is suggested only after binding, authority, network, privacy,
    tool, context, and compatibility probes, then explicitly user-confirmed.
-   It creates a new NativeSegment and normally a new native session with
-   reconstructed continuity. Transparent failover is prohibited.
+   Source execution is quiesced/fenced or explicitly forked; pending source
+   commands/approvals do not migrate. Plan and Edge steps bind the exact
+   qualification revision, capability digest, and expiry and recheck them
+   immediately before dispatch. Activation creates a new NativeSegment and
+   normally a new native session with reconstructed continuity. Transparent
+   failover is prohibited.
 
 ## Consequences
 
@@ -48,6 +52,9 @@ OpenAI-shaped endpoint does not establish behavioral compatibility.
 - OpenCode 1.18.16 isolated ACP results and local Ollama metadata are
   architecture evidence only. Real provider/auth, active-loss, terminal/fs,
   concurrent-client, and cross-host provider tests remain open.
+- G09 passes exactly one of two visible outcomes: a real qualified migration
+  after owner confirmation (`MIGRATION_EXECUTED`), or verified fail-closed
+  `NO_QUALIFIED_TARGET`. Only the first claims an activated migration.
 
 ## Evidence
 

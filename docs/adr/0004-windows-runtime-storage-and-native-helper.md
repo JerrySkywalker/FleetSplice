@@ -20,18 +20,31 @@ storage needs.
 2. Run the default Windows Edge in the interactive user's security/session
    context. Enroll admin and named WSL distribution/user companions separately,
    with least privilege and distinct generations. A Session-0 service is not
-   the default Agent owner.
-3. Define one small signed out-of-process native helper with a closed local
+   the default Agent owner. `windows-user` admission positively attests the
+   configured SID, interactive session, non-elevated token/integrity,
+   executable, Environment generation, and current instance; mismatch fails
+   closed.
+3. The admin companion independently requires live Hub-authenticated decision
+   evidence, exact admin Environment generation/instance, admin command family,
+   short-lived grant/deadline, recent human confirmation, authenticated caller
+   and replay-bound command/decision identity, and its local allowlist.
+4. Define one small signed out-of-process native helper with a closed local
    protocol for token/process launch, explicit ACL/pipe creation, Job Objects,
    handle identity, DPAPI, ConPTY, `WinVerifyTrust`, and reparse-sensitive path
    containment. It cannot grant Fleet authority or execute arbitrary shell.
-4. Use separate, one-writer patched SQLite databases for Hub and each Edge.
+5. Use separate, one-writer patched SQLite databases for Hub and each Edge.
    Authority data uses local-filesystem WAL and `synchronous=FULL`, with a
    supported engine containing the SQLite 3.51.3 WAL-reset fix or later.
-5. Use content-addressed filesystem blobs for large outputs/artifacts, with
-   same-filesystem temp write, digest/length verification, atomic rename,
-   transactional manifest reference, orphan repair, and visible tombstones.
-6. Prefer admitted Node 24 `node:sqlite`; retain `better-sqlite3` as a bounded
+6. Restore requires an externally anchored monotonic recovery generation or
+   full reenrollment/fencing with higher generations, fresh instance IDs,
+   retained receipt/tombstone reconciliation, and no dispatch until rollback
+   gaps cannot resurrect authority or duplicate effects.
+7. Publish content-addressed blobs before database visibility only after a
+   platform-proven durable data/rename-metadata barrier or equivalent two-phase
+   recoverable protocol. GC and backup use durable manifest/reachability
+   watermarks and mutual fencing so crashes cannot delete a visible or backed-up
+   blob.
+8. Prefer admitted Node 24 `node:sqlite`; retain `better-sqlite3` as a bounded
    fallback after exact package/native-binary qualification. Database APIs do
    not leak into product contracts.
 

@@ -3,18 +3,22 @@
 ## Status and authority
 
 - Baseline: `0.1`
-- State: `DRAFT_FOR_INDEPENDENT_REVIEW`
+- State: `DRAFT_CORRECTED_AFTER_G02_CHANGE_REQUIRED`
 - Drafting Goal: `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001` (`G01`)
+- Reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
 - Evidence cut: 2026-09-04 research and owner correction
 - `ARCHITECTURE_0_1_READY=false`
 - `IMPLEMENTATION_AUTHORIZED=false`
 - `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`
 
 This is a formal architecture draft, not an accepted baseline and not product
-implementation authority. It does not supersede [Baseline 0.0](baseline-0.0.md)
-until the independent G02 review and owner-controlled G03 acceptance gate both
-pass. Only G03 may change `ARCHITECTURE_0_1_READY`, and this draft deliberately
-leaves every readiness and implementation flag false.
+implementation authority. Independent G02 review of the original draft
+returned [`CHANGE_REQUIRED`](../train/receipts/G02.md); this revision contains
+only the bounded corrections from that receipt and has not received a fresh
+independent PASS. It does not supersede [Baseline 0.0](baseline-0.0.md) until a
+fresh review and the owner-controlled G03 acceptance gate both pass. Only G03
+may change `ARCHITECTURE_0_1_READY`, and this draft deliberately leaves every
+readiness and implementation flag false.
 
 ## Evidence basis and claim discipline
 
@@ -105,13 +109,14 @@ No fact has two writable authorities.
 | Fact or decision | Durable authority | Required boundary |
 | --- | --- | --- |
 | actor identity, browser/API authentication, Fleet policy | Hub | authentication establishes actor; display name is not identity |
-| Host enrollment and accepted Host generation | Hub policy plus Edge proof | re-enrollment fences the old generation |
-| Environment identity and accepted generation | Hub catalog plus Environment/Edge proof | user, admin, and WSL are separate authorities |
+| Host identity and durable enrollment generation | Hub enrollment registry, after Edge proof | generation is monotonic/non-reusable; reenrollment fences the old generation |
+| Environment identity and durable generation | Hub Environment catalog, after companion attestation | user, admin, and WSL are separate non-substitutable authorities |
 | current filesystem, path, Git/worktree, process, terminal, and native state | Edge/Environment | Hub receives time-qualified evidence only |
 | Workspace registration and intended placement | Hub | Edge resolves and re-authorizes the actual local root |
+| Workspace durable local generation and resolved-root identity | Edge local registry | Hub mirrors the accepted generation; Edge alone bumps it on local identity change |
 | LogicalSession, SessionLane, graph, normalized history, and search | Hub | native session IDs never replace Fleet IDs |
-| accepted FleetCommand, evaluated grant, and frozen resolution plan | Hub | immutable accepted intent and append-only receipts |
-| EdgeCommand admission, idempotency, local effect, and reconciliation | Edge journal | exact generations and local policy rechecked at dispatch |
+| accepted FleetCommand, evaluated grant, and frozen resolution plan | Hub | immutable accepted intent, current revocation watermark, and append-only receipts |
+| EdgeCommand admission, idempotency, local effect, and reconciliation | Edge journal | exact generations, authority snapshot/watermark, and local policy rechecked immediately before dispatch |
 | provider-profile metadata and desired binding | Hub | no secret-bearing profile content in public projections |
 | provider credential material and configuration application | target Environment/Edge | credentials do not move between Environments for convenience |
 | native Agent session/context | Agent runtime, observed by Edge | Fleet records native identity and continuity evidence |
@@ -126,9 +131,12 @@ partition occurs, the projection becomes `STALE` or `UNKNOWN`; it never becomes
 
 ```text
 Fleet
-  Host (stable ID, monotonic enrollment generation)
-    Environment (principal/process/path/credential/lifecycle identity + generation)
-      Workspace (registered Edge-resolved root + generation)
+  Host (stable ID + Hub-owned durable enrollment generation)
+    hostBootId (new on every OS boot)
+    edgeInstanceId (new on every Edge process start)
+    Environment (stable ID + Hub-owned durable configuration generation)
+      environmentInstanceId (new on every companion/runtime start)
+      Workspace (stable ID + Edge-owned durable resolved-root generation)
         optional WorktreeBinding (repository/worktree/head/dirty/writer evidence)
 
 LogicalSession (durable user-facing work identity)
@@ -136,17 +144,40 @@ LogicalSession (durable user-facing work identity)
     NativeSegment (stable execution/Agent/provider/capability binding epoch)
 ```
 
+Stable resource IDs and durable generations are tombstoned and never reused.
+The Hub enrollment authority alone allocates a Host generation; reenrollment,
+enrollment-credential replacement, identity discontinuity, or recovery without
+proven monotonic lineage bumps it. The Hub Environment catalog alone allocates
+an Environment generation after companion proof; a principal, integrity,
+credential boundary, path/interop policy, companion trust/configuration, or
+installation-identity change bumps it. Ordinary OS, Edge, or companion restart
+changes only its runtime instance identity unless one of those durable facts
+also changed.
+
 An `Environment` is not a platform tag or privilege toggle. It names an exact
 principal, process namespace, path system, credential-resolution boundary,
 lifecycle owner, and generation. `windows-user`, `windows-admin`, and a named
-WSL distribution/user cannot substitute for one another.
+WSL distribution/user cannot substitute for one another. A WSL Environment
+also binds the distribution installation identity, Linux UID and root status,
+and declared mount/interop policy. Reinstall or configuration change bumps its
+durable generation; WSL/companion restart creates a new
+`environmentInstanceId`.
 
-Every native execution binds to an admitted Workspace. A WorktreeBinding is
-optional but explicit when Git isolation, concurrent writers, or provenance
-requires it. Paths supplied by a Hub or client are never sufficient authority;
-the Edge resolves containment at operation time. One independently writable
-lane per exact WorktreeBinding is the safe v0.x default, but lane control is not
-a repository lock and cannot fence unrelated editors or processes.
+Every native execution binds to an admitted Workspace. The Edge alone allocates
+its monotonic local generation and bumps it when the resolved root/filesystem
+identity, containing Environment, containment policy, or registered local
+binding changes; the Hub catalogs but cannot synthesize that generation. A
+WorktreeBinding is optional but explicit when Git isolation, concurrent
+writers, or provenance requires it. Paths supplied by a Hub or client are never
+sufficient authority; the Edge resolves containment at operation time. One
+independently writable lane per exact WorktreeBinding is the safe v0.x default,
+but lane control is not a repository lock and cannot fence unrelated editors or
+processes.
+
+Every observation, snapshot, and EdgeCommand binds the durable generations and
+the current `hostBootId`, `edgeInstanceId`, `environmentInstanceId`, and stream
+identity that apply. A restart opens a new stream and fences every old-instance
+stream; an old instance can never resume its sequence under a new one.
 
 `LogicalSession` is the durable objective and history. A `SessionLane` is a
 causal branch with its own controller and ordering. A `NativeSegment` is a
@@ -194,26 +225,65 @@ inside an existing command family.
 
 ```text
 FleetCommand
-  actor-to-Hub typed semantic intent and immutable receipt identity
+  commandId persisted by the client before send
+  canonical payloadDigest + fleetCommandIntentDigest
       |
       v
 ResolvedExecutionPlan
-  durable Hub resolution to exact selected bindings and finite typed steps
+  resolutionId + immutable resolutionRevision
+  exact selected bindings and frozen finite typed steps
       |
       v
 EdgeCommand
-  exact generation-fenced request to one Edge effect boundary
+  edgeCommandId + parent command/resolution/step links
+  exact generation/instance/control-fenced request to one effect boundary
 ```
 
 The IDs are correlated and never identical. The Hub persists the resolution
-before dispatch and may auto-resolve only a unique, already selected compatible
-binding. Multiple lanes, stale/unknown placement, a privilege/provider change,
+before dispatch. Its immutable identity is `resolutionId + resolutionRevision`
+bound to the `fleetCommandId + fleetCommandIntentDigest`. Every step has a
+stable `stepKey`, distinct `edgeCommandId`, parent FleetCommand and resolution
+links, exact target Edge, typed operation/payload digest, authority decision,
+durable generations and runtime instances, `controlEpoch` and
+`laneMutationRevision` when causal, required qualification revision/expiry,
+required/optional classification, and frozen dependency `stepKey`s.
+
+The Hub may auto-resolve only a unique, already selected compatible binding.
+Multiple lanes, stale/unknown placement, a privilege/provider change,
 continuity choice, external writer, or capability gap requires explicit input.
+The complete step/dependency graph freezes before first dispatch. Each step has
+its own journal idempotency row and receipt; no composite claims cross-Edge
+atomicity or rollback, and no wildcard may expand after dispatch. The terminal
+Fleet receipt contains an ordered immutable manifest of every step receipt,
+required/optional outcome, effect identity, and ambiguity flag.
 
 Once an Edge step is admitted or may have started, the plan freezes. Redelivery
 uses the same ID, digest, plan revision, and generations. Retry never changes
 Host, Environment, Workspace, Driver, provider, model, native identity, or
 continuity mode. A new intent is a new FleetCommand with a new authority check.
+
+### Replay, duplicate, and conflict identity
+
+The client generates and durably retains `commandId` before its first send. The
+canonical command carries a separately recomputed typed `payloadDigest`; the
+Hub derives `fleetCommandIntentDigest` across every effect-relevant kind,
+target, precondition, selected authority, deadline, bounded reference, and
+payload field. Correlation metadata never deduplicates or grants authority.
+
+The Hub derives idempotency scope from authenticated actor, exact grant,
+command family, and logical target; a client cannot choose a global collision
+domain. The same `commandId` and identical intent digest returns the original
+record. Reuse with any changed effect-relevant field is
+`COMMAND_ID_REUSE_CONFLICT`. A new command ID with the same Hub-derived scope,
+idempotency key, and semantic intent aliases the original without a second
+effect; a changed intent is `IDEMPOTENCY_CONFLICT`. Rejections and at least a
+digest tombstone remain retained while the effect or session is actionable and
+for the accepted retention window.
+
+After response loss, the client retrieves by `commandId` or resends the exact
+same canonical command. Hub-to-Edge replay likewise reuses the exact
+`edgeCommandId`, digest, resolution revision, authority snapshot, generations,
+instances, and fences. Neither hop reconstructs a similar new command.
 
 ### Observation is never mutation authority
 
@@ -260,6 +330,17 @@ tool, process, or filesystem effect may have crossed its boundary and cannot be
 reconciled, automatic work stops at `AMBIGUOUS_EFFECT`. Later evidence appends
 a resolution; it never rewrites the original receipt.
 
+Every command family publishes its exact effect boundary, idempotency
+class/key/scope, admissible evidence, reconciler, terminal outcomes, and safe
+unknown-field behavior. A missing or unqualified contract disables that family.
+Ambiguity quarantines the smallest affected lane/resource/effect scope before
+another conflicting boundary; it does not stop proven-disjoint work or widen
+that work's authority. Reconciliation appends `RESOLVED_SUCCEEDED` or
+`RESOLVED_NO_EFFECT` evidence and then releases only that quarantine. A
+no-effect resolution permits a new, freshly authorized command; it does not
+retry or mutate the original. Human evidence is admissible only when the
+family contract explicitly defines it. No resolution grants unrelated rights.
+
 A deadline says not to cross a new effect boundary after its expiry. It is not
 cancellation. Cancellation and interruption are separately identified,
 best-effort commands that race completion and never claim rollback.
@@ -278,6 +359,15 @@ Each SessionLane has at most one northbound causal controller
 mutations. Browser tabs, phone sessions, TUI instances, and automation
 processes have distinct client-instance identities even for the same actor.
 
+Every causal EdgeCommand carries the exact admitted `controlEpoch` and
+`laneMutationRevision`. Edge journals the highest fenced epoch per lane and
+rejects any lower epoch before another effect boundary. Release, reconnect-grace
+expiry, suspend/archive, external-writer detection, and takeover all advance
+the epoch and must be fenced at Edge before effects from a new controller may
+start. External-writer detection immediately closes local admission while the
+Hub records the transition. If the Edge cannot acknowledge the fence, the Hub
+reports a pending reconciliation and admits no new-controller effect there.
+
 Disconnect enters bounded reconnect grace without releasing control or
 stopping native work. Authorized takeover raises the epoch, pauses automation,
 waits for the Edge fence, exposes in-flight work, and never interrupts
@@ -293,6 +383,18 @@ conditions, and revocation state. Omitted scope is never wildcard. General
 delegation, inherited roles, deny-rule languages, and enterprise RBAC are
 deferred.
 
+The Hub evaluates `notBefore`, expiry, revision, revocation, actor state, and a
+monotonic revocation watermark. Every EdgeCommand carries a Hub-authenticated,
+non-reusable decision snapshot bound to actor, grant revision/digest,
+FleetCommand and EdgeCommand intent digests, exact resource generations,
+decision expiry, and that watermark. Edge persists its highest accepted
+watermark, rejects older or expired decisions, and rechecks immediately before
+effect. Revocation blocks new Hub admission and advances the Edge watermark.
+Previously started effects are not undone. A disconnected Edge may use an
+unexpired snapshot only for a family whose policy explicitly permits it;
+high-risk and admin families require live Hub contact, a current watermark,
+short deadline, and fresh human decision at the final effect boundary.
+
 Effective authority is the intersection of authenticated actor, exact active
 grant, command schema, resource lineage, provider/model policy, lane control or
 explicit exception, Hub policy/revisions, Edge local ceiling/generations, and
@@ -307,6 +409,22 @@ terminals. `windows-admin` is a separately enrolled, explicitly elevated,
 least-privilege companion with a narrow operation set and authenticated,
 ACL-scoped IPC. A named WSL distribution/user is a separate companion with its
 own paths, processes, credentials, lifecycle, and generation.
+
+Before a `windows-user` instance admits an effect, it positively attests the
+configured Windows principal/SID, interactive session, non-elevated token and
+expected integrity level, executable identity, Environment generation, and
+fresh `environmentInstanceId`. A service, administrator/elevated token, wrong
+interactive session, or unproven attribute fails that Environment closed; the
+Edge never relabels or downgrades the process to make it match.
+
+The admin companion independently validates every effect. It requires a live
+Hub-authenticated decision snapshot bound to the exact admin Environment ID,
+durable generation and current instance, an admin-specific command family, a
+short-lived grant and deadline, recent human authentication/confirmation, the
+authenticated calling Edge/application identity plus command/decision digest
+and replay nonce, and the companion's local operation allowlist. Failure of any
+check is no-effect rejection. Neither the normal-user Edge nor an approval
+payload can mint, borrow, or generalize admin authority.
 
 A Session-0 service is not the default Agent owner. A later minimal service may
 support demonstrated pre-login discovery or update needs, but it must not take
@@ -364,10 +482,15 @@ FleetSplice configures agent-native provider mechanisms or a separately
 operated gateway profile; it does not implement a universal provider router.
 Migration is `SUGGESTED_PLUS_USER_CONFIRMED`. The proposal must show exact
 target, auth/network/privacy boundary, capability and context differences,
-checkpoint state, and continuity loss. Confirmation creates a new
-NativeSegment and normally a new native session with reconstructed continuity.
-There is no transparent failover and no blind retry of ambiguous in-flight
-work.
+checkpoint state, and continuity loss. The source lane/segment must be quiesced
+and fenced before target effect, or the user must explicitly fork so source and
+target causal histories remain distinct. Pending commands and approvals remain
+bound to the source and never migrate implicitly. The resolution plan and each
+EdgeCommand bind the target's exact compatibility/qualification record,
+revision, capability digest, and expiry; Edge rechecks all of them immediately
+before dispatch. Exact-proposal confirmation creates a new NativeSegment and
+normally a new native session with reconstructed continuity. There is no
+transparent failover and no blind retry of ambiguous in-flight work.
 
 ## Durable state, history, and handoff
 
@@ -384,12 +507,30 @@ normalized durable history, checkpoints, and blob manifests. Each Edge
 database owns local resources, EdgeCommand journal/idempotency, native/effect
 identity, outbound spool, and Hub acknowledgement watermarks.
 
+Backup and restore cannot move authority, generation, revocation, or
+idempotency time backward. Each authority store binds commands and streams to a
+monotonic `recoveryGeneration` anchored outside the rollback domain. Restore is
+admissible only when the anchor and retained receipt/tombstone watermarks prove
+lineage; it increments the recovery generation and creates new Hub/Edge,
+Environment, and event-stream instance identities. If that proof or newer
+tombstones/receipts are unavailable, all affected Hosts/Environments must be
+fully reenrolled with higher durable generations, old connections and grants
+fenced, and journals/remote receipts reconciled. No command dispatch resumes
+until gaps are tombstoned or reconciled and stale authority cannot reappear.
+
 Large tool output, terminal chunks, native payloads, diffs, and artifacts use
 content-addressed filesystem blobs. A blob is written to a same-filesystem
-temporary file, verified by digest/length, atomically renamed, and then
-referenced transactionally. Manifests record media, redaction/retention,
-availability, and provenance. Expiry leaves an event-level tombstone rather
-than silently erasing history.
+temporary file and verified by digest/length. It becomes database-visible only
+after a platform-proven durable file-data and rename-metadata barrier, or an
+equivalent two-phase recoverable publication journal that startup recovery can
+complete or tombstone. An atomic rename without that durability proof is not
+sufficient. Manifests record media, redaction/retention, availability, and
+provenance. Garbage collection uses a durable reachability watermark, grace
+window, and deletion journal; it cannot race uncommitted publication or an
+active backup. A backup fences a database snapshot to an immutable blob-manifest
+watermark, retains those blobs through verification, and restores/verifies both
+together. Expiry leaves an event-level tombstone rather than silently erasing
+history.
 
 Canonical normalized events and immutable receipts are distinct from live
 deltas and native payload references. Fleet history can span weeks even when
@@ -456,9 +597,13 @@ At v0.1 acceptance—not at G05 alone—one owner-facing URL must allow the user
 11. receive an immutable explicit ambiguity result when effect evidence cannot
     establish success or non-application.
 
-Provider migration is a separately confirmed v0.1 flow and may pass only with
-a qualified target or an honest fail-closed no-target result as defined by the
-later implementation contract. No step implies transparent failover.
+G09 has one acceptance rule with two honest terminal outcomes. It passes with
+either (a) a real, qualified migration activated only after owner confirmation
+of the exact proposal, recorded as `MIGRATION_EXECUTED`, or (b) required probes
+showing no qualified target while the product visibly remains disabled and
+fail-closed, recorded as `NO_QUALIFIED_TARGET`. Only the first claims that a
+migration occurred. Every target activation requires confirmation; neither
+outcome permits transparent failover or fabricated success.
 
 ## Security and provenance boundaries
 
@@ -528,7 +673,10 @@ This draft closes architecture wording only. The following order is normative:
    changes; the author does not self-review it.
 3. G03 may correct accepted findings and set
    `ARCHITECTURE_0_1_READY=true` only after a fresh independent PASS and owner
-   acceptance. G03 still does not create product code.
+   acceptance. G03 still does not create product code. Its receipt must publish
+   the literal accepted architecture commit SHA/tree and baseline path; all
+   later implementation receipts cite that immutable identifier rather than a
+   branch name or a self-referential placeholder.
 4. G04 may create only the v0.1 implementation contract/planning artifacts.
    **Product mutation requires G04 to reach `PASS_V0_1_IMPLEMENTATION_CONTRACT`
    on an exact accepted head; merely starting, entering, or being admitted to
@@ -536,13 +684,13 @@ This draft closes architecture wording only. The following order is normative:
    explicitly authorize exactly G05-G10 before any product directory, manifest,
    runtime dependency, service, deployment, or CI workflow may be created.
 5. G05-G10 may then implement only the accepted v0.1 contract and gates.
-6. G04's authority is deliberately limited to G05-G10. The presence of G11-G16
-   in the root train is scheduling intent, not implicit v0.2 mutation authority.
-   Before G11 product mutation, a separate owner-approved v0.2 implementation
-   contract or other explicit implementation authority must cite this accepted
-   baseline (and the accepted v0.1/G10 head), bound G11-G16 scope, and retain
-   their capability and owner-attended gates. This draft does not choose that
-   future authorization mechanism.
+6. G04's authority is deliberately limited to G05-G10. Separately, running the
+   owner-authored root train Goal is explicit authority for its listed G11-G16
+   only after the literal accepted Architecture 0.1 head is cited, G10 and
+   Station B pass on exact heads, and every manifest dependency, child-Goal
+   gate, owner-attended ceremony, and independent-review requirement is met.
+   This is not a widening of G04 and no second owner approval is invented; it is
+   the root train authority already granted. It authorizes no unlisted scope.
 
 ## Bounded implementation choices
 
@@ -561,9 +709,8 @@ them requires architecture review.
 | native helper implementation language | Rust candidate or another reviewed native implementation; protocol and privilege surface stay narrow | isolated helper qualification |
 | browser authentication and owner recovery | local owner bootstrap plus explicit remote-client auth/recovery; no browser secret propagation | owner security decision |
 | retention, encryption, backup, and redaction defaults | policy must preserve event/receipt meaning and database-plus-blob recovery | owner data-policy decision and G10 acceptance |
-| provider-migration acceptance | G04 must freeze whether G09 requires one successful qualified migration or may terminate honestly with `NO_QUALIFIED_TARGET`; neither option permits fabricated success or transparent failover | G04 acceptance contract and G09 capability gate |
 | packaging/start-at-login/update distribution | per-user execution context and externally verified canary/rollback remain invariant | G04/G10; owner-attended where needed |
-| typed composite command families | only small schema-declared finite plans with per-step receipts; no arbitrary DAG | G04 schema review and family-specific tests |
+| typed composite command families | only small schema-declared finite plans with frozen dependencies, per-step identity/idempotency/receipts, and ordered terminal manifest; no arbitrary DAG or cross-Edge atomicity | G04 schema review and family-specific tests |
 | assistant-ui adoption | accept public packages only after browser fixture; otherwise use a minimal Fleet renderer | UI capability gate |
 | permissive donor files | exact file/commit/license/import graph and Fleet adapter boundary | separate provenance review |
 | optional T3/OpenHands compatibility backend | out-of-process, version-pinned, capability-scoped; never core authority | post-0.1 demonstrated need and conformance |
@@ -577,16 +724,16 @@ No item in this table is a current PASS unless the cited report says exactly so.
 | Codex native driver | isolated no-auth lifecycle, known-ID recovery, interrupt, response-loss ambiguity, and model-transition observations | authenticated stream; successful harmless turn; pending approval/disconnect; active-turn loss; provider transition; Windows process containment |
 | generic ACP driver | OpenCode 1.18.16 isolated loopback prompt/tool/approval/cancel/load/resume/list evidence | real provider/auth; active process loss; filesystem/terminal delegation; different endpoint migration; concurrent clients |
 | driver/update admission | exact artifact/schema/capability model and bounded conformance evidence | implemented suite, retained artifact packaging, canary, downgrade/data compatibility, rollback proof |
-| lane control and grants | closed epoch/CAS/grant semantics | concurrent Hub CAS, Edge fence ordering, revocation propagation, expired delivery, external-writer and admin-generation fault injection |
-| Windows user Edge | safe medium-integrity/same-user process, pipe, loopback, and WSL discovery evidence | owner-attended logout/relogin, reboot, sleep/network loss, startup-at-logon, UAC/admin companion, cross-principal pipe ACL, ConPTY, active WSL stop/restart, WSL-after-reboot |
+| lane control and grants | closed epoch/CAS/grant/watermark semantics | concurrent Hub CAS, Edge fence ordering, live-Hub/admin snapshot validation, revocation propagation, expired delivery, external-writer and admin-generation fault injection |
+| Windows user Edge | safe medium-integrity/same-user process, pipe, loopback, and WSL discovery evidence | principal/session attestation plus owner-attended logout/relogin, reboot, sleep/network loss, startup-at-logon, UAC/admin companion, cross-principal pipe ACL, ConPTY, active WSL stop/restart, WSL-after-reboot |
 | native helper | Node gap and required primitive boundary identified | disposable DACL, token/process, Job, handle identity, DPAPI, ConPTY, WinVerifyTrust, reparse containment, crash, and slow-consumer tests |
-| SQLite and blobs | one-host disposable 1M/FTS, journal, WAL, backup, crash/reopen, migration, and integrity fixture | real power/storage fault; concurrency/WAL pressure; blob atomicity/orphans; encryption/retention; schema forward/downgrade; full database-plus-blob restore |
+| SQLite and blobs | one-host disposable 1M/FTS, journal, WAL, backup, crash/reopen, migration, and integrity fixture | real power/storage fault; monotonic restore fencing; concurrency/WAL pressure; durable blob publication/GC/backup fencing; encryption/retention; schema forward/downgrade; full database-plus-blob restore |
 | WebUI reuse | pinned source/import/package analysis | synthetic browser stream/tool/approval/10k virtualization, prepend/anchor, reconnect, blob auth, lane/tab isolation, accessibility, hostile-output qualification |
 | cross-host provider binding | same-host Ollama metadata reachability and static Codex/OpenCode adapter evidence | real enrolled remote Host reachability, TLS/auth/firewall/proxy/privacy, live inference, streaming/tool/context/cancel/approval, response-loss behavior |
 | browser/owner policy | authority model and security requirements closed | bootstrap, remote authentication/recovery, sensitive remote data classes, reconnect grace, persistent-approval default |
 | data policy | canonical store/blob architecture closed | owner retention, encryption, backup, restore, redaction, and remote-exposure defaults |
 | G02/G03/G04 | owner-authorized train and this G01 draft | independent exact-head review, owner acceptance/readiness, then exact-head G04 PASS before product mutation |
-| v0.2 G11-G16 | architecture describes bounded future capabilities | explicit post-v0.1 implementation authority; G12/G16 owner ceremonies; G15 parity review; G16 external activation |
+| v0.2 G11-G16 | root train explicitly authorizes listed work after accepted architecture and G10/Station B | exact accepted-baseline and dependency citations; G12/G16 owner ceremonies; G15 parity review; G16 external activation |
 
 An unavailable or unsafe owner-attended case is reported as
 `OWNER_ATTENDED_REQUIRED` with the exact proposed action and reason. It is not
@@ -629,13 +776,14 @@ They remain `Proposed` while this baseline is a draft:
 
 ## Review disposition
 
-This draft is complete enough for G02 to test its authority, failure, identity,
-security, storage, runtime, interaction, delivery, and scope claims against the
-exact evidence. It makes no claim that G02 or G03 has passed.
+G02 reviewed the exact original draft and returned `CHANGE_REQUIRED`. This
+revision applies those bounded findings, but the Implementer has not reviewed
+or approved its own corrections. It makes no claim that a fresh review or G03
+has passed.
 
 ```text
 ARCHITECTURE_0_1_READY=false
 IMPLEMENTATION_AUTHORIZED=false
 PRODUCT_IMPLEMENTATION_AUTHORIZED=false
-NEXT_REQUIRED_GATE=G02_INDEPENDENT_ADVERSARIAL_EXACT_HEAD_REVIEW
+NEXT_REQUIRED_GATE=FRESH_INDEPENDENT_ADVERSARIAL_REVIEW_OF_CORRECTED_EXACT_HEAD
 ```

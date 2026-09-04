@@ -32,9 +32,31 @@ activation decision were mutable from inside that work.
 
    Outage, ambiguity, rollback, fork, clone, unknown writer/root, or loss blocks
    new activation; no Hub, Edge, database, backup, standby, or candidate
-   substitutes. Planned root/epoch rollover is owner-attended, terminally closes
-   the old lineage, and links one successor to its final digest and qualified
-   predecessor closure. Unprovable lineage creates a fresh incomparable
+   substitutes. Planned rollover is owner-attended and only a preexisting
+   external owner-lifecycle writer, scoped solely to lifecycle records, may
+   authorize it; no successor root, Hub, Edge, Agent, updater, candidate, or
+   ordinary writer may do so. Before the old append, the candidate fixes stable
+   rollover and successor-genesis IDs and one complete immutable canonical
+   successor-genesis core: domain/canonicalization/digest suite, full old tuple
+   and predecessor, same Fleet, fresh anchor ID, monotonic epoch, successor
+   trust root and receipt-verification material, the full closed writer registry
+   with writer/material/credential-generation/scope-revision/record-kind/
+   resource/effect scopes, lifecycle-writer authorization digest, custody,
+   mechanism, pin, lifecycle-policy and predecessor-closure digests, and every
+   random ID and configuration value. Its digest excludes only the future old
+   terminal receipt.
+
+   One exact-predecessor CAS atomically appends `ROLLOVER_TERMINAL` and makes the
+   old lineage permanently lookup/export-only. Its `OldTerminalLink` fixes the
+   old tuple, rollover/genesis IDs, core digest, terminal record/candidate, and
+   resulting sequence/digest. Successor genesis is the deterministic canonical
+   combination of that core and exact authenticated old receipt/link; its
+   digest follows from those inputs, and no descendant is admitted before the
+   genesis is durable. Participants verify the whole link and repin. Changed or
+   noncanonical core/registry/receipt/ID, a missing link, a reused transition,
+   or any second genesis rejects. Crash, loss, and ambiguity at every boundary
+   permit exact-ID lookup/retry only, never an alternate successor. Unprovable
+   lineage creates a fresh incomparable
    Fleet/deployment/anchor and resource/credential namespace, effect-inactive,
    with qualified Path-1 predecessor termination/exclusive-control
    reconciliation required. Anchor storage/custody is separate and
@@ -80,7 +102,10 @@ activation decision were mutable from inside that work.
 - Rollback cannot undo already completed candidate effects or irreversible
   migrations; pre-activation forward/backward or restore evidence is required.
 - Anchor qualification must cover append/ack crash ambiguity, scoped-writer
-  denial, participant pins, rollback/fork/clone/loss, owner-attended rollover,
+  denial, participant pins, rollback/fork/clone/loss, lifecycle-writer
+  exclusivity, competing successor cores/registries/IDs, atomic old terminal
+  append and closure, deterministic genesis and participant repinning,
+  crash/loss/replay before and after every rollover boundary with no alternate,
   and incomparable reset. Security/update review evidence remains non-authority.
 
 ## Evidence

@@ -95,12 +95,16 @@ storage needs.
    remain its exact qualified supervisors; only target-bound predecessor fields
    may be non-current for reduction, while every unrelated fence remains
    current. That exception cannot authorize replacement privileged work. The
-   candidate orders companion consume-gate fencing before Edge issue-gate
-   fencing; anchor acknowledgement alone is neither local fence. Each gate must
-   durably install non-barging target/conflict `STOP_PENDING`, and complete
-   receipts must agree on `NONE` or one already-linearized privileged boundary.
-   An Edge-issued but unconsumed request rejects at the fenced companion. Edge
-   and companion durably retain candidate preparation, activation, reservation,
+   candidate precommits independent participant latch slots, a companion
+   authoritative boundary-cut slot, and an Edge consistency slot; anchor
+   acknowledgement alone is neither local fence. Each participant immediately
+   installs non-barging target/conflict `STOP_PENDING` at its own gate before
+   waiting. The companion cut selects `NONE` or one consumed unresolved boundary
+   and permanently fences its no-consume set; only afterward does the already
+   latched Edge reconcile its gap-free reservation map. An Edge-issued but
+   unconsumed request is classified no-effect and rejects at the fenced
+   companion. Edge and companion durably retain candidate preparation,
+   activation, reservation,
    consumption, effect, outcome, and resolution evidence. Crash after
    consumption or possible effect without a qualified outcome becomes
    `AMBIGUOUS_EFFECT`, requires reconciliation, and is never blindly replayed.
@@ -157,9 +161,21 @@ storage needs.
    reduction remains; no Hub, Edge, database, backup, clone, or standby can
    substitute.
 
-   Planned owner-attended rollover commits on and terminally closes the old
-   lineage, then links one non-concurrent successor to its final digest and
-   qualified predecessor closure. Unprovable lineage creates a fresh
+   Planned rollover is owner-attended and only the preexisting external
+   lifecycle writer may authorize it. The old candidate precommits stable
+   rollover/genesis IDs and one complete immutable successor-genesis core:
+   canonical/digest rules, old/successor tuples, same Fleet/fresh anchor/
+   monotonic epoch, successor root and verification material, full closed writer
+   registry with credential generations/scope revisions/kinds/resource/effect
+   scopes, lifecycle authorization, custody/mechanism/pin/policy digests,
+   predecessor closure, and all random IDs/configuration. The core excludes only
+   the future old terminal receipt. One CAS atomically appends
+   `ROLLOVER_TERMINAL` and closes old append to lookup/export. Successor genesis
+   is deterministic from the core plus its exact old receipt/link; changed
+   variant or second genesis rejects.
+   Participants verify and repin, and crashes use only exact-ID retry. No
+   successor root, Hub/Edge, or ordinary writer may authorize it. Unprovable
+   lineage creates a fresh
    incomparable Fleet/deployment/anchor and resource/credential namespace,
    effect-inactive, recording abandoned checkpoints/scopes and reenrollment. It
    invents no higher unknown generations and permits overlap only after
@@ -198,12 +214,14 @@ storage needs.
    not retroactive activation inputs. Admin reservation and companion
    consumption/outcome receipts are post-activation evidence, not authority,
    successor proof, or activation rewrites. Only the reduction-only
-   `SafetyControlFenceReceipt` and same-executor renewal `R_i`/`X_i` may affect
-   a specialized release or activation after candidate formation. Stable plan and
-   receipt slots are already in the candidate; no later receipt rewrites its
-   digest. Safety activation binds its fence receipt, renewal anchor decision
-   `B` binds all ordered `R_i`, and renewal activation binds `B` and all
-   `R_i`/`X_i`. No other successor proof may be late-bound.
+   `SafetyControlLocalLatchReceipt` set, applicable
+   `AdminSafetyBoundaryCutReceipt` and `SafetyControlEdgeConsistencyReceipt`,
+   and same-executor renewal `R_i`/`X_i` may affect a specialized release or
+   activation after candidate formation. Stable plan and receipt slots are
+   already in the candidate; no later receipt rewrites its digest. Safety
+   activation binds its complete latch/cut/consistency set, renewal anchor
+   decision `B` binds all ordered `R_i`, and renewal activation binds `B` and
+   all `R_i`/`X_i`. No other successor proof may be late-bound.
 
    Initial, replacement, and later-step permits follow that ordering. Renewal
    never extends an older permit. Only unchanged executor, target,
@@ -273,8 +291,9 @@ storage needs.
    families. Its closed candidate binds a domain-separated `SafetyControl`
    reservation namespace, complete AuthorityAnchor lineage/expected predecessor,
    exact target/conflict key, affected productive
-   namespaces and candidate-bound conflict chains, ordered local gates, stable
-   `STOP_PENDING`/receipt slots, exact target permit/activation,
+   namespaces and candidate-bound conflict chains, ordered local gates/roles,
+   one stable local-latch slot per participant, admin boundary-cut and Edge
+   consistency slots, exact target permit/activation,
    process-creation identity, admitted lane fences, binding,
    generation/runtime/attachment identities, aliases/transitive digest,
    actor/grant/live decision/watermark, local ceiling, monotonic `stopRevision`,
@@ -285,19 +304,29 @@ storage needs.
    concurrency requires exact participant-verifiable disjointness.
 
    Anchor acknowledgement is not a local fence. Upon authenticated observation,
-   each supervisor makes safety registration the next eligible conflicting
-   same-gate transition after any already-linearized CAS. Before waiting,
-   draining, or delivery it advances `stopRevision`, installs durable
-   target/conflict `STOP_PENDING`, rejects every not-yet-linearized conflicting
-   issue/consume/effect boundary, and emits one-use
-   `SafetyControlFenceReceipt` as the composite `PermitPreparationReceipt`
-   naming `NONE` or one exact already-linearized unresolved boundary. For admin,
-   companion consume fencing precedes Edge issue fencing; complete receipts must
-   agree on the slot, and Edge-issued/not-consumed work rejects at the fenced
-   companion. The latch survives crash/restart/response loss/replay/ambiguity
-   and expiry never reopens it. Authenticated activation binds all receipts
-   before control delivery. Acceptance, anchor ack, each fence, activation,
-   delivery, and termination are distinct.
+   each supervisor immediately changes its own precommitted slot
+   `UNSEEN -> LATCHED` as the next eligible conflicting same-gate CAS, before
+   waiting. It advances `stopRevision`, installs permanent target/conflict
+   `STOP_PENDING`, rejects not-yet-linearized conflicts, and emits an immutable
+   local latch receipt with local state/high-waters.
+
+   The companion latch CAS also emits the authoritative immutable cut: `NONE` or
+   one exact consumed unresolved slot, companion prefix/high-water and historic
+   terminal states, plus the permanent no-consume-set digest. After its own
+   latch, Edge emits a separate immutable gap-free non-forked consistency map:
+   plain `NONE`, issued/no-consume as `ISSUED_NO_EFFECT`, or exact selected Edge
+   reservation, with extra issue allowed only in the no-consume set. Gaps, forks,
+   rollback, mismatch, or extra consume reject. Activation binds every latch,
+   cut, consistency classification, high-water, and digest; pending/ambiguous
+   stays latched without delivery or barrier proof.
+
+   Candidate/activation bind one `DELIVERY_OWNER`, exact gate/route/native
+   identity/action and one-use slot; all others are `FENCE_ONLY`. The owner CASes
+   `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` before emission. Relays do not cross
+   the final boundary, replay never re-emits, and owner/route failure has no
+   fallback. Every receipt/latch survives crash/replay/expiry. Acceptance,
+   anchor ack, latches, cut, consistency, activation, transport, final delivery,
+   and termination are distinct.
 
    The safety namespace is excluded from productive reservation drain. Both
    productive gates check chain eligibility, no `STOP_PENDING`, and at most one
@@ -387,10 +416,13 @@ storage needs.
   downgrade, and full restore remain storage acceptance gates.
 - AuthorityAnchor gates include pre/post-CAS crash, lost acknowledgement and
   exact-ID lookup, competing predecessor, writer-scope denial, participant pin
-  restart, outage/loss, rollback/fork/clone/standby rejection, planned rollover
-  and old-epoch closure, and incomparable fresh-namespace reset with qualified
-  Path-1 predecessor proof. The concrete single-active storage/custody choice is
-  G04 work; none of these cases is a current PASS.
+  restart, outage/loss, rollback/fork/clone/standby rejection, lifecycle-writer
+  exclusivity, competing successor cores/registries/IDs, atomic terminal append
+  plus old-lineage closure, deterministic successor genesis and participant
+  repinning, crash/loss at every rollover boundary with no alternate genesis,
+  and incomparable fresh-namespace reset with qualified Path-1 predecessor
+  proof. The concrete single-active storage/custody choice is G04 work; none of
+  these cases is a current PASS.
 - Every authority-transition and permit-activation acknowledgement boundary,
   pending-state non-use, bounded monotonic lease expiry, trusted-time restore,
   resource/Hub-recovery/Edge-recovery/runtime successor no-overlap, qualified
@@ -404,10 +436,16 @@ storage needs.
   response loss and exact replay; changed tuple under reused
   request/slot/nonce/ordinal; stale permit/decision/proof/high-water rejection;
   and companion journal rollback/restore joining the existing barrier. Safety
-  cases include acknowledgement without local fence, `r1`/`r2`/fence
-  non-barging, Edge-issued/not-consumed rejection, participant slot agreement,
-  completion/stop, stop-revision CAS, durable latch crash/replay/expiry,
-  duplicates, unsupported delivery and crash ambiguity.
+  cases include immediate independent local latches before any wait; durable
+  non-barging across `r1`/`r2`/fence orders; companion authoritative `NONE` or
+  one-slot cut and permanent no-consume set; Edge gap-free consistency for no
+  issue, issued-no-effect, selected-slot terminal progress, gaps, forks,
+  rollback, mismatches, and extra consumes; activation binding every immutable
+  receipt; and exactly one delivery owner journaling
+  `DELIVERY_EFFECT_POSSIBLE` before native emission. Crash, response loss,
+  replay, expiry, owner/route failure, unsupported delivery, attempted fallback,
+  relay-versus-final-boundary confusion, and any second emission must fail
+  closed without rewriting a receipt or reopening a latch.
   Renewal cases cover `A`, every `R_i`, `B`, every general `X_i`,
   admin-specialized `X_C` then `X_E`, abort/final activation crash and replay,
   consume-versus-`X_C`, issue-versus-`X_E`, complete exact-namespace delta and

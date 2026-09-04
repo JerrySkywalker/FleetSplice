@@ -42,9 +42,18 @@ Edge, database, backup, clone, or standby substitutes for the lineage. Already
 activated work drains only within a previously verified finite horizon;
 reduction-only fail-closed safety may still reduce it.
 
-Planned epoch/root rollover is owner-attended, committed on and terminally
-closes the old lineage, and links one non-concurrent successor to the old final
-digest and qualified predecessor closure. If lineage is unprovable, recovery
+Planned epoch/root rollover is owner-attended and authorized only by the
+preexisting external lifecycle writer. The old candidate precommits stable
+rollover/genesis IDs and one complete canonical successor-genesis core: old and
+successor tuples, canonical/digest rules, trust/verification material, full
+closed writer registry/scopes, lifecycle authorization, custody/mechanism/pin/
+policy digests, predecessor closure, and every identifier/configuration field.
+One old-lineage CAS atomically appends the terminal record, permanently closes
+append, and returns its exact receipt/link. The one successor genesis is
+deterministic from that immutable core plus the exact old terminal link/receipt;
+changed variants or second genesis reject, and participants verify and repin
+before use. No successor
+root, Hub, Edge, or ordinary writer can authorize rollover. If lineage is unprovable, recovery
 creates a fresh incomparable Fleet/deployment/anchor and resource/credential
 namespace in an effect-inactive state. It never invents unknown higher
 generations; overlapping work needs qualified termination/exclusive control and
@@ -78,17 +87,28 @@ to the exact precommitted `P0` reservation namespace plus its transfer closure.
 Unrelated permit, safety, `STOP_PENDING`, revocation, boundary, changed
 `stopRevision`, unresolved possible effect, or any other predicate drift rejects.
 Transfer receipts and final activation bind base/final high-waters, the delta
-digest, final namespace digest, and `X_E -> X_C` evidence.
+digest and final namespace digest; `X_E` binds the exact already completed prior
+`X_C` receipt and evidence.
 
 Admin reservation slots are partitioned into candidate-bound exact conflict
 chains. Overlapping slots are sequential with at most one unresolved; concurrent
 chains require participant-verifiable disjointness. On authenticated observation
-of an acknowledged `SafetyControl`, the companion consume gate and Edge issue
-gate durably install same-gate target/conflict `STOP_PENDING` as the next
-eligible conflicting transition, reject all not-yet-linearized work, and bind
-`NONE` or the same one already-linearized unresolved boundary. Anchor
-acknowledgement is not a local fence. Latches and receipts survive crash/replay
-and do not expire; a safety stop-revision advance invalidates admin renewal.
+of an acknowledged `SafetyControl`, every participant immediately and
+independently installs an immutable same-gate local `STOP_PENDING` latch receipt
+before waiting. The companion latch also records the authoritative `NONE` or
+one-consumed-slot boundary cut and permanent no-consume set. After its own latch,
+the Edge records a distinct immutable gap-free reservation-to-cut consistency
+receipt; activation binds every latch, cut, consistency classification, and
+high-water/digest. Anchor acknowledgement is not a local fence, and companion
+cut precedence never delays the Edge latch. Pending or ambiguous state stays
+latched and cannot deliver.
+
+Exactly one candidate-bound participant is `DELIVERY_OWNER`; all others are
+`FENCE_ONLY`. The owner journals `DELIVERY_EFFECT_POSSIBLE` in a one-use slot
+before native emission. Relays cannot cross the final boundary, exact replay
+never re-emits, and owner/route failure or ambiguity has no fallback. Latches
+and receipts survive crash/replay and do not expire; a safety stop-revision
+advance invalidates admin renewal.
 
 ## Inference authority
 

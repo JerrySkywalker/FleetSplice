@@ -66,7 +66,13 @@ processes, renderers, candidates, and canaries cannot write the anchor or
 self-authorize. Anchor ambiguity, outage, rollback, fork, or loss blocks new
 authority, permit, barrier, and successor activation. Previously verified work
 may only drain inside its fixed finite horizon, and reduction-only local safety
-remains available. Planned rollover is owner-attended and one-way; unprovable
+remains available. Planned rollover is owner-attended, one-way, and authorized
+only by the preexisting external lifecycle writer. Its
+old-lineage candidate precommits one complete immutable successor-genesis core,
+closed writer registry, stable rollover/genesis IDs, custody/policy digests, and
+predecessor closure. One CAS atomically appends the terminal record and closes
+the old lineage; successor genesis is deterministic from that core plus the
+exact resulting old receipt. No successor root/Hub/Edge can authorize a variant. Unprovable
 lineage requires a fresh incomparable Fleet/deployment/anchor namespace and
 qualified predecessor termination/exclusive-control reconciliation rather than
 transparent failover.
@@ -79,5 +85,12 @@ admin `X_C`/`X_E` may accept a complete contiguous delta confined to their
 precommitted predecessor namespace, never safety, stop, revocation, or unrelated
 drift. On authenticated safety acknowledgement observation, participant-local
 same-gate `STOP_PENDING` registration—not Hub or anchor acknowledgement—is the
-non-barging fence. It rejects all not-yet-linearized conflicts, survives
-crash/replay/expiry, and invalidates a prepared admin renewal.
+non-barging fence. Every participant latches immediately without waiting. The
+companion simultaneously records the authoritative `NONE`/one-slot boundary
+cut; after its own latch the Edge records a separate immutable gap-free
+consistency map. Activation binds all latches, cut, consistency, and high-waters.
+Exactly one candidate-bound delivery owner may durably enter
+`DELIVERY_EFFECT_POSSIBLE` and emit at the final native boundary; all other
+participants are `FENCE_ONLY`, relays do not deliver, replay never re-emits, and
+owner/route failure has no fallback. Latches survive crash/replay/expiry and
+invalidate a prepared admin renewal.

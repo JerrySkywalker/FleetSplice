@@ -3,7 +3,7 @@
 ## Status and authority
 
 - Baseline: `0.1`
-- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_9_CHANGE_REQUIRED`
+- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_10_CHANGE_REQUIRED`
 - Drafting Goal: `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001` (`G01`)
 - Initial reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
 - Round-2 reviewed draft: `b82df67d5a045d31b04b0efb3fb5c0a2cb9de571`
@@ -14,14 +14,15 @@
 - Round-7 reviewed draft: `b7a213792be89fa8ff996bab989fc24ed1644313`
 - Round-8 reviewed draft: `35c4c1a815930642c723bf0916a531b73c18e6d2`
 - Round-9 reviewed draft: `690f822d6da054a6f65080cd74c90e61526e484e`
-- Evidence cut: 2026-09-05 round-9 review, erratum, and bounded correction
+- Round-10 reviewed draft: `0669ca707143cde2266c502971d5936622d5e64e`
+- Evidence cut: 2026-09-05 round-10 review and bounded correction
 - `ARCHITECTURE_0_1_READY=false`
 - `IMPLEMENTATION_AUTHORIZED=false`
 - `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`
 
 This is a formal architecture draft, not an accepted baseline and not product
 implementation authority. Independent G02 reviews of the original draft and
-its first eight corrections returned
+its first nine corrections returned
 [`CHANGE_REQUIRED`](../train/receipts/G02.md),
 [round-2 `CHANGE_REQUIRED`](../train/receipts/G02-r2.md),
 [round-3 `CHANGE_REQUIRED`](../train/receipts/G02-r3.md),
@@ -31,7 +32,8 @@ its first eight corrections returned
 [round-7 `CHANGE_REQUIRED`](../train/receipts/G02-r7.md),
 [round-8 `CHANGE_REQUIRED`](../train/receipts/G02-r8.md), and
 [round-9 `CHANGE_REQUIRED`](../train/receipts/G02-r9.md), with its
-[ordering erratum](../train/receipts/G02-r9-erratum.md), respectively. This
+[ordering erratum](../train/receipts/G02-r9-erratum.md), and
+[round-10 `CHANGE_REQUIRED`](../train/receipts/G02-r10.md), respectively. This
 revision contains only their bounded corrections and has not received a fresh
 independent PASS. It does not supersede [Baseline 0.0](baseline-0.0.md) until a
 fresh review and the owner-controlled G03 acceptance gate both pass. Only G03
@@ -188,7 +190,12 @@ replace its own credential, change its credential generation, or authorize a
 new writer. Agent, Driver, compatibility, native-helper, renderer, security
 scanner, update, and candidate processes receive no anchor-writer credential and
 cannot write, authorize, or attest their own admission. Writer lifecycle and
-root custody are owner-controlled bounded choices for G04.
+root custody are owner-controlled bounded choices for G04. The initial genesis
+registry designates exactly one preexisting external owner-lifecycle writer,
+identified by its own credential generation and scope revision, as the only
+writer for anchor lifecycle and rollover records. A Hub writer, ordinary scoped
+writer, successor trust root, successor Hub/Edge, Agent, updater, or candidate
+cannot authorize rollover or modify that lifecycle writer's authority.
 
 Every Hub, Edge, elevated companion, and other effect-boundary participant
 durably pins its highest independently verified checkpoint
@@ -215,14 +222,44 @@ companion, database, backup copy, stream, or newly started anchor instance may
 substitute for the unavailable lineage or invent a higher sequence.
 
 A planned anchor epoch or trust-root rollover is owner-attended, one-way, and
-never concurrent. Before the old epoch closes, its current lineage commits one
-rollover record naming the successor anchor/root/epoch, the terminal old
-sequence and digest, and qualified closure of every potentially effecting
-predecessor. The old epoch then permanently rejects further append. The
-successor genesis links to that terminal record and cannot become usable until
-participants verify the link and required predecessor closure. Rollback to the
-old epoch, dual-active roots, standby election, or transparent failover is a
-fork and fails closed.
+never concurrent. The preexisting external owner-lifecycle writer first forms
+one immutable rollover candidate with stable `rolloverId` and
+`successorGenesisId` and a complete canonical `SuccessorGenesisCore`. The core
+binds its canonicalization domain and digest suite; the full old lineage tuple
+and expected predecessor; the same `fleetId`; a fresh `anchorId`; the exact
+monotonic successor epoch; successor trust root and receipt-verification
+material; and the complete closed canonical successor writer registry. Every
+registry entry binds writer ID, public/material digest, credential generation,
+scope revision, allowed record kinds, and resource/effect scopes. The core also
+binds the lifecycle-writer authorization digest, anchor mechanism and custody
+digests, participant-pin and lifecycle-policy digests, qualified
+predecessor-closure digest, and all randomness, identifiers, and configuration
+that can distinguish one successor genesis from another. Its
+`successorGenesisCoreDigest` excludes only the future resulting old-lineage
+terminal receipt; no other field is late-bound.
+
+One exact-predecessor CAS by that lifecycle writer atomically appends the
+`ROLLOVER_TERMINAL` record and permanently changes the old lineage to
+`CLOSED_LOOKUP_EXPORT_ONLY`. Its resulting `OldTerminalLink` binds the old
+lineage tuple, `rolloverId`, `successorGenesisId`, core digest, terminal record
+ID/kind/candidate digest, and exact resulting old sequence and record digest.
+No append can follow that CAS. The successor genesis is the deterministic
+canonical combination of the precommitted `SuccessorGenesisCore` and that exact
+authenticated old terminal receipt/link; its `genesisDigest` is derived from
+both. The successor may append its first descendant only after this one genesis
+is durably committed.
+
+Every participant verifies the lifecycle writer, old terminal ancestry and
+atomic closure, exact core and registry, `OldTerminalLink`, deterministic
+successor genesis, qualified predecessor closure, and monotonic epoch before it
+repins to the successor. A changed core, registry, scope, receipt, transition or
+genesis ID, second genesis, non-canonical encoding, missing/mismatched link, or
+descendant before durable genesis rejects as fork. Crash or response loss before
+the old append, after append before acknowledgement, after old closure, during
+successor genesis commit, or before participant repin resolves only by exact
+`rolloverId`/`successorGenesisId` lookup and exact retry. It never authorizes an
+alternate record or successor. Rollback to the old epoch, dual-active roots,
+standby election, or transparent failover is a fork and fails closed.
 
 If the current lineage cannot be proved, catastrophic recovery is not a
 rollover. It creates a new incomparable `fleetId`, `deploymentId`, `anchorId`,
@@ -699,15 +736,18 @@ activation inputs. An admin `AdminBoundaryReservationReceipt` and matching
 companion consumption/outcome receipt are post-activation pre-effect or outcome
 evidence, not successor proof, activation input, or activation rewrite.
 The only additional late-produced local receipts that may affect a specialized
-release or activation are the reduction-only `SafetyControlFenceReceipt` and
+release or activation are the reduction-only
+`SafetyControlLocalLatchReceipt` set, applicable
+`AdminSafetyBoundaryCutReceipt` and `SafetyControlEdgeConsistencyReceipt`, and
 the same-executor renewal `R_i`/`X_i` receipts defined below. Safety-control
-activation binds its exact fence receipt; renewal anchor decision `B` binds the
-complete ordered `R_i` set, and renewal activation binds `B` and the complete
-ordered `R_i`/`X_i` sets. Their stable plan, slot, and receipt identities and
-proof obligations are committed in the corresponding immutable candidate; the
-later receipt values never rewrite `permitDigest`. A safety receipt is not a
-successor proof. No other specialized fence, barrier, disjointness evidence, or
-successor proof may be omitted from the candidate and supplied late.
+activation binds its complete exact latch/cut/consistency set; renewal anchor
+decision `B` binds the complete ordered `R_i` set, and renewal activation binds
+`B` and the complete ordered `R_i`/`X_i` sets. Their stable plan, slot, and
+receipt identities and proof obligations are committed in the corresponding
+immutable candidate; later receipt values never rewrite `permitDigest`. Safety
+evidence is not successor proof. No other specialized fence, barrier,
+disjointness evidence, or successor proof may be omitted from the candidate and
+supplied late.
 
 Every initial, replacement, and later composite-step permit follows the general
 ordering above. A renewal is a new permit with a new identity and never mutates
@@ -929,21 +969,30 @@ commitment alone is never authorization.
 The immutable candidate has a stable `safetyControlId`, digest, idempotency
 identity, `fencePlanId`, domain-separated `SafetyControl` reservation namespace,
 complete AuthorityAnchor lineage tuple and expected predecessor, and monotonic
-`stopRevision`. It binds the authenticated
-actor, exact grant/decision/digests/watermark and expiry; closed action; exact
-target FleetCommand, EdgeCommand, native turn or operation; predecessor
+`stopRevision`. It binds the authenticated actor, exact
+grant/decision/digests/watermark and expiry; closed action; exact target
+FleetCommand, EdgeCommand, native turn or operation; predecessor
 `permitId + activationId`; managed-process creation identity; executor and
 execution binding; resource and Hub/Edge recovery generations; the target
 command's admitted `controlEpoch` and `laneMutationRevision`;
 runtime/boot/timer/attachment identities; exact target/conflict key, effect
 scope, aliases, and complete transitive predecessor digest; applicable local
 policy ceiling; every affected productive reservation namespace and its
-candidate-bound conflict-chain membership/order; the ordered participant issue,
-consume, or native-effect gates; and stable per-participant `STOP_PENDING` and
-fence-receipt slots. It also names the exact already qualified supervising
-participant or ordered participant set from the target activation. The plan is
-closed before anchor commitment and has no free-form arguments or dynamically
-discovered conflict scope.
+candidate-bound conflict-chain membership/order; and the exact ordered
+participant issue, consume, or native-effect gates and roles.
+
+For every participant the candidate precommits one stable
+`localLatchReceiptSlotId`. An admin target additionally precommits one stable
+companion-authoritative `adminBoundaryCutReceiptSlotId` and one stable
+`edgeConsistencyReceiptSlotId`. The candidate and later activation also bind
+exactly one `controlDeliveryParticipantId` with role `DELIVERY_OWNER`, its exact
+delivery gate, `transportRouteDigest`, bound process-creation/native identity,
+closed action, and one-use `controlDeliverySlotId`; every other participant has
+role `FENCE_ONLY`. A relay may carry authenticated bytes but cannot cross the
+final native effect boundary. All identifiers, roles, gates, and receipt slots
+are closed before anchor commitment and cannot be discovered or reassigned
+later. The plan has no free-form arguments or dynamically discovered conflict
+scope.
 
 Safety control uses this ordering:
 
@@ -953,32 +1002,58 @@ Safety control uses this ordering:
    participant-local fence.
 2. Upon authenticated observation of that acknowledgement, each exact existing
    supervising participant verifies the candidate against the still-identical
-   target and registers safety at the exact serialized gate named by the plan.
+   target and immediately registers safety at its own exact serialized gate.
    Registration becomes the next eligible conflicting transition after any CAS
-   already linearized when the acknowledgement was observed; it cannot wait
-   outside that gate while a queued, delayed, higher-ordinal, or replayed
-   productive transition barges ahead. Before any other wait, drain, delivery,
-   or effect, one CAS atomically advances the highest `stopRevision`, installs a
-   durable target/conflict-scope `STOP_PENDING` latch, closes every
+   already linearized when the acknowledgement was observed; it cannot wait for
+   another participant or outside the gate while queued, delayed,
+   higher-ordinal, or replayed work barges ahead. Before any wait, drain,
+   reconciliation, delivery, or effect, one CAS changes its precommitted local
+   slot `UNSEEN -> LATCHED`, advances the highest `stopRevision`, installs a
+   permanent durable target/conflict-scope `STOP_PENDING` latch, closes every
    not-yet-linearized conflicting issue, consume, and non-safety boundary, and
-   journals one stable, one-shot
-   `SafetyControlFenceReceipt`. That receipt is the domain-separated composite
-   form of the participant's `PermitPreparationReceipt`: it includes every
-   ordinary preparation field plus the stop fence, exact gate and conflict
-   chain, and either `NONE` or the one exact already-linearized unresolved
-   effect-boundary slot allowed to finish. It serves as the ordered
-   preparation/closure acknowledgement. No generic participant acknowledgement
-   is omitted; returning the exact receipt grants no productive authority. For
-   an admin target the plan orders the companion consume gate before the Edge
-   issue gate so the companion identifies `NONE` or the one possible-effect
-   slot and the Edge receipt must bind that same identity. A complete receipt
-   set that names different slots fails closed. An Edge-issued request not yet
-   consumed by the companion is not an already-linearized privileged boundary;
-   the fenced companion durably rejects it without effect.
-3. An authenticated `SafetyControlActivation` binds the candidate, anchor
-   acknowledgement, and complete ordered fence-receipt set. Each participant
-   journals the activation before emitting only the exact closed native control
-   to the bound process-creation/native identity.
+   journals an immutable `SafetyControlLocalLatchReceipt`. The receipt binds the
+   candidate/anchor, participant/role/gate, prior and resulting local
+   high-waters and state, stop revision, conflict chains, and latch slot. Crash
+   or response loss retries that exact slot and returns the same receipt;
+   `LATCHED` never reopens because of expiry, disconnect, or ambiguity.
+3. For an admin target, the companion's latch CAS additionally fills the
+   precommitted `adminBoundaryCutReceiptSlotId` with one immutable authoritative
+   `AdminSafetyBoundaryCutReceipt`. The cut binds `NONE` or the one exact
+   companion-consumed unresolved slot permitted by the conflict-chain rule, the
+   complete companion journal prefix and high-water through the latch, historic
+   terminal states, and a digest of every other precommitted reservation slot
+   that had not consumed at the cut and is now permanently fenced. Selection is
+   final: later terminal progress may refine the selected slot's outcome but
+   cannot change its identity, and a slot in the no-consume set can never consume.
+   "Companion first" means this cut is authoritative before Edge consistency;
+   it never permits the Edge to delay its own immediate local latch.
+4. After its own latch the Edge may wait for the authenticated companion cut,
+   then fills the precommitted `edgeConsistencyReceiptSlotId` once with an
+   immutable `SafetyControlEdgeConsistencyReceipt`. It proves a complete,
+   contiguous, gap-free, non-forked reservation-to-cut map between the Edge
+   journal and companion prefix. A `NONE` cut with no Edge issue maps to `NONE`.
+   Each Edge-issued slot named in the cut's permanent no-consume set maps to
+   `ISSUED_NO_EFFECT`. A selected slot must have the exact compatible Edge
+   reservation and keeps that fixed identity even if its outcome later becomes
+   terminal. Any additional issued slot is admissible only when present in the
+   permanent no-consume set. A sequence gap, fork, rollback, mismatched selected
+   identity, unlisted issue, extra consume, or non-monotonic selected outcome
+   fails closed without rewriting any receipt.
+5. An authenticated `SafetyControlActivation` binds the candidate, anchor
+   acknowledgement, complete ordered local-latch receipts, authoritative admin
+   boundary cut and Edge consistency receipt when applicable, all exact
+   high-waters/digests, and the reconciled boundary classification. A pending or
+   ambiguous selected boundary stays latched and permits neither control delivery
+   nor barrier/termination proof until qualified reconciliation.
+6. Only the bound `DELIVERY_OWNER` may approach the final native control
+   boundary. At the exact delivery gate it atomically changes its one-use slot
+   `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and journals a receipt binding all
+   activation, cut/consistency, route, action, and native/process evidence before
+   first native emission. Exact replay returns that receipt and never re-emits.
+   Owner crash, response loss, ambiguity, outage, disqualification, or route
+   failure has no fallback owner and keeps the target quarantined until
+   reconciliation. Transport acceptance or relay handoff and the final native
+   effect boundary are distinct receipts; only this owner can cross the latter.
 
 The `SafetyControl` reservation namespace is disjoint from every productive
 admin reservation namespace and is excluded from productive reservation drain.
@@ -990,19 +1065,19 @@ the registration CAS is next and rejects every other not-yet-linearized request
 regardless of earlier Edge issue, transport delay, ordinal, or replay. If safety
 registration wins first, it rejects all such requests immediately. Exact
 participant-verifiable disjoint chains may continue, but ordinal or list order
-alone is not disjointness. The latch and receipt survive crash, restart,
-response loss, exact replay, and ambiguity; expiry, timer discontinuity,
-disconnect, or failed delivery never removes the latch or reopens a boundary.
-Exact replay returns the same registration/fence receipt.
+alone is not disjointness. Every local latch, boundary cut, consistency receipt,
+and delivery slot survives crash, restart, response loss, exact replay, and
+ambiguity; expiry, timer discontinuity, disconnect, or failed delivery never
+removes a latch or reopens a boundary.
 
 Hub acceptance, anchor acknowledgement, each participant-local safety
-registration, complete fence-receipt reconciliation, safety activation, native
-delivery, and target termination are distinct facts. Safety never waits for
-productive drain and never grants productive authority, satisfies `X_C` or
-`X_E`, proves termination, completes a barrier, or authorizes transfer. Its
-`stopRevision` advance invalidates a prepared admin renewal; neither the
-`STOP_PENDING` transition nor any safety record is eligible for the
-admin-specialized high-water delta.
+registration, companion boundary cut, Edge consistency, safety activation,
+transport handoff, final native delivery boundary, and target termination are
+distinct facts. Safety never waits before local latching, grants productive
+authority, satisfies `X_C` or `X_E`, proves termination, completes a barrier, or
+authorizes transfer. Its `stopRevision` advance invalidates a prepared admin
+renewal; no latch, cut, consistency, `STOP_PENDING`, or delivery transition is
+eligible for the admin-specialized high-water delta.
 
 `SafetyControl` cannot retarget, start, resume, retry new work, steer, approve,
 write, migrate, renew a permit, change binding/scope/lease/controller, or carry
@@ -1010,14 +1085,15 @@ arbitrary shell, path, method, or provider arguments. A replacement runtime may
 not acquire the target merely to deliver control; it must already be the named,
 qualified supervisor of that exact target and creation identity. Target
 completion versus stop is linearized in the supervising local journal. Receipts
-distinguish `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, `DELIVERED_PENDING`,
+distinguish `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`,
+`DELIVERY_EFFECT_POSSIBLE`,
 `UNSUPPORTED`, and `AMBIGUOUS_EFFECT`; delivery is never proof of terminality,
 rollback, predecessor termination, or barrier completion.
 
-Exact replay returns the existing receipt. A command family may instead permit
-idempotent retransmission only to the same process-creation/native identity
-under the same candidate, activation, and `stopRevision`; changed identity or
-an opaque control family is not retried. Response or crash ambiguity keeps the
+Exact replay returns the existing local-latch, cut, consistency, delivery, or
+outcome receipt as applicable and never re-emits the native control. Changed
+identity, owner, route, slot, or action is a no-effect conflict. Response or
+crash ambiguity keeps the
 target and every alias in the unresolved transitive predecessor set and
 quarantines conflicting successors until reconciled. Only a qualified terminal
 outcome plus complete final journal/native/effect-boundary reconciliation may
@@ -1699,9 +1775,13 @@ implementation/capability gates, not current PASS claims:
   clone or standby; complete outage; durable loss; and attempted Hub, Edge,
   database, or backup substitution. Every case must block new activation while
   admitting only the explicitly bounded old-work drain and reduction paths.
-- **Anchor lifecycle:** crash before and after planned rollover commitment;
-  terminal old-epoch append rejection; successor-link verification; attempted
-  dual-root use; and catastrophic unprovable-lineage reset to a fresh
+- **Anchor lifecycle:** external lifecycle-writer admission; two changed genesis
+  cores/registries/IDs competing for one predecessor; crash before terminal
+  append, after atomic append/closure before response, during deterministic
+  successor-genesis commit, and before participant repin; exact-ID replay;
+  terminal old-epoch append rejection; missing/mismatched old link; descendant
+  before durable genesis; attempted dual-root use; and catastrophic
+  unprovable-lineage reset to a fresh
   Fleet/deployment/anchor and fresh resource/credential namespace. Reset must
   prove qualified Path 1 predecessor closure/reconciliation or keep an
   unreachable predecessor unavailable; trusted-time alone cannot qualify it.
@@ -1711,14 +1791,20 @@ implementation/capability gates, not current PASS claims:
   predicate drift rejects; pending/`CONSUMED_EFFECT_POSSIBLE`/ambiguous state
   blocks; `X_C -> X_E`, receipt binding, final activation, crash, and replay all
   retain the same base/final high-waters and digests.
-- **Safety non-barging:** reproduce the vulnerable total order companion
+- **Safety non-barging and delivery:** reproduce the vulnerable total order companion
   consume `r1` -> companion consume `r2` -> safety-fence CAS when authenticated
   safety is pending but no local latch exists; then prove the corrected gate
-  permits at most one already-linearized boundary, makes safety registration
-  next, and rejects `r2`. Cover fence-first, consume-first, Edge-issued but not
-  companion-consumed delivery, proven-disjoint chains, mismatched participant
-  slot receipts, crash/restart, response loss, exact replay, expiry, and
-  acknowledgement-without-local-fence.
+  permits at most one already-linearized boundary, makes every independent local
+  latch next without cross-participant waiting, and rejects `r2`. Cover distinct
+  observation times; companion `NONE` with no issue; `NONE` with issued slot in
+  the permanent no-consume set mapping to `ISSUED_NO_EFFECT`; selected consumed
+  slot with later terminal progress; extra issued no-consume slots; gap, fork,
+  mismatch, rollback, and extra consume; proven-disjoint chains; latch/cut/
+  consistency crash and exact replay; expiry; and acknowledgement without a
+  local latch. Prove one bound delivery owner, all others `FENCE_ONLY`, durable
+  `DELIVERY_EFFECT_POSSIBLE` before emission, transport-versus-native-boundary
+  separation, exact replay without re-emission, and no fallback on owner or
+  route failure.
 
 ## Required capability and owner gates retained
 
@@ -1726,11 +1812,11 @@ No item in this table is a current PASS unless the cited report says exactly so.
 
 | Area | Evidence currently available | Gate that remains |
 | --- | --- | --- |
-| Fleet-scoped AuthorityAnchor | mechanism-independent record, writer-scope, participant-pin, outage/fork, planned-rollover, and catastrophic-reset contract | G04 chooses exact single-active mechanism/custody; implementation then passes append ambiguity, crash/restart, rollback/fork/clone/loss, scoped-writer, participant-pin, rollover, and fresh-namespace Path-1 reset fault gates |
+| Fleet-scoped AuthorityAnchor | mechanism-independent record, writer-scope, participant-pin, outage/fork, deterministic successor-genesis rollover, and catastrophic-reset contract | G04 chooses exact single-active mechanism/custody; implementation then passes append ambiguity, crash/restart, rollback/fork/clone/loss, scoped-writer, immutable-core/atomic-close/deterministic-genesis rollover, participant repin, and fresh-namespace Path-1 reset fault gates |
 | Codex native driver | isolated no-auth lifecycle, known-ID recovery, interrupt, response-loss ambiguity, and model-transition observations | authenticated stream; successful harmless turn; pending approval/disconnect; active-turn loss; provider transition; Windows process containment |
 | generic ACP driver | OpenCode 1.18.16 isolated loopback prompt/tool/approval/cancel/load/resume/list evidence | real provider/auth; active process loss; filesystem/terminal delegation; different endpoint migration; concurrent clients |
 | driver/update admission | exact artifact/schema/capability model and bounded conformance evidence | implemented suite, retained artifact packaging, isolated-canary disjointness and promotion-predecessor closure, downgrade/data compatibility, rollback proof |
-| lane control and grants | closed epoch/CAS/grant/watermark semantics | concurrent Hub CAS, authority-transition anchor crash/ambiguity and pending-state non-use, Edge fence ordering/final-boundary reconciliation, successor-grant and changed-executor barrier behavior, same-executor renewal crash/replay/race at `A`, every `R_i`, `B`, every general `X_i`, admin-specialized companion `X_C` then Edge `X_E`, exact contiguous high-water delta acceptance and gap/unrelated/safety/stop/revocation rejection, abort, and final activation, consume-versus-`X_C`, issue-versus-`X_E`, partial transfer states, safety-control completion and authenticated-observation registration, `r1`/`r2`/fence non-barging, participant-receipt agreement, monotonic stop revision, duplicate delivery, unsupported control and crash ambiguity, source-bound pending approval, transitive-successor chains, revocation quiescence/propagation, and expired delivery |
+| lane control and grants | closed epoch/CAS/grant/watermark semantics | concurrent Hub CAS, authority-transition anchor crash/ambiguity and pending-state non-use, Edge fence ordering/final-boundary reconciliation, successor-grant and changed-executor barrier behavior, same-executor renewal crash/replay/race at `A`, every `R_i`, `B`, every general `X_i`, admin-specialized companion `X_C` then Edge `X_E`, exact contiguous high-water delta acceptance and gap/unrelated/safety/stop/revocation rejection, abort, and final activation, consume-versus-`X_C`, issue-versus-`X_E`, partial transfer states, safety-control immediate local latches, companion boundary cut and Edge consistency cases, `r1`/`r2`/fence non-barging, unique delivery ownership/no fallback/no replay emission, monotonic stop revision, unsupported control and crash ambiguity, source-bound pending approval, transitive-successor chains, revocation quiescence/propagation, and expired delivery |
 | Windows user Edge | safe medium-integrity/same-user process, pipe, loopback, and WSL discovery evidence | principal/session attestation plus resource/Hub-recovery/Edge-recovery/runtime split-brain fault injection, qualified termination versus socket/stream/PID absence, disconnected-predecessor drain/re-entry, owner-attended logout/relogin, reboot, sleep/network loss, timer-epoch/clock-uncertainty discontinuity, startup-at-logon, UAC/admin companion, ordered Edge-plus-companion preparation/activation and intersection, Edge and companion crash before or after reservation/consumption CAS and possible admin effect, delayed and duplicate admin delivery, response loss and exact replay, reused-ID/slot/nonce/ordinal changed-tuple conflict, reservation namespace drain and tombstone, companion journal rollback/restore joining the existing barrier, stale decision/permit/barrier/high-water rejection, cross-principal pipe ACL, ConPTY, active WSL stop/restart, and WSL-after-reboot |
 | native helper | Node gap and required primitive boundary identified | disposable DACL, token/process, Job, handle identity, DPAPI, ConPTY, WinVerifyTrust, reparse containment, crash, and slow-consumer tests |
 | SQLite and blobs | one-host disposable 1M/FTS, journal, WAL, backup, crash/reopen, migration, and integrity fixture | real power/storage fault; separate Hub-only and Edge-only restore barriers with exact recovery/runtime tuples and qualified reconciliation or trusted-time proof; concurrency/WAL pressure; durable blob publication/GC/backup fencing; encryption/retention; schema forward/downgrade; full database-plus-blob restore |
@@ -1783,11 +1869,12 @@ They remain `Proposed` while this baseline is a draft:
 ## Review disposition
 
 G02 reviewed the exact original draft and the exact round-1, round-2, round-3,
-round-4, round-5, round-6, round-7, and round-8 corrections; all nine reviews
-returned `CHANGE_REQUIRED`. The round-9 receipt's safety-race ordering is
-corrected by its immutable erratum. This revision applies only those bounded
+round-4, round-5, round-6, round-7, round-8, and round-9 corrections; all ten
+reviews returned `CHANGE_REQUIRED`. The round-9 receipt's safety-race ordering
+is corrected by its immutable erratum. This revision applies only those bounded
 findings, but the Implementer has not reviewed or approved its own corrections.
-It makes no claim that a fresh review or G03 has passed.
+It has not received a fresh independent review and makes no claim that G02 or
+G03 has passed.
 
 ```text
 ARCHITECTURE_0_1_READY=false

@@ -84,9 +84,27 @@ command boundary independently of any UI or transport.
    activated work drains only in its unchanged finite horizon, and already
    acknowledged or local fail-closed reduction may still stop it.
 
-   Planned owner-attended rollover is committed on and terminally closes the old
-   lineage, then links one non-concurrent successor to its final digest and
-   qualified predecessor closure. Unprovable lineage instead creates a fresh
+   Planned rollover is owner-attended and only the preexisting external
+   lifecycle writer may authorize it; no successor root/Hub/Edge or ordinary
+   writer may do so. Its immutable old-lineage candidate precommits stable
+   rollover/genesis IDs and one complete canonical successor-genesis core:
+   canonical/digest rules, full old and successor tuples, same Fleet/fresh anchor/
+   monotonic epoch, successor trust and receipt-verification material, full
+   closed writer registry with credential generations/scope revisions/kinds/
+   resource/effect scopes, lifecycle authorization, custody/mechanism/pin/policy
+   digests, predecessor closure, and every random ID/configuration field. The
+   core digest excludes only the future old terminal receipt.
+
+   One exact-predecessor CAS atomically appends `ROLLOVER_TERMINAL` and closes old
+   append to lookup/export only. The old terminal link binds all IDs/core and the
+   exact resulting sequence/digest. Successor genesis and its digest are
+   deterministic from that core plus the exact authenticated old receipt/link;
+   no descendant precedes durable genesis. Participants verify all fields and
+   repin. Changed core/registry/receipt/ID, second genesis, missing link, or
+   non-canonical encoding rejects. Crash/loss at every append, close, genesis,
+   and repin boundary uses only exact-ID lookup/retry, never an alternate.
+
+   Unprovable lineage instead creates a fresh
    incomparable Fleet/deployment/anchor and resource/credential namespace,
    effect-inactive, with the abandoned checkpoints/scopes and reenrollment
    recorded. It never invents unknown higher generations or uses trusted-time as
@@ -216,9 +234,11 @@ command boundary independently of any UI or transport.
    activation inputs. Admin reservation and companion consumption/outcome
    receipts are post-activation boundary evidence, not authority, successor
    proof, or activation rewrites. The only further late local receipts that may
-   affect a specialized release or activation are a reduction-only
-   `SafetyControlFenceReceipt` and the same-executor renewal `R_i`/`X_i` below.
-   Safety activation binds its fence receipt; renewal decision `B` binds every
+   affect a specialized release or activation are the reduction-only
+   `SafetyControlLocalLatchReceipt` set, applicable
+   `AdminSafetyBoundaryCutReceipt` and `SafetyControlEdgeConsistencyReceipt`,
+   and the same-executor renewal `R_i`/`X_i` below. Safety activation binds its
+   complete exact latch/cut/consistency set; renewal decision `B` binds every
    ordered `R_i`, and renewal activation binds `B` and every ordered
    `R_i`/`X_i`. Stable plan/slot/receipt identities and obligations are already
    in the candidate; later values never rewrite `permitDigest`. Safety is not a
@@ -381,41 +401,60 @@ command boundary independently of any UI or transport.
     resource/recovery/runtime/boot/timer/attachment identities, scope, aliases,
     transitive predecessor digest, monotonic `stopRevision`, grant/decision and
     local ceiling, affected productive namespaces and candidate-bound conflict
-    chains, ordered local gates, stable `STOP_PENDING`/receipt slots, and the
-    target's exact already-qualified supervising participant set. Overlapping
+    chains, ordered local gates/roles, one `localLatchReceiptSlotId` per
+    participant and, for admin, stable boundary-cut and Edge-consistency receipt
+    slots, and the target's exact already-qualified supervising participant set.
+    It also binds one `DELIVERY_OWNER` participant, exact delivery gate/route/
+    native identity/action and one-use delivery slot; all others are
+    `FENCE_ONLY`. Overlapping
     productive slots in each chain are strictly sequential with at most one
     unresolved; concurrency requires exact participant-verifiable disjointness,
     not a different ordinal.
 
     The external anchor acknowledges that candidate, but acknowledgement is not
     a local fence. Upon authenticated observation, each named supervisor makes
-    safety registration the next eligible conflicting transition at the same
-    issue/consume/effect gate after any CAS already linearized. Before waiting,
-    draining, or delivering, one CAS advances `stopRevision`, installs durable
-    non-barging target/conflict `STOP_PENDING`, rejects every not-yet-linearized
-    conflicting boundary despite prior issue, delay, ordinal, or replay, and
-    journals a one-use `SafetyControlFenceReceipt`. The receipt is the
-    domain-separated composite `PermitPreparationReceipt`, contains all ordinary
-    preparation evidence plus the exact gate/chain and `NONE` or one exact
-    already-linearized unresolved effect-boundary slot, and is its ordered
-    preparation/closure acknowledgement; no generic acknowledgement is omitted.
-    For admin safety the companion consume gate precedes the Edge issue gate;
-    complete participant receipts must name the same slot or fail closed, and an
-    Edge-issued but not companion-consumed request is rejected at the fenced
-    companion.
+    its own registration the next eligible conflicting same-gate transition
+    after any already-linearized CAS. Before waiting for any participant,
+    draining, reconciling, or delivering, one CAS changes its precommitted slot
+    `UNSEEN -> LATCHED`, advances `stopRevision`, installs permanent non-barging
+    target/conflict `STOP_PENDING`, rejects every not-yet-linearized conflicting
+    boundary despite prior issue/delay/ordinal/replay, and emits an immutable
+    `SafetyControlLocalLatchReceipt` binding local state/high-waters. Crash or
+    response loss retries the same slot; expiry never reopens it.
 
-    Authenticated safety activation binds the anchor and ordered fence receipts;
-    the supervisor journals activation before emitting the exact native control.
+    For admin, the companion latch CAS also emits the authoritative immutable
+    boundary cut: `NONE` or one exact consumed unresolved slot, the journal
+    prefix/high-water and historic terminal states, plus a digest of every
+    precommitted non-consumed slot now permanently fenced. Selection identity is
+    fixed although its outcome may advance monotonically. "Companion first"
+    means cut authority precedes Edge consistency, never that Edge waits before
+    its own latch.
+
+    After latching, Edge emits a separate immutable consistency receipt proving
+    a gap-free non-forked reservation-to-cut map: no issue for plain `NONE`;
+    issued/no-consume slots become `ISSUED_NO_EFFECT`; the selected slot has its
+    exact Edge reservation even if later terminal; and every extra issued slot
+    is in the permanent no-consume set. Gaps, forks, rollback, mismatch, or extra
+    consume reject. Authenticated activation binds all local latches, cut,
+    consistency, classifications, high-waters, and digests. Pending/ambiguous
+    selection stays latched with no delivery or barrier proof.
+
+    Only `DELIVERY_OWNER` may cross the final native boundary. It journal-CASes
+    `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE`, binding activation, route, action,
+    native/process identity, and slot before first emission. Relays never cross
+    that boundary; exact replay returns the receipt without re-emission, and
+    owner/route failure, ambiguity, or disqualification has no fallback owner.
 
     The safety namespace is excluded from productive admin reservation drain.
     Both productive issue and consume gates check chain eligibility, no
     `STOP_PENDING`, and at most one unresolved. A CAS already linearized when
     safety is observed may let only that one boundary finish; registration is
     next and all others reject. Exact proven-disjoint chains may continue. The
-    latch/receipt survives crash, restart, response loss, replay, ambiguity, and
-    expiry, which never reopens admission; exact replay returns the same receipt.
-    Hub acceptance, anchor acknowledgement, each local fence, complete receipt
-    reconciliation, activation, native delivery, and termination remain distinct.
+    latch/cut/consistency/delivery evidence survives crash, restart, response
+    loss, replay, ambiguity, and expiry, which never reopens admission. Hub
+    acceptance, anchor acknowledgement, each local latch, boundary cut, Edge
+    consistency, activation, transport, final native boundary, and termination
+    remain distinct.
     Safety never waits for productive drain, grants productive authority,
     satisfies renewal `X`, proves termination, or completes a barrier. Its
     changed `stopRevision` invalidates renewal and is never an admin delta record.
@@ -424,11 +463,10 @@ command boundary independently of any UI or transport.
     renew, change binding/scope/lease/controller, or carry arbitrary arguments.
     A replacement runtime cannot acquire the target unless it was already the
     exact qualified supervisor. Completion versus stop is locally linearized,
-    with `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, `DELIVERED_PENDING`,
+    with `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, `DELIVERY_EFFECT_POSSIBLE`,
     `UNSUPPORTED`, and `AMBIGUOUS_EFFECT` distinguished. Delivery is not
-    terminality, rollback, or barrier proof. Exact replay returns the receipt or
-    uses a family-qualified idempotent transmission to the same creation
-    identity. Ambiguity retains the target and aliases as unresolved and
+    terminality, rollback, or barrier proof. Exact replay returns the receipt
+    without native re-emission. Ambiguity retains the target and aliases as unresolved and
     quarantines successors. Only qualified terminal and complete final-boundary
     reconciliation evidence can later satisfy the ordinary barrier. Independent
     local fail-closed quiescence under timer/connectivity uncertainty grants no
@@ -454,10 +492,12 @@ command boundary independently of any UI or transport.
   loss and exact replay; changed tuple under reused request/slot/nonce/ordinal;
   journal rollback and restore joining the
   existing barrier; and stale permit/decision/proof rejection. It must cover
-  safety-control acknowledgement-versus-local-fence, `r1`/`r2`/fence
-  non-barging, Edge-issued/not-consumed rejection, participant-slot agreement,
-  latch crash/replay/expiry, stop-revision CAS, duplicate/unsupported delivery
-  and crash ambiguity; and
+  safety-control acknowledgement-versus-immediate independent local latches,
+  `r1`/`r2`/fence non-barging, companion cut cases, Edge gap-free consistency
+  mapping, selected outcome progress, Edge-issued/no-consume classification,
+  latch/cut/consistency crash/replay/expiry, one delivery owner/FENCE_ONLY roles,
+  no replay emission or fallback, transport/final-boundary separation,
+  stop-revision CAS, unsupported delivery and crash ambiguity; and
   same-executor renewal crash/replay at `A`, every `R_i`, `B`, every general
   `X_i`, admin-specialized `X_C` then `X_E`, abort and final activation,
   including consume-versus-`X_C`,
@@ -466,8 +506,10 @@ command boundary independently of any UI or transport.
   These remain acceptance work, not claims of live validation.
 - Anchor qualification must cover pre/post-commit crash, lost acknowledgement
   and exact-ID recovery, competing CAS, scoped-writer rejection, participant
-  pin/restart, outage/loss, rollback/fork/clone/standby rejection, planned
-  rollover and old-epoch closure, and incomparable fresh-namespace reset with
+  pin/restart, outage/loss, rollback/fork/clone/standby rejection, lifecycle
+  writer authorization, competing successor cores/registries, atomic terminal
+  append/old closure, deterministic genesis, crash/replay through participant
+  repin, and incomparable fresh-namespace reset with
   Path-1 predecessor proof. None is a current PASS.
 - Exact framing, transport, enrollment keys, clock source, admissible
   uncertainty thresholds, minimal composite-family list, and exact single-active

@@ -40,7 +40,11 @@ activation decision were mutable from inside that work.
    immutable receipts, external independent review, data/compatibility checks,
    isolated canary, and external/owner activation or rollback.
 8. N+1 cannot alter N's identity, journal, grants, verifier, acceptance record,
-   or running installation; it cannot approve or activate itself.
+   or running installation; it cannot approve or activate itself. Canary
+   disjointness must be exact and permit-bound. Promotion closes and reconciles
+   every overlapping stable-N predecessor, completes the transitive
+   `PredecessorNoOverlapBarrier`, or proves exact resource/effect disjointness;
+   installation generation and owner approval alone are not no-overlap proof.
 
 ## Consequences
 

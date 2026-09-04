@@ -38,36 +38,50 @@ lease or enterprise authorization system.
    replacement is pending, without claiming that a disconnected predecessor
    has stopped.
 
-   For every Host, Environment, or Workspace replacement, anchor acknowledgement
-   creates only an effect-inactive pending successor. The named
-   `PredecessorNoOverlapBarrier` binds the exact predecessor and successor,
-   smallest potentially conflicting scope, affected predecessor participants,
+   For every Host/Environment/Workspace resource-generation or Hub/Edge
+   recovery-generation replacement, anchor acknowledgement creates only an
+   effect-inactive pending successor when predecessor effects may remain. The
+   same named `PredecessorNoOverlapBarrier` also gates a replacement
+   effect-capable runtime under unchanged generations. It binds tagged exact
+   resource old/new generations, authority-store old/new recovery generations,
+   or old/new runtime identities; the smallest potentially conflicting scope;
+   affected predecessor participants; prerequisite anchor/identity evidence;
    and maximum externally anchor-acknowledged predecessor permit/deadline
-   horizons. Its completion proof is itself anchor-acknowledged before the
-   successor becomes current/usable or can authorize or activate a potentially
-   conflicting permit. Completion proves either that every affected predecessor
-   participant observed the fence, durably closed old-generation admission,
-   quiesced, and reconciled final effect/journal/receipt/tombstone boundaries,
-   or that trusted continuous time passed every bound horizon plus uncertainty
-   margin while unreachable predecessors remain quarantined. Without that time
-   proof, or for a command family without enforceable lease-end quiescence,
-   only acknowledged quiescence/reconciliation is valid; an unreachable
-   predecessor then keeps the potentially conflicting successor scope blocked.
-   A Workspace successor additionally requires Edge-local closure and
-   reconciliation of old path, process, native-session, journal, receipt,
-   tombstone, and effect boundaries. An old predecessor must observe the
-   current generation and reconcile before re-entry; proven-disjoint scope may
-   continue.
+   horizons. Runtime pairs name every applicable `hostBootId`, `edgeInstanceId`,
+   `environmentInstanceId`, `edgeTimerEpoch`, managed-process, native-session,
+   and `RuntimeAttachment` identity.
+
+   Its completion proof is itself anchor-acknowledged before the successor
+   becomes current/usable for effect authority or can authorize or activate a
+   potentially conflicting permit. Path 1 proves, for each affected
+   predecessor, either acknowledged old-identity admission closure, quiescence,
+   and complete journal/process/native/effect/receipt/tombstone/stream
+   reconciliation, or
+   qualified durable nonexistence, exclusive termination, or transferred effect
+   ownership plus the same reconciliation. Socket/stream loss, PID reuse,
+   unqualified absence, or a fresh boot, instance, or timer-epoch ID is
+   insufficient. Path 2 proves trusted continuous time past every bound horizon
+   plus uncertainty margin while unreachable predecessors remain quarantined.
+   Without that time proof, or for a command family without enforceable
+   lease-end quiescence, only Path 1 is valid and an unproved predecessor keeps
+   the conflicting scope blocked. A Workspace successor additionally requires
+   Edge-local closure of its old path and all listed boundaries. An old
+   predecessor must observe the exact current successor tuple and reconcile
+   before re-entry; observation-only and proven-disjoint scope may continue.
 5. Runtime reincarnation is separate: every OS boot, Edge start, and
    Environment/companion start creates a fresh boot or instance ID and stream.
    Old-instance streams are rejected for new admission and by every observer of
    the successor. That local rejection is not proof that an already activated,
-   disconnected effect has stopped; it remains bounded by its valid witnessed
-   monotonic permit and requires reconciliation before re-entry. The
-   `PredecessorNoOverlapBarrier` additionally applies when a durable resource
-   generation is replaced. A WSL Environment also binds distribution install
-   identity, Linux UID/root status, and mount/interop policy; reinstall or
-   configuration changes generation, while restart changes instance.
+   disconnected effect has stopped. A replacement effect-capable runtime starts
+   in non-effecting reconciliation mode and binds the exact old/new runtime pair
+   to the `PredecessorNoOverlapBarrier`, even when durable generations are
+   unchanged. Qualified durable proof that the predecessor is terminated and
+   no longer owns the effect, plus complete reconciliation, may satisfy Path 1
+   without waiting for lease expiry. Otherwise predecessor work remains bounded
+   by its valid witnessed monotonic permit and the successor remains blocked.
+   A WSL Environment also binds distribution install identity, Linux UID/root
+   status, and mount/interop policy; reinstall or configuration changes
+   generation, while restart changes instance.
 6. Environment is a principal/process/path/credential/lifecycle authority, not
    a label. Edge resolves and authorizes actual paths.
 7. Each SessionLane has at most one causal controller
@@ -83,7 +97,10 @@ lease or enterprise authorization system.
    inability to obtain anchor or Edge acknowledgement leaves takeover pending
    and the affected scope blocked. Disconnect itself grants bounded grace and
    never stops work. Exact safety interrupt and approval resolution may be
-   separately authorized.
+   separately authorized. The acknowledged Edge fence satisfies the generic
+   successor trigger only after old-epoch admission closes and every
+   potentially conflicting final boundary is reconciled; unresolved old effects
+   still require the transitive barrier or exact disjointness proof.
 9. One immutable, allow-only `AuthorityGrant` revision is evaluated per
    FleetCommand. The grant binds the exact Hub recovery generation that issued
    it. Explicit lineage entries, command families, provider/model, approval,
@@ -92,7 +109,10 @@ lease or enterprise authorization system.
    one command. Grant issuance, revocation, and tombstone are exact monotonic
    authority transitions; their complete candidate revision/digest, predecessor,
    high-water mark, and idempotency identity are anchor-acknowledged before
-   terminal publication or use. A pending grant is never usable.
+   terminal publication or use. A pending grant is never usable. Grants are not
+   exclusive effect-ownership leases: supersession does not terminate old work
+   or prove disjointness, and every successor-grant permit applies the generic
+   trigger to overlapping predecessor grants/permits before activation.
 10. Edge admission requires a Hub-authenticated decision snapshot containing
     exact grant/digests/generations, the grant's issuing Hub recovery
     generation, expiry, and a monotonic revocation watermark. Edge rejects
@@ -120,11 +140,14 @@ lease or enterprise authorization system.
 - Hub CAS, Edge epoch order, revocation propagation, expired delivery, and admin
   generation behavior require fault-injection acceptance. Tests must cover
   crash/ambiguity at every authority-transition anchor boundary, pending-state
-  non-use, revocation quiescence, and exact-idempotency retry. Ordinary Host,
-  Environment, and Workspace replacement must prove the exact predecessor
-  barrier, disconnected-predecessor drain/re-entry, and Workspace Edge-local
-  boundary closure. Restore must also prove prior-generation grant invalidation
-  and gated fresh issuance through that same barrier.
+  non-use, revocation quiescence, and exact-idempotency retry. Resource
+  replacement, Hub-only and Edge-only restore, and same-generation runtime
+  replacement must prove the exact predecessor barrier, qualified termination
+  rather than socket/stream/PID absence, disconnected-predecessor drain/re-entry,
+  Workspace Edge-local boundary closure, transitive successor chains,
+  successor-grant permits, and same- versus changed-executor permit renewal.
+  Hub restore must also prove prior-generation grant invalidation and gated
+  fresh issuance through that same barrier.
 
 ## Evidence
 

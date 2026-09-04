@@ -42,23 +42,29 @@ storage needs.
    authority high-water is a fully formed immutable candidate with exact
    predecessor and idempotency identity. It is synchronously anchor-committed
    and durably acknowledged before terminal/success publication or use to
-   authorize an effect. Pending authority is unusable. For a Host, Environment,
-   or Workspace replacement, that acknowledgement creates only an
-   effect-inactive pending successor. Its exact
-   `PredecessorNoOverlapBarrier` completion proof must also be
-   anchor-acknowledged before the successor becomes current/usable or authorizes
-   a potentially conflicting permit. Revocation begins local fail-closed
-   quiescence immediately at every participant that observes the pending
-   transition and keeps its scope blocked without a terminal claim until the
-   exact fence/tombstone is acknowledged; crash or ambiguous acknowledgement
-   retains quarantine and exact-identity retry.
+   authorize an effect. Pending authority is unusable. For a
+   Host/Environment/Workspace resource-generation or Hub/Edge
+   recovery-generation successor whose predecessor may still effect, that
+   acknowledgement creates only an effect-inactive pending successor. A new
+   effect-capable Edge or companion runtime under unchanged generations also
+   starts pending/reconciling after its exact identity proof. The applicable
+   `PredecessorNoOverlapBarrier` completion proof must be anchor-acknowledged
+   before either successor becomes current/usable for effect authority or
+   authorizes a potentially conflicting permit. Revocation begins local
+   fail-closed quiescence immediately at every participant that observes the
+   pending transition and keeps its scope blocked without a terminal claim
+   until the exact fence/tombstone is acknowledged; crash or ambiguous
+   acknowledgement retains quarantine and exact-identity retry.
 
    Every `DispatchPermit` is also fully formed and inert before activation. Its
    unique ID/digest binds the exact anchor-predecessor sequence/digest;
    FleetCommand, resolution, complete manifest, step, EdgeCommand, target, and
    binding; grant/decision and lane fences; Hub/Edge recovery and resource
-   generations; every applicable `barrierProofId`/`barrierProofDigest`;
-   applicable instances and Edge boot/timer epoch; absolute
+   generations; applicable instances and Edge boot/timer epoch; the complete
+   transitive unresolved-predecessor set/digest; and every applicable
+   specialized-fence receipt, `barrierProofId`/`barrierProofDigest` with exact
+   tagged resource/recovery/runtime pair set, or exact resource/effect
+   disjointness proof; absolute
    `effectLeaseNotAfter` no later than every applicable Hub-evaluated
    Edge-admission time bound; Hub-authenticated `remainingBudget` for that same
    conservative horizon; declared clock/skew uncertainty; and completeness
@@ -73,16 +79,20 @@ storage needs.
    must not cross an effect boundary until it verifies and durably journals the
    candidate and activation as an immutable stable-identity activation receipt.
    Immediately before activation and effect it also verifies every exact
-   resource generation is current and every applicable barrier proof binds the
-   permit's exact predecessor/successor resource-generation tuple and covers the
-   potentially conflicting scope. Initial, renewed, replacement, and later-step
-   permits all use new exact anchor records; renewal never extends an older
-   permit. Replay/redelivery
-   preserves the candidate, acknowledgements, activation, monotonic deadline,
-   and budget and never replenishes time. Anchor, transport, preparation, and
-   activation delay consume the fixed horizon. The anchored maximum never lags
-   an activated permit, and asynchronous anchor lag is prohibited across every
-   effect.
+   resource and Hub/Edge recovery generation, runtime incarnation, and
+   attachment is current, and every applicable successor-trigger proof binds
+   the permit's complete transitive predecessor set, exact tuples, aliases, and
+   conflict scope. Initial, renewed, replacement, and later-step permits all use
+   new exact anchor records; renewal never extends an older permit.
+   Same-executor/target/conflict-scope renewal requires atomic Edge-journal
+   supersession that deactivates the old permit for every later boundary and
+   transfers one exclusive effect authority. Changed executor, target, scope,
+   binding, or conflict authority requires the transitive barrier or exact
+   disjointness proof. Replay/redelivery preserves the candidate,
+   acknowledgements, activation, monotonic deadline, and budget and never
+   replenishes time. Anchor, transport, preparation, and activation delay
+   consume the fixed horizon. The anchored maximum never lags an activated
+   permit, and asynchronous anchor lag is prohibited across every effect.
 7. At receipt, Edge persists the effective expiry as the tighter of the absolute
    Hub deadline adjusted for declared uncertainty and a local monotonic deadline
    derived from authenticated remaining budget, bound to the exact Edge
@@ -93,36 +103,45 @@ storage needs.
    a freshly anchored permit. Interruption or uncertainty never extends a lease;
    disconnected work continues only inside a valid witnessed monotonic lease.
 
-   Every Host, Environment, and Workspace replacement uses the named
-   `PredecessorNoOverlapBarrier`. Its proof binds exact predecessor/successor
-   generations, conflict scope, affected predecessor participants, and their
-   maximum externally anchor-acknowledged predecessor permit/deadline horizons.
-   Completion requires either every affected predecessor participant to observe
-   the fence, durably close old admission, quiesce, and reconcile final
-   effect/journal/receipt/tombstone boundaries, or
-   trusted time-continuity evidence with bounded known uncertainty to prove
-   current time past every bound horizon plus margin while unreachable
-   predecessors remain quarantined. Without trusted time, or when a family
-   cannot enforce lease-end quiescence, the acknowledged
-   quiescence/reconciliation path is mandatory; an unreachable predecessor then
-   keeps the potentially conflicting successor scope blocked. A Workspace
-   replacement also requires Edge-local closure and reconciliation of old path,
-   process, native-session, journal, receipt, tombstone, and effect boundaries.
-   A predecessor cannot rejoin or effect until it observes the current
-   generation and reconciles; proven-disjoint scope may continue.
+   The named `PredecessorNoOverlapBarrier` applies to every potentially
+   overlapping Host/Environment/Workspace resource successor, Hub/Edge recovery
+   successor, and replacement effect-capable Edge or companion runtime. Its
+   proof binds exact tagged old/new generation, recovery, and runtime tuples;
+   conflict scope; affected predecessor participants; prerequisite
+   anchor/identity evidence; and maximum externally anchor-acknowledged
+   predecessor permit/deadline horizons. Runtime tuples include applicable
+   boot, Edge, Environment, timer-epoch, managed-process, native-session, and
+   attachment identities. Other effect-capable authority, segment, binding, or
+   permit successors use a tagged exact predecessor/successor
+   identity-and-binding-digest pair.
+
+   Path 1 requires, for every affected predecessor, either acknowledged closure
+   of old-identity admission, quiescence, and complete
+   journal/process/native/effect/receipt/tombstone/stream reconciliation, or
+   qualified durable proof of nonexistence, exclusive termination, or
+   transferred effect ownership plus the same reconciliation. Socket/stream
+   loss, PID reuse, unqualified absence, or a new boot, instance, or timer-epoch
+   ID is insufficient. Path 2 uses trusted continuous time past every bound
+   horizon plus margin with unreachable predecessors quarantined. Without
+   trusted time, or when a family cannot enforce lease-end quiescence, only
+   Path 1 is valid and an unproved predecessor keeps the conflicting scope
+   blocked. A Workspace replacement also requires Edge-local closure of its old
+   path and all listed boundaries. A predecessor cannot rejoin or effect until
+   it observes the exact successor tuple and reconciles; non-effecting
+   observation/reconciliation and proven-disjoint scope may continue.
 
    Restore requires proven anchor lineage or full authority reset and
-   reenrollment with higher externally witnessed generations. Its
-   recovery-generation transition is anchor-acknowledged but remains
-   effect-inactive until the same `PredecessorNoOverlapBarrier` completes with
-   every affected Edge as a predecessor; restore is not a weaker special case.
-   The anchor records a maximum permit horizon that cannot lag activation and
-   its conservative uncertainty.
-   AuthorityGrants bind their issuing Hub recovery generation; restore
-   invalidates prior-generation grants and each fresh issuance waits for the
-   affected `PredecessorNoOverlapBarrier` and passes its own anchor gate. A
-   family without enforceable lease-end quiescence must use acknowledgement
-   and final-boundary reconciliation.
+   reenrollment with higher externally witnessed generations. Restore of either
+   authority store anchor-acknowledges the exact old/new recovery-generation
+   transition but leaves it effect-inactive until the same barrier completes.
+   Hub restore treats every Edge/runtime in the recovered scope as a
+   predecessor. Edge-only restore binds that Edge's old/new recovery generations
+   plus its old runtime/native attachments, journal, receipts, tombstones, and
+   effect scope even when resource generations are unchanged. The anchor records
+   a maximum permit horizon that cannot lag activation and its conservative
+   uncertainty. AuthorityGrants bind their issuing Hub recovery generation; Hub
+   restore invalidates prior-generation grants and each fresh issuance waits for
+   the affected barrier and passes its own anchor gate.
 8. Publish content-addressed blobs before database visibility only after a
    platform-proven durable data/rename-metadata barrier or equivalent two-phase
    recoverable protocol. GC and backup use durable manifest/reachability
@@ -144,10 +163,12 @@ storage needs.
   downgrade, and full restore remain storage acceptance gates.
 - Every authority-transition and permit-activation acknowledgement boundary,
   pending-state non-use, bounded monotonic lease expiry, trusted-time restore,
-  ordinary resource-successor no-overlap, disconnected-predecessor drain and
-  re-entry, Workspace Edge-local closure, unreachable-Edge quarantine,
-  exact-idempotency retry, final-boundary reconciliation, and post-restore grant
-  reissuance remain fault-injection acceptance gates.
+  resource/Hub-recovery/Edge-recovery/runtime successor no-overlap, qualified
+  termination versus stream/PID absence, transitive predecessor chains,
+  disconnected-predecessor drain and re-entry, Workspace Edge-local closure,
+  unreachable-Edge quarantine, exact-idempotency retry, final-boundary
+  reconciliation, atomic permit supersession, and post-restore grant reissuance
+  remain fault-injection acceptance gates.
 
 ## Evidence
 

@@ -48,11 +48,16 @@ If the Hub or network disappears, already-running native sessions should
 continue under the Edge Runtime within their externally witnessed effect lease.
 Reconnection should report truth and replay durable events, not restart work
 merely to recover central state. Any Host, Environment, or Workspace
-resource-generation successor, including restore, does not immediately fence a
-disconnected predecessor: old work drains only within its valid witnessed
-monotonic lease, and potentially conflicting successor work waits for the
-[baseline's named `PredecessorNoOverlapBarrier`](baseline-0.1.md#identity-generation-and-incarnation-model).
-Proven-disjoint scope may continue.
+resource-generation successor, Hub/Edge recovery-generation successor, or
+replacement effect-capable runtime incarnation does not immediately fence a
+disconnected predecessor. A new Edge or companion may observe and reconcile in
+pending mode, but cannot effect until qualified durable predecessor termination
+and complete reconciliation satisfy Path 1 or the
+[baseline's named `PredecessorNoOverlapBarrier`](baseline-0.1.md#identity-and-generation-model)
+otherwise completes. Socket/stream loss, PID reuse, or a new boot, instance, or
+timer-epoch ID is not termination proof. Old work drains only within its valid
+witnessed monotonic lease; observation-only and proven-disjoint scope may
+continue.
 
 ## Non-goal
 

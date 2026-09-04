@@ -77,9 +77,14 @@ An append-only transition linking current Hub, Edge, companion/Environment,
 stream, managed-process, and native-session instances to an existing
 NativeSegment. A restart may reattach only after qualified reconciliation proves
 the same native and managed-process identity plus unchanged durable bindings and
-generations. Otherwise the attachment is `UNKNOWN`, `LOST`, or
-`AMBIGUOUS_EFFECT` until explicit resolution, and a changed durable binding or
-native identity requires a new segment.
+generations. The successor attachment may observe and reconcile while pending,
+but if its predecessor may still effect it remains effect-inactive until
+qualified durable termination/exclusive-ownership proof plus complete
+reconciliation satisfies Path 1 or the same `PredecessorNoOverlapBarrier`
+otherwise completes. Without continuity or exclusive-ownership proof, the
+attachment is `UNKNOWN`, `LOST`, or `AMBIGUOUS_EFFECT` until explicit
+resolution, and a changed durable binding or native identity requires a new
+segment.
 
 ### HandoffCapsule
 
@@ -130,8 +135,10 @@ FleetCommand to exact `hubRecoveryGeneration`, every selected target's exact
 One exact `stepKey + edgeCommandId` effect request with parent links,
 exact `hubRecoveryGeneration` and target `edgeRecoveryGeneration`, durable
 resource generations, runtime instances, control fences,
-authority/qualification revisions, dependencies, and its own idempotency record
-and receipt. Edge rejects either recovery-generation mismatch before effect.
+authority/qualification revisions, dependencies, the complete transitive
+successor-fence/barrier/disjointness proof set, and its own idempotency record
+and receipt. Edge rejects any recovery, resource, runtime, or proof mismatch
+before effect.
 
 ### ObservedState
 
@@ -151,5 +158,9 @@ under the baseline's `PredecessorNoOverlapBarrier`, and it must observe the
 current generation and reconcile before re-entry. An old-instance stream is
 likewise rejected for new admission and by successor observers; already
 activated work remains bounded by its valid witnessed monotonic permit and
-reconciliation, while the named barrier applies when a durable resource
-generation is replaced.
+reconciliation. Stream rejection alone is not termination proof. The same named
+barrier applies whenever a Host/Environment/Workspace generation, Hub/Edge
+recovery generation, or effect-capable runtime incarnation could overlap an
+unresolved predecessor. Qualified termination/exclusive-ownership proof may
+satisfy Path 1; non-effecting observation and exact proven-disjoint work remain
+available.

@@ -39,7 +39,11 @@ OpenAI-shaped endpoint does not establish behavioral compatibility.
    qualification revision, capability digest, and expiry and recheck them
    immediately before dispatch. Activation creates a new NativeSegment and
    normally a new native session with reconstructed continuity. Transparent
-   failover is prohibited.
+   failover is prohibited. A fork, new segment, Agent/Execution/Provider or
+   installation binding, or user confirmation is not effect disjointness:
+   before target effect, its permit binds acknowledged source-fence and
+   final-boundary reconciliation evidence, the transitive
+   `PredecessorNoOverlapBarrier`, or exact resource/effect-disjointness proof.
 
 ## Consequences
 

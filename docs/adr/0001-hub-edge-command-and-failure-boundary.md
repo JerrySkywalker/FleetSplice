@@ -56,26 +56,55 @@ command boundary independently of any UI or transport.
    candidate outside every affected database/backup rollback domain and waits
    for durable authenticated external-anchor acknowledgement before terminal or
    success publication or use to authorize an effect. Pending authority is
-   unusable. For a Host, Environment, or Workspace generation replacement,
-   anchor acknowledgement creates only a visible, effect-inactive pending
-   successor. The named `PredecessorNoOverlapBarrier` additionally binds exact
-   predecessor/successor generations, smallest potentially conflicting scope,
-   affected predecessor participants, and maximum externally
-   anchor-acknowledged predecessor permit/deadline horizons. Its completion
-   proof is anchor-acknowledged before the successor becomes current/usable or
-   authorizes a potentially conflicting permit. It proves either every
-   affected predecessor participant observed the fence, durably closed old
-   admission, quiesced, and reconciled final effect/journal/receipt/tombstone
-   boundaries, or trusted continuous time passed every bound predecessor
-   horizon plus uncertainty margin while unreachable predecessors remain
-   quarantined. Without trusted time, or for a family without enforceable
-   lease-end quiescence, only acknowledged quiescence/reconciliation is valid.
-   When only that path is valid, an unreachable predecessor keeps the
-   potentially conflicting successor scope blocked. A Workspace proof also
-   requires Edge-local closure and reconciliation of its old path, process,
-   native-session, journal, receipt, tombstone, and effect boundaries.
-   A predecessor must observe the successor and reconcile before re-entry;
-   proven-disjoint scope remains available and no placement right is implied.
+   unusable. For a Host/Environment/Workspace resource-generation or Hub/Edge
+   recovery-generation successor whose predecessor may still effect, anchor
+   acknowledgement creates only a visible, effect-inactive pending successor.
+   A replacement effect-capable runtime under unchanged generations likewise
+   remains pending/reconciling after its exact identity proof; it may observe
+   and reconcile but not effect.
+
+   The same named `PredecessorNoOverlapBarrier` binds every applicable tagged
+   predecessor/successor pair: exact stable resource and old/new generation;
+   exact authority store and old/new recovery generation; or exact effect scope
+   and applicable old/new `hostBootId`, `edgeInstanceId`,
+   `environmentInstanceId`, `edgeTimerEpoch`, managed-process, native-session,
+   and `RuntimeAttachment` identities. An effect-capable authority,
+   NativeSegment, Agent/Execution/Provider or installation binding, or permit
+   successor not already represented uses a tagged exact
+   predecessor/successor identity-and-binding-digest pair. The proof also binds
+   the smallest potentially conflicting scope, affected predecessor
+   participants, prerequisite anchor/identity evidence, and maximum externally
+   anchor-acknowledged predecessor permit/deadline horizons. Its completion proof is
+   anchor-acknowledged before the successor becomes current/usable for effect
+   authority or authorizes a potentially conflicting permit.
+
+   The cross-cutting trigger uses overlapping effect scope, aliases, and every
+   unresolved transitive predecessor, not only nominal IDs or the immediate
+   predecessor. Before any successor identity, authority state, binding,
+   runtime, or permit authorizes a potentially conflicting effect, its permit
+   binds either a specialized acknowledged local fence plus final-boundary
+   reconciliation, this anchor-acknowledged barrier, or exact proof that the
+   predecessor/successor resource and effect scopes are disjoint. Pending
+   successor chains inherit all unresolved proofs. A different lane, segment,
+   generation, Host, provider, instance, grant, permit, or confirmation is not
+   itself disjointness. True first allocations with no predecessor and
+   observation-only streams/cursors/projections/history are excluded.
+
+   Path 1 proves, for every affected predecessor, either acknowledged
+   old-identity admission closure, quiescence, and complete final
+   journal/process/native/effect/receipt/tombstone/stream reconciliation, or
+   qualified durable nonexistence, exclusive termination, or transferred effect
+   ownership plus the same reconciliation. Socket or stream loss, PID reuse,
+   unqualified absence, or a new boot, instance, or timer-epoch ID is
+   insufficient. Path 2 proves trusted continuous time passed every bound
+   predecessor horizon plus uncertainty margin while unreachable predecessors
+   remain quarantined.
+   Without trusted time, or for a family without enforceable lease-end
+   quiescence, only Path 1 is valid and an unproved predecessor keeps the
+   conflicting scope blocked. A Workspace proof includes Edge-local closure of
+   its old path and all listed boundaries. A predecessor must observe the exact
+   successor tuple and reconcile before re-entry; observation-only and
+   proven-disjoint scope remain available and no placement right is implied.
    Revocation starts fail-closed quiescence immediately at every
    participant that observes the pending transition, keeps the affected scope
    blocked, and has no terminal claim until its exact fence/tombstone is
@@ -86,8 +115,10 @@ command boundary independently of any UI or transport.
    anchor-predecessor sequence/digest; FleetCommand ID/intent; resolution,
    complete plan manifest, step, EdgeCommand, target, and execution binding;
    grant/decision and lane fences; Hub/Edge recovery and resource generations;
-   every applicable `barrierProofId`/`barrierProofDigest`; applicable instances;
-   target Edge boot/timer epoch; absolute
+   applicable instances; target Edge boot/timer epoch; the complete transitive
+   unresolved-predecessor set/digest; and every applicable specialized-fence
+   receipt, `barrierProofId`/`barrierProofDigest` with complete tagged pair set,
+   or exact resource/effect-disjointness proof; absolute
    `effectLeaseNotAfter` no later than every applicable Hub-evaluated
    Edge-admission time bound; Hub-authenticated `remainingBudget` for that same
    conservative horizon; declared clock/skew uncertainty; and
@@ -105,19 +136,27 @@ command boundary independently of any UI or transport.
    verified activation as an immutable stable-identity activation receipt before
    effect. Initial, renewed, replacement, and later composite-step permits all
    use this ordering. Renewal is a new permit and anchor record and cannot
-   extend an older permit. Replay/redelivery preserves the original candidate,
-   acknowledgements, activation, monotonic deadline, and budget and never
-   replenishes time. Anchor, transport, preparation, and activation delay
+   extend an older permit. Same-executor/target/conflict-scope renewal is valid
+   only with atomic Edge-journal supersession that deactivates the predecessor
+   for all later boundaries, transfers one exclusive effect authority, and
+   reconciles the current boundary. A changed executor, target, scope, binding,
+   or conflict authority, or unproved atomic supersession, requires the
+   transitive barrier or exact disjointness proof. Replay/redelivery preserves the original
+   candidate, acknowledgements, activation, monotonic deadline, and budget and
+   never replenishes time. Anchor, transport, preparation, and activation delay
    consume the fixed horizon. The anchored maximum horizon never lags an
    activated permit; asynchronous anchor lag is prohibited across every effect.
    Missing, stale, mismatched, unverifiable, inactive, unjournaled, or expired
-   or barrier-incomplete evidence rejects with no effect. Immediately before
-   activation and effect, Edge verifies every resource generation is current
-   and every applicable barrier proof covers the exact conflict scope. At
-   receipt, Edge persists the effective expiry as the tighter of the absolute Hub
-   `effectLeaseNotAfter` adjusted for declared uncertainty and a local
-   monotonic deadline derived from authenticated remaining budget, bound to the
-   exact Edge boot/timer epoch. It rechecks immediately before effect. Clock
+   or barrier-incomplete evidence, including false disjointness, rejects with no
+   effect. Immediately before activation and effect, Edge verifies every
+   resource and Hub/Edge recovery generation, runtime incarnation, and
+   attachment is current, and every
+   applicable successor-trigger proof matches the complete transitive
+   predecessor set, exact predecessor/successor tuples, aliases, and conflict
+   scope. At receipt, Edge persists the effective expiry as the tighter of the
+   absolute Hub `effectLeaseNotAfter` adjusted for declared uncertainty and a
+   local monotonic deadline derived from authenticated remaining budget, bound
+   to the exact Edge boot/timer epoch. It rechecks immediately before effect. Clock
    anomaly outside the bound, excessive/unknown uncertainty, suspend or
    sleep/hibernate discontinuity, process/Host reboot, monotonic reset, or lost
    timer provenance invalidates the permit and requires current-generation
@@ -130,9 +169,10 @@ command boundary independently of any UI or transport.
    digest tombstones prevent forgotten duplicates. Exact replay preserves the
    Hub and target-Edge recovery generations. Hub and every Edge that has
    observed the current Hub generation reject pre-recovery identity or
-   generation mismatch before effect. A disconnected predecessor is contained
-   by the applicable `PredecessorNoOverlapBarrier`, including during restore,
-   rather than presumed immediately fenced.
+   generation mismatch before effect. A disconnected resource, recovery, or
+   runtime predecessor is contained by the applicable
+   `PredecessorNoOverlapBarrier`, including during restore or same-generation
+   runtime replacement, rather than presumed immediately fenced.
 9. HCP carries exact Edge commands, observations, snapshots, journal/event
    watermarks, receipts, and reconnect repair over an outbound authenticated
    Edge connection. Agent protocols and transport mechanics do not define HCP
@@ -149,18 +189,24 @@ command boundary independently of any UI or transport.
     `RESOLVED_NO_EFFECT` evidence permits bounded re-entry without new rights.
 12. The external anchor records a maximum predecessor effect-lease/deadline
     horizon that never lags an activated permit, plus its conservative
-    clock/skew uncertainty. Hub restore uses the same
-    `PredecessorNoOverlapBarrier`, with every Edge in the recovered scope treated
-    as an affected predecessor; it is not a weaker restore-only exception. A
-    restore's higher recovery-generation transition is anchor-acknowledged but
-    remains effect-inactive until the shared barrier completes. Old disconnected
-    work may drain only inside its valid witnessed monotonic lease; no
-    potentially conflicting successor or recovered work overlaps it. An
-    unreachable predecessor cannot rejoin or effect until it observes the
-    current generation and reconciles. Grants bind their issuing Hub recovery
-    generation; restore invalidates prior-generation grants, and each fresh
-    issuance waits for the barrier and passes its own authority-transition
-    anchor gate.
+    clock/skew uncertainty. Restore of either Hub or Edge authority state uses
+    the same `PredecessorNoOverlapBarrier`; its higher recovery-generation
+    transition is anchor-acknowledged but remains effect-inactive until the
+    shared barrier completes. Hub restore binds exact old/new Hub recovery
+    generations and treats every Edge/runtime in the recovered effect scope as
+    a predecessor. Edge-only restore binds exact old/new Edge recovery
+    generations plus the old Edge/runtime/native attachment,
+    journal/receipt/tombstone, and effect scope even when resource generations
+    are unchanged. A new Edge or companion runtime also remains effect-inactive
+    until predecessor termination/exclusive ownership and complete
+    reconciliation qualify Path 1 or the shared barrier otherwise completes;
+    stream replacement is not proof. Old disconnected work may drain only
+    inside its valid witnessed monotonic lease, and no potentially conflicting
+    successor work overlaps it. An unreachable predecessor cannot rejoin or
+    effect until it observes the exact current tuples and reconciles. Grants
+    bind their issuing Hub recovery generation; Hub restore invalidates
+    prior-generation grants, and each fresh issuance waits for the barrier and
+    passes its own authority-transition anchor gate.
 13. Deadline, cancellation, interruption, compensation, and rollback remain
     separate concepts. None silently undoes a completed external effect.
 
@@ -173,10 +219,11 @@ command boundary independently of any UI or transport.
   effectively-once claim.
 - Finite multi-step behavior remains a typed command-family contract, not a
   general DAG engine.
-- Every resource-generation successor, including restore, delays potentially
-  conflicting work until its `PredecessorNoOverlapBarrier` completes;
-  generation advance alone is not a remote kill or an immediate fence of a
-  disconnected predecessor.
+- Every effect-authorizing resource-generation, recovery-generation, or runtime
+  successor delays potentially conflicting work until its
+  `PredecessorNoOverlapBarrier` completes; generation, instance, or stream
+  advance alone is not a remote kill or an immediate fence of a disconnected
+  predecessor.
 - Exact framing, transport, enrollment keys, clock source, admissible
   uncertainty thresholds, and the minimal composite-family list remain bounded
   implementation decisions; fail-closed monotonic lease semantics do not.

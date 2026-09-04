@@ -13,33 +13,53 @@ activation decision were mutable from inside that work.
 
 ## Proposed decision
 
-1. Browser, Hub, transport, Edge kernel, each Environment, Agent or
-   compatibility process, provider endpoint, renderer/extension, and update
-   path are separate trust boundaries.
+1. Browser, Hub, Fleet-scoped `AuthorityAnchor`, transport, Edge kernel, each
+   Environment, Agent or compatibility process, provider endpoint,
+   renderer/extension, and update path are separate trust boundaries.
 2. The immutable Edge trust kernel includes identity/enrollment, transport and
    message admission, authorization/generation enforcement, journal and receipt
    integrity, secret boundary, durable-state migration/recovery, process
    ownership, mandatory audit/redaction, and update verification/rollback.
-3. Agent/tool/native output is untrusted. Browser/API surfaces require
+3. The `AuthorityAnchor` is one active Fleet-scoped linearizable append/CAS
+   lineage with an immutable Fleet/anchor/genesis/root/epoch identity, scoped
+   authenticated writers, exact-predecessor records, independently verifiable
+   receipts, and participant-pinned ancestry. It owns only canonical ordering
+   and rollback witnessing, never policy, identity, local truth, or effects.
+   Writers cannot widen or rotate themselves. Agent, Driver, compatibility,
+   native-helper, renderer, security-scanner, updater, candidate, stable-N, N+1,
+   and canary processes cannot hold its writer credentials, change its trust
+   root, attest their own evidence, or authorize their own activation.
+
+   Outage, ambiguity, rollback, fork, clone, unknown writer/root, or loss blocks
+   new activation; no Hub, Edge, database, backup, standby, or candidate
+   substitutes. Planned root/epoch rollover is owner-attended, terminally closes
+   the old lineage, and links one successor to its final digest and qualified
+   predecessor closure. Unprovable lineage creates a fresh incomparable
+   Fleet/deployment/anchor and resource/credential namespace, effect-inactive,
+   with qualified Path-1 predecessor termination/exclusive-control
+   reconciliation required. Anchor storage/custody is separate and
+   single-active; snapshot restore, clone promotion, transparent failover,
+   quorum, and consensus are prohibited. G04 selects the concrete mechanism.
+4. Agent/tool/native output is untrusted. Browser/API surfaces require
    authenticated sessions, CSRF/Origin defenses, per-action authorization,
    typed bounded messages, safe rendering, quotas/backpressure, and exact
    approval canonicalization.
-4. Credentials remain referenced and resolved inside their authorized
+5. Credentials remain referenced and resolved inside their authorized
    Environment. Browser credentials never flow to Edge/Agent, and user/admin/
    WSL auth homes are not copied to fabricate continuity.
-5. Compatibility backends and extensions are built-in, static, or
+6. Compatibility backends and extensions are built-in, static, or
    out-of-process, versioned, provenance-bound, and capability-scoped. They
    cannot access Fleet authority stores, issue raw commands, widen grants, or
    inject arbitrary remote JavaScript.
-6. FleetSplice remains MIT. HAPI/AGPL implementation code is prohibited from
+7. FleetSplice remains MIT. HAPI/AGPL implementation code is prohibited from
    the core. Every permissive dependency or copied file needs exact commit/file
    provenance, license/NOTICE preservation, transitive dependency/asset review,
    modification record, security review, and explicit authorization.
-7. Stable N may develop N+1 only in a separate Workspace/Worktree and
+8. Stable N may develop N+1 only in a separate Workspace/Worktree and
    installation generation under a bounded grant. N+1 passes ordinary tests,
    immutable receipts, external independent review, data/compatibility checks,
    isolated canary, and external/owner activation or rollback.
-8. N+1 cannot alter N's identity, journal, grants, verifier, acceptance record,
+9. N+1 cannot alter N's identity, journal, grants, verifier, acceptance record,
    or running installation; it cannot approve or activate itself. Canary
    disjointness must be exact and permit-bound. Promotion closes and reconciles
    every overlapping stable-N predecessor, completes the transitive
@@ -52,12 +72,16 @@ activation decision were mutable from inside that work.
   secret detection, arbitrary-extension safety, exactly-once external effects,
   and enterprise tenant isolation are not claimed.
 - Owner policy must still select browser bootstrap/recovery, remote sensitive
-  data classes, retention/encryption/backup, and update distribution.
+  data classes, retention/encryption/backup, update distribution, and
+  AuthorityAnchor mechanism/custody/writer lifecycle within the closed contract.
 - Logout/reboot/elevation, destructive WSL lifecycle, credential enrollment,
   and activation ceremonies remain owner-attended when they cannot be safe and
   disposable.
 - Rollback cannot undo already completed candidate effects or irreversible
   migrations; pre-activation forward/backward or restore evidence is required.
+- Anchor qualification must cover append/ack crash ambiguity, scoped-writer
+  denial, participant pins, rollback/fork/clone/loss, owner-attended rollover,
+  and incomparable reset. Security/update review evidence remains non-authority.
 
 ## Evidence
 

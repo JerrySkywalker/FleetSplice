@@ -1,6 +1,6 @@
 # Authority Model
 
-FleetSplice should avoid multiple writable authorities for the same fact.
+FleetSplice has no fact with multiple writable authorities.
 
 ## Central Control Plane authority
 
@@ -12,9 +12,46 @@ Working ownership:
 - provider-profile metadata and capability metadata;
 - normalized durable timeline/history;
 - external API authentication and authorization;
+- scoped formation and submission of authority, permit, and barrier candidates;
 - references to workspaces/native sessions reported by hosts.
 
 The central control plane does **not** own the truth of a remote process simply because it last observed that process as running.
+
+## AuthorityAnchor ordering authority
+
+Each Fleet has one active `AuthorityAnchor` lineage identified by
+`(fleetId, anchorId, genesisDigest, trustRootDigest, epoch)`. It owns only the
+canonical order and rollback witness for immutable authority, permit, activation,
+barrier, and anchor-lifecycle candidates. It owns no Fleet policy, resource or
+actor identity, host-local fact, grant semantics, process state, or effect.
+
+Every record binds global sequence, exact predecessor sequence/digest, stable
+record ID/kind and candidate digest, authenticated writer identity plus
+credential generation/scope revision, and resulting record digest. The
+candidate excludes the resulting receipt. Exact predecessor CAS creates one
+linearizable total order; exact-ID lookup/retry returns the committed receipt,
+while a changed tuple rejects. Writer scopes are closed and cannot be widened or
+rotated by their holder. Agent, Driver, native-helper, security/update,
+candidate, and canary processes are not writers and cannot attest themselves.
+
+Hub, Edge, and every effect-boundary participant independently verify unbroken
+ancestry and pin their highest accepted checkpoint. A skip,
+same-sequence/different digest, non-descendant record, unexpected root/epoch,
+unknown writer, outage, rollback, fork, or loss closes new admission. No Hub,
+Edge, database, backup, clone, or standby substitutes for the lineage. Already
+activated work drains only within a previously verified finite horizon;
+reduction-only fail-closed safety may still reduce it.
+
+Planned epoch/root rollover is owner-attended, committed on and terminally
+closes the old lineage, and links one non-concurrent successor to the old final
+digest and qualified predecessor closure. If lineage is unprovable, recovery
+creates a fresh incomparable Fleet/deployment/anchor and resource/credential
+namespace in an effect-inactive state. It never invents unknown higher
+generations; overlapping work needs qualified termination/exclusive control and
+complete Path-1 reconciliation, and an unreachable predecessor remains
+unavailable. Concrete single-active storage and custody are a G04 choice; clone
+promotion, snapshot restore, transparent failover, quorum, and consensus are
+outside the contract.
 
 ## Edge Runtime authority
 
@@ -27,6 +64,31 @@ Working ownership:
 - local command journal and replay results;
 - event spool while disconnected;
 - host-local credentials and native agent authentication state where applicable.
+
+An elevated companion independently owns its local privileged effect-boundary
+journal. Edge reservation and companion consumption are intersecting decisions;
+neither is another Fleet authority.
+
+## Permit renewal and safety ordering
+
+Generic same-executor renewal requires exact equality with every `R_i` journal
+and effect-boundary high-water at `X_i`. Only admin `X_C`/`X_E` may accept an
+advance, and only as a complete contiguous, gap-free, non-forked delta confined
+to the exact precommitted `P0` reservation namespace plus its transfer closure.
+Unrelated permit, safety, `STOP_PENDING`, revocation, boundary, changed
+`stopRevision`, unresolved possible effect, or any other predicate drift rejects.
+Transfer receipts and final activation bind base/final high-waters, the delta
+digest, final namespace digest, and `X_E -> X_C` evidence.
+
+Admin reservation slots are partitioned into candidate-bound exact conflict
+chains. Overlapping slots are sequential with at most one unresolved; concurrent
+chains require participant-verifiable disjointness. On authenticated observation
+of an acknowledged `SafetyControl`, the companion consume gate and Edge issue
+gate durably install same-gate target/conflict `STOP_PENDING` as the next
+eligible conflicting transition, reject all not-yet-linearized work, and bind
+`NONE` or the same one already-linearized unresolved boundary. Anchor
+acknowledgement is not a local fence. Latches and receipts survive crash/replay
+and do not expire; a safety stop-revision advance invalidates admin renewal.
 
 ## Inference authority
 

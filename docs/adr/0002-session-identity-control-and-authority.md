@@ -28,15 +28,43 @@ lease or enterprise authorization system.
    owns Environment generation after companion proof; Edge owns the local
    Workspace resolved-root generation. Reenrollment/identity discontinuity,
    Environment principal/trust/config/install changes, and Workspace
-   root/containment identity changes respectively bump them.
-   Every allocation, advance, and tombstone is a fully formed immutable
-   authority-transition candidate with an exact predecessor and stable
+    root/containment identity changes respectively bump them.
+    Every allocation, advance, and tombstone is a fully formed immutable
+    authority-transition candidate with the complete AuthorityAnchor lineage
+    tuple, exact predecessor sequence/digest, and stable
    idempotency identity. It is synchronously committed outside rollback domains
    and durably authenticated by the external anchor before terminal publication
    or use. Pending generations are unusable; evidence invalidating an old
-   generation closes admission at each reachable participant while the
-   replacement is pending, without claiming that a disconnected predecessor
-   has stopped.
+    generation closes admission at each reachable participant while the
+    replacement is pending, without claiming that a disconnected predecessor
+    has stopped.
+
+   The external anchor is one active Fleet-scoped lineage identified by
+   `(fleetId, anchorId, genesisDigest, trustRootDigest, epoch)`, not the Hub,
+   Edge, database, or backup. It owns canonical append/CAS ordering and rollback
+   witnessing only. Every record binds global sequence, exact predecessor
+   sequence/digest, stable ID/kind and candidate digest, scoped authenticated
+   writer identity/credential generation/scope revision, and resulting digest;
+   the candidate excludes that result. Exact-predecessor CAS is linearizable.
+   Exact-ID lookup/retry resolves ambiguity; a changed tuple rejects. Writers
+   cannot widen or rotate themselves, and Agent, Driver, helper,
+   security/update, candidate, and canary processes cannot write or self-authorize.
+
+   Hub, Edge, companion, and effect-boundary participants pin their highest
+   independently verified checkpoint and require unbroken ancestry. A skip,
+   same-sequence/different digest, non-descendant record, unknown writer/root,
+   outage, rollback, fork, or loss blocks new authority/permit/barrier/successor
+   activation. No backup, clone, standby, Hub, or Edge substitute exists;
+   previously verified work drains only within its fixed finite horizon and
+   fail-closed reduction remains. Planned owner-attended rollover terminally
+   closes the old lineage and links one successor to its final digest and
+   qualified predecessor closure. Unprovable lineage creates a fresh
+   incomparable Fleet/deployment/anchor and resource/credential namespace,
+   effect-inactive, never invented higher generations; overlapping work needs
+   qualified Path-1 termination/exclusive-control reconciliation and an
+   unreachable predecessor stays unavailable. G04 chooses the separate
+   single-active storage/custody; restore, clone promotion, transparent failover,
+   quorum, and consensus are prohibited.
 
    For every Host/Environment/Workspace resource-generation or Hub/Edge
    recovery-generation replacement, anchor acknowledgement creates only an
@@ -52,7 +80,8 @@ lease or enterprise authorization system.
    and `RuntimeAttachment` identity.
 
    Its completion proof is itself anchor-acknowledged before the successor
-   becomes current/usable for effect authority or can authorize or activate a
+   and binds the complete lineage tuple and exact resulting anchor record before
+   the successor becomes current/usable for effect authority or can authorize or activate a
    potentially conflicting permit. Path 1 proves, for each affected
    predecessor, either acknowledged old-identity admission closure, quiescence,
    and complete journal/process/native/effect/receipt/tombstone/stream
@@ -109,25 +138,34 @@ lease or enterprise authorization system.
    expiry and Edge-ceiling checks, binds the target's admitted generations and
    lane fences, and requires unrelated generations/fences current. Only the
    named target may be non-current solely for reduction, and prior quiescence
-   may be omitted only for that exact existing target. Its anchor-acknowledged inert candidate
-   binds the target command/turn/native operation, predecessor permit and
-   activation, admitted control epoch/lane-mutation revision, process creation
-   identity, executor/binding, generations,
-   runtimes/attachment, scope/aliases/transitive digest, closed action, stable
-   fence-plan identity, idempotency identity, and monotonic `stopRevision`.
-   The already qualified supervising participant atomically closes later
-   non-safety target boundaries and journals a one-use
-   `SafetyControlFenceReceipt` as the composite `PermitPreparationReceipt` with
-   all ordinary preparation evidence and its preparation/closure acknowledgement;
-   authenticated activation binds that receipt
-   before exact control delivery. This is not takeover, transfer, disjointness,
-   barrier or termination proof, and cannot retarget, start/resume/retry, steer,
-   approve, write, migrate, renew, widen a lease, or carry arbitrary arguments.
-   Completion races are locally linearized; delivery remains pending evidence,
-   and ambiguity retains the target/aliases as unresolved and quarantines
-   successors. Only qualified terminal plus full final-boundary reconciliation
-   may feed the ordinary barrier. Timer/connectivity uncertainty may still
-   trigger separate local quiescence but grants no remote authority.
+   may be omitted only for that exact existing target.
+
+   Its inert candidate binds the target/conflict key, affected productive
+   namespaces, complete AuthorityAnchor lineage/expected predecessor, and
+   candidate-bound exact conflict chains, their ordered local
+   gates, stable `STOP_PENDING`/receipt slots, target command/turn/native
+   operation, predecessor permit/activation, admitted lane fences, process
+   identity, executor/binding, generations/runtimes, scope/aliases/transitive
+   digest, closed action, idempotency identity, and monotonic `stopRevision`.
+   Overlapping productive slots are sequential with at most one unresolved;
+   concurrency requires exact participant-verifiable disjointness.
+
+   Anchor acknowledgement is not a local fence. Upon authenticated observation,
+   every existing supervisor makes registration the next eligible conflicting
+   same-gate transition after any already-linearized CAS. Before waiting or
+   delivery it atomically advances `stopRevision`, installs durable non-barging
+   `STOP_PENDING`, rejects all not-yet-linearized conflicting issue/consume/
+   effect boundaries, and journals a one-use `SafetyControlFenceReceipt` naming
+   `NONE` or the same one already-linearized unresolved boundary. Admin fencing
+   orders companion consume before Edge issue; mismatched participant slot
+   receipts fail closed, and Edge-issued/not-consumed requests reject at the
+   fenced companion. Latch and receipt survive crash/replay/expiry and never
+   reopen. Authenticated activation binds all receipts before exact control
+   delivery; acceptance, anchor ack, local fences, delivery, and termination are
+   distinct. The stop advance invalidates admin renewal and cannot enter its
+   high-water delta. Safety is not takeover, transfer, disjointness, barrier or
+   termination proof and grants no productive authority. Only qualified
+   terminal plus full reconciliation may feed the ordinary barrier.
 9. One immutable, allow-only `AuthorityGrant` revision is evaluated per
    FleetCommand. The grant binds the exact Hub recovery generation that issued
    it. Explicit lineage entries, command families, provider/model, approval,
@@ -166,11 +204,15 @@ lease or enterprise authorization system.
   proven reattachment.
 - Hub CAS, Edge epoch order, revocation propagation, expired delivery, and admin
   generation behavior require fault-injection acceptance. Tests must cover
-  crash/ambiguity at every authority-transition anchor boundary, pending-state
-  non-use, revocation quiescence, and exact-idempotency retry. Safety-control
-  tests cover completion-versus-stop races, monotonic stop-revision CAS,
-  duplicate and unsupported delivery, supervisor-identity change, and crash or
-  response ambiguity without treating delivery as terminality. Resource
+   crash/ambiguity at every authority-transition anchor boundary, pending-state
+   non-use, revocation quiescence, exact-idempotency retry, anchor scoped writers,
+   pinned ancestry, rollback/fork/clone/loss, planned rollover, and incomparable
+   fresh-namespace reset. Safety-control tests cover acknowledgement before
+   participant latch, `r1`/`r2`/fence non-barging, Edge-issued/not-consumed
+   rejection, participant slot agreement, completion-versus-stop races,
+   monotonic stop-revision CAS, duplicate and unsupported delivery, latch
+   crash/replay/expiry, supervisor-identity change, and crash or response
+   ambiguity without treating delivery as terminality. Resource
   replacement, Hub-only and Edge-only restore, and same-generation runtime
   replacement must prove the exact predecessor barrier, qualified termination
   rather than socket/stream/PID absence, disconnected-predecessor drain/re-entry,

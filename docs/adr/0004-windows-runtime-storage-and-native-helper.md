@@ -31,10 +31,14 @@ storage needs.
    participant prepares. Each plan slot fixes a stable
    `adminBoundaryRequestId`, one-use nonce/ordinal, named Edge caller and
    companion, canonical operation/target/parameter digest, stable
-   Edge-reservation and companion-consumption receipt slots, and fixed horizon
-   no wider than the permit candidate. There is no wildcard, dynamic slot, or
-   later-added request, and delay, replay, or renewal cannot replenish that
-   horizon. Each participant independently prepares the acknowledged candidate
+   Edge-reservation and companion-consumption receipt slots, fixed horizon no
+   wider than the permit candidate, and exact participant-verifiable conflict
+   key/chain position. The candidate partitions all slots into closed conflict
+   chains. Overlapping slots are sequential with at most one unresolved and the
+   next requires terminal/no-effect/skipped/tombstoned predecessor state;
+   concurrency requires exact disjointness, not a different ordinal. There is no
+   wildcard, dynamic slot, or later-added request, and delay, replay, or renewal
+   cannot replenish that horizon. Each participant independently prepares the acknowledged candidate
    and emits a durable
    `PermitPreparationReceipt`; activation binds their complete ordered receipt
    set. Their allow decisions are an intersection and never substitute.
@@ -47,8 +51,10 @@ storage needs.
    participant/journal state, stop/revocation high-waters, and independently
    derived monotonic deadline.
 
-   After activation, the Edge's serialized admin boundary/renewal gate uses one
-   journal CAS to change its plan slot `UNISSUED -> ISSUED_OUTSTANDING` and
+   After activation, the Edge's serialized admin boundary/renewal gate verifies
+   chain eligibility, no matching `STOP_PENDING`, and at most one unresolved
+   overlapping slot, then uses one journal CAS to change its plan slot
+   `UNISSUED -> ISSUED_OUTSTANDING` and
    create an `AdminBoundaryReservationReceipt` before sending the request. It
    binds exact permit/activation IDs and digests, plan slot/request
    ID/nonce/ordinal, outbound authenticated caller equal to the named Edge,
@@ -70,7 +76,9 @@ storage needs.
    recent human authentication/confirmation; named authenticated Edge caller;
    local allowlist; canonical operation/target/parameter digest; and matching
    request ID, nonce/ordinal, plan/consumption slot, companion permit/transfer
-   slot, `stopRevision`, and journal/boundary high-waters. That CAS changes only
+   slot, `stopRevision`, journal/boundary high-waters, candidate-bound chain and
+   predecessor terminal/no-effect/skip/tombstone state, no matching
+   `STOP_PENDING`, and at most one unresolved overlapping slot. That CAS changes only
    `UNSEEN -> CONSUMED_EFFECT_POSSIBLE`; the effect may occur only afterward.
 
    The same slot then records qualified terminal outcome, durable no-effect, or
@@ -86,7 +94,12 @@ storage needs.
    For `SafetyControl` against an older admin target, both original participants
    remain its exact qualified supervisors; only target-bound predecessor fields
    may be non-current for reduction, while every unrelated fence remains
-   current. That exception cannot authorize replacement privileged work. Edge
+   current. That exception cannot authorize replacement privileged work. The
+   candidate orders companion consume-gate fencing before Edge issue-gate
+   fencing; anchor acknowledgement alone is neither local fence. Each gate must
+   durably install non-barging target/conflict `STOP_PENDING`, and complete
+   receipts must agree on `NONE` or one already-linearized privileged boundary.
+   An Edge-issued but unconsumed request rejects at the fenced companion. Edge
    and companion durably retain candidate preparation, activation, reservation,
    consumption, effect, outcome, and resolution evidence. Crash after
    consumption or possible effect without a qualified outcome becomes
@@ -107,8 +120,9 @@ storage needs.
    database/backup rollback domain. Every monotonic grant
    issue/revoke/tombstone, lane epoch/revision advance, resource-generation
    allocation/advance/tombstone, recovery-generation advance, and equivalent
-   authority high-water is a fully formed immutable candidate with exact
-   predecessor and idempotency identity. It is synchronously anchor-committed
+   authority high-water is a fully formed immutable candidate with complete
+   AuthorityAnchor lineage tuple, exact predecessor sequence/digest, and
+   idempotency identity. It is synchronously anchor-committed
    and durably acknowledged before terminal/success publication or use to
    authorize an effect. Pending authority is unusable. For a
    Host/Environment/Workspace resource-generation or Hub/Edge
@@ -124,8 +138,42 @@ storage needs.
    until the exact fence/tombstone is acknowledged; crash or ambiguous
    acknowledgement retains quarantine and exact-identity retry.
 
+   This witness is one active Fleet-scoped `AuthorityAnchor` lineage identified
+   by `(fleetId, anchorId, genesisDigest, trustRootDigest, epoch)`. It owns only
+   canonical ordering and rollback witnessing. Each record binds global
+   sequence, exact predecessor sequence/digest, stable ID/kind/candidate digest,
+   authenticated writer identity/credential generation/scope revision, and
+   resulting digest; the immutable candidate excludes that result. Exact
+   predecessor CAS is linearizable, exact-ID lookup/retry resolves ambiguity,
+   and changed tuple rejects. Closed writer scopes cannot be self-widened or
+   self-rotated; Agent, Driver, helper, security/update, candidate, and canary
+   processes cannot write or self-authorize.
+
+   Hub, Edge, companion, and every effect-boundary participant pin the highest
+   independently verified checkpoint and require complete unbroken ancestry.
+   Skip, same-sequence/different digest, non-descendant record, unknown
+   writer/root, outage, rollback, fork, or loss closes new activation. Already
+   verified work drains only in its fixed finite horizon and fail-closed
+   reduction remains; no Hub, Edge, database, backup, clone, or standby can
+   substitute.
+
+   Planned owner-attended rollover commits on and terminally closes the old
+   lineage, then links one non-concurrent successor to its final digest and
+   qualified predecessor closure. Unprovable lineage creates a fresh
+   incomparable Fleet/deployment/anchor and resource/credential namespace,
+   effect-inactive, recording abandoned checkpoints/scopes and reenrollment. It
+   invents no higher unknown generations and permits overlap only after
+   qualified Path-1 termination/exclusive-control reconciliation; an unreachable
+   predecessor remains unavailable. Anchor writable storage, trust-root custody,
+   writer credentials, pins, and recovery are separate from SQLite, blobs, and
+   ordinary backups. Copies are read-only evidence and only the unique durable
+   store may restart the lineage. G04 selects this single-active mechanism;
+   snapshot restore, clone promotion, standby election, transparent failover,
+   quorum, and consensus are prohibited.
+
    Every `DispatchPermit` is fully formed and inert before activation. Its exact
-   candidate ID/digest binds anchor predecessor; FleetCommand, resolution,
+   candidate ID/digest binds the complete AuthorityAnchor lineage tuple and
+   anchor predecessor; FleetCommand, resolution,
    complete manifest, step, EdgeCommand, target and binding; grant/decision and
    lane fences; Hub/Edge recovery and resource generations; runtime and
    boot/timer identities; complete transitive predecessors/aliases and every
@@ -135,9 +183,9 @@ storage needs.
    admin effect also requires its separate elevated companion.
 
    The Hub anchor-commits that exact candidate and horizon. Every ordered
-   participant independently prepares it with the resulting acknowledgement
+   participant independently prepares it with the complete lineage and resulting acknowledgement
    and emits a durable inert `PermitPreparationReceipt`. Activation binds the
-   permit, anchor, complete ordered participant receipts, and a horizon that may
+   permit, complete anchor lineage/result, complete ordered participant receipts, and a horizon that may
    only narrow. Each participant independently rechecks generations, runtimes,
    attachments, complete transitive proofs, high-waters, and its own monotonic
    horizon and journals activation before its boundary decision. Only their
@@ -171,7 +219,9 @@ storage needs.
    anchor CAS then chooses abort or `B`, never both; `B` binds every ordered
    `R_i`, may narrow the horizon, and conditionally authorizes but does not
    perform transfer. At each participant's single serialized boundary gate,
-   unchanged state is rechecked and journal CAS `X_i` atomically persists its
+   unchanged state plus exact equality to matching `R_i` journal/effect-boundary
+   high-waters is rechecked. That equality remains the generic `X_i` rule; only
+   admin `X_C`/`X_E` use the closed delta exception below. Journal CAS `X_i` atomically persists its
    receipt, permanently changes `P0` from `ACTIVE` to `SUPERSEDED`, and changes
    `P1` from `PREPARED` to local slot `ACTIVE`. Before local `X_i` only `P0`
    occupies the slot; afterward only `P1`, whose effect gate remains closed
@@ -191,9 +241,21 @@ storage needs.
    Edge reserve then companion consume. Companion `X_C` shares the consumption
    gate. Consumption-first blocks `X_C` pending qualified terminal/no-effect
    reconciliation; consumed-effect-possible, pending, or ambiguous is not drain.
+
+   Only `X_C`/`X_E` may accept an advanced high-water. Each requires a complete,
+   contiguous, append-only, gap-free, non-forked delta from matching `R_i`
+   through closure, containing only exact precommitted `P0` namespace
+   issue/consume/terminal/no-effect/skip/tombstone records plus the local
+   transfer closure. An unrelated permit, safety, `STOP_PENDING`, revocation,
+   boundary or namespace transition, changed `stopRevision` or other predicate,
+   sequence gap, or predecessor mismatch invalidates renewal. Pending,
+   consumed/effect-possible, or ambiguous state blocks. Each receipt binds
+   base/first/last/final high-waters, delta digest, and final namespace-state
+   digest; `X_E` additionally binds exact `X_C`, and activation binds both.
+
    `X_C`-first atomically closes the namespace, tombstones all unconsumed slots
    while preserving prior receipts, supersedes companion-local `P0`, and emits
-   its final high-water and namespace digest. Later `P0` requests return stable
+   its bound high-water/delta and namespace digests. Later `P0` requests return stable
    tombstones or prior receipts without effect.
 
    Only authenticated `X_C` admits Edge `X_E`. At the shared issuance gate, one
@@ -202,31 +264,48 @@ storage needs.
    exact unconsumed `X_C` tombstone, or qualified fixed-horizon evidence that
    proves never-consumed. Elapsed time cannot clear effect-possible or ambiguous
    work. The CAS supersedes Edge-local `P0`, switches local `P1` with its effect
-   gate closed, and emits `X_E`. Final activation binds `X_C` and `X_E`; partial
+   gate closed, and emits `X_E` with its delta fields and exact `X_C`. Final
+   activation binds `X_C` and `X_E`; partial
    states are unavailable and cannot effect under either permit.
 
    The reduction-only `DispatchPermit` specialization `SafetyControl` serves
    existing interrupt, exact cancellation, and admitted grant-revocation
    families. Its closed candidate binds a domain-separated `SafetyControl`
-   reservation namespace, exact target permit/activation,
+   reservation namespace, complete AuthorityAnchor lineage/expected predecessor,
+   exact target/conflict key, affected productive
+   namespaces and candidate-bound conflict chains, ordered local gates, stable
+   `STOP_PENDING`/receipt slots, exact target permit/activation,
    process-creation identity, admitted lane fences, binding,
    generation/runtime/attachment identities, aliases/transitive digest,
    actor/grant/live decision/watermark, local ceiling, monotonic `stopRevision`,
    and one exact action. All ordinary admission remains; only the named target's
    prior quiescence and current-generation equality are omitted so its existing
-   qualified supervisor can reduce it. Unrelated fences remain current. After
-   candidate anchor acknowledgement, that supervisor atomically closes later
-   non-safety target boundaries and emits one-use `SafetyControlFenceReceipt`
-   as the composite `PermitPreparationReceipt` with all ordinary preparation
-   evidence and its ordered preparation/closure acknowledgement;
-   authenticated safety activation binds the receipt before control delivery.
-   The safety namespace is excluded from productive reservation drain. At a
-   shared companion gate, safety-fence-first advances `stopRevision` and rejects
-   older unconsumed ordinary reservations without effect; ordinary-consume-first
-   permits at most that one predecessor boundary and leaves safety deliverable
-   to close every later boundary. Safety never waits for productive drain,
-   grants productive authority, satisfies `X`, proves termination, or completes
-   a barrier.
+   qualified supervisor can reduce it. Unrelated fences remain current.
+   Overlapping productive chain slots are sequential with at most one unresolved;
+   concurrency requires exact participant-verifiable disjointness.
+
+   Anchor acknowledgement is not a local fence. Upon authenticated observation,
+   each supervisor makes safety registration the next eligible conflicting
+   same-gate transition after any already-linearized CAS. Before waiting,
+   draining, or delivery it advances `stopRevision`, installs durable
+   target/conflict `STOP_PENDING`, rejects every not-yet-linearized conflicting
+   issue/consume/effect boundary, and emits one-use
+   `SafetyControlFenceReceipt` as the composite `PermitPreparationReceipt`
+   naming `NONE` or one exact already-linearized unresolved boundary. For admin,
+   companion consume fencing precedes Edge issue fencing; complete receipts must
+   agree on the slot, and Edge-issued/not-consumed work rejects at the fenced
+   companion. The latch survives crash/restart/response loss/replay/ambiguity
+   and expiry never reopens it. Authenticated activation binds all receipts
+   before control delivery. Acceptance, anchor ack, each fence, activation,
+   delivery, and termination are distinct.
+
+   The safety namespace is excluded from productive reservation drain. Both
+   productive gates check chain eligibility, no `STOP_PENDING`, and at most one
+   unresolved. A boundary already linearized at observation may finish; safety
+   is next and rejects all later conflicts. Proven-disjoint chains may continue.
+   Safety never waits for productive drain, grants productive authority,
+   satisfies `X`, proves termination, or completes a barrier. Its stop-revision
+   change invalidates admin renewal and cannot enter the renewal delta.
    It cannot retarget, start/resume/retry, steer, approve, write, migrate, renew,
    or alter scope/binding/lease/controller. Delivery is not terminality,
    rollback, or barrier completion; ambiguity retains target/aliases and blocks
@@ -245,7 +324,8 @@ storage needs.
    overlapping Host/Environment/Workspace resource successor, Hub/Edge recovery
    successor, and replacement effect-capable Edge or companion runtime. Its
    proof binds exact tagged old/new generation, recovery, and runtime tuples;
-   conflict scope; affected predecessor participants; prerequisite
+   complete AuthorityAnchor lineage and resulting record; conflict scope;
+   affected predecessor participants; prerequisite
    anchor/identity evidence; and maximum externally anchor-acknowledged
    predecessor permit/deadline horizons. Runtime tuples include applicable
    boot, Edge, Environment, timer-epoch, managed-process, native-session, and
@@ -268,10 +348,13 @@ storage needs.
    it observes the exact successor tuple and reconciles; non-effecting
    observation/reconciliation and proven-disjoint scope may continue.
 
-   Restore requires proven anchor lineage or full authority reset and
-   reenrollment with higher externally witnessed generations. Restore of either
-   authority store anchor-acknowledges the exact old/new recovery-generation
-   transition but leaves it effect-inactive until the same barrier completes.
+   Ordinary authority-store restore requires proven current anchor lineage.
+   Within that proved lineage it anchor-acknowledges the exact old/new
+   recovery-generation transition but leaves it effect-inactive until the same
+   barrier completes. If the anchor lineage itself is unprovable, no component
+   invents a higher generation: catastrophic reset creates the fresh
+   incomparable Fleet/deployment/anchor and resource/credential namespace above
+   and requires full reenrollment plus qualified Path-1 predecessor closure.
    Hub restore treats every Edge/runtime in the recovered scope as a
    predecessor. Edge-only restore binds that Edge's old/new recovery generations
    plus its old runtime/native attachments, journal, receipts, tombstones, and
@@ -302,6 +385,12 @@ storage needs.
   remain owner-attended or targeted tests.
 - Power loss, reader/writer pressure, WAL growth, blob crash gaps, schema
   downgrade, and full restore remain storage acceptance gates.
+- AuthorityAnchor gates include pre/post-CAS crash, lost acknowledgement and
+  exact-ID lookup, competing predecessor, writer-scope denial, participant pin
+  restart, outage/loss, rollback/fork/clone/standby rejection, planned rollover
+  and old-epoch closure, and incomparable fresh-namespace reset with qualified
+  Path-1 predecessor proof. The concrete single-active storage/custody choice is
+  G04 work; none of these cases is a current PASS.
 - Every authority-transition and permit-activation acknowledgement boundary,
   pending-state non-use, bounded monotonic lease expiry, trusted-time restore,
   resource/Hub-recovery/Edge-recovery/runtime successor no-overlap, qualified
@@ -315,11 +404,14 @@ storage needs.
   response loss and exact replay; changed tuple under reused
   request/slot/nonce/ordinal; stale permit/decision/proof/high-water rejection;
   and companion journal rollback/restore joining the existing barrier. Safety
-  cases include completion/stop and safety-fence-versus-consume races,
-  stop-revision CAS, duplicates, unsupported delivery and crash ambiguity.
+  cases include acknowledgement without local fence, `r1`/`r2`/fence
+  non-barging, Edge-issued/not-consumed rejection, participant slot agreement,
+  completion/stop, stop-revision CAS, durable latch crash/replay/expiry,
+  duplicates, unsupported delivery and crash ambiguity.
   Renewal cases cover `A`, every `R_i`, `B`, every general `X_i`,
   admin-specialized `X_C` then `X_E`, abort/final activation crash and replay,
-  consume-versus-`X_C`, issue-versus-`X_E`, and every partial transfer state.
+  consume-versus-`X_C`, issue-versus-`X_E`, complete exact-namespace delta and
+  gap/unrelated/safety/stop/revocation rejection, and every partial transfer state.
   These are required future tests, not current live validation.
 
 ## Evidence

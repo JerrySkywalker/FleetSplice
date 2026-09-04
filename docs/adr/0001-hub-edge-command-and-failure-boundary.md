@@ -121,7 +121,14 @@ command boundary independently of any UI or transport.
    uncertainty; completeness high-waters; and an exact ordered
    effect-boundary-participant set. Edge is always a participant. An admin
    effect requires both Edge and the separately elevated companion as ordered,
-   non-substitutable participants.
+   non-substitutable participants. An admin candidate also binds one closed,
+   finite, ordered `AdminBoundaryReservationPlan` as part of `permitDigest`
+   before anchor commitment and preparation. Each slot fixes a stable
+   `adminBoundaryRequestId`, one-use nonce/ordinal, named Edge caller and
+   companion, canonical operation/target/parameter digest, Edge-reservation and
+   companion-consumption receipt slots, and absolute horizon no wider than the
+   permit candidate; no wildcard or dynamic additional slot exists, and delay,
+   replay, or renewal cannot replenish the slot horizon.
 
    The Hub synchronously commits the exact candidate and horizon to the external
    anchor. Each ordered participant independently prepares the candidate plus
@@ -133,11 +140,35 @@ command boundary independently of any UI or transport.
    effective expiry and journals activation before its effect decision. The
    effect is allowed only by the intersection of all required participants.
 
+   After admin activation, the Edge's serialized boundary/renewal gate creates
+   one durable `AdminBoundaryReservationReceipt` by journal CAS that changes its
+   plan slot `UNISSUED -> ISSUED_OUTSTANDING` before sending the request. It
+   binds permit and activation IDs/digests, plan slot/request
+   ID/nonce/ordinal, authenticated caller equal to the named Edge, operation
+   digest, current local permit/transfer slot, `stopRevision`, pre/post journal
+   and boundary high-waters, runtime/timer, and fixed horizon. It remains
+   `ISSUED_OUTSTANDING` until authenticated durable companion terminal or
+   no-effect resolution; timeout, cancellation, response/pipe loss, or process
+   absence is not resolution. Exact Edge replay returns that receipt; changed
+   tuple or request identity for the used slot conflicts without effect.
+
+   At the actual companion boundary, one journal CAS verifies the entire permit,
+   activation, anchor, participant, transitive-proof, generation, runtime,
+   grant/decision, human-confirmation, allowlist, horizon, operation, and exact
+   reservation tuple and changes its precommitted slot from `UNSEEN` to
+   `CONSUMED_EFFECT_POSSIBLE` before effect. It binds the matching companion
+   permit/transfer slot, caller, `stopRevision`, and high-waters. Exact replay
+   returns the existing pending, ambiguous, rejection, or outcome receipt. A
+   changed tuple under a reused ID/slot/nonce/ordinal, or another request ID for
+   a used slot, conflicts without effect. Possible-effect state is never
+   inferred terminal or replayed blindly.
+
    Candidate late binding is closed: resulting anchor acknowledgement and
    ordered participant preparation receipts are normal activation inputs. The
    later activation/effect/outcome receipts are outputs, not retroactive
-   activation inputs; an admin Edge activation receipt is only ordered
-   companion pre-effect evidence. The only further late local receipts that may
+   activation inputs. Admin reservation and companion consumption/outcome
+   receipts are post-activation boundary evidence, not authority, successor
+   proof, or activation rewrites. The only further late local receipts that may
    affect a specialized release or activation are a reduction-only
    `SafetyControlFenceReceipt` and the same-executor renewal `R_i`/`X_i` below.
    Safety activation binds its fence receipt; renewal decision `B` binds every
@@ -172,13 +203,37 @@ command boundary independently of any UI or transport.
    `P1`'s effect gate remains closed until the complete authenticated successor
    activation. The Hub cannot claim global activation until all ordered `X_i`
    receipts reconcile and the activation binds `D + A + B` and all
-   `R_i`/`X_i`. A partial Edge/companion switch accepts neither permit at the
-   complete participant intersection and is safe unavailability. If any participant cannot serialize every
-   boundary, or any eligibility field changed, the renewal requires the general
-   barrier or exact disjointness. Abort before `B` tombstones `A/R*` by the
+   `R_i`/`X_i`. For ordinary multi-participant renewal a partial transfer accepts
+   neither permit at the complete participant intersection and cannot effect
+   under either permit. Admin renewal instead has fixed transfer precedence and
+   reservation drain; it does not rely on arbitrary participant order. If any
+   participant cannot serialize every boundary, or any eligibility field
+   changed, the renewal requires the general barrier or exact disjointness.
+   Abort before `B` tombstones `A/R*` by the
    mutually exclusive anchor CAS. Once `B` or release may have escaped,
    ambiguity uses revocation, quarantine, reconciliation, and horizon expiry;
    it never resurrects `P0`, assumes no-effect, or mints another successor.
+
+   For an eligible admin renewal, `D` precommits the complete `P0` reservation
+   namespace, stable final closure/high-water slots, and precedence `X_C -> X_E`.
+   Ordinary effect ordering remains Edge reservation then companion consumption.
+   Companion `X_C` uses the same journal gate as consumption: consume-first
+   blocks `X_C` until qualified terminal/no-effect reconciliation, and
+   effect-possible, pending, or ambiguous is not drain; `X_C`-first atomically
+   closes the namespace, tombstones every unconsumed slot while preserving prior
+   receipts, supersedes companion-local `P0`, and emits its final high-water and
+   namespace digest. Later `P0` requests return the tombstone or prior receipt
+   without effect.
+
+   Edge `X_E` is forbidden before exact authenticated `X_C`. At the same gate as
+   issuance, one `X_E` CAS closes new `P0` reservations and proves zero unresolved
+   issued slots through final high-waters. Each issued slot requires a durable
+   companion terminal/no-effect outcome, its exact unconsumed `X_C` tombstone,
+   or qualified fixed-horizon evidence durably proving it was never consumed;
+   elapsed time cannot clear effect-possible or ambiguous work. The CAS
+   supersedes Edge-local `P0`, switches local `P1` with its effect gate closed,
+   and emits `X_E`. Final activation binds both `X_C` and `X_E`; every partial
+   state is unavailable and non-effecting under either permit.
 
    Replay uses the same stable identities and never replenishes time. Missing,
    stale, mismatched, unverifiable, inactive, unjournaled, expired,
@@ -254,7 +309,8 @@ command boundary independently of any UI or transport.
     successor/takeover/transfer authority, or permission to start replacement
     work.
 
-    Its inert candidate and stable fence-plan identity bind the closed action,
+    Its inert candidate and stable fence-plan identity bind a domain-separated
+    `SafetyControl` reservation namespace and the closed action,
     exact FleetCommand/EdgeCommand/turn/native operation, predecessor permit and
     activation, admitted control epoch and lane-mutation revision,
     process-creation identity, executor/binding,
@@ -270,6 +326,15 @@ command boundary independently of any UI or transport.
     preparation/closure acknowledgement; no generic acknowledgement is omitted.
     Authenticated safety activation binds the anchor and ordered fence receipts;
     the supervisor journals activation before emitting the exact native control.
+
+    The safety namespace is excluded from productive admin reservation drain.
+    At a shared participant journal gate, a safety-fence CAS that wins first
+    advances `stopRevision` and rejects all older unconsumed ordinary
+    reservations without effect. If one ordinary consumption wins first, at
+    most that exact predecessor boundary may proceed and safety remains
+    deliverable to close every later boundary. Safety never waits for productive
+    drain, grants productive authority, satisfies renewal `X`, proves
+    termination, or completes a barrier.
 
     It cannot retarget, start/resume/retry work, steer, approve, write, migrate,
     renew, change binding/scope/lease/controller, or carry arbitrary arguments.
@@ -300,11 +365,17 @@ command boundary independently of any UI or transport.
   advance alone is not a remote kill or an immediate fence of a disconnected
   predecessor.
 - Fault injection must cover admin Edge/companion ordered preparation and
-  activation, crash before and after privileged effect, journal rollback and
-  restore, and stale permit/decision/proof rejection; safety-control completion
-  races, stop-revision CAS, duplicate/unsupported delivery and crash ambiguity;
-  and same-executor renewal crash/replay at `A`, every `R_i`, `B`, every `X_i`,
-  abort and final activation, including partial multi-participant transfer.
+  activation; Edge/companion crash before and after reservation/consumption CAS
+  and possible privileged effect; delayed/duplicate admin delivery, response
+  loss and exact replay; changed tuple under reused request/slot/nonce/ordinal;
+  journal rollback and restore joining the
+  existing barrier; and stale permit/decision/proof rejection. It must cover
+  safety-control completion and safety-fence-versus-consume races,
+  stop-revision CAS, duplicate/unsupported delivery and crash ambiguity; and
+  same-executor renewal crash/replay at `A`, every `R_i`, `B`, every general
+  `X_i`, admin-specialized `X_C` then `X_E`, abort and final activation,
+  including consume-versus-`X_C`,
+  issue-versus-`X_E`, and partial transfer states.
   These remain acceptance work, not claims of live validation.
 - Exact framing, transport, enrollment keys, clock source, admissible
   uncertainty thresholds, and the minimal composite-family list remain bounded

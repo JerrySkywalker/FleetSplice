@@ -27,19 +27,31 @@ command boundary independently of any UI or transport.
    subscriptions are observation only.
 4. `FleetCommand`, immutable `ResolvedExecutionPlan`, and exact fenced
    `EdgeCommand` have correlated but different identities. The client persists
-   `commandId` before send. Hub recomputes separate canonical payload and
-   semantic-intent digests, assigns `resolutionId + resolutionRevision`, and
+   `commandId` before send and supplies a typed
+   `expectedHubRecoveryGeneration` precondition. Hub recomputes separate
+   canonical payload and semantic-intent digests and rejects a stale
+   precondition before resolution, assigns `resolutionId + resolutionRevision`
+   bound to exact `hubRecoveryGeneration` and every selected target's
+   `edgeRecoveryGeneration`, and
    derives one `stepKey + edgeCommandId` per frozen step with parent links,
-   dependencies, target, generations/instances, causal fences, authority and
-   qualification revisions, and payload digest.
+   dependencies, target, exact Hub/Edge recovery-generation values, resource
+   generations/instances, causal fences, authority and qualification revisions,
+   and payload digest.
 5. A composite is finite and schema-declared before first dispatch. Every step
    owns an idempotency row and receipt; no wildcard expands later, no cross-Edge
    atomicity or rollback is claimed, and the terminal receipt carries an
-   ordered step manifest. Once an effect may have started, retry cannot retarget.
+   ordered immutable manifest of required/optional step outcomes. Aggregate
+   `SUCCEEDED` is permitted only when every required step succeeds; it cannot
+   hide a mixed result. A known mix of successful effects and non-success
+   outcomes is `PARTIAL_EFFECT`; uncertainty about any step effect makes the
+   aggregate `AMBIGUOUS_EFFECT`.
+   Once an effect may have started, retry cannot retarget.
 6. The client recovers response loss by receipt lookup or exact canonical
    replay. Hub derives idempotency scope from actor/grant/family/logical target;
    same identity aliases, changed intent conflicts without effect, and retained
-   digest tombstones prevent forgotten duplicates.
+   digest tombstones prevent forgotten duplicates. Exact replay preserves the
+   Hub and target-Edge recovery generations; Hub and Edge reject any pre-recovery
+   identity or generation mismatch before effect.
 7. HCP carries exact Edge commands, observations, snapshots, journal/event
    watermarks, receipts, and reconnect repair over an outbound authenticated
    Edge connection. Agent protocols and transport mechanics do not define HCP

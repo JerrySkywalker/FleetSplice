@@ -36,9 +36,15 @@ storage needs.
    Authority data uses local-filesystem WAL and `synchronous=FULL`, with a
    supported engine containing the SQLite 3.51.3 WAL-reset fix or later.
 6. Restore requires an externally anchored monotonic recovery generation or
-   full reenrollment/fencing with higher generations, fresh instance IDs,
-   retained receipt/tombstone reconciliation, and no dispatch until rollback
-   gaps cannot resurrect authority or duplicate effects.
+   full authority reset and reenrollment/fencing with higher externally
+   witnessed generations. The anchor commits Hub/Edge recovery generations and
+   a monotonic completeness watermark or digest over accepted commands,
+   immutable plans and frozen step manifests, Edge commands, receipts, and
+   tombstones. Its advance fences all pre-restore commands, plans, steps,
+   streams, and stale instances even if restored databases lost newer rows.
+   Restore creates fresh instance IDs, and no resolution, replay, or dispatch
+   resumes until monotonic proof and reconciliation show rollback gaps cannot
+   resurrect authority or duplicate effects.
 7. Publish content-addressed blobs before database visibility only after a
    platform-proven durable data/rename-metadata barrier or equivalent two-phase
    recoverable protocol. GC and backup use durable manifest/reachability

@@ -42,8 +42,10 @@ compatibility record for native Codex or a generic ACP target.
 
 ### ExecutionBinding
 
-The exact Host, Environment, Workspace/Worktree, managed-process and generation
-tuple for a NativeSegment.
+The exact durable Host, Environment, Workspace/Worktree, Agent execution
+configuration, native identity, and generation tuple for a NativeSegment. It
+does not include ephemeral Hub, Edge, companion, or Environment runtime-instance
+IDs.
 
 ### NativeSession
 
@@ -68,6 +70,16 @@ A binding epoch in which one SessionLane uses one declared AgentBinding,
 ExecutionBinding, ProviderBinding, native identity, compatibility record, and
 continuity class. Any effective binding change opens a new segment even when a
 native thread ID survives.
+
+### RuntimeAttachment
+
+An append-only transition linking current Hub, Edge, companion/Environment,
+stream, managed-process, and native-session instances to an existing
+NativeSegment. A restart may reattach only after qualified reconciliation proves
+the same native and managed-process identity plus unchanged durable bindings and
+generations. Otherwise the attachment is `UNKNOWN`, `LOST`, or
+`AMBIGUOUS_EFFECT` until explicit resolution, and a changed durable binding or
+native identity requires a new segment.
 
 ### HandoffCapsule
 
@@ -103,18 +115,23 @@ A reference to host- or inference-owned secret material rather than the secret i
 
 A client-to-Hub typed semantic intent identified by a client-persisted
 `commandId`, canonical payload digest, and Hub-recomputed
-`fleetCommandIntentDigest`.
+`fleetCommandIntentDigest`. Every command includes the client's
+`expectedHubRecoveryGeneration` typed precondition; Hub rejects a mismatch with
+no effect before resolution.
 
 ### ResolvedExecutionPlan
 
 The Hub-owned immutable `resolutionId + resolutionRevision` that binds one
-FleetCommand to exact bindings and a finite frozen step graph.
+FleetCommand to exact `hubRecoveryGeneration`, every selected target's exact
+`edgeRecoveryGeneration`, exact bindings, and a finite frozen step graph.
 
 ### EdgeCommand
 
 One exact `stepKey + edgeCommandId` effect request with parent links,
-generations, runtime instances, control fences, authority/qualification
-revisions, dependencies, and its own idempotency record and receipt.
+exact `hubRecoveryGeneration` and target `edgeRecoveryGeneration`, durable
+resource generations, runtime instances, control fences,
+authority/qualification revisions, dependencies, and its own idempotency record
+and receipt. Edge rejects either recovery-generation mismatch before effect.
 
 ### ObservedState
 

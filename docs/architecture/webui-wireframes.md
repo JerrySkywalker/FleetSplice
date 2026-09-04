@@ -443,14 +443,17 @@ G05 / M0 Single-host Walking Skeleton
 G06 / M1 Two-host Minimum Fleet Loop
   W4 Session Index
   two Hosts visible and selectable
-  durable history across browser reopen
+  exact Host/Environment identity across Edge reconnect
 
 G07 / M2 Daily-use Control
   W2 Approval Attention
   interrupt/resume/controller state
+  browser close/reopen projection without duplicate effect
 
 G08 / M3 Durable Session
   W7 History/Checkpoint/Continuity
+  durable Fleet history and Hub/Edge/native disruption recovery
+  explicit ambiguity when effect evidence cannot resolve outcome
 
 G09 / M4 Provider Migration
   W3 Migration Review

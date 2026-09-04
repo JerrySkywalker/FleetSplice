@@ -266,10 +266,16 @@ The train reaches this loop in deliberately named slices:
   Browser -> Hub -> SKYFORGE-01 Edge -> native Codex -> Browser round trip with
   minimal W1 and W5 surfaces. It is the first product slice, not the accepted
   minimum-useful v0.1 product.
-- **G06 / M1 Minimum Fleet Loop is two-host.** It adds ZenBook Duo so the same
-  WebUI can select either Host and preserve Fleet history across browser reopen.
-- G07-G09 add the approval, interrupt, takeover, reconnect, durable recovery,
-  ambiguity, and explicit provider-migration behavior required for daily use.
+- **G06 / M1 Minimum Fleet Loop is two-host.** It adds the exact ZenBook Duo
+  path so the same WebUI can select either Host and prove Host/Environment
+  identity across Edge reconnect.
+- **G07 / M2 Daily-use Control** adds approval, interrupt/resume, takeover, and
+  browser close/reopen projection without duplicate effect.
+- **G08 / M3 Durable Session** adds durable Fleet history and recovery across
+  Hub, Edge, and native disruption, including explicit ambiguity.
+- **G09 / M4 Provider Migration** proves the qualified, owner-confirmed target
+  activation or verified visible fail-closed `NO_QUALIFIED_TARGET` outcome; it
+  never performs transparent failover.
 - G10 accepts the hardened minimum-useful two-host v0.1 product only after its
   exact-head recovery, storage, update, security, and UI gates pass.
 

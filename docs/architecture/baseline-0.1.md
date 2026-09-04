@@ -3,18 +3,20 @@
 ## Status and authority
 
 - Baseline: `0.1`
-- State: `DRAFT_CORRECTED_AFTER_G02_CHANGE_REQUIRED`
+- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_2_CHANGE_REQUIRED`
 - Drafting Goal: `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001` (`G01`)
-- Reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
+- Initial reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
+- Round-2 reviewed draft: `b82df67d5a045d31b04b0efb3fb5c0a2cb9de571`
 - Evidence cut: 2026-09-04 research and owner correction
 - `ARCHITECTURE_0_1_READY=false`
 - `IMPLEMENTATION_AUTHORIZED=false`
 - `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`
 
 This is a formal architecture draft, not an accepted baseline and not product
-implementation authority. Independent G02 review of the original draft
-returned [`CHANGE_REQUIRED`](../train/receipts/G02.md); this revision contains
-only the bounded corrections from that receipt and has not received a fresh
+implementation authority. Independent G02 review of the original draft and of
+the round-1 correction returned [`CHANGE_REQUIRED`](../train/receipts/G02.md)
+and [round-2 `CHANGE_REQUIRED`](../train/receipts/G02-r2.md). This revision
+contains only their bounded corrections and has not received a fresh
 independent PASS. It does not supersede [Baseline 0.0](baseline-0.0.md) until a
 fresh review and the owner-controlled G03 acceptance gate both pass. Only G03
 may change `ARCHITECTURE_0_1_READY`, and this draft deliberately leaves every
@@ -130,8 +132,10 @@ partition occurs, the projection becomes `STALE` or `UNKNOWN`; it never becomes
 ## Identity and generation model
 
 ```text
+Hub authority store (monotonic hubRecoveryGeneration)
 Fleet
   Host (stable ID + Hub-owned durable enrollment generation)
+    Edge authority store (monotonic edgeRecoveryGeneration)
     hostBootId (new on every OS boot)
     edgeInstanceId (new on every Edge process start)
     Environment (stable ID + Hub-owned durable configuration generation)
@@ -178,6 +182,16 @@ Every observation, snapshot, and EdgeCommand binds the durable generations and
 the current `hostBootId`, `edgeInstanceId`, `environmentInstanceId`, and stream
 identity that apply. A restart opens a new stream and fences every old-instance
 stream; an old instance can never resume its sequence under a new one.
+
+Runtime instance identity is not part of NativeSegment's durable identity. A
+restart may attach to the same segment only after a qualified reconciler proves
+the same native identity and managed-process identity, plus unchanged
+Agent/Execution/Provider bindings and durable generations. Fleet appends a
+`RuntimeAttachment` transition naming the new instances, stream, evidence, and
+reconciliation result; it does not rewrite the segment. If continuity cannot be
+proved, the attachment and affected work remain `UNKNOWN`, `LOST`, or
+`AMBIGUOUS_EFFECT` as applicable until explicit resolution, and continuation
+requires a new NativeSegment when the binding or native identity changed.
 
 `LogicalSession` is the durable objective and history. A `SessionLane` is a
 causal branch with its own controller and ordering. A `NativeSegment` is a
@@ -227,26 +241,36 @@ inside an existing command family.
 FleetCommand
   commandId persisted by the client before send
   canonical payloadDigest + fleetCommandIntentDigest
+  typed expectedHubRecoveryGeneration precondition
       |
       v
 ResolvedExecutionPlan
   resolutionId + immutable resolutionRevision
+  hubRecoveryGeneration + targetEdgeRecoveryGenerationByEdgeId
   exact selected bindings and frozen finite typed steps
       |
       v
 EdgeCommand
   edgeCommandId + parent command/resolution/step links
-  exact generation/instance/control-fenced request to one effect boundary
+  hubRecoveryGeneration + edgeRecoveryGeneration
+  exact resource-generation/instance/control-fenced request to one effect boundary
 ```
 
 The IDs are correlated and never identical. The Hub persists the resolution
 before dispatch. Its immutable identity is `resolutionId + resolutionRevision`
-bound to the `fleetCommandId + fleetCommandIntentDigest`. Every step has a
-stable `stepKey`, distinct `edgeCommandId`, parent FleetCommand and resolution
-links, exact target Edge, typed operation/payload digest, authority decision,
-durable generations and runtime instances, `controlEpoch` and
-`laneMutationRevision` when causal, required qualification revision/expiry,
-required/optional classification, and frozen dependency `stepKey`s.
+bound to the `fleetCommandId + fleetCommandIntentDigest` and exact admitted Hub
+`recoveryGeneration`. Every client command carries
+`expectedHubRecoveryGeneration` as a typed precondition from a current Hub
+projection; the Hub rejects a mismatch with no effect before resolution. Every
+plan binds exact `hubRecoveryGeneration` and each selected target Edge's exact
+`edgeRecoveryGeneration`. Every step has a stable `stepKey`, distinct
+`edgeCommandId`, parent FleetCommand and resolution links, exact target Edge,
+typed operation/payload digest, authority decision, exact
+`hubRecoveryGeneration` and target `edgeRecoveryGeneration`, durable resource
+generations and runtime instances,
+`controlEpoch` and `laneMutationRevision` when causal, required qualification
+revision/expiry, required/optional classification, and frozen dependency
+`stepKey`s.
 
 The Hub may auto-resolve only a unique, already selected compatible binding.
 Multiple lanes, stale/unknown placement, a privilege/provider change,
@@ -257,10 +281,19 @@ atomicity or rollback, and no wildcard may expand after dispatch. The terminal
 Fleet receipt contains an ordered immutable manifest of every step receipt,
 required/optional outcome, effect identity, and ambiguity flag.
 
+The aggregate FleetCommand may be `SUCCEEDED` only when every required step is
+`SUCCEEDED`; optional-step outcomes remain explicit and success cannot hide a
+mixed result. A known mix of successful effects and non-success step outcomes
+is `PARTIAL_EFFECT`. Any unresolved uncertainty about whether a step crossed
+its effect boundary makes the aggregate `AMBIGUOUS_EFFECT`, including a mixture
+containing otherwise successful steps. Neither aggregate erases the ordered
+required/optional per-step outcomes.
+
 Once an Edge step is admitted or may have started, the plan freezes. Redelivery
-uses the same ID, digest, plan revision, and generations. Retry never changes
-Host, Environment, Workspace, Driver, provider, model, native identity, or
-continuity mode. A new intent is a new FleetCommand with a new authority check.
+uses the same ID, digest, plan revision, Hub and target-Edge recovery
+generations, and resource generations. Retry never changes Host, Environment,
+Workspace, Driver, provider, model, native identity, or continuity mode. A new
+intent is a new FleetCommand with a new authority check.
 
 ### Replay, duplicate, and conflict identity
 
@@ -282,8 +315,12 @@ for the accepted retention window.
 
 After response loss, the client retrieves by `commandId` or resends the exact
 same canonical command. Hub-to-Edge replay likewise reuses the exact
-`edgeCommandId`, digest, resolution revision, authority snapshot, generations,
-instances, and fences. Neither hop reconstructs a similar new command.
+`edgeCommandId`, digest, resolution revision, authority snapshot, Hub and
+target-Edge recovery generations, resource generations, instances, and fences.
+The Hub rejects any client command whose expected recovery generation is not
+current, and the Edge rejects a plan or EdgeCommand with either a non-current
+Hub recovery generation or a non-current local Edge recovery generation before
+effect. Neither hop reconstructs a similar new command.
 
 ### Observation is never mutation authority
 
@@ -509,14 +546,25 @@ identity, outbound spool, and Hub acknowledgement watermarks.
 
 Backup and restore cannot move authority, generation, revocation, or
 idempotency time backward. Each authority store binds commands and streams to a
-monotonic `recoveryGeneration` anchored outside the rollback domain. Restore is
-admissible only when the anchor and retained receipt/tombstone watermarks prove
-lineage; it increments the recovery generation and creates new Hub/Edge,
-Environment, and event-stream instance identities. If that proof or newer
-tombstones/receipts are unavailable, all affected Hosts/Environments must be
-fully reenrolled with higher durable generations, old connections and grants
-fenced, and journals/remote receipts reconciled. No command dispatch resumes
-until gaps are tombstoned or reconciled and stale authority cannot reappear.
+monotonic `recoveryGeneration` anchored outside the rollback domain. The
+external anchor commits the current Hub and Edge recovery generations plus a
+monotonic completeness watermark or digest covering accepted FleetCommand
+identities and intent digests, resolution identities/revisions, frozen ordered
+step manifests, EdgeCommand identities, receipts, and tombstones. Restore is
+admissible only when that anchor and retained evidence prove lineage; it first
+advances the affected recovery generation and creates new Hub/Edge,
+Environment, and event-stream instance identities. The advance fences every
+pre-restore command, plan, step manifest, EdgeCommand, stream, and stale runtime
+instance before replay or effect even when the restored databases lost their
+newer receipt or tombstone rows.
+
+If anchored completeness cannot be proved, all affected authority and
+Hosts/Environments require a full reset and reenrollment that establishes
+higher externally witnessed recovery and durable resource generations, revokes
+old connections and grants, and reconciles journals and remote receipts. No
+command resolution, replay, or dispatch resumes until monotonic proof and
+reconciliation establish that rollback gaps cannot resurrect authority or
+duplicate an effect.
 
 Large tool output, terminal chunks, native payloads, diffs, and artifacts use
 content-addressed filesystem blobs. A blob is written to a same-filesystem
@@ -570,12 +618,17 @@ The train uses two different milestones that must not be conflated:
    Browser -> Hub -> Edge -> native Codex -> Browser round trip using minimal
    W1 Session Workspace and W5 Host/Workspace selection. This is the first
    product slice, not the minimum-useful v0.1 acceptance.
-2. **G06 / M1 minimum Fleet loop:** add ZenBook Duo so both Hosts are visible
-   and selectable through the same Hub and WebUI, with durable history across
-   browser reopen. This establishes the two-host minimum Fleet topology.
-3. **G07-G09:** add daily control, durable recovery/history, ambiguity, and
-   explicit provider migration on the same semantics.
-4. **G10 / v0.1 acceptance:** harden and accept the complete minimum-useful
+2. **G06 / M1 minimum Fleet loop:** add the exact ZenBook Duo path so both
+   Hosts are visible and selectable through the same Hub and WebUI, and prove
+   Host/Environment identity across Edge reconnect. This establishes only the
+   two-host minimum Fleet topology.
+3. **G07 / M2 daily-use control:** add approval, interrupt/resume, takeover,
+   and browser close/reopen projection without duplicate effect.
+4. **G08 / M3 durable session:** add durable Fleet history and recovery across
+   Hub, Edge, and native disruption, including explicit ambiguity.
+5. **G09 / M4 provider migration:** prove its qualified, confirmed activation
+   or visible fail-closed no-target outcome on the same semantics.
+6. **G10 / v0.1 acceptance:** harden and accept the complete minimum-useful
    two-host product only after exact-head review, fault/recovery, storage,
    upgrade, security, and UI gates pass.
 
@@ -776,10 +829,10 @@ They remain `Proposed` while this baseline is a draft:
 
 ## Review disposition
 
-G02 reviewed the exact original draft and returned `CHANGE_REQUIRED`. This
-revision applies those bounded findings, but the Implementer has not reviewed
-or approved its own corrections. It makes no claim that a fresh review or G03
-has passed.
+G02 reviewed the exact original draft and the exact round-1 correction; both
+reviews returned `CHANGE_REQUIRED`. This revision applies only their bounded
+findings, but the Implementer has not reviewed or approved its own corrections.
+It makes no claim that a fresh review or G03 has passed.
 
 ```text
 ARCHITECTURE_0_1_READY=false

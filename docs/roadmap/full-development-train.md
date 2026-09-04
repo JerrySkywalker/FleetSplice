@@ -21,7 +21,7 @@ The train therefore uses **vertical-slice-first fast-track development**. Each i
 | C Minimum Fleet | G06 | one WebUI controls SKYFORGE + ZenBook Duo |
 | D Daily Control | G07 | approval, interrupt, takeover, reconnect |
 | E Durable Work | G08 | durable session/history/recovery/ambiguity |
-| F Provider Mobility | G09 | explicit confirmed provider migration |
+| F Provider Mobility | G09 | qualified owner-confirmed activation or verified visible fail-closed `NO_QUALIFIED_TARGET`; no transparent failover |
 | G v0.1 Release | G10 | hardening, fault injection, backup/update/UI acceptance |
 | H Multi-Agent Runtime | G11 | second real ACP Agent |
 | I Environment/UX/TUI | G12-G14 | admin/WSL, workspace panels, remote TUI |

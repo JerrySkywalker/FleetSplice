@@ -34,7 +34,15 @@ FleetSplice should never claim an in-place hot switch when an agent actually req
 Any changed Agent/Driver, Host, Environment, Workspace/Worktree, provider,
 model/reasoning contract, compatibility record, or relevant capability opens a
 new NativeSegment even if the native thread ID survives. Every segment binds
-the exact durable generations and current runtime instance identities.
+the exact durable native identity, bindings, and generations, never ephemeral
+Hub, Edge, companion/Environment, or stream instance IDs.
+
+A runtime restart may append a `RuntimeAttachment` to the same segment only
+after qualified reconciliation proves the same native and managed-process
+identity and unchanged durable bindings/generations. The transition records the
+new runtime and stream identities plus its evidence. If continuity cannot be
+proved, Fleet reports `UNKNOWN`, `LOST`, or `AMBIGUOUS_EFFECT` until explicit
+resolution; a changed binding or native identity requires a new segment.
 
 ## Provider switching capability
 

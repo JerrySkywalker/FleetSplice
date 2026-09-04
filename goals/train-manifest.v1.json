@@ -1,0 +1,31 @@
+{
+  "schema": "fleetsplice-development-train.v1",
+  "train_id": "FLEETSPLICE-FULL-DEVELOPMENT-TRAIN-001",
+  "base_lineage_head": "1eb39b669de9a9e3dd24fdd7af74ed45a661b7d4",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "ultra",
+  "allow_model_substitution": false,
+  "merge_stations": [
+    {"id":"A","after":"G04","purpose":"architecture-and-implementation-contract"},
+    {"id":"B","after":"G10","purpose":"v0.1-release"},
+    {"id":"C","after":"G16","purpose":"v0.2-and-self-hosting"}
+  ],
+  "goals": [
+    {"seq":"G01","id":"FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001","file":"goals/FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001.md","depends_on":[],"phase":"architecture","parallel":false},
+    {"seq":"G02","id":"FLEETSPLICE-ARCH-0_1-ADVERSARIAL-REVIEW-002","file":"goals/FLEETSPLICE-ARCH-0_1-ADVERSARIAL-REVIEW-002.md","depends_on":["G01"],"phase":"architecture","parallel":false},
+    {"seq":"G03","id":"FLEETSPLICE-ARCH-0_1-ACCEPTANCE-003","file":"goals/FLEETSPLICE-ARCH-0_1-ACCEPTANCE-003.md","depends_on":["G02"],"phase":"architecture","parallel":false},
+    {"seq":"G04","id":"FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004","file":"goals/FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004.md","depends_on":["G03"],"phase":"planning","parallel":false},
+    {"seq":"G05","id":"FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005","file":"goals/FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005.md","depends_on":["G04"],"phase":"v0.1","parallel":false},
+    {"seq":"G06","id":"FLEETSPLICE-V0_1-M1-TWO-HOST-LOOP-006","file":"goals/FLEETSPLICE-V0_1-M1-TWO-HOST-LOOP-006.md","depends_on":["G05"],"phase":"v0.1","parallel":false},
+    {"seq":"G07","id":"FLEETSPLICE-V0_1-M2-DAILY-CONTROL-007","file":"goals/FLEETSPLICE-V0_1-M2-DAILY-CONTROL-007.md","depends_on":["G06"],"phase":"v0.1","parallel":false},
+    {"seq":"G08","id":"FLEETSPLICE-V0_1-M3-DURABLE-SESSION-008","file":"goals/FLEETSPLICE-V0_1-M3-DURABLE-SESSION-008.md","depends_on":["G07"],"phase":"v0.1","parallel":false},
+    {"seq":"G09","id":"FLEETSPLICE-V0_1-M4-PROVIDER-MIGRATION-009","file":"goals/FLEETSPLICE-V0_1-M4-PROVIDER-MIGRATION-009.md","depends_on":["G08"],"phase":"v0.1","parallel":false},
+    {"seq":"G10","id":"FLEETSPLICE-V0_1-HARDENING-010","file":"goals/FLEETSPLICE-V0_1-HARDENING-010.md","depends_on":["G09"],"phase":"v0.1","parallel":false},
+    {"seq":"G11","id":"FLEETSPLICE-V0_2-ACP-AGENT-011","file":"goals/FLEETSPLICE-V0_2-ACP-AGENT-011.md","depends_on":["G10"],"phase":"v0.2","parallel":false},
+    {"seq":"G12","id":"FLEETSPLICE-V0_2-ENVIRONMENTS-012","file":"goals/FLEETSPLICE-V0_2-ENVIRONMENTS-012.md","depends_on":["G11"],"phase":"v0.2","parallel":true,"parallel_group":"v0.2-expansion"},
+    {"seq":"G13","id":"FLEETSPLICE-V0_2-WORKSPACE-UX-013","file":"goals/FLEETSPLICE-V0_2-WORKSPACE-UX-013.md","depends_on":["G11"],"phase":"v0.2","parallel":true,"parallel_group":"v0.2-expansion"},
+    {"seq":"G14","id":"FLEETSPLICE-V0_2-TUI-014","file":"goals/FLEETSPLICE-V0_2-TUI-014.md","depends_on":["G11"],"phase":"v0.2","parallel":true,"parallel_group":"v0.2-expansion"},
+    {"seq":"G15","id":"FLEETSPLICE-V0_2-TUI-PARITY-015","file":"goals/FLEETSPLICE-V0_2-TUI-PARITY-015.md","depends_on":["G12","G13","G14"],"phase":"v0.2","parallel":false},
+    {"seq":"G16","id":"FLEETSPLICE-SELF-HOSTING-016","file":"goals/FLEETSPLICE-SELF-HOSTING-016.md","depends_on":["G15"],"phase":"self-hosting","parallel":false}
+  ]
+}

@@ -1057,11 +1057,12 @@ The core also binds the digest of the closed transition table defined below.
 That canonical digest covers every row's stable ID, result, writer-mode and
 evidence predicates, evidence-union arm and schema revision, immutable producer
 selectors and revisions, both manifests and every manifest field, D classifier
-schema, total precedence and negative guards, exact predecessor, resulting
-eligibility, atomic tombstones, evidence-slot behavior, and native-emission
-authority. `deliveryPlanDigest` is derived from that core while excluding the
-digest field itself. `D` permits only the exact precommitted delivery owner/
-incarnation; `O` and `R` permit only their explicitly listed owner or recovery/
+schema, the classifiable (`row-eligible`) domain and zero/multiple-match
+rejection definitions, total precedence and negative guards, exact predecessor,
+resulting eligibility, atomic tombstones, evidence-slot behavior, and native-
+emission authority. `deliveryPlanDigest` is derived from that core while
+excluding the digest field itself. `D` permits only the exact precommitted
+delivery owner/incarnation; `O` and `R` permit only their explicitly listed owner or recovery/
 reconciliation writers, whose scopes grant no native emission or fallback
 authority.
 
@@ -1095,16 +1096,28 @@ grants no emission.
 
 The digest-bound classifier uses total precedence
 `ALREADY_TERMINAL > CANCELED_NO_EFFECT > UNSUPPORTED > DELIVERY_EFFECT_POSSIBLE`
-and these exhaustive guarded predicates: terminal iff `targetState=TERMINAL`;
-canceled iff `targetState=NONTERMINAL` and the exact attempt is durably
-withdrawn/tombstoned; unsupported iff the target is nonterminal, the attempt is
-live, and the bound capability/admission is unsupported; effect-possible iff the
-target is nonterminal, the attempt is live, capability/admission is supported,
-and the bound final gate, owner, identities, and qualifications are current and
-`READY`. A higher-precedence fact precludes every lower row even when lower-
-dimension facts coexist. Contradictory values for one fact, or any unknown,
-blocked, missing, stale, forked, reordered, unlisted, or digest-mismatched source
-derives no row, seals rejection, and leaves `S0` unchanged.
+and these four guarded predicates: terminal iff `targetState=TERMINAL`; canceled
+iff `targetState=NONTERMINAL` and the exact attempt is durably withdrawn/
+tombstoned; unsupported iff the target is nonterminal, the attempt is live, and
+the bound capability/admission is unsupported; effect-possible iff the target is
+nonterminal, the attempt is live, capability/admission is supported, and the
+bound final gate, owner, identities, and qualifications are current and readiness
+is exactly `READY`. The classifiable (`row-eligible`) domain consists only of complete,
+current, gap-free, non-forked source vectors that satisfy every source and gate
+eligibility requirement applicable to one of those ordered rows. Within that
+domain the predicates are mutually exclusive and exactly one matches; across all
+known vectors, total precedence and the negative guards permit at most one match.
+A higher-precedence fact precludes every lower row even when lower-dimension
+facts coexist.
+
+A nonterminal target with a live attempt and supported capability/admission but
+a noncurrent bound final gate, owner, identity, or qualification, or a readiness
+value other than exactly `READY`, is outside the row-eligible domain and derives
+zero rows. An unknown, blocked, contradictory, missing, stale, forked, reordered,
+unlisted, or digest-mismatched source likewise derives zero rows. Every zero
+match or multiple guarded match makes the atomic operation seal the cut slot as
+`SEALED_REJECTED`, write no `SafetyControlDeliveryReceipt`, leave `S0` unchanged,
+and grant no emission.
 
 For the exact current `D=DELIVERY_EFFECT_POSSIBLE` receipt and head, denote that
 immutable predecessor as `D*`; denote its exact CAS-winning delivery owner and
@@ -1298,8 +1311,9 @@ Safety control uses this ordering:
    `attemptIncarnation=controlDeliveryOwnerIncarnationId` against still-live,
    qualified `DW`; verifies the complete current classification manifest and
    ordered source-cut vector; seals that one cut; applies the digest-bound
-   classifier; and writes exactly its one derived stable row in the same atomic
-   operation. It never accepts a caller-selected row.
+   classifier; and, only for a row-eligible vector with exactly one derived row,
+   writes that stable row in the same atomic operation. It never accepts a
+   caller-selected row.
 
    - `D-ALREADY_TERMINAL-OWNER` is derived iff exact-target `targetState` is
      terminal. This highest fact precludes every lower row.
@@ -1311,15 +1325,24 @@ Safety control uses this ordering:
      Those guards preclude terminal, canceled, and effect-possible rows.
    - `D-DELIVERY_EFFECT_POSSIBLE-OWNER` is derived iff the target is nonterminal,
      the exact attempt is live, native capability/admission is supported, and
-     the exact owner, identities, qualifications, and final gate remain current
-     and `READY`. Its cut proves no emission; only the successful atomic D CAS
+      the exact owner, identities, qualifications, and final gate remain current
+      and readiness is exactly `READY`. Its cut proves no emission; only the
+      successful atomic D CAS
      grants its winner one-shot native-emission authority.
 
-   Complete consistent fact combinations derive exactly one row under the
-   precommitted precedence. Zero matches, multiple guarded matches, an unknown
-   or blocked fact, or conflicting, missing, stale, forked, reordered, unlisted,
-   self-produced, source/revision/schema/high-water/digest-mismatched evidence
-   seals `SEALED_REJECTED`, leaves `S0` unchanged, and grants no emission. A
+   A complete, current, gap-free, non-forked source vector derives exactly one
+   row only when it satisfies every applicable source and gate requirement and
+   is therefore classifiable (`row-eligible`). Within that domain the four rows
+   are mutually exclusive and exactly one matches; across all known vectors the
+   precedence and negative guards permit at most one match. A nonterminal/live/
+   supported vector with a noncurrent final gate, owner, identity, or
+   qualification, or readiness other than exactly `READY`, derives zero rows.
+   Every vector outside the domain, including one with an unknown or blocked
+   fact or conflicting, missing, stale, forked, reordered, unlisted,
+   self-produced, source/revision/schema/high-water/digest-mismatched evidence,
+   also derives zero rows. Every zero match or multiple guarded match seals
+   `SEALED_REJECTED`, writes no `SafetyControlDeliveryReceipt`, leaves `S0`
+   unchanged, and grants no emission. A
    terminal D-row CAS writes the immutable `SafetyControlDeliveryReceipt`,
    becomes absorbing, atomically tombstones O and R, and grants no emission. Only
    the `D-DELIVERY_EFFECT_POSSIBLE-OWNER` CAS makes O eligible, records D's per-
@@ -1410,7 +1433,7 @@ Safety control uses this ordering:
    | `D-ALREADY_TERMINAL-OWNER` | `ALREADY_TERMINAL` | `targetState=TERMINAL`; highest precedence, so every lower row is precluded | terminal D head / O and R | none |
    | `D-CANCELED_NO_EFFECT-OWNER` | `CANCELED_NO_EFFECT` | `targetState=NONTERMINAL` and exact attempt durably withdrawn/tombstoned; terminal and all lower rows precluded | terminal D head / O and R | none |
    | `D-UNSUPPORTED-OWNER` | `UNSUPPORTED` | target nonterminal, exact attempt live, and bound capability/admission unsupported; terminal, canceled, and effect rows precluded | terminal D head / O and R | none |
-   | `D-DELIVERY_EFFECT_POSSIBLE-OWNER` | `DELIVERY_EFFECT_POSSIBLE` | target nonterminal, exact attempt live, capability/admission supported, and final gate/owner/identities/qualifications current and `READY`; every higher row false | O only / none | exact D CAS winner/incarnation once |
+   | `D-DELIVERY_EFFECT_POSSIBLE-OWNER` | `DELIVERY_EFFECT_POSSIBLE` | target nonterminal, exact attempt live, capability/admission supported, final gate/owner/identities/qualifications current, and readiness exactly `READY`; every higher row false | O only / none | exact D CAS winner/incarnation once |
 
    Every O row has exact predecessor `D*`, produces the closed
    `SafetyControlOutcomeReceipt` through its precommitted producer selector, and
@@ -2311,14 +2334,20 @@ implementation/capability gates, not current PASS claims:
   resolution, or synthetic `H0`.
 
   Exercise every combination of terminal/nonterminal target, withdrawn/
-  tombstoned/live attempt, supported/unsupported capability, and current/
-  noncurrent/ready/not-ready final gate. Prove the one precommitted classifier
-  applies precedence `ALREADY_TERMINAL`, then `CANCELED_NO_EFFECT`, then
-  `UNSUPPORTED`, then `DELIVERY_EFFECT_POSSIBLE`; its negative guards make every complete consistent
-  vector derive exactly one row, and a higher fact precludes every lower row.
-  Prove unknown, blocked, internally contradictory, zero-match, or multiple-
-  guarded-match vectors seal rejection, leave `S0` unchanged, and grant no
-  emission.
+  tombstoned/live attempt, supported/unsupported capability, current/noncurrent
+  final-gate facts, and readiness exactly `READY`/not `READY`. For each complete
+  vector, expect exactly one row only when it is classifiable (`row-eligible`)
+  under the digest-bound domain definition; otherwise expect zero. Prove the one
+  precommitted classifier applies precedence `ALREADY_TERMINAL`, then
+  `CANCELED_NO_EFFECT`, then `UNSUPPORTED`, then
+  `DELIVERY_EFFECT_POSSIBLE`; within the row-eligible domain its predicates are
+  mutually exclusive and exactly one matches, across all known vectors its
+  negative guards permit at most one match, and a higher fact precludes every
+  lower row. Specifically prove a nonterminal/live/supported vector with a
+  noncurrent final gate or readiness other than exactly `READY` derives zero
+  rows. Prove every out-of-domain, unknown, blocked, internally contradictory,
+  zero-match, or multiple-guarded-match vector seals `SEALED_REJECTED`, writes no
+  `SafetyControlDeliveryReceipt`, leaves `S0` unchanged, and grants no emission.
 
   Race lifecycle, withdrawal, capability, owner/currentness, and readiness
   changes immediately before and after the final-gate CAS. Prove they serialize

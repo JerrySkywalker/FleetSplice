@@ -197,8 +197,10 @@ lease or enterprise authorization system.
    `ownerEmissionFenceSlotId`, `nativeEmissionMarkerSlotId`, and
    `rNoEffectTerminalCutSlotId` are evidence slots, not stages. The closed
    transition-table digest covers both manifests and all fields, D classifier
-   schema/precedence/negative guards, every row's predecessor/eligibility/
-   tombstones, evidence-slot behavior, and emission authority. It binds stable
+   schema, the classifiable (`row-eligible`) domain and zero/multiple-match
+   rejection definitions, precedence/negative guards, every row's predecessor/
+   eligibility/tombstones, evidence-slot behavior, and emission authority. It
+   binds stable
    definitions only, with no future selected row/arm/producer, source cut, fence,
    marker, terminal cut, result/evidence value or digest, receipt/head digest, or
    dynamic fourth stage; `deliveryPlanDigest` excludes its own field.
@@ -218,17 +220,28 @@ lease or enterprise authorization system.
 
    One final-gate CAS over exact `S0` and the open cut slot verifies the complete
    current gap-free/non-forked vector and producer independence, seals the cut,
-   evaluates the classifier, and writes exactly its derived row atomically; no
-   transition can fall between cut and CAS. The slot seals once as `SEALED_D` or
-   `SEALED_REJECTED` and cannot be reused. Precedence is
+   evaluates the classifier, and, only when exactly one row is derived from a
+   row-eligible vector, writes that row atomically; no transition can fall between
+   cut and CAS. The slot seals once as `SEALED_D` or `SEALED_REJECTED` and cannot
+   be reused. Precedence is
    `ALREADY_TERMINAL > CANCELED_NO_EFFECT > UNSUPPORTED > DELIVERY_EFFECT_POSSIBLE`.
    Guarded rows respectively require: target terminal; target nonterminal and
    attempt withdrawn/tombstoned; target nonterminal, live attempt, and
    unsupported capability/admission; or target nonterminal, live attempt,
-   supported capability/admission, and current `READY` final gate/owner/
-   bindings. Higher facts preclude lower rows. Unknown, blocked, contradiction,
-   missing, stale, forked, reordered, unlisted, or mismatched sources derive no
-   row, seal rejection, leave `S0` unchanged, and grant no emission.
+   supported capability/admission, current final gate/owner/bindings/
+   qualifications, and readiness exactly `READY`. The classifiable
+   (`row-eligible`) domain consists only of complete,
+   current, gap-free, non-forked source vectors satisfying every source and gate
+   eligibility requirement applicable to one of those ordered rows. Within it
+   the predicates are mutually exclusive and exactly one matches; across all
+   known vectors, precedence and negative guards permit at most one match. Higher
+   facts preclude lower rows. A nonterminal/live/supported vector with a
+   noncurrent final gate, owner, identity, or qualification, or readiness other
+   than exactly `READY`, derives zero rows. Unknown, blocked, contradictory,
+   missing, stale, forked, reordered, unlisted, or mismatched sources likewise
+   derive zero rows. Every zero or multiple match seals `SEALED_REJECTED`, writes
+   no `SafetyControlDeliveryReceipt`, leaves `S0` unchanged, and grants no
+   emission.
 
    For O, `D*` means the exact current `D=DELIVERY_EFFECT_POSSIBLE` receipt/head;
    `OW` means that D CAS's exact winning delivery owner/incarnation; and `RW`
@@ -334,18 +347,28 @@ lease or enterprise authorization system.
 
    D invokes the final-gate CAS over exact `S0` and the open cut slot as `DW`;
    the gate seals the complete current source vector and derives, rather than
-   accepts, one row. `D-ALREADY_TERMINAL-OWNER` is selected iff target state is
+   accepts, any matching row. `D-ALREADY_TERMINAL-OWNER` is selected iff target
+   state is
    terminal. `D-CANCELED_NO_EFFECT-OWNER` is selected iff the target is
    nonterminal and the exact attempt is withdrawn/tombstoned.
    `D-UNSUPPORTED-OWNER` is selected iff the target is nonterminal, the attempt
    is live, and bound capability/admission is unsupported.
    `D-DELIVERY_EFFECT_POSSIBLE-OWNER` is selected iff the target is nonterminal,
    the attempt is live, capability/admission is supported, and the final gate,
-   owner, bindings, and qualifications are current and `READY`. Total precedence
-   and negative guards make every complete consistent vector select exactly one,
-   with higher facts precluding lower. Unknown, blocked, contradictory, zero/
-   multiple-match, missing, stale, forked, reordered, unlisted, self-produced,
-   or mismatched evidence seals rejection and leaves `S0` unchanged. The cut is
+   owner, bindings, and qualifications are current, with readiness exactly
+   `READY`. A
+   complete, current, gap-free, non-forked source vector derives exactly one row
+   only when it satisfies every applicable source and gate requirement and is
+   therefore classifiable (`row-eligible`). Within that domain the four
+   predicates are mutually exclusive and exactly one matches; across all known
+   vectors total precedence and the negative guards permit at most one match,
+   with higher facts precluding lower. A nonterminal/live/supported vector with a
+   noncurrent final gate, owner, identity, or qualification, or readiness other
+   than exactly `READY`, derives zero rows. Unknown, blocked, contradictory,
+   missing, stale, forked, reordered, unlisted, self-produced, or mismatched
+   evidence likewise derives zero rows. Every zero or multiple match seals
+   `SEALED_REJECTED`, writes no `SafetyControlDeliveryReceipt`, leaves `S0`
+   unchanged, and grants no emission. The cut is
    single-use and no transition interleaves with its CAS. Terminal D rows
    atomically tombstone O/R and grant no emission; only effect-possible makes O
    eligible, records D's per-source emission-authorization high-water/digest
@@ -460,11 +483,16 @@ lease or enterprise authorization system.
   arm and immutable producer/schema revisions, both complete source manifests,
   D classifier/precedence/guards, and all cut/fence/marker/terminal-cut slots,
   but no future selected row/arm/producer, source cut, fence, marker, terminal
-  cut, result/evidence value or digest, head, resolution, or synthetic `H0`; all
-  target/attempt/capability/readiness fact combinations deriving exactly one D
-  row under the total precedence and negative guards, with higher facts
-  precluding lower, and unknown/blocked/contradictory/zero-or-multiple-match
-  vectors rejecting; source-state races serializing wholly before or after the
+  cut, result/evidence value or digest, head, resolution, or synthetic `H0`;
+  every target/attempt/capability/final-gate-currentness/readiness combination,
+  including nonterminal/live/supported with a noncurrent final gate or readiness
+  other than exactly `READY`, expecting exactly one D row only when classifiable
+  (`row-eligible`) and otherwise expecting zero; mutual exclusion and exactly one
+  match within that domain, at most one match across all known vectors, higher-
+  fact precedence, and every out-of-domain, unknown/blocked/contradictory/zero-
+  or-multiple-match vector sealing `SEALED_REJECTED`, writing no D receipt,
+  leaving `S0` unchanged, and granting no emission; source-state races
+  serializing wholly before or after the
   atomic final-gate cut/classification/D CAS, with no interleaving; missing/
   stale/forked/reordered/gapped/unlisted or mismatched manifest, source,
   selector, producer/credential/schema, stream/generation, high-water, prefix/

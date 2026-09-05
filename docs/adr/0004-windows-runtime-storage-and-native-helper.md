@@ -219,11 +219,14 @@ storage needs.
    `SafetyControlLocalLatchReceipt` set, applicable
    `AdminSafetyBoundaryCutReceipt` and `SafetyControlEdgeConsistencyReceipt`,
    and same-executor renewal `R_i`/`X_i` may affect a specialized release or
-   activation after candidate formation. Stable plan and receipt slots are
-   already in the candidate; no later receipt rewrites its digest. Safety
-   activation binds its complete latch/cut/consistency set, renewal anchor
-   decision `B` binds all ordered `R_i`, and renewal activation binds `B` and
-   all `R_i`/`X_i`. No other successor proof may be late-bound.
+   activation after candidate formation. The SafetyControl candidate also
+   precommits its finite delivery-stage plan, stable stage/receipt/slot
+   identities, writer scopes, schemas, and transition-table digest, but no
+   future result/evidence or receipt/head digest. Safety activation binds its
+   complete latch/cut/consistency set and delivery-plan identities/schemas but
+   no result; renewal anchor decision `B` binds all ordered `R_i`, and renewal
+   activation binds `B` and all `R_i`/`X_i`. No later receipt rewrites candidate
+   or activation, and no other successor proof may be late-bound.
 
    Initial, replacement, and later-step permits follow that ordering. Renewal
    never extends an older permit. Only unchanged executor, target,
@@ -299,7 +302,21 @@ storage needs.
    process-creation identity, admitted lane fences, binding,
    generation/runtime/attachment identities, aliases/transitive digest,
    actor/grant/live decision/watermark, local ceiling, monotonic `stopRevision`,
-   and one exact action. All ordinary admission remains; only the named target's
+   one exact action, and one `DELIVERY_OWNER` plus exact
+   `controlDeliveryOwnerIncarnationId`, gate/route/native identity, and allowed
+   delivery-writer identities/scopes. All other
+   participants are `FENCE_ONLY`. Its finite
+   `SafetyControlDeliveryStagePlan` binds stable
+   `deliveryPlanId`/`deliveryPlanDigest`; ordered
+   `D=DELIVERY_DECISION`, `O=DELIVERY_OUTCOME`, and
+   `R=AMBIGUITY_RESOLUTION`; each stable stage/receipt/slot ID, ordinal, kind,
+   exact writer scope, and closed schema. D/O/R respectively produce
+   `SafetyControlDeliveryReceipt`, `SafetyControlOutcomeReceipt`, and
+   `SafetyControlDeliveryResolutionReceipt`; the plan binds the closed
+   transition-table digest and no future result/evidence, receipt/head digest,
+   or dynamic fourth stage; `deliveryPlanDigest` excludes its own field. All
+   ordinary admission remains; only the named
+   target's
    prior quiescence and current-generation equality are omitted so its existing
    qualified supervisor can reduce it. Unrelated fences remain current.
    Overlapping productive chain slots are sequential with at most one unresolved;
@@ -326,31 +343,55 @@ storage needs.
    cut and consistency receipt, high-waters/digests, and
    `productiveBoundaryClassification` as `NONE` or
    `SELECTED_EFFECT_POSSIBLE` and the current `productiveOutcomeState` snapshot
-   when present. It also freezes `controlDeliveryParticipantId` with role
-   `DELIVERY_OWNER`, delivery gate, `transportRouteDigest`, native/process
-   identity, closed action, one-use `controlDeliverySlotId`, safety-delivery
-   classification schema/domain, and
-   `safetyDeliveryInitialState=UNDELIVERED`; it never binds or predicts a
-   resulting `safetyDeliveryClassification`. An exact selected productive
+   when present. It also freezes the exact owner/incarnation/gate/route/native
+   identity/action and complete D/O/R plan identities, writer scopes, schemas,
+   and transition-table digest. It binds structured
+   `(INITIAL, sequence=0, head=NONE, eligible=D, UNDELIVERED)` only, with no
+   future result, evidence, receipt/head digest, or resulting
+   `safetyDeliveryClassification`. Its core excludes its derived
+   `activationDigest`; state is keyed by the exact derived activation tuple
+   without a recursively bound synthetic `H0`. An exact selected productive
    outcome that is `PENDING`, `CONSUMED_EFFECT_POSSIBLE`, or
    `AMBIGUOUS_EFFECT` remains eligible for the bound reduction-only activation
    and delivery; this outcome uncertainty is not identity ambiguity.
 
-   Candidate/activation bind one `DELIVERY_OWNER`, exact gate/route/native
-   identity/action and one-use slot; all others are `FENCE_ONLY`. On emission
-   attempt the owner CASes `UNDELIVERED -> DELIVERY_EFFECT_POSSIBLE` and writes
-   the immutable `SafetyControlDeliveryReceipt` before emission. Qualified
-   pre-emission `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or `UNSUPPORTED`
-   evidence atomically records its result in an immutable
-   `SafetyControlDeliveryReceipt` under the same slot without emission; a
-   qualified later result or `AMBIGUOUS_EFFECT` appends an immutable
-   `SafetyControlOutcomeReceipt` under the same slot/receipt lineage. Only those
-   later receipts establish
-   `safetyDeliveryClassification`; activation and earlier receipts never change.
-   Relays do not cross the final boundary, exact replay returns existing state
-   without re-emission, a changed tuple conflicts, and owner/route failure or
-   safety-delivery ambiguity has no fallback.
-   Every receipt/latch survives crash/replay/expiry. Acceptance, anchor ack,
+   Every D/O/R transition exact-predecessor CASes one current head at the single
+   delivery gate. Its core binds plan/activation, stage/receipt/slot, prior
+   stage/sequence/head, exact writer/scope/incarnation, result/evidence digest,
+   resulting stage, and tombstoned precommitted IDs while excluding its own
+   resulting receipt/head digest. D CASes structured `UNDELIVERED`, verifies and
+   binds `attemptOwner=controlDeliveryParticipantId` and
+   `attemptIncarnation=controlDeliveryOwnerIncarnationId`, and either records a
+   qualified pre-emission terminal/no-effect/unsupported result while atomically
+   tombstoning O/R without emission, or records `DELIVERY_EFFECT_POSSIBLE` and
+   makes O eligible before only that winner/incarnation may emit once. A crash
+   before D commit permits a first attempt; after D commit no restart, recovery
+   writer, replay, or later stage may emit or re-emit.
+
+   O CASes the exact D receipt/head once into `SafetyControlOutcomeReceipt` and
+   requires the attempt owner's qualified native return, or proof that exact
+   owner/incarnation is fenced and
+   non-emitting before a precommitted recovery writer with zero emission/
+   fallback authority may append. D alone is insufficient; PID/stream absence,
+   timeout, response loss, restart, route failure, or a new incarnation alone is
+   not proof. O chooses only
+   closed terminal delivery/no-effect/unsupported results or
+   `AMBIGUOUS_EFFECT`; non-ambiguity atomically tombstones R and ambiguity alone
+   makes R eligible. R CASes the exact ambiguous O receipt/head once into
+   `SafetyControlDeliveryResolutionReceipt` with only
+   `RESOLVED_DELIVERY_EFFECT_POSSIBLE` or `RESOLVED_NO_DELIVERY_EFFECT`; absent
+   proof ambiguity remains and no fourth stage exists.
+
+   The delivery lineage has one contiguous, non-forking current head; a
+   terminal D/O receipt stays the head when later stages are atomically
+   tombstoned. Byte-identical exact-stage replay returns existing state; changed
+   tuple/predecessor/result/evidence, competing sibling, unlisted, or tombstoned
+   transition rejects, and terminal heads are absorbing. D/O supplies
+   `safetyDeliveryClassification`; R separately
+   supplies `safetyDeliveryResolution` without rewriting O. Relays do not cross
+   the final boundary, and owner/route failure or ambiguity has no fallback.
+   Every receipt, head, tombstone, and latch survives crash/replay/expiry.
+   Acceptance, anchor ack,
    latches, cut, consistency, activation, transport, final delivery, productive
    outcome, and termination are distinct.
 
@@ -477,12 +518,17 @@ storage needs.
   outcome remains safety-deliverable; activation-bound productive classification/
   outcome kept separate from later receipt-bound safety-delivery classification/
   ambiguity with no outcome/barrier inference; activation binding initial
-  `UNDELIVERED` without predicting the delivery result; later one-slot delivery/
-  outcome receipts; and exactly one delivery owner journaling
-  `DELIVERY_EFFECT_POSSIBLE` before native emission. Crash, response-loss exact
-  replay, expiry, owner/route failure, unsupported delivery, attempted fallback,
-  relay-versus-final-boundary confusion, and any second emission must fail
-  closed without rewriting a receipt or reopening a latch.
+  structured `UNDELIVERED`, finite D/O/R identities/schemas/table and no future
+  result/head or synthetic `H0`; D crash before/after commit and emission, O/R
+  pre/post-CAS crash and lost acknowledgement, and sole winner/incarnation
+  emission; O rejection before qualified owner return or
+  fenced-owner proof; zero-emission recovery writer; competing outcome/ambiguity; R
+  resolution or persistent ambiguity; exact predecessor/head CAS, atomic
+  tombstones, one head, byte-identical replay versus changed result/sibling,
+  receipt-core self-reference exclusion, and no fourth stage. Expiry, owner/
+  route failure, unsupported delivery, attempted fallback,
+  relay-versus-final-boundary confusion, and any second emission must fail closed without
+  rewriting a receipt or reopening a latch.
   Renewal cases cover `A`, every `R_i`, `B`, every general `X_i`,
   admin-specialized `X_C` then `X_E`, abort/final activation crash and replay,
   consume-versus-`X_C`, issue-versus-`X_E`, complete exact-namespace delta and

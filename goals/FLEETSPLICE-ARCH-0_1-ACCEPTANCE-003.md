@@ -26,6 +26,8 @@ architecture gate without starting implementation.
    - `docs/architecture/README.md`
    - `docs/architecture/baseline-0.1.md`
    - `docs/architecture/domain-model.md`
+   - `docs/architecture/history-and-handoff.md`
+   - `docs/architecture/host-runtime-model.md`
    - `docs/architecture/session-model.md`
    - `docs/architecture/webui-model.md`
    - `docs/architecture/webui-wireframes.md`
@@ -40,8 +42,11 @@ architecture gate without starting implementation.
 6. Within that allowlist, permit only current-readiness wording, the baseline's
    draft-to-accepted state and `ARCHITECTURE_0_1_READY` value, the six ADR status
    transitions `Proposed -> Accepted`, and `AGENTS.md` routing to the current
-   accepted baseline. Keep `IMPLEMENTATION_AUTHORIZED=false` and
-   `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`; create no product artifact and
+   accepted baseline. In `docs/architecture/history-and-handoff.md` and
+   `docs/architecture/host-runtime-model.md`, only their current `Proposed`/
+   draft-to-`Accepted` wording may change in that future promotion commit; their
+   architecture semantics remain frozen. Keep `IMPLEMENTATION_AUTHORIZED=false`
+   and `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`; create no product artifact and
    change no architecture semantics. `docs/architecture/baseline-0.0.md`, all
    research, and every prior receipt are immutable.
 7. Reject the promotion if its parent is not the exact content-PASS head, it is

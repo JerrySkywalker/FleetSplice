@@ -1,9 +1,9 @@
 # Architecture
 
-FleetSplice architecture is currently in the pre-implementation draft-review
+FleetSplice architecture is currently in the accepted pre-implementation
 phase.
 
-`ARCHITECTURE_0_1_READY=false`
+`ARCHITECTURE_0_1_READY=true`
 
 `IMPLEMENTATION_AUTHORIZED=false`
 
@@ -12,17 +12,19 @@ phase.
 1. [`baseline-0.0.md`](baseline-0.0.md) — historical working baseline.
 2. [`research-findings-wave-01.md`](research-findings-wave-01.md) — broad architecture research consequences.
 3. [`research-findings-wave-02.md`](research-findings-wave-02.md) — semantic closure and qualification consequences.
-4. [`baseline-0.1.md`](baseline-0.1.md) — corrected formal draft; readiness and
-   implementation authority remain false pending fresh independent review and
-   G03.
+4. [`baseline-0.1.md`](baseline-0.1.md) — accepted Architecture 0.1 baseline;
+   implementation authority remains false pending exact-head G04 PASS.
 5. [`webui-model.md`](webui-model.md) — shared first-party interaction-surface model for the WebUI and any future TUI.
 6. [`webui-wireframes.md`](webui-wireframes.md) — owner-reviewable character wireframes and v0.1 surface priorities.
 
-Architecture Baseline 0.1 was drafted under G01. G02 reviewed its exact head,
-returned `CHANGE_REQUIRED`, and the current draft contains bounded corrections
-that still require a fresh independent exact-head PASS. G03 alone may then
-accept it and change readiness. Product mutation additionally requires an
-exact-head G04 implementation-contract PASS; admission to G04 is insufficient.
+Architecture Baseline 0.1 was drafted under G01. After bounded G02 correction
+rounds, its exact content head and tree received a fresh independent content
+PASS. The Owner accepted that content and authorized the current single
+status-only G03 promotion. The promotion object still requires a fresh
+independent exact-head/tree review before its literal SHA and tree can be
+recorded by the G03 receipt; the content PASS does not accept the changed
+promotion head. Product mutation additionally requires an exact-head G04
+implementation-contract PASS; admission to G04 is insufficient.
 G04 is limited to G05-G10. G11-G16 instead use the independent authority of the
 owner-authored root train after the accepted architecture citation,
 G10/Station B, and their exact DAG/child gates all pass.
@@ -31,9 +33,8 @@ G10/Station B, and their exact DAG/child gates all pass.
 
 Supporting documents cover product intent, domain semantics, authority,
 sessions, Agent/provider boundaries, Host Runtime, history/handoff, interaction
-surfaces, and safe self-iteration. The clustered decision proposals are indexed
-in [`docs/adr/README.md`](../adr/README.md); they remain Proposed while Baseline
-0.1 remains a draft.
+surfaces, and safe self-iteration. The accepted clustered decisions are indexed
+in [`docs/adr/README.md`](../adr/README.md).
 
 The corrected [`domain-model.md`](domain-model.md) and
 [`session-model.md`](session-model.md) use the normative

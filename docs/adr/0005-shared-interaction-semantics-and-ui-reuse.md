@@ -1,7 +1,7 @@
 # ADR-0005: Shared WebUI/TUI semantics and UI reuse
 
-- Status: Proposed
-- Baseline: [Architecture Baseline 0.1 DRAFT](../architecture/baseline-0.1.md)
+- Status: Accepted
+- Baseline: [Architecture Baseline 0.1](../architecture/baseline-0.1.md)
 - `IMPLEMENTATION_AUTHORIZED=false`
 
 ## Context
@@ -11,7 +11,7 @@ TUI later without creating two control models. Donor libraries can render
 conversation or workspace elements but do not understand Fleet authority,
 history, continuity, ambiguity, or reconnect evidence.
 
-## Proposed decision
+## Accepted decision
 
 1. The primary v0.x client is a Fleet-owned React/TypeScript/Vite WebUI with
    Fleet navigation, Session core, and Control context.
@@ -57,6 +57,6 @@ history, continuity, ambiguity, or reconnect evidence.
 
 ## Acceptance gate
 
-This ADR remains Proposed until G02 exact-head review and G03 owner acceptance.
-UI implementation and donor selection additionally require exact-head G04 PASS
-and the named browser/provenance gates.
+This ADR is Accepted with Architecture Baseline 0.1. It does not authorize
+implementation; UI implementation and donor selection additionally require
+exact-head G04 PASS and the named browser/provenance gates.

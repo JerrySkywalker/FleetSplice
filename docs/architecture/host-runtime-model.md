@@ -18,9 +18,9 @@ Each admitted machine should run a small Edge Runtime that keeps execution autho
 - secret references and host-local authentication boundaries;
 - controlled self-update only after architecture/security design.
 
-## Proposed local persistence
+## Accepted local persistence
 
-The proposed [Architecture Baseline 0.1](baseline-0.1.md) selects a separate,
+The accepted [Architecture Baseline 0.1](baseline-0.1.md) selects a separate,
 one-writer patched SQLite authority database for each Edge, using local-filesystem
 WAL and `synchronous=FULL` where loss is unacceptable. It holds the local
 command/idempotency journal, native and effect identities, resource bindings,
@@ -29,9 +29,9 @@ output, terminal chunks, native payloads, diffs, and artifacts use
 content-addressed filesystem blobs with database manifests and the baseline's
 durable publication, garbage-collection, backup, and restore fences.
 
-This supersedes the earlier SQLite/WAL candidate wording, but remains a Proposed
-architecture selection rather than an accepted decision or implementation
-authority. The exact admitted SQLite binding and later storage-policy defaults
+This supersedes the earlier SQLite/WAL candidate wording, but remains an
+Accepted architecture selection rather than implementation authority. The
+exact admitted SQLite binding and later storage-policy defaults
 remain bounded implementation/acceptance choices.
 
 ## Connectivity hypothesis

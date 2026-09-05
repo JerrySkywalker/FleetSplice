@@ -1,6 +1,6 @@
 # Session Model
 
-`ARCHITECTURE_0_1_READY=false`
+`ARCHITECTURE_0_1_READY=true`
 
 ## Fleet session chain and native identity
 

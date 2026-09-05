@@ -1,7 +1,7 @@
 # ADR-0002: Fleet identity, lane control, and AuthorityGrant
 
-- Status: Proposed
-- Baseline: [Architecture Baseline 0.1 DRAFT](../architecture/baseline-0.1.md)
+- Status: Accepted
+- Baseline: [Architecture Baseline 0.1](../architecture/baseline-0.1.md)
 - `IMPLEMENTATION_AUTHORIZED=false`
 
 ## Context
@@ -11,7 +11,7 @@ an execution Environment, and a provider binding do not share one lifecycle.
 Multiple clients also need safe causal control without inventing a repository
 lease or enterprise authorization system.
 
-## Proposed decision
+## Accepted decision
 
 1. Fleet identity is `LogicalSession -> SessionLane -> NativeSegment`.
    LogicalSession is durable user work; SessionLane is a causal branch and
@@ -542,5 +542,5 @@ lease or enterprise authorization system.
 
 ## Acceptance gate
 
-This ADR remains Proposed until G02 exact-head review and G03 owner acceptance.
-Implementation additionally requires exact-head G04 PASS.
+This ADR is Accepted with Architecture Baseline 0.1. It does not authorize
+implementation; implementation additionally requires exact-head G04 PASS.

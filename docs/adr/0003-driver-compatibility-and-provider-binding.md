@@ -1,7 +1,7 @@
 # ADR-0003: Agent Driver, compatibility, and provider binding
 
-- Status: Proposed
-- Baseline: [Architecture Baseline 0.1 DRAFT](../architecture/baseline-0.1.md)
+- Status: Accepted
+- Baseline: [Architecture Baseline 0.1](../architecture/baseline-0.1.md)
 - `IMPLEMENTATION_AUTHORIZED=false`
 
 ## Context
@@ -11,7 +11,7 @@ Codex exposes a high-fidelity native service API; ACP provides a negotiated
 generic local Agent protocol. Both evolve quickly, and a version string or an
 OpenAI-shaped endpoint does not establish behavioral compatibility.
 
-## Proposed decision
+## Accepted decision
 
 1. Keep `AgentBinding`, `ExecutionBinding`, and `ProviderBinding` as distinct
    identities and capability records.
@@ -70,5 +70,6 @@ OpenAI-shaped endpoint does not establish behavioral compatibility.
 
 ## Acceptance gate
 
-This ADR remains Proposed until G02 exact-head review and G03 owner acceptance.
-Each runtime capability still requires its named conformance gate after G04.
+This ADR is Accepted with Architecture Baseline 0.1. It does not authorize
+implementation; each runtime capability still requires its named conformance
+gate after G04.

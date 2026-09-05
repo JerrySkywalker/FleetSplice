@@ -5,7 +5,7 @@
 - Scope: architecture / interaction model
 - Applies to: first-party WebUI and any future first-party TUI
 - Evidence basis: Architecture Baseline 0.0, Research Waves 01 and 02, including the FleetCommand, multi-client authority, WebUI reuse, and session/history findings
-- `ARCHITECTURE_0_1_READY=false`
+- `ARCHITECTURE_0_1_READY=true`
 - `IMPLEMENTATION_AUTHORIZED=false`
 
 This document defines the interaction model FleetSplice surfaces should preserve. It is not a pixel specification and does not authorize implementation. The companion [webui-wireframes.md](webui-wireframes.md) records reviewable character wireframes.

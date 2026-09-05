@@ -5,7 +5,7 @@
 - Purpose: owner-reviewable interaction wireframes
 - Scope: first-party WebUI now, future first-party TUI later
 - Fidelity: information architecture / semantic layout only
-- `ARCHITECTURE_0_1_READY=false`
+- `ARCHITECTURE_0_1_READY=true`
 - `IMPLEMENTATION_AUTHORIZED=false`
 
 These wireframes define what information must remain visible and how Fleet concepts relate on screen. They are not a pixel-perfect design, component library specification, or implementation authorization.

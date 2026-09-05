@@ -1,7 +1,7 @@
 # ADR-0004: Windows runtime, storage, and native helper
 
-- Status: Proposed
-- Baseline: [Architecture Baseline 0.1 DRAFT](../architecture/baseline-0.1.md)
+- Status: Accepted
+- Baseline: [Architecture Baseline 0.1](../architecture/baseline-0.1.md)
 - `IMPLEMENTATION_AUTHORIZED=false`
 
 ## Context
@@ -12,7 +12,7 @@ coordinator and protocol work but does not expose every security-sensitive
 Win32 primitive. Authority data and unbounded tool output also have different
 storage needs.
 
-## Proposed decision
+## Accepted decision
 
 1. Use TypeScript on a pinned Node runtime for Hub, Edge coordinator,
    FleetCommand/HCP contracts, built-in drivers, ordinary filesystem work, and
@@ -755,6 +755,6 @@ storage needs.
 
 ## Acceptance gate
 
-This ADR remains Proposed until G02 exact-head review and G03 owner acceptance.
-The actual toolchain, package binding, helper, and owner-attended cases remain
-gated after exact-head G04 PASS.
+This ADR is Accepted with Architecture Baseline 0.1. It does not authorize
+implementation; the actual toolchain, package binding, helper, and
+owner-attended cases remain gated after exact-head G04 PASS.

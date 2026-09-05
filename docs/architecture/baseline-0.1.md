@@ -1,9 +1,9 @@
-# FleetSplice Architecture Baseline 0.1 (DRAFT)
+# FleetSplice Architecture Baseline 0.1 (ACCEPTED)
 
 ## Status and authority
 
 - Baseline: `0.1`
-- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_15_CHANGE_REQUIRED`
+- State: `ACCEPTED`
 - Drafting Goal: `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001` (`G01`)
 - Initial reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
 - Round-2 reviewed draft: `b82df67d5a045d31b04b0efb3fb5c0a2cb9de571`
@@ -20,14 +20,21 @@
 - Round-13 reviewed draft: `806823e43c5daf8f59f8c2cf80beea9eb1070f1c`
 - Round-14 reviewed draft: `234b2d5299e69cc3dd3bc31e8a8b94640dfe1f60`
 - Round-15 reviewed draft: `3adae814f73bdec672b674bfbbf0c8544b8035a2`
-- Evidence cut: 2026-09-05 round-15 review and bounded correction
-- `ARCHITECTURE_0_1_READY=false`
+- Round-16 reviewed draft: `1cc3b0a618e96b04ae988bf0dea4701e48edcbf1`
+- Round-17 reviewed draft: `700607623349ac68b3ad5ac6d9c2b4df3a953b30`
+- Content-PASS head: `002ee620539a20a49e4bb1082bafa0b0077e107d`
+- Content-PASS tree: `690ec6aa5798c72f33164daf4bcd373de88088da`
+- Content review disposition: `PASS_ARCHITECTURE_0_1_EXACT_HEAD`
+- Evidence cut: 2026-09-05 G02 round-18 content PASS and explicit Owner
+  acceptance/authorization for this single G03 status-only promotion
+- Promotion review: pending fresh independent exact-head/tree review
+- `ARCHITECTURE_0_1_READY=true`
 - `IMPLEMENTATION_AUTHORIZED=false`
 - `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`
 
-This is a formal architecture draft, not an accepted baseline and not product
+This is the accepted Architecture 0.1 baseline. It is not product
 implementation authority. Independent G02 reviews of the original draft and
-its first fourteen corrections have final controlling dispositions of
+its corrections through round 17 had final controlling dispositions of
 [`CHANGE_REQUIRED`](../train/receipts/G02.md),
 [round-2 `CHANGE_REQUIRED`](../train/receipts/G02-r2.md),
 [round-3 `CHANGE_REQUIRED`](../train/receipts/G02-r3.md),
@@ -43,23 +50,32 @@ its first fourteen corrections have final controlling dispositions of
 [round-12 `CHANGE_REQUIRED`](../train/receipts/G02-r12.md),
 [round-13 `CHANGE_REQUIRED`](../train/receipts/G02-r13.md),
 [round-14 `CHANGE_REQUIRED`](../train/receipts/G02-r14.md), and
-[round-15 `CHANGE_REQUIRED`](../train/receipts/G02-r15.md), respectively. The
+[round-15 `CHANGE_REQUIRED`](../train/receipts/G02-r15.md),
+[round-16 `CHANGE_REQUIRED`](../train/receipts/G02-r16.md), and
+[round-17 `CHANGE_REQUIRED`](../train/receipts/G02-r17.md), respectively. The
 round-12 full review's initial `PASS` and the round-13 focused review's initial
 `PASS` were each explicitly superseded after reassessment. The round-14 full
 review's `PASS` was explicitly nonaccepting because the focused D/O/R Medium
-finding controls the review union. Round 15 found two Medium issues in D/R
-result-specific evidence closure and the G03 promotion exact-head gate. None is
-an operative acceptance result. This revision contains only the bounded
-corrections and has not received a fresh
-independent PASS. It does not supersede
-[Baseline 0.0](baseline-0.0.md) until a fresh review and the owner-controlled
-G03 acceptance gate both pass. Only G03 may change
-`ARCHITECTURE_0_1_READY`, and this draft deliberately leaves every readiness
-and implementation flag false.
+finding controlled the review union. Those dispositions remain historical and
+nonaccepting.
+
+The fresh round-18 review inspected the literal content head and tree listed
+above and returned
+`PASS_ARCHITECTURE_0_1_EXACT_HEAD` with no findings. The Owner then explicitly
+accepted that content and authorized exactly this one status-only promotion
+whose sole parent is the content-PASS head. The round-18 receipt commit
+`3b7edd764c0a07e0126d73203d344327dc06699a` is a separate child that records the
+content PASS; it is not the reviewed content object and is not in this
+promotion's lineage. This distinct promotion object remains pending its own
+fresh independent exact-head/tree review. This document does not claim that
+promotion review has passed or that its later receipt exists. The accepted
+baseline now supersedes [Baseline 0.0](baseline-0.0.md) as current architecture;
+Baseline 0.0 remains historical. Architecture readiness is true, while both
+implementation flags remain false.
 
 ## Evidence basis and claim discipline
 
-This draft incorporates:
+This accepted baseline incorporates:
 
 - the historical hypotheses in [Baseline 0.0](baseline-0.0.md);
 - the broad [Wave-01 synthesis](../research/wave-01/synthesis.md), its complete
@@ -2171,7 +2187,8 @@ installation generation or owner decision alone is insufficient.
 
 ## Authorization gates and scope boundaries
 
-This draft closes architecture wording only. The following order is normative:
+This accepted baseline closes architecture wording only. The following order is
+normative:
 
 1. G01 produces this draft and Proposed ADRs with all readiness flags false.
 2. G02 independently reviews the exact G01 head and may return PASS or bounded
@@ -2246,8 +2263,9 @@ This draft closes architecture wording only. The following order is normative:
    This is not a widening of G04 and no second owner approval is invented; it is
    the root train authority already granted. It authorizes no unlisted scope.
 
-Nothing in this draft performs that promotion: all six ADRs remain `Proposed`,
-`ARCHITECTURE_0_1_READY=false`, and both implementation flags remain false.
+This status-only promotion sets all six ADRs to `Accepted` and
+`ARCHITECTURE_0_1_READY=true`; both implementation flags remain false. It does
+not claim that the promotion's required fresh exact-head/tree review has passed.
 
 ## Bounded implementation choices
 
@@ -2462,10 +2480,10 @@ Session-0 service owning user Agents, a Fleet-owned model gateway, blind retry
 after possible native effect, and hot-loaded code replacing the trusted Edge
 kernel.
 
-## Proposed decision records
+## Accepted decision records
 
-The following records capture the settled clusters at reviewable granularity.
-They remain `Proposed` while this baseline is a draft:
+The following accepted records capture the settled clusters at reviewable
+granularity:
 
 1. [ADR-0001: Hub/Edge authority, command, observation, and failure](../adr/0001-hub-edge-command-and-failure-boundary.md)
 2. [ADR-0002: Fleet identity, lane control, and AuthorityGrant](../adr/0002-session-identity-control-and-authority.md)
@@ -2476,22 +2494,21 @@ They remain `Proposed` while this baseline is a draft:
 
 ## Review disposition
 
-G02 reviewed the exact initial draft and the exact corrected drafts submitted
-through review round 15; all fifteen final controlling dispositions are
-`CHANGE_REQUIRED`. Round 12's full reviewer and round 13's focused reviewer each
-initially returned `PASS` and explicitly superseded it after reassessment. Round
-14's full-review `PASS` is nonaccepting because the focused D/O/R Medium controls
-the review union. Round 15 requires closed D and R result-row evidence machinery
-and a separately reviewed G03 promotion head. The round-9 receipt's safety-race
-ordering is corrected by its immutable erratum. This revision applies only
-those bounded findings, but the
-Implementer has not reviewed or approved its own corrections.
-It has not received a fresh independent review and makes no claim that G02 or
-G03 has passed.
+G02 reviewed the exact initial draft and each corrected draft through round 17.
+Rounds 1 through 17 ended in controlling `CHANGE_REQUIRED` dispositions. The
+round-9 receipt's safety-race ordering remains corrected by its immutable
+erratum. The fresh round-18 review then inspected content head
+`002ee620539a20a49e4bb1082bafa0b0077e107d` and tree
+`690ec6aa5798c72f33164daf4bcd373de88088da` and returned
+`PASS_ARCHITECTURE_0_1_EXACT_HEAD` with no findings. The Owner explicitly
+accepted that reviewed content and authorized this single status-only promotion
+from it. The promotion commit is a new object and still requires the mandated
+fresh independent exact-head/tree review; the earlier content PASS is not reused
+and no promotion-review PASS or G03 receipt is claimed here.
 
 ```text
-ARCHITECTURE_0_1_READY=false
+ARCHITECTURE_0_1_READY=true
 IMPLEMENTATION_AUTHORIZED=false
 PRODUCT_IMPLEMENTATION_AUTHORIZED=false
-NEXT_REQUIRED_GATE=FRESH_INDEPENDENT_ADVERSARIAL_REVIEW_OF_CORRECTED_EXACT_HEAD
+NEXT_REQUIRED_GATE=FRESH_INDEPENDENT_EXACT_HEAD_TREE_REVIEW_OF_G03_PROMOTION
 ```

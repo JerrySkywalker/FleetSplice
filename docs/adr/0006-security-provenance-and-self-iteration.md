@@ -1,7 +1,7 @@
 # ADR-0006: Security, provenance, and stable-N self-iteration
 
-- Status: Proposed
-- Baseline: [Architecture Baseline 0.1 DRAFT](../architecture/baseline-0.1.md)
+- Status: Accepted
+- Baseline: [Architecture Baseline 0.1](../architecture/baseline-0.1.md)
 - `IMPLEMENTATION_AUTHORIZED=false`
 
 ## Context
@@ -11,7 +11,7 @@ credentials, approvals, and updates. An Agent capable of changing FleetSplice
 could invalidate its controller and evidence if the running trust kernel or
 activation decision were mutable from inside that work.
 
-## Proposed decision
+## Accepted decision
 
 1. Browser, Hub, Fleet-scoped `AuthorityAnchor`, transport, Edge kernel, each
    Environment, Agent or compatibility process, provider endpoint,
@@ -121,6 +121,7 @@ activation decision were mutable from inside that work.
 
 ## Acceptance gate
 
-This ADR remains Proposed until G02 exact-head review and G03 owner acceptance.
-G16 still requires separately authorized stable-N/candidate/canary targets and
-an external/owner activation decision; this ADR is not that authorization.
+This ADR is Accepted with Architecture Baseline 0.1. It does not authorize
+implementation; G16 still requires separately authorized
+stable-N/candidate/canary targets and an external/owner activation decision;
+this ADR is not that activation authorization.

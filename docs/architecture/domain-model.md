@@ -1,8 +1,8 @@
-# Architecture 0.1 Draft Domain Model
+# Accepted Architecture 0.1 Domain Model
 
-`ARCHITECTURE_0_1_READY=false`
+`ARCHITECTURE_0_1_READY=true`
 
-This document follows the corrected Architecture 0.1 draft. It does not grant
+This document follows the accepted Architecture 0.1 baseline. It does not grant
 implementation authority.
 
 ## Fleet resources

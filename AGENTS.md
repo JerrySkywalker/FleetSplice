@@ -1,8 +1,11 @@
 # FleetSplice repository rules
 
-FleetSplice is architecture-only until it is explicitly released from this gate. `ARCHITECTURE_0_1_READY=true` has not been declared.
+FleetSplice Architecture 0.1 is accepted. `ARCHITECTURE_0_1_READY=true`.
+Product implementation remains gated: `IMPLEMENTATION_AUTHORIZED=false` and
+`PRODUCT_IMPLEMENTATION_AUTHORIZED=false`.
 
-Current owner-supplied working baseline: `docs/architecture/baseline-0.0.md`.
+Current accepted baseline: `docs/architecture/baseline-0.1.md`.
+Historical working baseline: `docs/architecture/baseline-0.0.md`.
 Current research program: `docs/research/research-program-0.1.md`.
 
 1. Do not implement product code merely because a design appears obvious.
@@ -16,4 +19,4 @@ Current research program: `docs/research/research-program-0.1.md`.
 9. Prefer simple, inspectable repository state.
 10. A future implementation Goal must cite an accepted architecture baseline that explicitly declares `ARCHITECTURE_0_1_READY=true`.
 11. Baseline 0.0 is a working hypothesis set, not implementation authority. Research is expected to challenge it.
-12. No product source tree, package manifest, runtime dependency, service, deployment, or CI workflow is authorized during the current research phase.
+12. No product source tree, package manifest, runtime dependency, service, deployment, or CI workflow is authorized before an exact-head G04 review returns `PASS_V0_1_IMPLEMENTATION_CONTRACT`.

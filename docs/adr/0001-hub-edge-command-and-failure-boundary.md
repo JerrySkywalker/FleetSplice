@@ -1,7 +1,7 @@
 # ADR-0001: Hub/Edge authority, command, observation, and failure boundary
 
-- Status: Proposed
-- Baseline: [Architecture Baseline 0.1 DRAFT](../architecture/baseline-0.1.md)
+- Status: Accepted
+- Baseline: [Architecture Baseline 0.1](../architecture/baseline-0.1.md)
 - `IMPLEMENTATION_AUTHORIZED=false`
 
 ## Context
@@ -12,7 +12,7 @@ show that collapsing them causes duplicate starts, lost ownership, destructive
 replacement, and false completion. Wave 02 also closes the generic northbound
 command boundary independently of any UI or transport.
 
-## Proposed decision
+## Accepted decision
 
 1. The Hub is stateful but process-thin. It owns Fleet identity, actor/grant
    policy, accepted commands, immutable resolution plans, LogicalSession
@@ -834,5 +834,5 @@ command boundary independently of any UI or transport.
 
 ## Acceptance gate
 
-This ADR remains Proposed until G02 exact-head review and G03 owner acceptance.
-Implementation additionally requires exact-head G04 PASS.
+This ADR is Accepted with Architecture Baseline 0.1. It does not authorize
+implementation; implementation additionally requires exact-head G04 PASS.

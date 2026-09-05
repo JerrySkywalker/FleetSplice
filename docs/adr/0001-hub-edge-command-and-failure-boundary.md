@@ -243,11 +243,14 @@ command boundary independently of any UI or transport.
    and the same-executor renewal `R_i`/`X_i` below. Safety activation binds its
    complete exact latch/cut/consistency set; renewal decision `B` binds every
    ordered `R_i`, and renewal activation binds `B` and every ordered
-   `R_i`/`X_i`. The SafetyControl candidate additionally precommits every stable
-   finite delivery-stage plan, stage/receipt/slot identity, writer scope, schema,
-   transition-table digest, and obligation. It binds no future result, evidence,
-   receipt body/digest, or stage-head digest; activation freezes the plan but no
-   result, and later values never rewrite `permitDigest` or activation. Safety
+   `R_i`/`X_i`. The SafetyControl candidate additionally precommits its finite
+   delivery-stage plan, every stage/receipt/slot and D/O/R row identity, writer/
+   predicate definition, closed evidence arm/schema revision, immutable producer
+   selector/revision, transition-table digest, and obligation. It binds no future
+   selected row/arm/producer, result, evidence value/digest, receipt body/digest,
+   or stage-head digest; activation freezes those definitions but no selected
+   result or resolution, and later values never rewrite `permitDigest` or
+   activation. Safety
    is not a successor proof, and no other successor fence, barrier, or
    disjointness proof may be supplied late.
 
@@ -417,21 +420,33 @@ command boundary independently of any UI or transport.
     stable `deliveryPlanId`/`deliveryPlanDigest`; exactly ordered
     `D=DELIVERY_DECISION`,
     `O=DELIVERY_OUTCOME`, and `R=AMBIGUITY_RESOLUTION`; each stable stage,
-    receipt, and slot ID, ordinal, kind, writer scope, and closed schema. Every O
-    row additionally has a stable row ID, exact result, writer-mode and evidence
-    predicates, closed evidence-union schema, and candidate-bound producer
-    selector. D/O/R respectively produce `SafetyControlDeliveryReceipt`,
+    receipt, and slot ID, ordinal, kind, writer scope, and closed schema. Every D,
+    O, and R result row additionally has a stable row ID, exact result, writer-
+    mode and result-specific evidence predicates, one closed evidence-union arm,
+    candidate-bound producer selector or selectors, and immutable producer and
+    evidence-schema revisions. D/O/R respectively produce `SafetyControlDeliveryReceipt`,
     `SafetyControlOutcomeReceipt`, and
     `SafetyControlDeliveryResolutionReceipt`. The plan binds a closed
     transition-table digest covering every row ID/result/writer-mode predicate/
-    evidence predicate, schema/producer selector, predecessor, eligibility,
-    tombstones, and emission authority. It precommits no future selected row,
-    result/evidence value,
-    receipt/head digest, or dynamic fourth stage; `deliveryPlanDigest` excludes
+    evidence predicate, arm/schema revision, immutable producer selector/
+    revision, predecessor, eligibility, tombstones, and emission authority. It
+    precommits all definitions but no future selected row/arm/producer,
+    result/evidence value or digest, receipt/head digest, or dynamic fourth
+    stage; `deliveryPlanDigest` excludes
     its own field. Overlapping
     productive slots in each chain are strictly sequential with at most one
     unresolved; concurrency requires exact participant-verifiable disjointness,
     not a different ordinal.
+
+    `S0` is exact `(INITIAL,0,NONE,UNDELIVERED)`, and `DW` is the exact
+    precommitted `DELIVERY_OWNER` and incarnation. Every D row uses
+    `D_PRE_EFFECT{producerSelectorId,producerRevision,preEffectWitnessDigest}`
+    from a candidate-bound authoritative producer independent of `DW`'s
+    transition-writer scope. Its witness binds candidate/activation/plan, exact
+    `S0` and D stage/receipt/slot, `DW`, target/action/final native gate, and
+    exact runtime/helper/capability revisions; it satisfies exactly one D-row
+    predicate while excluding the prospective D row/result, receipt/head, and
+    their digests.
 
     For O, `D*` is the exact current `D=DELIVERY_EFFECT_POSSIBLE` receipt/head;
     `OW` is that D CAS's exact winning delivery owner/incarnation; and `RW` is an
@@ -444,6 +459,23 @@ command boundary independently of any UI or transport.
     `D*` receipt/head, `OW`, target/action, native boundary, and the runtime,
     helper, and capability revisions and uniquely proving `r`; `RW` cannot
     self-attest it.
+
+    `O*` is the exact current immutable `O=AMBIGUOUS_EFFECT` receipt/head, and
+    `RR` is the exact precommitted zero-emission, zero-fallback reconciliation
+    writer. `R-RESOLVED_DELIVERY_EFFECT_POSSIBLE` uses
+    `R_EFFECT_RESOLUTION{producerSelectorId,producerRevision,crossingWitnessDigest}`
+    from an independent authoritative producer and proves exact crossing or
+    irrevocable acceptance plus consumed/closed one-shot attempt.
+    `R-RESOLVED_NO_DELIVERY_EFFECT` uses
+    `R_NO_EFFECT_RESOLUTION{noPastProducerSelectorId,noPastProducerRevision,noPastCrossingDigest,fenceProducerSelectorId,fenceProducerRevision,ownerFenceDigest}`;
+    complete gap-free independent evidence proves no past crossing across every
+    bound route/journal/native boundary and separate `F(D*)` proves no future
+    emission. Both are mandatory. Each R witness binds candidate/activation/
+    plan, `D*`, `O*`, `OW`, target/action/native boundary, and exact runtime/
+    helper/capability revisions. `RR` cannot produce either proof in its writer
+    scope. The closed union contains only `D_PRE_EFFECT`, `OWNER_RETURN`,
+    `FENCED_RECOVERY`, `R_EFFECT_RESOLUTION`, and `R_NO_EFFECT_RESOLUTION`;
+    evidence cannot depend on the receipt, selected result, or head it proves.
 
     The external anchor acknowledges that candidate, but acknowledgement is not
     a local fence. Upon authenticated observation, each named supervisor makes
@@ -480,11 +512,12 @@ command boundary independently of any UI or transport.
     when present. It also binds immutable `controlDeliveryParticipantId` with
     role `DELIVERY_OWNER`, `controlDeliveryOwnerIncarnationId`, gate/route/native
     identity/action, and the complete D/O/R plan identities, writer scopes,
-    schemas, O row/predicate and producer-selector definitions, closed evidence
-    union, and transition-table digest.
-    It binds structured `(INITIAL, sequence=0, head=NONE, eligible=D,
-    UNDELIVERED)` only, with no future selected O row/mode, result, evidence
-    value, receipt/head digest, or resulting `safetyDeliveryClassification`. Its
+    schemas, every D/O/R row/predicate/arm definition, immutable producer
+    selectors and producer/schema revisions, closed evidence union, and
+    transition-table digest. It binds definitions only plus exact `S0` with
+    `eligible=D`, with no future selected row/mode/arm/producer, result, evidence
+    value/digest, receipt/head digest, `safetyDeliveryClassification`, or
+    `safetyDeliveryResolution`. Its
     canonical core excludes its derived `activationDigest`; the local state is
     keyed by the exact derived
     activation tuple without a recursively bound synthetic `H0`. An exact
@@ -496,22 +529,33 @@ command boundary independently of any UI or transport.
     Every stage exact-predecessor CASes one current head at the single delivery
     gate. Its transition core binds plan/activation, stable stage/receipt/slot,
     exact prior stage/sequence/head, writer identity/scope/incarnation, stable
-    selected row ID, result, writer mode, evidence digest, resulting stage, and
-    tombstoned precommitted IDs. An O core binds exactly one closed union arm,
-    `OWNER_RETURN{returnDigest}` or
-    `FENCED_RECOVERY{ownerFenceDigest,resultWitnessDigest}`; its recovery witness
-    is mandatory for every non-ambiguous result and literal
-    `resultWitnessDigest=NONE` is allowed only for ambiguity. The core
-    excludes its own receipt/head digest, derived after commit. D alone CASes
-    structured `UNDELIVERED`, verifies and binds
-    `attemptOwner=controlDeliveryParticipantId` and
-    `attemptIncarnation=controlDeliveryOwnerIncarnationId`, and either records
-    qualified pre-emission
-    `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or `UNSUPPORTED` while atomically
-    tombstoning O/R without emission, or records `DELIVERY_EFFECT_POSSIBLE` and
-    makes O eligible before only that CAS winner/incarnation may emit once.
-    Crash before D commit permits a first attempt; after commit no restart,
-    replay, recovery writer, or later stage may emit or re-emit.
+    selected row ID, result, writer mode, exactly one closed evidence-union arm,
+    selected producer identities, immutable producer/schema revisions, canonical
+    evidence digest, resulting stage, and tombstoned precommitted IDs. D binds
+    `D_PRE_EFFECT`; O binds `OWNER_RETURN` or `FENCED_RECOVERY`; R binds
+    `R_EFFECT_RESOLUTION` or `R_NO_EFFECT_RESOLUTION`. An O recovery witness is
+    mandatory for every non-ambiguous result and literal
+    `resultWitnessDigest=NONE` is allowed only for ambiguity. Evidence is
+    evaluated before CAS and cannot depend on the selected result or resulting
+    receipt/head. The core excludes its own receipt/head digest, derived after
+    commit.
+
+    D alone CASes exact `S0` as `DW`. Its stable rows are
+    `D-ALREADY_TERMINAL-OWNER`, requiring authoritative lifecycle/native-gate
+    proof that the exact creation identity was terminal before D and no action
+    crossed; `D-CANCELED_NO_EFFECT-OWNER`, requiring durable exact-attempt
+    withdrawal/tombstone while at `S0` before authorization and permanent
+    exclusion of later consumption; `D-UNSUPPORTED-OWNER`, requiring exact
+    bound capability/native-admission rejection of this action/runtime/helper
+    revision before the final boundary; and
+    `D-DELIVERY_EFFECT_POSSIBLE-OWNER`, requiring exact supported/current/
+    qualified final-gate readiness. Readiness proves no emission. Missing,
+    conflicting, stale, self-produced, circular, or mismatched evidence leaves
+    `S0` unchanged. Terminal D rows tombstone O/R and grant no emission; only the
+    effect-possible D CAS makes O eligible and grants its winner/incarnation one-
+    shot emission. Crash before D commit permits a first attempt; after effect-
+    possible D commit no restart, replay, recovery writer, or later stage may
+    emit or re-emit.
 
     O exact-CASes only `D*` once into `SafetyControlOutcomeReceipt`. Its stable
     rows bind these exact predicates: `DELIVERY_EFFECT_POSSIBLE` accepts
@@ -530,19 +574,27 @@ command boundary independently of any UI or transport.
     static or unbound capability assertion, or `RW` self-claim is not `Q(r)`.
     No O row grants emission or fallback authority; only `D*` supplied `OW`'s
     one-shot attempt authority, which `N(r)` closes. Non-ambiguity atomically
-    tombstones R and is absorbing; ambiguity alone makes R eligible.
-    R exact-CASes that ambiguous O receipt/head once
-    into `SafetyControlDeliveryResolutionReceipt` with only
-    `RESOLVED_DELIVERY_EFFECT_POSSIBLE` or
-    `RESOLVED_NO_DELIVERY_EFFECT`; without proof ambiguity remains, and there is
-    no fourth stage. `F(D*)` alone cannot resolve R.
+    tombstones R and is absorbing; ambiguity alone makes R eligible. Only `RR`
+    exact-CASes `O*` once. `R-RESOLVED_DELIVERY_EFFECT_POSSIBLE` accepts only its
+    independent `R_EFFECT_RESOLUTION` crossing witness proving exact crossing/
+    irrevocable acceptance and consumed/closed attempt.
+    `R-RESOLVED_NO_DELIVERY_EFFECT` accepts only its
+    `R_NO_EFFECT_RESOLUTION`, with complete gap-free no-past proof across every
+    bound route/journal/native boundary plus separate `F(D*)`; both are
+    mandatory. Missing logs, timeout/loss, transport/relay acceptance, later
+    target state, D/O classification, an `RR` claim, or `F(D*)` alone satisfies
+    neither. Gaps, forks, source/selector/producer/revision/schema/identity
+    mismatch, stale or circular evidence, or `RR` self-production reject and
+    leave `O*` unchanged. R is terminal, grants no emission, keeps O immutable,
+    and has no fourth stage.
 
     The current head is contiguous and non-forking. Its winning receipt digest
     remains the head when precommitted later stages are tombstoned. Byte-identical
     exact-stage replay returns the receipt/state; changed tuple, predecessor,
-    stable row ID, writer/mode, result, evidence-union arm or digest, producer
-    identity/revision, predicate, sibling, unlisted, or tombstoned transition
-    rejects, and terminal heads are absorbing.
+    stable row ID, writer/mode, result, evidence-union arm/schema revision or
+    digest, producer selector/identity/revision, source/predicate mismatch,
+    circular evidence, sibling, unlisted, or tombstoned transition rejects, and
+    terminal heads are absorbing.
     D/O receipts alone supply `safetyDeliveryClassification`; R separately adds
     `safetyDeliveryResolution` without rewriting O. Relays never cross the final
     boundary, and owner/route failure, ambiguity, or disqualification has no
@@ -568,9 +620,10 @@ command boundary independently of any UI or transport.
     A replacement runtime cannot acquire the target unless it was already the
     exact qualified supervisor. Completion versus stop is locally linearized.
     Activation freezes the productive classification/outcome snapshot and
-    finite D/O/R identities, schemas, O row writer/evidence predicates and closed
-    evidence union, transition table, and structured `UNDELIVERED` initial state
-    without a future selected row, head, evidence, or result. Only the unique
+    finite D/O/R identities, schemas, every row's writer/evidence predicate,
+    closed evidence union, immutable producer selector/revision definitions,
+    transition table, and exact `S0` without a future selected row/arm/producer,
+    head, evidence value/digest, result, or resolution. Only the unique
     D/O head classifies safety delivery as
     `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, `DELIVERY_EFFECT_POSSIBLE`,
     `UNSUPPORTED`, or `AMBIGUOUS_EFFECT`; R may add a separate closed resolution
@@ -611,25 +664,31 @@ command boundary independently of any UI or transport.
   remaining safety-deliverable, selected-identity ambiguity still blocking,
   separate productive/safety ambiguity classifications with no outcome or
   barrier inference, Edge-issued/no-consume classification,
-  latch/cut/consistency crash/replay/expiry, activation-before-delivery with
-  structured `UNDELIVERED`, finite D/O/R identities/schemas/table and no future
-  selected row/mode, result/evidence value, head, or synthetic `H0`; D crash
-  before/after commit and emission, O/R
-  pre/post-CAS crash and lost acknowledgement, and sole winner/incarnation
-  emission; after `D*`, every non-ambiguous result accepting only matching
-  `OW + N(r)` or `RW + F(D*) + Q(r)` and fence-only recovery accepting only
-  ambiguity; row/result/mode/evidence and bound activation/plan/D*/head/OW/
-  target/action/native-boundary/runtime/helper/capability identity mismatch or
-  evidence-producer selector/identity mismatch; `RW` self-attestation, later
-  terminal or relay/transport evidence,
-  cancellation without exact no-consume proof, and static/unbound capability
-  rejection; O-row races producing one CAS winner; exact replay versus changed
-  evidence; R resolution or persistent ambiguity with `F(D*)` alone unable to
-  resolve R; exact predecessor/head CAS, atomic non-ambiguous tombstones,
-  ambiguity-only R eligibility, one current head, receipt-core self-reference
-  exclusion, no dynamic fourth stage, one delivery owner/FENCE_ONLY roles,
-  preserved quarantine, no fallback, and
-  transport/final-boundary separation,
+  latch/cut/consistency crash/replay/expiry; activation-before-delivery binding
+  exact `S0`, finite D/O/R identities/schemas/table, every row/predicate/writer/
+  evidence arm and immutable producer/schema revisions, while binding no future
+  selected row/arm/producer, result/evidence value or digest, head, resolution,
+  or synthetic `H0`; each D row accepting only matching independently produced
+  `D_PRE_EFFECT` evidence and rejecting wrong/stale/self-produced/circular row,
+  source, selector, producer, revision, schema, owner, target, gate, runtime,
+  helper, or capability facts; all D rows racing to one winner, with only the
+  effect-possible row granting one-shot emission and terminal rows tombstoning
+  O/R with none; D crash before/after commit and emission, O/R pre/post-CAS crash
+  and lost acknowledgement; after `D*`, every non-ambiguous O result accepting
+  only matching `OW + N(r)` or `RW + F(D*) + Q(r)` and fence-only recovery
+  accepting only ambiguity; O row/result/mode/arm/evidence/producer/revision/
+  identity/circularity mismatch, `RW` self-attestation, later terminal or relay/
+  transport evidence, cancellation without exact no-consume proof, and static/
+  unbound capability rejection; O-row races and exact replay; R effect accepting
+  only independent crossing evidence and rejecting fence/transport/loss/writer/
+  classification claims; R no-effect requiring complete gap-free no-past proof
+  over every bound source plus a separate future fence and rejecting gaps,
+  forks, missing/mismatched sources, or fence alone; R-row race, exact replay,
+  changed evidence and second-R rejection; exact predecessor/head CAS, atomic
+  non-ambiguous tombstones, immutable ambiguous O, ambiguity-only R eligibility,
+  one current head, receipt-core self-reference exclusion, no dynamic fourth
+  stage, one delivery owner/FENCE_ONLY roles, preserved quarantine, no fallback,
+  no re-emission, and transport/final-boundary separation,
   stop-revision CAS, unsupported delivery and crash ambiguity; and
   same-executor renewal crash/replay at `A`, every `R_i`, `B`, every general
   `X_i`, admin-specialized `X_C` then `X_E`, abort and final activation,

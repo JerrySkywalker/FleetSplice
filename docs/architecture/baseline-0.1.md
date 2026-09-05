@@ -3,7 +3,7 @@
 ## Status and authority
 
 - Baseline: `0.1`
-- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_14_CHANGE_REQUIRED`
+- State: `DRAFT_CORRECTED_AFTER_G02_ROUND_15_CHANGE_REQUIRED`
 - Drafting Goal: `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001` (`G01`)
 - Initial reviewed draft: `7a3c4618bf5c589ff7b53e7cc86f847e111e1fe0`
 - Round-2 reviewed draft: `b82df67d5a045d31b04b0efb3fb5c0a2cb9de571`
@@ -19,14 +19,15 @@
 - Round-12 reviewed draft: `82f44ff7dcb10a28acea14fe8042bdda6c768672`
 - Round-13 reviewed draft: `806823e43c5daf8f59f8c2cf80beea9eb1070f1c`
 - Round-14 reviewed draft: `234b2d5299e69cc3dd3bc31e8a8b94640dfe1f60`
-- Evidence cut: 2026-09-05 round-14 review and bounded correction
+- Round-15 reviewed draft: `3adae814f73bdec672b674bfbbf0c8544b8035a2`
+- Evidence cut: 2026-09-05 round-15 review and bounded correction
 - `ARCHITECTURE_0_1_READY=false`
 - `IMPLEMENTATION_AUTHORIZED=false`
 - `PRODUCT_IMPLEMENTATION_AUTHORIZED=false`
 
 This is a formal architecture draft, not an accepted baseline and not product
 implementation authority. Independent G02 reviews of the original draft and
-its first thirteen corrections have final controlling dispositions of
+its first fourteen corrections have final controlling dispositions of
 [`CHANGE_REQUIRED`](../train/receipts/G02.md),
 [round-2 `CHANGE_REQUIRED`](../train/receipts/G02-r2.md),
 [round-3 `CHANGE_REQUIRED`](../train/receipts/G02-r3.md),
@@ -40,13 +41,16 @@ its first thirteen corrections have final controlling dispositions of
 [round-10 `CHANGE_REQUIRED`](../train/receipts/G02-r10.md), and
 [round-11 `CHANGE_REQUIRED`](../train/receipts/G02-r11.md), and
 [round-12 `CHANGE_REQUIRED`](../train/receipts/G02-r12.md),
-[round-13 `CHANGE_REQUIRED`](../train/receipts/G02-r13.md), and
-[round-14 `CHANGE_REQUIRED`](../train/receipts/G02-r14.md), respectively. The
+[round-13 `CHANGE_REQUIRED`](../train/receipts/G02-r13.md),
+[round-14 `CHANGE_REQUIRED`](../train/receipts/G02-r14.md), and
+[round-15 `CHANGE_REQUIRED`](../train/receipts/G02-r15.md), respectively. The
 round-12 full review's initial `PASS` and the round-13 focused review's initial
 `PASS` were each explicitly superseded after reassessment. The round-14 full
 review's `PASS` was explicitly nonaccepting because the focused D/O/R Medium
-finding controls the review union. None is an operative acceptance result. This
-revision contains only the bounded corrections and has not received a fresh
+finding controls the review union. Round 15 found two Medium issues in D/R
+result-specific evidence closure and the G03 promotion exact-head gate. None is
+an operative acceptance result. This revision contains only the bounded
+corrections and has not received a fresh
 independent PASS. It does not supersede
 [Baseline 0.0](baseline-0.0.md) until a fresh review and the owner-controlled
 G03 acceptance gate both pass. Only G03 may change
@@ -757,10 +761,13 @@ activation binds its complete exact latch/cut/consistency set; renewal anchor
 decision `B` binds the complete ordered `R_i` set, and renewal activation binds
 `B` and the complete ordered `R_i`/`X_i` sets. The SafetyControl candidate also
 precommits the finite delivery-stage plan and every stable stage, receipt, and
-slot identity, writer scope, schema, transition-table digest, and proof
-obligation described below. It binds no future result, evidence value, receipt
-body or digest, or delivery-lineage head digest. Activation binds the plan
-identities and schemas but no delivery result. Later receipt values never
+slot identity, writer scope, D/O/R result-row and evidence-predicate definition,
+closed evidence-union arm/schema revision, immutable producer selector/revision,
+transition-table digest, and proof obligation described below. It binds no
+future selected row/arm/producer, result, evidence value or digest, receipt body
+or digest, or delivery-lineage head digest. Activation binds those plan and
+row-definition identities and schemas but no selected delivery result or
+resolution. Later receipt values never
 rewrite `permitDigest` or activation. Safety evidence is not successor proof.
 No other specialized fence, barrier, disjointness evidence, or successor proof
 may be omitted from the candidate and supplied late.
@@ -1015,17 +1022,32 @@ canonical core has a stable `deliveryPlanId`; exactly three ordered stage tuples
 `R = AMBIGUITY_RESOLUTION` producing
 `SafetyControlDeliveryResolutionReceipt`; and, for every tuple, a stable stage
 ID, receipt ID, slot ID, ordinal, kind, exact allowed writer identities and
-scopes, and closed receipt schema. For every O row the core additionally binds a
-stable `deliveryOutcomeRowId`, exact result, writer-mode predicate, evidence
-predicate, closed evidence-union schema, and candidate-bound evidence-producer
-selector. The core also binds the digest of the closed transition table defined
-below. That canonical digest covers each row's stable ID, result, writer-mode
-and evidence predicates, schemas and producer selectors, exact predecessor,
+scopes, and closed receipt schema. For every D, O, and R result row the core
+additionally binds a stable row ID, exact result, writer-mode predicate,
+result-specific evidence predicate, one arm of the closed evidence union,
+candidate-bound evidence-producer selector or selectors, and immutable producer
+and evidence-schema revisions. The core also binds the digest of the closed
+transition table defined below. That canonical digest covers every row's stable
+ID, result, writer-mode and evidence predicates, evidence-union arm and schema
+revision, immutable producer selectors and revisions, exact predecessor,
 resulting eligibility, atomic tombstones, and native-emission authority.
 `deliveryPlanDigest` is derived from that core while excluding the digest field
-itself. `D` permits only the exact `DELIVERY_OWNER`; `O` and `R` permit only
-their explicitly listed owner or recovery/reconciliation writers, whose scopes
-grant no native emission or fallback authority.
+itself. `D` permits only the exact precommitted delivery owner/incarnation; `O`
+and `R` permit only their explicitly listed owner or recovery/reconciliation
+writers, whose scopes grant no native emission or fallback authority.
+
+Let `S0` denote the exact initial delivery state
+`(INITIAL, 0, NONE, UNDELIVERED)`, and let `DW` denote the exact precommitted
+`DELIVERY_OWNER` participant and `controlDeliveryOwnerIncarnationId`. Every D
+row uses the closed arm
+`D_PRE_EFFECT{producerSelectorId,producerRevision,preEffectWitnessDigest}`. Its
+selector and revision are candidate-bound and select an authoritative producer
+independent of `DW`'s transition-writer scope. The canonical pre-effect witness
+binds the candidate, activation, plan, exact `S0` and D stage/receipt/slot, `DW`,
+target and action, final native gate, and exact runtime, helper, and capability
+revisions. It supplies facts that satisfy exactly one precommitted D-row
+predicate and excludes every prospective D row/result, receipt or receipt
+digest, and resulting head or head digest.
 
 For the exact current `D=DELIVERY_EFFECT_POSSIBLE` receipt and head, denote that
 immutable predecessor as `D*`; denote its exact CAS-winning delivery owner and
@@ -1040,15 +1062,38 @@ binds the activation and plan, exact `D*` receipt/head, `OW`, target and action,
 native boundary, and the runtime, helper, and capability revisions, and uniquely
 proves `r`. `RW` is not that evidence authority and cannot self-attest `Q(r)`.
 
+For the exact current immutable `O=AMBIGUOUS_EFFECT` receipt and head, denote
+that predecessor as `O*`; denote the exact precommitted zero-emission,
+zero-fallback reconciliation writer as `RR`. The R effect row uses
+`R_EFFECT_RESOLUTION{producerSelectorId,producerRevision,crossingWitnessDigest}`.
+Its candidate-bound independent authoritative crossing witness binds the
+candidate, activation, plan, `D*`, `O*`, `OW`, target and action, final native
+boundary, and exact runtime, helper, and capability revisions, and proves that
+the exact action crossed or was irrevocably accepted and that the one-shot
+attempt was consumed and closed. The R no-effect row uses
+`R_NO_EFFECT_RESOLUTION{noPastProducerSelectorId,noPastProducerRevision,noPastCrossingDigest,fenceProducerSelectorId,fenceProducerRevision,ownerFenceDigest}`.
+Its first candidate-bound independent authority proves by complete, gap-free
+reconciliation across every bound route, journal, and native boundary that no
+past crossing occurred; its separately bound fence evidence is `F(D*)` and
+proves no future emission. Both proofs are mandatory. `RR` cannot be either
+evidence producer in its transition-writer scope.
+
+The closed evidence union contains only `D_PRE_EFFECT`, `OWNER_RETURN`,
+`FENCED_RECOVERY`, `R_EFFECT_RESOLUTION`, and `R_NO_EFFECT_RESOLUTION`. Evidence
+may bind antecedent facts and source identities. Evidence cannot depend on,
+bind to, hash, or be derived from the prospective receipt, selected result, or
+resulting head it is offered to prove.
+
 All three stages exist in the candidate even when `O` or `R` will later be
 tombstoned. There is no fourth or dynamically allocated stage. The candidate
-binds the stable identities, schemas, allowed writers, O row and evidence
-predicate definitions, producer selectors, and transition table, but no future
-selected row, result, evidence value, receipt body or receipt digest, stage-head
-digest, or synthetic initial-head digest. All identifiers, roles, gates, plan
-fields, and receipt slots are closed before anchor commitment and cannot be
-discovered or reassigned later. The plan has no free-form arguments or
-dynamically discovered conflict scope.
+binds the stable identities, schemas, allowed writers, every D/O/R row and
+evidence-predicate definition, evidence-union arms, immutable producer selectors
+and revisions, and transition table, but no future selected row or arm, result,
+evidence value or digest, receipt body or receipt digest, stage-head digest, or
+synthetic initial-head digest. All identifiers, roles, gates, plan fields, and
+receipt slots are closed before anchor commitment and cannot be discovered or
+reassigned later. The plan has no free-form arguments or dynamically discovered
+conflict scope.
 
 Safety control uses this ordering:
 
@@ -1113,13 +1158,16 @@ Safety control uses this ordering:
    `transportRouteDigest`, native/process identity, closed action, complete
    `SafetyControlDeliveryStagePlan` identity and digest, all
    three stage/receipt/slot IDs, writer scopes, closed receipt and evidence-union
-   schemas, O row/predicate and evidence-producer selectors, and the
-   transition-table digest. It binds only the structured initial delivery state
-   `currentDeliveryStage=INITIAL`, `deliveryStageSequence=0`,
-   `currentDeliveryHeadDigest=NONE`, `eligibleDeliveryStageId=D.stageId`, and
+   schemas, every D/O/R row and predicate definition, and all immutable
+   evidence-producer selectors, producer revisions, and evidence-schema
+   revisions, plus the transition-table digest. It binds definitions only and
+   the structured initial delivery state `currentDeliveryStage=INITIAL`,
+   `deliveryStageSequence=0`, `currentDeliveryHeadDigest=NONE`,
+   `eligibleDeliveryStageId=D.stageId`, and
    `safetyDeliveryInitialState=UNDELIVERED`. Activation MUST NOT bind or predict
-   a future selected O row or writer mode, result, evidence value, receipt or
-   head digest, or resulting `safetyDeliveryClassification`. Its canonical core
+   a future selected D/O/R row, writer mode, evidence-union arm, producer
+   identity, result, evidence value or digest, receipt or head digest, or
+   resulting `safetyDeliveryClassification` or `safetyDeliveryResolution`. Its canonical core
    excludes its own derived
    `activationDigest`; after that digest is derived, the participant keys this
    literal initial state by the exact `activationId + activationDigest` without
@@ -1132,34 +1180,55 @@ Safety control uses this ordering:
    single candidate-bound delivery gate. Each transition core binds the plan
    and activation, stable stage/receipt/slot ID, exact prior stage ID, sequence,
    and head digest, exact writer identity/scope/incarnation, selected stable row
-   ID, result, writer mode, qualified evidence digest, resulting stage, and every
-   atomically tombstoned precommitted stage ID. An O transition additionally
-   binds exactly one closed evidence-union arm:
-   `OWNER_RETURN{returnDigest}` or
-   `FENCED_RECOVERY{ownerFenceDigest,resultWitnessDigest}`. The latter requires a
-   matching `Q(r)` witness digest for every non-ambiguous result; literal
-   `resultWitnessDigest=NONE` is permitted only for `AMBIGUOUS_EFFECT`. The core
-   excludes its own resulting receipt digest
-   and head digest; those are derived only after the CAS commits. Tombstones
-   name only already precommitted IDs, so neither receipts nor tombstones
-   mutually include a future digest. The gate maintains one contiguous,
-   non-forking current head.
+   ID, result, writer mode, exactly one closed evidence-union arm, the actual
+   evidence-producer identity or identities selected by the precommitted
+   selector or selectors, immutable producer and evidence-schema revisions, the
+   canonical evidence digest, resulting stage, and every atomically tombstoned
+   precommitted stage ID. D binds `D_PRE_EFFECT`; O binds `OWNER_RETURN` or
+   `FENCED_RECOVERY`; and R binds `R_EFFECT_RESOLUTION` or
+   `R_NO_EFFECT_RESOLUTION`. `FENCED_RECOVERY` requires a matching `Q(r)` witness
+   digest for every non-ambiguous O result; literal `resultWitnessDigest=NONE`
+   is permitted only for `AMBIGUOUS_EFFECT`. Evidence is authenticated and
+   evaluated before the transition and cannot depend on the selected result,
+   resulting receipt, or resulting head it proves. The core excludes its own
+   resulting receipt digest and head digest; those are derived only after the
+   CAS commits. Tombstones name only already precommitted IDs, so neither
+   receipts nor tombstones mutually include a future digest. The gate maintains
+   one contiguous, non-forking current head.
 
-   **Stage D — `DELIVERY_DECISION`.** Only the exact bound `DELIVERY_OWNER` may
-   CAS the structured `(INITIAL, 0, NONE, UNDELIVERED)` state keyed by the exact
-   activation tuple. The CAS verifies and binds
+   **Stage D — `DELIVERY_DECISION`.** Only `DW` may CAS exact `S0` keyed by the
+   exact activation tuple. The CAS verifies and binds
    `attemptOwner=controlDeliveryParticipantId` and
    `attemptIncarnation=controlDeliveryOwnerIncarnationId` against the still-live
-   qualified owner. Qualified pre-emission evidence may choose
-   `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or `UNSUPPORTED`; the same CAS
-   writes the immutable `SafetyControlDeliveryReceipt`, enters an absorbing
-   terminal state, and tombstones `O` and `R` without emission. Otherwise the
-   CAS writes `D=DELIVERY_EFFECT_POSSIBLE`, makes only `O` eligible, and durably
-   records that receipt before native emission. Only that CAS-winning
-   precommitted owner/incarnation may emit the exact native action, once.
-   A crash before the D CAS commits leaves the first attempt available because
-   no emission was authorized; after it commits, no retry, restarted
-   incarnation, recovery writer, or later stage may emit or re-emit.
+   qualified `DW`, plus the selected row's exact `D_PRE_EFFECT` producer,
+   revision, and witness. The four stable D rows are mechanically exclusive:
+
+   - `D-ALREADY_TERMINAL-OWNER` requires `DW` plus authoritative lifecycle and
+     native-gate proof that the exact target creation identity was terminal
+     before D and that no action crossed.
+   - `D-CANCELED_NO_EFFECT-OWNER` requires `DW` plus durable exact-attempt
+     withdrawal or tombstone proof recorded while still at `S0`, before any
+     emission authorization, which permanently excludes later consumption under
+     this activation.
+   - `D-UNSUPPORTED-OWNER` requires `DW` plus exact bound capability and native-
+     admission proof that this action under the bound runtime/helper revision is
+     rejected before the final boundary.
+   - `D-DELIVERY_EFFECT_POSSIBLE-OWNER` requires `DW` plus exact final-gate
+     readiness and admission proof that the action is supported, all bound
+     identities and qualifications remain current, and the gate is ready. That
+     witness proves no emission; only the successful D CAS grants its winner the
+     one-shot native-emission authority.
+
+   Missing, conflicting, stale, self-produced, circular, source-mismatched, or
+   predicate-mismatched D evidence leaves `S0` unchanged. A terminal D-row CAS
+   writes the immutable `SafetyControlDeliveryReceipt`, becomes absorbing,
+   atomically tombstones O and R, and grants no emission. Only the
+   `D-DELIVERY_EFFECT_POSSIBLE-OWNER` CAS makes O eligible and durably records
+   its receipt before only that CAS-winning precommitted owner/incarnation may
+   emit the exact native action, once. A crash before a D CAS commits leaves the
+   first attempt available because no emission was authorized; after the effect-
+   possible D CAS commits, no retry, restarted incarnation, recovery writer, or
+   later stage may emit or re-emit.
 
    **Stage O — `DELIVERY_OUTCOME`.** O exact-predecessor CASes `D*` once and
    writes `SafetyControlOutcomeReceipt`. D's existence alone is insufficient.
@@ -1191,17 +1260,33 @@ Safety control uses this ordering:
    authority, which `N(r)` closes. Each non-ambiguous row atomically tombstones R
    and is absorbing; only the ambiguous row makes R eligible.
 
-   **Stage R — `AMBIGUITY_RESOLUTION`.** R exact-predecessor CASes the unique
-   ambiguous O receipt and head once and writes
-   `SafetyControlDeliveryResolutionReceipt`. Qualified evidence may choose only
-   `RESOLVED_DELIVERY_EFFECT_POSSIBLE` or `RESOLVED_NO_DELIVERY_EFFECT`. Without
-   that proof the O head remains ambiguous. `F(D*)` or its owner-fence digest
-   alone cannot resolve R. R is terminal and absorbing; there is no fourth or
-   dynamically allocated stage.
+   **Stage R — `AMBIGUITY_RESOLUTION`.** Only `RR` exact-predecessor CASes `O*`
+   once and writes `SafetyControlDeliveryResolutionReceipt`. Its two stable rows
+   are mechanically exclusive:
 
-   The transition table is closed to these rows. Grouped D and R result labels
-   still denote distinct schema-enumerated stable row IDs. O writer mode is part
-   of row identity and is expanded below:
+   - `R-RESOLVED_DELIVERY_EFFECT_POSSIBLE` uses
+     `R_EFFECT_RESOLUTION{producerSelectorId,producerRevision,crossingWitnessDigest}`.
+     The selected independent authoritative evidence binds `D*`, `O*`, `OW`,
+     action and final native boundary, and exact runtime, helper, and capability
+     revisions; it proves the exact action crossed or was irrevocably accepted
+     and that the one-shot attempt was consumed and closed.
+   - `R-RESOLVED_NO_DELIVERY_EFFECT` uses
+     `R_NO_EFFECT_RESOLUTION{noPastProducerSelectorId,noPastProducerRevision,noPastCrossingDigest,fenceProducerSelectorId,fenceProducerRevision,ownerFenceDigest}`.
+     Complete, gap-free reconciliation from the first independent producer must
+     prove no past crossing across every bound route, journal, and native
+     boundary, while the separately produced `F(D*)` must prove no future
+     emission. Both proofs are mandatory.
+
+   A missing log, timeout, transport or response loss, later target state, D or O
+   classification, `RR` claim, or `F(D*)` alone satisfies neither R predicate.
+   A gap, fork, source/selector/revision/identity mismatch, stale evidence, or
+   evidence produced by `RR` in its writer scope also leaves `O*` unchanged.
+   R is terminal and absorbing and does not rewrite the immutable ambiguous O
+   receipt; there is no fourth or dynamically allocated stage and no R row can
+   emit or re-emit.
+
+   The transition table is closed to the individually enumerated D, O, and R
+   rows below:
 
    | Exact prior state | Stage | Allowed result | Resulting eligibility | Atomic tombstones | Native emission authority |
    | --- | --- | --- | --- | --- | --- |
@@ -1210,6 +1295,17 @@ Safety control uses this ordering:
    | exact `D=DELIVERY_EFFECT_POSSIBLE` head | O | `DELIVERY_EFFECT_POSSIBLE`, `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, or `UNSUPPORTED` | terminal O head | R | none |
    | exact `D=DELIVERY_EFFECT_POSSIBLE` head | O | `AMBIGUOUS_EFFECT` | R only | none | none |
    | exact `O=AMBIGUOUS_EFFECT` head | R | `RESOLVED_DELIVERY_EFFECT_POSSIBLE` or `RESOLVED_NO_DELIVERY_EFFECT` | terminal R head | none | none |
+
+   Every D row has exact predecessor `S0`, writer `DW`, and the closed
+   `D_PRE_EFFECT` arm produced through its own precommitted independent selector
+   and immutable revision:
+
+   | Stable D row ID | Result | Exact result-specific evidence predicate | Resulting eligibility / tombstones | Native emission authority |
+   | --- | --- | --- | --- | --- |
+   | `D-ALREADY_TERMINAL-OWNER` | `ALREADY_TERMINAL` | exact target creation identity authoritatively terminal before D; no action crossed | terminal D head / O and R | none |
+   | `D-CANCELED_NO_EFFECT-OWNER` | `CANCELED_NO_EFFECT` | durable exact-attempt withdrawal/tombstone while at `S0`, before authorization, permanently excluding consumption | terminal D head / O and R | none |
+   | `D-UNSUPPORTED-OWNER` | `UNSUPPORTED` | exact bound capability/native admission rejects this action/runtime/helper revision before the final boundary | terminal D head / O and R | none |
+   | `D-DELIVERY_EFFECT_POSSIBLE-OWNER` | `DELIVERY_EFFECT_POSSIBLE` | exact final-gate readiness/admission proves support, current identities/qualifications, and ready gate, but no emission | O only / none | exact D CAS winner/incarnation once |
 
    Every O row has exact predecessor `D*`, produces the closed
    `SafetyControlOutcomeReceipt` through its precommitted producer selector, and
@@ -1228,11 +1324,22 @@ Safety control uses this ordering:
    | `O-AMBIGUOUS_EFFECT-OWNER` | `AMBIGUOUS_EFFECT` | `OW` under `OWNER_RETURN` | matching `N(AMBIGUOUS_EFFECT)` |
    | `O-AMBIGUOUS_EFFECT-RECOVERY` | `AMBIGUOUS_EFFECT` | `RW` under `FENCED_RECOVERY` | matching `F(D*)`; `resultWitnessDigest=NONE` |
 
-   The four non-ambiguous result pairs yield a terminal O head and atomically
-   tombstone R. The two ambiguity rows make only R eligible and tombstone
-   nothing. These eligibility/tombstone values, the closed schema and producer
-   selector, and every displayed predicate are fields of the canonical
-   transition-table digest, not commentary outside it.
+   Every R row has exact predecessor `O*`, writer `RR`, no native-emission or
+   fallback authority, and its own closed evidence arm and immutable producers:
+
+   | Stable R row ID | Result | Evidence arm | Exact result-specific evidence predicate |
+   | --- | --- | --- | --- |
+   | `R-RESOLVED_DELIVERY_EFFECT_POSSIBLE` | `RESOLVED_DELIVERY_EFFECT_POSSIBLE` | `R_EFFECT_RESOLUTION` | independent bound crossing witness proves exact crossing/irrevocable acceptance and consumed/closed one-shot attempt |
+   | `R-RESOLVED_NO_DELIVERY_EFFECT` | `RESOLVED_NO_DELIVERY_EFFECT` | `R_NO_EFFECT_RESOLUTION` | complete gap-free bound no-past-crossing proof plus separately produced `F(D*)`; both mandatory |
+
+   The three terminal D rows yield a terminal D head and atomically tombstone O
+   and R; the effect-possible D row makes only O eligible. The four
+   non-ambiguous O result pairs yield a terminal O head and atomically tombstone
+   R; the two ambiguity rows make only R eligible and tombstone nothing. Each R
+   row yields a terminal R head. Every displayed predicate, writer mode,
+   evidence arm/schema revision, immutable producer selector/revision,
+   eligibility/tombstone value, and emission-authority value is a field of the
+   canonical transition-table digest, not commentary outside it.
 
    In a terminal D or O row, the winning receipt digest is the final head;
    tombstones are fields in that same transition core and do not create another
@@ -1241,9 +1348,11 @@ Safety control uses this ordering:
    At every stage, byte-identical retry of the exact stable stage identity and
    transition core returns the existing receipt and current state without an
    append or native re-emission. A changed tuple, predecessor, sequence, head,
-   selected row ID, writer or writer mode, result, evidence-union arm or digest,
-   producer identity/revision, competing sibling, predicate mismatch, unlisted
-   transition, or tombstoned stage rejects without effect. The safety-delivery
+   selected row ID, writer or writer mode, result, evidence-union arm/schema
+   revision or canonical digest, producer selector/identity/revision, evidence
+   source or predicate mismatch, circular evidence that depends on the result or
+   receipt it proves, competing sibling, unlisted transition, or tombstoned
+   stage rejects without effect. The safety-delivery
    projection is
    derived only from this unique current head and the closed transition table.
    It exposes the immutable latest D/O `safetyDeliveryClassification` plus, only
@@ -1292,10 +1401,11 @@ qualified supervisor of that exact target and creation identity. Target
 completion versus stop is linearized in the supervising local journal.
 Activation carries the independent `productiveBoundaryClassification` and
 `productiveOutcomeState` snapshot plus the safety-delivery schema/domain and
-finite D/O/R plan identities, schemas, O row writer/evidence predicates and
-closed evidence union, transition table, and structured `UNDELIVERED` initial
-state, but no future selected row, evidence, receipt/head digest, or resulting
-`safetyDeliveryClassification`. Only the unique later D/O/R head
+finite D/O/R plan identities, schemas, every D/O/R row writer/evidence predicate,
+closed evidence union, immutable producer selector/revision definitions,
+transition table, and exact `S0`, but no future selected row or arm, producer
+identity, result, evidence value/digest, receipt/head digest, or resulting
+`safetyDeliveryClassification` or `safetyDeliveryResolution`. Only the unique later D/O/R head
 derives that projection. The latest D/O receipt classifies delivery as
 `ALREADY_TERMINAL`, `CANCELED_NO_EFFECT`, `DELIVERY_EFFECT_POSSIBLE`,
 `UNSUPPORTED`, or `AMBIGUOUS_EFFECT`; an R head separately reports
@@ -1934,26 +2044,72 @@ This draft closes architecture wording only. The following order is normative:
 1. G01 produces this draft and Proposed ADRs with all readiness flags false.
 2. G02 independently reviews the exact G01 head and may return PASS or bounded
    changes; the author does not self-review it.
-3. G03 may correct accepted findings and set
-   `ARCHITECTURE_0_1_READY=true` only after a fresh independent PASS and owner
-   acceptance. G03 still does not create product code. Its receipt must publish
-   the literal accepted architecture commit SHA/tree and baseline path; all
-   later implementation receipts cite that immutable identifier rather than a
-   branch name or a self-referential placeholder.
-4. G04 may create only the v0.1 implementation contract/planning artifacts.
+3. G03 may correct accepted findings only while architecture remains a draft.
+   It must first obtain a fresh independent content PASS bound to the corrected
+   exact head and tree. That content PASS authorizes no changed head and does not
+   itself declare Architecture 0.1 accepted.
+4. After that content PASS, G03 must obtain explicit owner acceptance and
+   authorization for exactly one status-only promotion commit whose parent is
+   the exact content-PASS head. The promotion diff is closed to this current-
+   state readiness/ADR/AGENTS allowlist:
+
+   - `README.md`
+   - `AGENTS.md`
+   - `docs/architecture/README.md`
+   - `docs/architecture/baseline-0.1.md`
+   - `docs/architecture/domain-model.md`
+   - `docs/architecture/session-model.md`
+   - `docs/architecture/webui-model.md`
+   - `docs/architecture/webui-wireframes.md`
+   - `docs/adr/README.md`
+   - `docs/adr/0001-hub-edge-command-and-failure-boundary.md`
+   - `docs/adr/0002-session-identity-control-and-authority.md`
+   - `docs/adr/0003-driver-compatibility-and-provider-binding.md`
+   - `docs/adr/0004-windows-runtime-storage-and-native-helper.md`
+   - `docs/adr/0005-shared-interaction-semantics-and-ui-reuse.md`
+   - `docs/adr/0006-security-provenance-and-self-iteration.md`
+
+   Within that allowlist, only current-readiness wording, the baseline's draft-
+   to-accepted state and `ARCHITECTURE_0_1_READY` value, all six ADR status
+   transitions from `Proposed` to `Accepted`, and `AGENTS.md` routing to the
+   current accepted baseline may change. `IMPLEMENTATION_AUTHORIZED=false` and
+   `PRODUCT_IMPLEMENTATION_AUTHORIZED=false` remain false. No architecture
+   semantics, product file, implementation authorization, or other status may
+   change. Historical `baseline-0.0.md`, all research, and every prior receipt
+   are immutable.
+5. G03 must reject promotion if the parent is not the literal content-PASS head,
+   more or fewer than the one authorized promotion commit is used, any path is
+   outside the allowlist, any allowlisted change exceeds the permitted status/
+   routing fields, either implementation flag changes, any product artifact
+   appears, or any historical baseline, research file, or prior receipt changes.
+6. A new independent reviewer must then review the promotion commit's exact SHA
+   and tree and return a fresh exact-head/tree PASS. The earlier content PASS
+   cannot accept this changed head. Only this second PASS establishes the
+   accepted Architecture 0.1 head. Any mutation after that review, including a
+   seemingly mechanical status edit, invalidates it and repeats exact-head/tree
+   review before acceptance.
+7. Only after the promotion head's second PASS may a receipt-only child commit
+   publish the literal promotion SHA, promotion tree, and baseline path. Every
+   later Goal cites that immutable promotion object, never the receipt commit,
+   branch name, `HEAD`, or `SELF`; the receipt child does not replace or mutate
+   the accepted head it records.
+8. G04 may create only the v0.1 implementation contract/planning artifacts.
    **Product mutation requires G04 to reach `PASS_V0_1_IMPLEMENTATION_CONTRACT`
    on an exact accepted head; merely starting, entering, or being admitted to
    G04 is insufficient.** G04 must cite the accepted Architecture 0.1 and
    explicitly authorize exactly G05-G10 before any product directory, manifest,
    runtime dependency, service, deployment, or CI workflow may be created.
-5. G05-G10 may then implement only the accepted v0.1 contract and gates.
-6. G04's authority is deliberately limited to G05-G10. Separately, running the
+9. G05-G10 may then implement only the accepted v0.1 contract and gates.
+10. G04's authority is deliberately limited to G05-G10. Separately, running the
    owner-authored root train Goal is explicit authority for its listed G11-G16
    only after the literal accepted Architecture 0.1 head is cited, G10 and
    Station B pass on exact heads, and every manifest dependency, child-Goal
    gate, owner-attended ceremony, and independent-review requirement is met.
    This is not a widening of G04 and no second owner approval is invented; it is
    the root train authority already granted. It authorizes no unlisted scope.
+
+Nothing in this draft performs that promotion: all six ADRs remain `Proposed`,
+`ARCHITECTURE_0_1_READY=false`, and both implementation flags remain false.
 
 ## Bounded implementation choices
 
@@ -2031,30 +2187,55 @@ implementation/capability gates, not current PASS claims:
   classifications and ambiguities remain separate with no terminal, rollback,
   or barrier inference. Prove activation-before-delivery binds the immutable
   owner/gate/route/native/action plus the finite D/O/R plan identities, schemas,
-  writer scopes, transition-table digest, and structured
-  `safetyDeliveryInitialState=UNDELIVERED` without a future result, evidence,
-  receipt/head digest, or synthetic `H0`. Exercise crash before and after D CAS;
-  after its receipt but before emission; and after possible emission. Prove only
-  its exact winning attempt owner/incarnation may emit once and no restart,
-  recovery writer, or replay may emit after D commit. Exercise crash and lost
-  acknowledgement before and after each O and R CAS. After `D*`, prove each
-  non-ambiguous O result accepts only `OW` with its matching `N(r)`, or only `RW`
-  with matching `F(D*) + Q(r)` from the bound independent evidence authority.
-  Prove fence-only recovery after possible emission rejects every non-ambiguous
-  row and is accepted only as `AMBIGUOUS_EFFECT`; prove an owner return can close
-  that ambiguity without claiming a past crossing fact. Reject row/result/mode/
-  evidence mismatches, wrong activation/plan/D*/head/OW/target/action/native-
-  boundary/runtime/helper/capability identity or revision, evidence-producer
-  selector or identity, `RW` self-attestation,
-  later terminal observation, relay or transport acceptance, cancellation lacking
-  exact no-consume proof, and static or unbound capability assertions. Race all
-  eligible O rows to one CAS winner; prove byte-identical replay returns it while
-  changed evidence rejects. Exercise R resolution to each closed terminal result
-  and prove `F(D*)` alone cannot resolve R, so insufficient proof remains
-  ambiguous. Reprove unique D emission, non-ambiguous R tombstones, ambiguous R
-  eligibility, quarantine, rejection of a fourth/dynamic stage, exact predecessor
-  sequence/head CAS, one non-forked current head, transition-core self-reference
-  exclusion, transport-versus-native-boundary separation, and no fallback on
+  every stable row/predicate/writer mode/evidence arm, immutable producer
+  selectors and producer/schema revisions, transition-table digest, and exact
+  `S0`, without any future selected row/arm/producer, result, evidence value or
+  digest, receipt/head digest, resolution, or synthetic `H0`.
+
+  For every D row, accept only `DW` with matching independently produced
+  `D_PRE_EFFECT` evidence: exact pre-D terminality/no crossing, durable
+  withdrawal/tombstone/no later consumption, exact unsupported admission, or
+  exact supported/current/ready final gate, respectively. Reject a missing,
+  stale, conflicting, wrong-row, wrong-selector/producer/revision/schema,
+  self-produced-by-`DW`, or circular witness, and any wrong candidate,
+  activation, plan, `S0`, D slot, owner/incarnation, target/action/native gate,
+  runtime/helper/capability identity or revision. Race all D rows from `S0` to
+  one CAS winner; prove only `D-DELIVERY_EFFECT_POSSIBLE-OWNER` grants the exact
+  winner/incarnation one-shot emission, while each terminal D row atomically
+  tombstones O/R and grants none. Exercise crash before and after D CAS, after
+  its receipt but before emission, and after possible emission; no restart,
+  recovery writer, later stage, or replay may emit after D commit.
+
+  Exercise crash and lost acknowledgement before and after each O and R CAS.
+  After `D*`, prove each non-ambiguous O result accepts only `OW` with its
+  matching `N(r)`, or only `RW` with matching `F(D*) + Q(r)` from the bound
+  independent evidence authority. Prove fence-only recovery after possible
+  emission rejects every non-ambiguous row and is accepted only as
+  `AMBIGUOUS_EFFECT`; prove an owner return can close that ambiguity without
+  claiming a past crossing fact. Reject row/result/mode/arm/digest mismatches,
+  wrong activation/plan/D*/head/OW/target/action/native-boundary/runtime/helper/
+  capability identity or revision, evidence-selector/producer/revision/schema
+  mismatch, circular evidence, `RW` self-attestation, later terminal
+  observation, relay or transport acceptance, cancellation lacking exact no-
+  consume proof, and static or unbound capability assertions. Race all eligible
+  O rows to one CAS winner; prove byte-identical replay returns it while changed
+  evidence rejects.
+
+  From exact `O*`, accept `R-RESOLVED_DELIVERY_EFFECT_POSSIBLE` only with its
+  independently produced bound crossing witness; reject an owner fence,
+  transport/relay acceptance, missing log, timeout/loss, later target state, D/O
+  classification, or `RR` claim as crossing proof. Accept
+  `R-RESOLVED_NO_DELIVERY_EFFECT` only when complete gap-free reconciliation
+  proves no past crossing across every bound route/journal/native boundary and a
+  separately selected `F(D*)` proves no future emission. Reject a gap, fork,
+  missing source, source/selector/producer/revision/schema/identity mismatch,
+  circular evidence, or the future fence alone. Race both R rows to one CAS
+  winner, replay it byte-identically, reject changed evidence or any second R,
+  and keep the ambiguous O receipt immutable. Reprove non-ambiguous O tombstones,
+  ambiguity-only R eligibility, terminal R, quarantine, rejection of a fourth/
+  dynamic stage, exact predecessor sequence/head CAS, one non-forked current
+  head, transition-core self-reference exclusion, transport-versus-native-
+  boundary separation, unique D emission, no re-emission, and no fallback on
   owner or route failure.
 
 ## Required capability and owner gates retained
@@ -2067,7 +2248,7 @@ No item in this table is a current PASS unless the cited report says exactly so.
 | Codex native driver | isolated no-auth lifecycle, known-ID recovery, interrupt, response-loss ambiguity, and model-transition observations | authenticated stream; successful harmless turn; pending approval/disconnect; active-turn loss; provider transition; Windows process containment |
 | generic ACP driver | OpenCode 1.18.16 isolated loopback prompt/tool/approval/cancel/load/resume/list evidence | real provider/auth; active process loss; filesystem/terminal delegation; different endpoint migration; concurrent clients |
 | driver/update admission | exact artifact/schema/capability model and bounded conformance evidence | implemented suite, retained artifact packaging, isolated-canary disjointness and promotion-predecessor closure, downgrade/data compatibility, rollback proof |
-| lane control and grants | closed epoch/CAS/grant/watermark semantics | concurrent Hub CAS, authority-transition anchor crash/ambiguity and pending-state non-use, Edge fence ordering/final-boundary reconciliation, successor-grant and changed-executor barrier behavior, same-executor renewal crash/replay/race at `A`, every `R_i`, `B`, every general `X_i`, admin-specialized companion `X_C` then Edge `X_E`, exact contiguous high-water delta acceptance and gap/unrelated/safety/stop/revocation rejection, abort, and final activation, consume-versus-`X_C`, issue-versus-`X_E`, partial transfer states, safety-control immediate local latches, companion boundary cut and Edge consistency cases, `r1`/`r2`/fence non-barging, unique delivery ownership with finite non-forking D/O/R stage CAS, O writer/result-specific evidence predicates, tombstones, replay, and no fallback or replay emission, monotonic stop revision, unsupported control and crash ambiguity, source-bound pending approval, transitive-successor chains, revocation quiescence/propagation, and expired delivery |
+| lane control and grants | closed epoch/CAS/grant/watermark semantics | concurrent Hub CAS, authority-transition anchor crash/ambiguity and pending-state non-use, Edge fence ordering/final-boundary reconciliation, successor-grant and changed-executor barrier behavior, same-executor renewal crash/replay/race at `A`, every `R_i`, `B`, every general `X_i`, admin-specialized companion `X_C` then Edge `X_E`, exact contiguous high-water delta acceptance and gap/unrelated/safety/stop/revocation rejection, abort, and final activation, consume-versus-`X_C`, issue-versus-`X_E`, partial transfer states, safety-control immediate local latches, companion boundary cut and Edge consistency cases, `r1`/`r2`/fence non-barging, unique delivery ownership with finite non-forking D/O/R stage CAS, every D/O/R stable row's writer/result-specific noncircular producer-and-revision-bound evidence predicate, D-row race and effect-only emission grant, R crossing versus complete no-past-plus-future-fence resolution, source gap/fork/mismatch rejection, tombstones, replay, no fourth stage, and no fallback or replay emission, monotonic stop revision, unsupported control and crash ambiguity, source-bound pending approval, transitive-successor chains, revocation quiescence/propagation, and expired delivery |
 | Windows user Edge | safe medium-integrity/same-user process, pipe, loopback, and WSL discovery evidence | principal/session attestation plus resource/Hub-recovery/Edge-recovery/runtime split-brain fault injection, qualified termination versus socket/stream/PID absence, disconnected-predecessor drain/re-entry, owner-attended logout/relogin, reboot, sleep/network loss, timer-epoch/clock-uncertainty discontinuity, startup-at-logon, UAC/admin companion, ordered Edge-plus-companion preparation/activation and intersection, Edge and companion crash before or after reservation/consumption CAS and possible admin effect, delayed and duplicate admin delivery, response loss and exact replay, reused-ID/slot/nonce/ordinal changed-tuple conflict, reservation namespace drain and tombstone, companion journal rollback/restore joining the existing barrier, stale decision/permit/barrier/high-water rejection, cross-principal pipe ACL, ConPTY, active WSL stop/restart, and WSL-after-reboot |
 | native helper | Node gap and required primitive boundary identified | disposable DACL, token/process, Job, handle identity, DPAPI, ConPTY, WinVerifyTrust, reparse containment, crash, and slow-consumer tests |
 | SQLite and blobs | one-host disposable 1M/FTS, journal, WAL, backup, crash/reopen, migration, and integrity fixture | real power/storage fault; separate Hub-only and Edge-only restore barriers with exact recovery/runtime tuples and qualified reconciliation or trusted-time proof; concurrency/WAL pressure; durable blob publication/GC/backup fencing; encryption/retention; schema forward/downgrade; full database-plus-blob restore |
@@ -2120,12 +2301,14 @@ They remain `Proposed` while this baseline is a draft:
 ## Review disposition
 
 G02 reviewed the exact initial draft and the exact corrected drafts submitted
-through review round 14; all fourteen final controlling dispositions are
+through review round 15; all fifteen final controlling dispositions are
 `CHANGE_REQUIRED`. Round 12's full reviewer and round 13's focused reviewer each
 initially returned `PASS` and explicitly superseded it after reassessment. Round
 14's full-review `PASS` is nonaccepting because the focused D/O/R Medium controls
-the review union. The round-9 receipt's safety-race ordering is corrected by its
-immutable erratum. This revision applies only those bounded findings, but the
+the review union. Round 15 requires closed D and R result-row evidence machinery
+and a separately reviewed G03 promotion head. The round-9 receipt's safety-race
+ordering is corrected by its immutable erratum. This revision applies only
+those bounded findings, but the
 Implementer has not reviewed or approved its own corrections.
 It has not received a fresh independent review and makes no claim that G02 or
 G03 has passed.

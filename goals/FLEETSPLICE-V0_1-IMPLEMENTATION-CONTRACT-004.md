@@ -1,55 +1,48 @@
 # FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004
 
-## Objective
+## Objective and G04A correction
 
-Freeze the v0.1 implementation contract before product code begins.
+Freeze the v0.1 contract before product work. The prior G04 planning receipt is
+historical and lacked formal acceptance. The Owner's bounded
+[G04A correction](FLEETSPLICE-G04A-VISIBLE-MVP-PREDEVELOPMENT-CLOSURE-004A.md)
+now supplies architecture simplification, visible sequencing and final review.
 
-## Required outputs
+Required contract documents are [scope](../docs/v0.1/scope.md),
+[acceptance](../docs/v0.1/acceptance-contract.md),
+[roadmap](../docs/v0.1/implementation-roadmap.md),
+[quality gates](../docs/v0.1/quality-gates.md),
+[layout](../docs/v0.1/repo-layout.md), [development policy](../docs/v0.1/development-test-merge-policy.md),
+[Tencent design](../docs/v0.1/tencent-mobile-deployment.md), and
+[remote mobile acceptance](../docs/v0.1/remote-mobile-acceptance.md).
 
-Create `docs/v0.1/` planning artifacts covering:
+## Conditional scope
 
-- `scope.md`;
-- `acceptance-contract.md`;
-- `implementation-roadmap.md`;
-- `quality-gates.md`;
-- `repo-layout.md`;
-- development/test/merge policy.
+Only G05-G10 are in this contract. Future shape:
+apps/web, apps/hub, apps/edge, packages/contracts, packages/driver-codex.
+Additional packages need demonstrated need/provenance; none is created now.
+No AuthorityAnchor package/port or separate Relay service is required.
 
-Freeze a deliberately small initial repo shape:
+G05 gives a real local SKYFORGE Codex loop. G06 gives remote mobile control
+through Tencent Hub + WebUI and v0.1-alpha.1. G07 adds ZenBook/takeover. G08
+adds durable recovery, G09 explicit migration or NO_QUALIFIED_TARGET, and G10
+hardens/releases the two-host/mobile product. VISIBLE_INCREMENT_RULE=true.
 
-```text
-apps/web
-apps/hub
-apps/edge
-packages/contracts
-packages/driver-codex
-```
-
-Additional packages require demonstrated need.
-
-## v0.1 required loop
-
-One URL must control a real Codex session on either SKYFORGE-01 or ZenBook Duo,
-with two-host visibility, prompt/stream, approval/interrupt, durable
-history/reconnect, Hub restart survival, and explicit ambiguity. The G09
-provider-migration gate has exactly the outcomes defined by its Goal: either a
-real qualified migration after owner confirmation of the exact target, or a
-verified, visible, fail-closed `NO_QUALIFIED_TARGET`. Only the first claims that
-a migration occurred; every target activation requires confirmation and no
-transparent failover is allowed.
-
-## Explicitly deferred from v0.1
-
-ACP second Agent, admin/WSL, full files/diff/Git/terminal UX, TUI, Coordination Loop integration, scheduler, transparent failover, enterprise tenancy, plugin SDK.
-
-## Gate
-
-No feature may enter v0.1 merely because it is convenient while implementing another feature. Out-of-scope discoveries become backlog notes.
+ACP, Admin/WSL, full IDE/workspace panels, TUI, Coordination Loop, scheduling,
+transparent failover, enterprise tenancy and a plugin SDK remain outside v0.1.
 
 ## Acceptance
 
-Implementation contracts cite the literal accepted Architecture 0.1 commit
-SHA/tree and baseline path from the G03 receipt and authorize exactly G05-G10
-product implementation.
+Cite G03 commit `96cb7a4965a651b8582a3ee35049d52204c3fc73`, tree
+`b554b8568b633397681307d73c7d7fec105963bd`, path
+`docs/architecture/baseline-0.1.md`, plus the literal independently accepted
+G04A amendment head/tree from the new receipt. The amendment explicitly
+supersedes old first-effect machinery; no original G03 receipt changes.
 
-Return `DISPOSITION=PASS_V0_1_IMPLEMENTATION_CONTRACT`.
+The final G04A independent exact-head reviewer must also return
+`DISPOSITION=PASS_V0_1_IMPLEMENTATION_CONTRACT`, with all actionable findings
+resolved. See [current status](../docs/train/G04A-status.md).
+
+This freezes conditional G05-G10 scope and establishes Station A design
+readiness. It does not grant execution now: G05_STARTED=false,
+OWNER_RESUME_REQUIRED_FOR_G05=true. No product directory/manifest/runtime/
+dependency/CI/deployment or credential may be created in G04/G04A.

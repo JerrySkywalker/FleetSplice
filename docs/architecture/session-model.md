@@ -1,5 +1,7 @@
 # Session Model
 
+> Current semantics and milestone timing follow the [G04A amendment](amendments/g04a-visible-mvp-simplification.md) and [current status](../train/G04A-status.md).
+
 `ARCHITECTURE_0_1_READY=true`
 
 ## Fleet session chain and native identity
@@ -38,10 +40,8 @@ the exact durable native identity, bindings, and generations, never ephemeral
 Hub, Edge, companion/Environment, or stream instance IDs.
 
 A new lane or NativeSegment separates causal identity, not effect scope. Before
-an effect-capable successor segment activates, its exact permit must bind an
-acknowledged specialized source fence with final-boundary reconciliation, the
-transitive `PredecessorNoOverlapBarrier`, or exact resource/effect-disjointness
-proof covering every unresolved predecessor and alias.
+successor effects, prove source closure/exclusive ownership and reconcile
+potentially conflicting work under the amendment; no new-ID shortcut exists.
 
 A runtime restart may append a `RuntimeAttachment` to the same segment only
 after qualified reconciliation proves the same native and managed-process
@@ -51,7 +51,7 @@ managed/native attachment, and stream identities that apply. It may begin in
 non-effecting observation/reconciliation mode. If the predecessor may still
 effect, the successor attachment remains effect-inactive until qualified
 durable termination/exclusive-ownership proof plus complete reconciliation
-satisfies Path 1 or its runtime-incarnation barrier otherwise completes. Socket
+satisfies the amended fail-closed recovery gate. Socket
 or stream loss, PID reuse, unqualified absence, and a new boot, instance, or
 timer-epoch ID are insufficient. If continuity cannot be proved, Fleet reports
 `UNKNOWN`, `LOST`, or `AMBIGUOUS_EFFECT` until explicit resolution; a changed

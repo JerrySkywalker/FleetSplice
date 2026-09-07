@@ -2,27 +2,41 @@
 
 ## Objective
 
-Make LogicalSession history and recovery durable across browser, Hub, Edge, and native-process disruption.
+G08 — DURABLE SESSION AND RECOVERY. The Owner closes/restarts/disconnects
+components and returns to the same honest Fleet session state.
+VISIBLE_INCREMENT_RULE=true.
 
-## Scope
+## Admission and scope
 
-- full v0.1 LogicalSession/SessionLane/NativeSegment persistence;
-- Hub SQLite canonical state/history/receipts/checkpoints/FTS as required;
-- Edge SQLite command/idempotency/resource/spool journal;
-- content-addressed blob store for large outputs/native detail;
-- stable history pagination/cursors and W7 continuity view;
-- checkpoint creation;
-- reconnect/reconciliation;
-- explicit `AMBIGUOUS_EFFECT` and later append-only resolution.
+Require G07 PASS, accepted G03 plus G04A citations and D1a decisions before
+backup/restore operations. Apply the
+[amended recovery kernel](../docs/architecture/amendments/g04a-visible-mvp-simplification.md#restart-restore-and-rollback-fail-closed).
 
-## Failure acceptance
+Add complete durable LogicalSession/SessionLane/NativeSegment, Hub/Edge recovery
+journals, history/cursors, checkpoints, blobs and required search/pagination,
+runtime attachment evidence and append-only ambiguity resolution. Minimum
+dispatch journals and AMBIGUOUS_EFFECT already exist from G05.
 
-Exercise safe failure injection for browser close, Hub restart, Edge restart/reconnect, response loss around native dispatch, and known native ID reconciliation.
+## Failure and visible acceptance
 
-Never blind-retry a possibly side-effecting native turn.
+Exercise browser close, Hub restart, Edge restart/reconnect, native restart and
+response loss before/after dispatch with known and missing native identities.
+Also exercise Hub-only/Edge-only/combined restored storage, old native work
+still running, missing/corrupt evidence and conflicting new IDs.
 
-## Acceptance
+Every server/runtime cold-start is admission-closed. Invalidate relevant
+authority incarnations, generations and runtime identities, reject old
+commands/decisions/permits, reconcile native evidence and prove exclusive
+attachment/old execution closure. Require explicit re-admission/reenrollment
+where appropriate before new effects. Neither restored counters nor timeouts
+prove continuity; no live memory-snapshot/clone authority activation.
 
-History survives restart, running/native truth is not inferred from transport presence, duplicate commands remain deduplicated, and ambiguity is visible rather than hidden.
+History/cursors/checkpoints return to the same Fleet LogicalSession with exact
+segment/native continuity labels. Unknown possible effects stay visibly
+AMBIGUOUS_EFFECT and quarantine conflicts, even if that blocks forever.
+RESOLVED_NO_EFFECT evidence permits a new explicitly admitted intent; no blind
+retry or rewrite of the old receipt.
 
-Return `DISPOSITION=PASS_M3_DURABLE_SESSION`.
+Return DISPOSITION=PASS_M3_DURABLE_SESSION with real recovery evidence and
+the full applicable fault matrix. Complete release storage/retention/update
+qualification remains G10.

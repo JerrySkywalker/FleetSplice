@@ -2,30 +2,40 @@
 
 ## Objective
 
-Implement the v0.1 provider migration workflow without transparent failover.
+G09 — PROVIDER / BINDING MIGRATION.
+VISIBLE_INCREMENT_RULE=true.
+The Owner either confirms and observes a real qualified migration or sees an
+honest visible NO_QUALIFIED_TARGET result.
 
-## Target scenario
+## Admission and scope
 
-Use the owner's real environment where feasible: cloud/OpenAI-backed coding session with a candidate SKYFORGE local inference path (for example Ollama-backed model) or another architecture-compatible target proven by fresh probes.
+Require G08 PASS and accepted G03 plus G04A citations. Keep AgentBinding,
+ExecutionBinding and ProviderBinding distinct. Probe an actual candidate such
+as a qualified local inference path or another explicitly selected target.
+No endpoint shape alone establishes prompt/tool/context/approval behavior.
 
-## Scope
+Show W3 proposal with source/target Host/Environment/Workspace, provider/model,
+capability/qualification revision and expiry, losses, privacy and continuity.
+Checkpoint first. Fence/quiesce source and reconcile all possibly conflicting
+effects before target activation. A new segment, fork, new Host or Owner click
+never proves no overlap. Source commands and approvals do not migrate.
 
-- AgentBinding / ExecutionBinding / ProviderBinding projections;
-- provider/model capability probe and compatibility record;
-- W3 migration proposal/review UI;
-- explicit capability/continuity loss explanation;
-- checkpoint before migration;
-- owner confirmation;
-- new NativeSegment and normally new native session;
-- reconstructed continuity label;
-- no credential copying between environments.
-
-## Hard gate
-
-An OpenAI-compatible endpoint is not proof of behavioral compatibility. If no target passes required prompt/tool/context semantics, the product must show `UNQUALIFIED` and keep migration disabled rather than fake success.
+Owner confirmation binds the exact immutable proposal/target/digest; changed or
+expired evidence requires a fresh proposal and confirmation. Activation creates
+a new NativeSegment and normally a new native session with reconstructed
+continuity. Credentials remain local; no transparent failover.
 
 ## Acceptance
 
-At least one real migration path is qualified or the feature correctly fails closed with evidence. No transparent automatic provider switch exists.
+Exactly one outcome is required:
 
-Return `DISPOSITION=PASS_M4_PROVIDER_MIGRATION`.
+- MIGRATION_EXECUTED: a real qualified target, exact Owner confirmation, proven
+  source closure, real target work and honest segment/continuity evidence.
+- NO_QUALIFIED_TARGET: record the relevant actual candidate/probe set and why
+  none qualifies; show the result and disabled activation in the UI.
+
+UNQUALIFIED is per-candidate, not a replacement for the terminal no-target
+result. Missing probes cannot be relabeled as qualification or completed
+migration. Provider unavailable does not trigger a transparent switch.
+
+Return DISPOSITION=PASS_M4_PROVIDER_MIGRATION with the actual outcome.

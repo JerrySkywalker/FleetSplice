@@ -1,5 +1,7 @@
 # FleetSplice Interaction Surface Wireframes
 
+> Current semantics and milestone timing follow the [G04A amendment](amendments/g04a-visible-mvp-simplification.md) and [current status](../train/G04A-status.md).
+
 ## Status
 
 - Purpose: owner-reviewable interaction wireframes
@@ -440,15 +442,14 @@ G05 / M0 Single-host Walking Skeleton
   W5 minimal Host/Workspace selection
   real Browser -> Hub -> SKYFORGE-01 Edge -> Codex -> Browser
 
-G06 / M1 Two-host Minimum Fleet Loop
-  two Hosts visible and selectable
-  exact Host/Environment identity across Edge reconnect
+G06 / M1 Remote Mobile MVP / v0.1-alpha.1
+  Tencent Hub + WebUI, SKYFORGE outbound authenticated WSS HCP
+  minimal W4 session access, W2 Allow Once / Deny, interrupt/basic reconnect
+  real mobile-network or equivalent actual remote browser
 
-G07 / M2 Daily-use Control
-  W4 Session Index
-  W2 Approval Attention
-  interrupt/resume/controller state
-  browser close/reopen projection without duplicate effect
+G07 / M2 Multi-host Expansion
+  SKYFORGE and ZenBook selectable, exact Host/Environment generations
+  richer viewer/controller/takeover and multi-host rotation/revocation
 
 G08 / M3 Durable Session
   W7 History/Checkpoint/Continuity
@@ -480,7 +481,9 @@ G16 / Stable-N Self-hosting Proof
   separate N+1 worktree/canary, external activation, rollback
 ```
 
-No later wireframe is allowed to delay the G06 two-host Fleet session loop.
+No later wireframe may delay G05 local real Codex or G06 remote mobile usability.
+Fold/unfold uses the same five Fleet models and ordinary clientInstanceId;
+see [remote mobile acceptance](../v0.1/remote-mobile-acceptance.md).
 
 # Owner review checklist
 

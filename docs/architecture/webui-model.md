@@ -1,5 +1,7 @@
 # FleetSplice Interaction Surface Model
 
+> Current semantics and milestone timing follow the [G04A amendment](amendments/g04a-visible-mvp-simplification.md) and [current status](../train/G04A-status.md).
+
 ## Status
 
 - Scope: architecture / interaction model
@@ -246,58 +248,18 @@ The wireframes define eight views. For architecture purposes they group into the
 
 These are views over one product model, not separate subsystems.
 
-## 7. v0.1 priority and vertical-slice rule
+## 7. v0.1 priority and vertical slice rule
 
-The architecture should not force all eight views to exist before FleetSplice becomes usable.
+VISIBLE_INCREMENT_RULE=true. G05 uses only minimum W1/W5 to choose a Workspace,
+create/continue a session, prompt and see real Codex output locally on SKYFORGE.
+G06 delivers the real remote mobile MVP at Tencent Hub + WebUI: secure login,
+minimal session index, W2 harmless approval, interrupt, state and basic reconnect.
+G07 adds ZenBook selection and richer controller/takeover. G08 adds W7 durable
+history/checkpoints/recovery; G09 W3 explicit migration; G10 long-history/release
+qualification. W6 IDE/workspace richness and TUI remain later.
 
-### P0 - minimum useful v0.1 loop
-
-Required for the eventual two-host daily-use v0.1 loop:
-
-- Session Workspace;
-- basic Approval Attention;
-- Session Index;
-- Host / Environment / Workspace Explorer;
-- shared connection/status presentation.
-
-The train reaches this loop in deliberately named slices:
-
-- **G05 / M0 Walking Skeleton is single-host.** It proves a real
-  Browser -> Hub -> SKYFORGE-01 Edge -> native Codex -> Browser round trip with
-  minimal W1 and W5 surfaces. It is the first product slice, not the accepted
-  minimum-useful v0.1 product.
-- **G06 / M1 Minimum Fleet Loop is two-host.** It adds the exact ZenBook Duo
-  path so the same WebUI can select either Host and prove Host/Environment
-  identity across Edge reconnect.
-- **G07 / M2 Daily-use Control** adds approval, interrupt/resume, takeover, and
-  browser close/reopen projection without duplicate effect.
-- **G08 / M3 Durable Session** adds durable Fleet history and recovery across
-  Hub, Edge, and native disruption, including explicit ambiguity.
-- **G09 / M4 Provider Migration** proves the qualified, owner-confirmed target
-  activation or verified visible fail-closed `NO_QUALIFIED_TARGET` outcome; it
-  never performs transparent failover.
-- G10 accepts the hardened minimum-useful two-host v0.1 product only after its
-  exact-head recovery, storage, update, security, and UI gates pass.
-
-The minimum-useful v0.1 acceptance should therefore be able to open the WebUI,
-select a registered Workspace on either of two Hosts, create/continue a
-LogicalSession, start native Codex, submit a prompt, receive streaming output,
-resolve a harmless approval, and preserve history across browser reopen. G05
-alone deliberately proves only the single-host subset.
-
-### P1 - early daily-use hardening
-
-- History / Checkpoint / Continuity Inspector;
-- richer controller/takeover presentation;
-- Provider Migration Review when provider migration is implemented.
-
-### P2 - later workspace richness
-
-- files/diff/Git/terminal Coding Workspace;
-- richer Agent-native extension panels;
-- future remote TUI.
-
-No P1/P2 surface should block the first real Browser -> Hub -> Edge -> Codex -> Browser loop.
+No later surface or infrastructure-only milestone may delay the first visible
+local or remote loop without a concrete unavoidable dependency.
 
 ## 8. Technology direction
 
@@ -416,6 +378,12 @@ Prioritize:
 4. Fleet navigation.
 
 Use drawers/tabs rather than forcing three narrow columns.
+
+Folded/unfolded and narrow layouts render the same FleetNavigationModel,
+SessionHeaderModel, SessionTimelineModel, ControlContextModel and AttentionModel.
+Responsive layout changes do not create a clientInstanceId, change control,
+retarget an admitted command or trigger mutation. A mobile browser is an ordinary
+client; see [real remote acceptance](../v0.1/remote-mobile-acceptance.md).
 
 ### Future TUI
 

@@ -1,5 +1,7 @@
 # History, Context, Checkpoints, and Handoff
 
+> Current semantics and milestone timing follow the [G04A amendment](amendments/g04a-visible-mvp-simplification.md) and [current status](../train/G04A-status.md).
+
 ## Two different problems
 
 FleetSplice must separate durable history from model context. A WebUI may retain very long session history even when no model can consume that history in one request.

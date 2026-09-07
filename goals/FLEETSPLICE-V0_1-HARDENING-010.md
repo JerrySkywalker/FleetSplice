@@ -2,27 +2,48 @@
 
 ## Objective
 
-Stop feature growth and harden the exact v0.1 minimum-useful product to release quality.
+G10 — V0.1 HARDENING AND RELEASE.
+VISIBLE_INCREMENT_RULE=true.
+Deliver a hardened two-host/mobile product the Owner can operate, back up,
+restore and update through qualified procedures.
 
-## Required qualification
+## Admission and qualification
 
-- Hub/Edge/network reconnect and generation fencing;
-- command response-loss / duplicate / conflict / ambiguity paths;
-- Lane CAS/controller race and revocation fencing;
-- Codex upgrade compatibility and rollback record;
-- SQLite concurrency, migration rollback, backup/restore, database+blob restore, integrity checks;
-- long/tool-heavy WebUI history, prepend, reconnect, approval correctness, scroll/virtualization, blob references;
-- assistant-ui final accept/reject decision behind Fleet-owned adapter;
-- security review of remote auth, grants, sensitive projections, logs, and secrets;
-- installation/update/uninstall/diagnostic path;
-- two-host dogfood regression.
+Require G09 PASS, accepted G03 plus G04A citations and D1b release decisions.
+No future G10 policy retroactively blocks G05.
 
-## No feature rule
+Qualify the existing product only:
 
-Any new non-release feature discovered here is deferred unless it fixes data loss, security boundary violation, incorrect authority, or failure to meet existing v0.1 acceptance.
+- two-host/mobile Owner dogfood including longer real Codex sessions;
+- strict browser/Host trust, controller CAS/takeover/revocation, grants, safe
+  output/approval rendering, sensitive projections, logs and credential placement;
+- response loss, duplicates/conflicts, exact target/generation and honest ambiguity;
+- browser/Hub/Edge/native recovery and fail-closed cold-start restore/rollback,
+  including Hub-only, Edge-only, combined and missing predecessor evidence;
+- SQLite concurrency/WAL pressure, integrity, migration compatibility,
+  database+blob backup/restore, retention and tombstones;
+- exact Codex artifact/schema/capability upgrade/downgrade evidence,
+  side-by-side install/update/rollback and diagnostics;
+- long/tool-heavy 10k history, cursor/prepend/anchors, reconnect, virtualization,
+  approval correctness, blob authorization and accessibility;
+- final assistant-ui accept/reject behind the Fleet adapter.
 
-## Acceptance
+No external AuthorityAnchor, seamless restored authority, participant pins,
+renewable permits or SafetyControl/D/O/R implementation is required. The amended
+safety properties must pass, not be waived as deferred machinery.
 
-All v0.1 hard gates pass on exact head; installation and rollback are documented; release notes and known limitations are honest; exact-head independent review passes.
+## No feature rule and acceptance
 
-Return `DISPOSITION=PASS_V0_1_RELEASE_ACCEPTED`.
+New non-release features defer unless they fix an existing safety, data-loss,
+security, authority or acceptance defect. Release requires the real two-host
+and mobile Owner path; if Xiaomi Fold is still unavailable, report the missing
+required dogfood or obtain an explicit Owner acceptance change, never silently
+claim it ran.
+
+All applicable gates pass on the exact head, including fresh independent
+review. Installation/backup/restore/update/rollback and known limitations are
+documented truthfully. The visible increment is the operable hardened release,
+not a detached infrastructure package.
+
+Return DISPOSITION=PASS_V0_1_RELEASE_ACCEPTED. Station B and later Goals retain
+their own admission; G04A itself never starts any of this work.

@@ -2,30 +2,236 @@
   "schema": "fleetsplice-development-train.v1",
   "train_id": "FLEETSPLICE-FULL-DEVELOPMENT-TRAIN-001",
   "base_lineage_head": "1eb39b669de9a9e3dd24fdd7af74ed45a661b7d4",
-  "model": "gpt-5.6-sol",
-  "reasoning_effort": "ultra",
+  "model": "gpt-6-astra",
+  "reasoning_effort": "max",
   "allow_model_substitution": false,
   "merge_stations": [
-    {"id":"A","after":"G04","purpose":"architecture-and-implementation-contract"},
-    {"id":"B","after":"G10","purpose":"v0.1-release"},
-    {"id":"C","after":"G16","purpose":"v0.2-and-self-hosting"}
+    {
+      "id": "A",
+      "after": "G04A",
+      "purpose": "amended-architecture-and-formal-G04-contract; readiness is not merge or G05 authority"
+    },
+    {
+      "id": "B",
+      "after": "G10",
+      "purpose": "v0.1-release"
+    },
+    {
+      "id": "C",
+      "after": "G16",
+      "purpose": "v0.2-and-self-hosting"
+    }
   ],
   "goals": [
-    {"seq":"G01","id":"FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001","file":"goals/FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001.md","depends_on":[],"phase":"architecture","parallel":false},
-    {"seq":"G02","id":"FLEETSPLICE-ARCH-0_1-ADVERSARIAL-REVIEW-002","file":"goals/FLEETSPLICE-ARCH-0_1-ADVERSARIAL-REVIEW-002.md","depends_on":["G01"],"phase":"architecture","parallel":false},
-    {"seq":"G03","id":"FLEETSPLICE-ARCH-0_1-ACCEPTANCE-003","file":"goals/FLEETSPLICE-ARCH-0_1-ACCEPTANCE-003.md","depends_on":["G02"],"phase":"architecture","parallel":false},
-    {"seq":"G04","id":"FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004","file":"goals/FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004.md","depends_on":["G03"],"phase":"planning","parallel":false},
-    {"seq":"G05","id":"FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005","file":"goals/FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005.md","depends_on":["G04"],"phase":"v0.1","parallel":false},
-    {"seq":"G06","id":"FLEETSPLICE-V0_1-M1-TWO-HOST-LOOP-006","file":"goals/FLEETSPLICE-V0_1-M1-TWO-HOST-LOOP-006.md","depends_on":["G05"],"phase":"v0.1","parallel":false},
-    {"seq":"G07","id":"FLEETSPLICE-V0_1-M2-DAILY-CONTROL-007","file":"goals/FLEETSPLICE-V0_1-M2-DAILY-CONTROL-007.md","depends_on":["G06"],"phase":"v0.1","parallel":false},
-    {"seq":"G08","id":"FLEETSPLICE-V0_1-M3-DURABLE-SESSION-008","file":"goals/FLEETSPLICE-V0_1-M3-DURABLE-SESSION-008.md","depends_on":["G07"],"phase":"v0.1","parallel":false},
-    {"seq":"G09","id":"FLEETSPLICE-V0_1-M4-PROVIDER-MIGRATION-009","file":"goals/FLEETSPLICE-V0_1-M4-PROVIDER-MIGRATION-009.md","depends_on":["G08"],"phase":"v0.1","parallel":false},
-    {"seq":"G10","id":"FLEETSPLICE-V0_1-HARDENING-010","file":"goals/FLEETSPLICE-V0_1-HARDENING-010.md","depends_on":["G09"],"phase":"v0.1","parallel":false},
-    {"seq":"G11","id":"FLEETSPLICE-V0_2-ACP-AGENT-011","file":"goals/FLEETSPLICE-V0_2-ACP-AGENT-011.md","depends_on":["G10"],"phase":"v0.2","parallel":false},
-    {"seq":"G12","id":"FLEETSPLICE-V0_2-ENVIRONMENTS-012","file":"goals/FLEETSPLICE-V0_2-ENVIRONMENTS-012.md","depends_on":["G11"],"phase":"v0.2","parallel":true,"parallel_group":"v0.2-expansion"},
-    {"seq":"G13","id":"FLEETSPLICE-V0_2-WORKSPACE-UX-013","file":"goals/FLEETSPLICE-V0_2-WORKSPACE-UX-013.md","depends_on":["G11"],"phase":"v0.2","parallel":true,"parallel_group":"v0.2-expansion"},
-    {"seq":"G14","id":"FLEETSPLICE-V0_2-TUI-014","file":"goals/FLEETSPLICE-V0_2-TUI-014.md","depends_on":["G11"],"phase":"v0.2","parallel":true,"parallel_group":"v0.2-expansion"},
-    {"seq":"G15","id":"FLEETSPLICE-V0_2-TUI-PARITY-015","file":"goals/FLEETSPLICE-V0_2-TUI-PARITY-015.md","depends_on":["G12","G13","G14"],"phase":"v0.2","parallel":false},
-    {"seq":"G16","id":"FLEETSPLICE-SELF-HOSTING-016","file":"goals/FLEETSPLICE-SELF-HOSTING-016.md","depends_on":["G15"],"phase":"self-hosting","parallel":false}
-  ]
+    {
+      "seq": "G01",
+      "id": "FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001",
+      "file": "goals/FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001.md",
+      "depends_on": [],
+      "phase": "architecture",
+      "parallel": false
+    },
+    {
+      "seq": "G02",
+      "id": "FLEETSPLICE-ARCH-0_1-ADVERSARIAL-REVIEW-002",
+      "file": "goals/FLEETSPLICE-ARCH-0_1-ADVERSARIAL-REVIEW-002.md",
+      "depends_on": [
+        "G01"
+      ],
+      "phase": "architecture",
+      "parallel": false
+    },
+    {
+      "seq": "G03",
+      "id": "FLEETSPLICE-ARCH-0_1-ACCEPTANCE-003",
+      "file": "goals/FLEETSPLICE-ARCH-0_1-ACCEPTANCE-003.md",
+      "depends_on": [
+        "G02"
+      ],
+      "phase": "architecture",
+      "parallel": false
+    },
+    {
+      "seq": "G04",
+      "id": "FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004",
+      "file": "goals/FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004.md",
+      "depends_on": [
+        "G03"
+      ],
+      "phase": "planning",
+      "parallel": false
+    },
+    {
+      "seq": "G04A",
+      "id": "FLEETSPLICE-G04A-VISIBLE-MVP-PREDEVELOPMENT-CLOSURE-004A",
+      "file": "goals/FLEETSPLICE-G04A-VISIBLE-MVP-PREDEVELOPMENT-CLOSURE-004A.md",
+      "depends_on": [
+        "G04"
+      ],
+      "phase": "predevelopment-closure",
+      "parallel": false,
+      "stop_after": true,
+      "max_correction_review_cycles": 3
+    },
+    {
+      "seq": "G05",
+      "id": "FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005",
+      "file": "goals/FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005.md",
+      "depends_on": [
+        "G04",
+        "G04A"
+      ],
+      "phase": "v0.1",
+      "parallel": false,
+      "owner_resume_required": true,
+      "target": "LOCAL_SKYFORGE_REAL_CODEX",
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G06",
+      "id": "FLEETSPLICE-V0_1-M1-REMOTE-MOBILE-MVP-006",
+      "file": "goals/FLEETSPLICE-V0_1-M1-REMOTE-MOBILE-MVP-006.md",
+      "depends_on": [
+        "G05"
+      ],
+      "phase": "v0.1",
+      "parallel": false,
+      "target": "PHONE_TENCENT_HUB_SKYFORGE_REAL_CODEX",
+      "release": "v0.1-alpha.1",
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G07",
+      "id": "FLEETSPLICE-V0_1-M2-MULTI-HOST-007",
+      "file": "goals/FLEETSPLICE-V0_1-M2-MULTI-HOST-007.md",
+      "depends_on": [
+        "G06"
+      ],
+      "phase": "v0.1",
+      "parallel": false,
+      "target": "MOBILE_MULTI_HOST_SKYFORGE_ZENBOOK",
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G08",
+      "id": "FLEETSPLICE-V0_1-M3-DURABLE-SESSION-008",
+      "file": "goals/FLEETSPLICE-V0_1-M3-DURABLE-SESSION-008.md",
+      "depends_on": [
+        "G07"
+      ],
+      "phase": "v0.1",
+      "parallel": false,
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G09",
+      "id": "FLEETSPLICE-V0_1-M4-PROVIDER-MIGRATION-009",
+      "file": "goals/FLEETSPLICE-V0_1-M4-PROVIDER-MIGRATION-009.md",
+      "depends_on": [
+        "G08"
+      ],
+      "phase": "v0.1",
+      "parallel": false,
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G10",
+      "id": "FLEETSPLICE-V0_1-HARDENING-010",
+      "file": "goals/FLEETSPLICE-V0_1-HARDENING-010.md",
+      "depends_on": [
+        "G09"
+      ],
+      "phase": "v0.1",
+      "parallel": false,
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G11",
+      "id": "FLEETSPLICE-V0_2-ACP-AGENT-011",
+      "file": "goals/FLEETSPLICE-V0_2-ACP-AGENT-011.md",
+      "depends_on": [
+        "G10"
+      ],
+      "phase": "v0.2",
+      "parallel": false,
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G12",
+      "id": "FLEETSPLICE-V0_2-ENVIRONMENTS-012",
+      "file": "goals/FLEETSPLICE-V0_2-ENVIRONMENTS-012.md",
+      "depends_on": [
+        "G11"
+      ],
+      "phase": "v0.2",
+      "parallel": true,
+      "parallel_group": "v0.2-expansion",
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G13",
+      "id": "FLEETSPLICE-V0_2-WORKSPACE-UX-013",
+      "file": "goals/FLEETSPLICE-V0_2-WORKSPACE-UX-013.md",
+      "depends_on": [
+        "G11"
+      ],
+      "phase": "v0.2",
+      "parallel": true,
+      "parallel_group": "v0.2-expansion",
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G14",
+      "id": "FLEETSPLICE-V0_2-TUI-014",
+      "file": "goals/FLEETSPLICE-V0_2-TUI-014.md",
+      "depends_on": [
+        "G11"
+      ],
+      "phase": "v0.2",
+      "parallel": true,
+      "parallel_group": "v0.2-expansion",
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G15",
+      "id": "FLEETSPLICE-V0_2-TUI-PARITY-015",
+      "file": "goals/FLEETSPLICE-V0_2-TUI-PARITY-015.md",
+      "depends_on": [
+        "G12",
+        "G13",
+        "G14"
+      ],
+      "phase": "v0.2",
+      "parallel": false,
+      "visible_increment_required": true
+    },
+    {
+      "seq": "G16",
+      "id": "FLEETSPLICE-SELF-HOSTING-016",
+      "file": "goals/FLEETSPLICE-SELF-HOSTING-016.md",
+      "depends_on": [
+        "G15"
+      ],
+      "phase": "self-hosting",
+      "parallel": false,
+      "visible_increment_required": true
+    }
+  ],
+  "model_scope": "G04A explicit Owner override; future execution re-admits routing",
+  "active_goal": "G04A",
+  "visible_increment_rule": true,
+  "owner_resume_required_for_g05": true,
+  "g05_started": false,
+  "current_status": "docs/train/G04A-status.md",
+  "g04a_start": {
+    "branch": "planning/v0.1-full-train",
+    "head": "2597f03a2288bdd11c1b94a3e5cc4bfee42ad7ac",
+    "tree": "75f39d5adae787844f0ddcb4a574d6671652437c"
+  },
+  "deployment": {
+    "tencent_mvp_role": "HUB_AND_WEBUI",
+    "separate_relay_required": false,
+    "hcp_g05": "SAME_HOST_LOOPBACK",
+    "hcp_g06_onward": "AUTHENTICATED_EDGE_INITIATED_WSS"
+  }
 }

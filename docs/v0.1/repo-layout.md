@@ -1,78 +1,49 @@
 # v0.1 Repository Layout and Toolchain Proposal
 
-## Status and authoritative inputs
-
-| Field | Value |
-| --- | --- |
-| Planning Goal | FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004 (G04) |
-| Accepted promotion head | 96cb7a4965a651b8582a3ee35049d52204c3fc73 |
-| Accepted promotion tree | b554b8568b633397681307d73c7d7fec105963bd |
-| Accepted baseline | docs/architecture/baseline-0.1.md |
-| Recording receipt path | docs/train/receipts/G03.md |
-| Recording receipt commit | ca671e66cf1980a88f0c197016f2d2556390b7be |
-
-~~~text
-ARCHITECTURE_0_1_READY=true
-IMPLEMENTATION_AUTHORIZED=false
-PRODUCT_IMPLEMENTATION_AUTHORIZED=false
-G04_CONTRACT_STATUS=DRAFT_PENDING_OWNER_DECISIONS_AND_EXACT_HEAD_REVIEW
-G04_PASS=false
-~~~
-
-This is a source-only layout and toolchain proposal. The paths below are future
-G05 artifacts only after G04 passes; this planning change does not create any of
-them, install packages, produce a lockfile, or qualify a binary.
+The [current contract](acceptance-contract.md) and [G04A amendment](../architecture/amendments/g04a-visible-mvp-simplification.md)
+govern this design. See [current status](../train/G04A-status.md).
+No source, package, dependency or lockfile is created by G04A.
 
 ## Deliberately small future shape
 
-~~~text
-apps/web
-apps/hub
-apps/edge
-packages/contracts
-packages/driver-codex
-~~~
+| Future path | Responsibility and dependency direction |
+| --- | --- |
+| apps/web | Fleet-owned React/Vite rendering and typed browser requests; depends on contracts, never Edge/driver or credential stores. |
+| apps/hub | Fleet identity/grants/controller admission, immutable plans, journals/history, HTTP/events and HCP; depends on contracts. Tencent hosts it from G06. No provider/Host credentials or native process supervision. |
+| apps/edge | Per-user local identity, Workspace/native/process truth, HCP client, journal/spool and reconciliation; depends on contracts and driver-codex. |
+| packages/contracts | Closed schemas/types/canonicalization, FleetCommand/plan/EdgeCommand and one HCP; no I/O/secrets/database/Host access. |
+| packages/driver-codex | Edge-local native app-server stdio and exact capability evidence; depends on contracts; no Fleet/browser authority or provider credential ownership. |
 
-| Future path | Responsibility | Allowed dependency direction |
-| --- | --- | --- |
-| apps/web | React/Vite rendering of Fleet resources, projections, receipts, events, history, blobs, and typed browser requests. | May depend on packages/contracts. It cannot import Edge/driver code, authority stores, host credentials, or local file paths. |
-| apps/hub | Fleet identity, authorization policy, command resolution, projections, history/search, HTTP resources, event authorization, and HCP session coordination. | May depend on packages/contracts. It requests external anchor operations through a port and never owns host credentials or native process truth. |
-| apps/edge | Per-user Host admission, local resource/process/native truth, HCP client, local journal/spool, reconciliation, and Environment-local credential references. | May depend on packages/contracts and packages/driver-codex. It cannot import WebUI state or turn Hub projections into local truth. |
-| packages/contracts | Closed versioned schemas, canonicalization helpers, typed Fleet command/resource/event/receipt vocabulary, and HCP wire envelopes. | No runtime I/O, secrets, database access, Host access, or implementation-specific driver code. |
-| packages/driver-codex | Edge-owned adapter for exact native Codex app-server behavior and capability evidence. | May depend on packages/contracts only; it cannot own Fleet authority, browser auth, HCP semantics, or provider credentials. |
-
-Any additional package, including an AuthorityAnchor daemon/client package,
-requires demonstrated need, explicit ownership, provenance/license review, and
-an approved additional-package exception. The external AuthorityAnchor is not
-silently placed in apps/hub.
+Additional packages require concrete need, bounded ownership and provenance.
+No AuthorityAnchor client port/daemon, generic native-helper package or separate
+FleetSplice Relay is a prerequisite. Required windows-user identity/process
+primitives still need actual qualification before first use. A helper that is
+concretely required for those primitives must remain narrowly scoped; a full
+Admin/WSL/helper product cannot delay the first local loop.
 
 ## Storage and boundary ports
 
-Port labels below describe future dependency directions rather than frozen source
-API names.
+Hub and Edge own separate one-writer local SQLite journals. Hub admission and
+Edge before-dispatch durability, idempotency/tombstones/native IDs are G05.
+Use a qualified patched SQLite build, local WAL and FULL durability where loss
+is unacceptable; do not infer readiness from Node version alone. Blob/history/
+checkpoint/recovery breadth arrives G08, full storage/backup/update acceptance
+G10. No network-share WAL, shared journal writer or remote native protocol.
 
-| Port role | Sole durable authority | Boundary |
-| --- | --- | --- |
-| Hub authority-store port | Hub-owned SQLite database for Fleet identities, grants, lanes, commands, receipts, history, checkpoints, and blob manifests. | One writer; local WAL/FULL where loss is unacceptable; it is not an anchor or Edge journal. |
-| Edge journal/spool port | Edge-owned SQLite database for local resources, EdgeCommand idempotency/effects, native/process evidence, outbound spool, and Hub watermarks. | One writer; each Edge owns local truth and never borrows Hub credentials. |
-| Blob publication port | Content-addressed filesystem blobs with digest/length, durable publication barrier, manifest, retention/redaction, GC watermark, and backup fence. | Blob bytes become visible only through verified publication; a database backup and blob manifest restore together. |
-| AuthorityAnchor client port | External one-active append/CAS authority lineage selected under O1. | Hub submits scoped candidates; participants verify signed receipts and pins. No Hub/Edge/backup database is a substitute. |
-| Driver/native port | Exact Edge-local Codex app-server stdio process and bounded capability/conformance evidence. | Native protocol, provider configuration, process identity, and credentials stay behind Edge. |
-
-The accepted storage semantics are linked in
-[the baseline durable-state section](../architecture/baseline-0.1.md#durable-state-history-and-handoff)
-and [ADR-0004](../adr/0004-windows-runtime-storage-and-native-helper.md).
-No cross-import may move credentials, browser session material, private keys, or
-direct host-filesystem access across these boundaries. A typed, authorized
-Workspace or approval-path projection may carry only the policy-approved path
-metadata; unchecked or unauthorized raw path projection is prohibited. A
-decision-critical path detail remains visible to the authorized decision maker,
-or the corresponding resolve action is disabled.
+Browser credentials remain at browser/Hub, transport identity at its owning
+peer, provider/native credentials inside the target Environment. Projections
+carry only authorized metadata; unchecked local paths and auth homes never
+cross as authority. Exact approval detail must be safely displayed or disabled.
 
 ## Source-only toolchain proposal
 
-The following pins were checked from public metadata during this G04 drafting
-phase. They are proposals, not an installed or qualified toolchain.
+The following historical pins were checked during the earlier G04 drafting
+phase at e79c8ed8da88f29f0f664fcba6c0d75dae1ca4c4. G04A does not refresh them
+or claim they are current. They remain proposals, not installed or qualified
+artifacts. Revalidate exact available versions, licenses, peer compatibility
+and required safety fixes at G05 admission before any package/toolchain write.
+Only dependencies needed for the local visible slice belong in G05; later
+browser/history tooling does not become an earlier milestone dependency.
 
 | Item | Proposed pin and public source | Status |
 | --- | --- | --- |

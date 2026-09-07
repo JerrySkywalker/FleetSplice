@@ -1,5 +1,10 @@
 # ADR-0005: Shared WebUI/TUI semantics and UI reuse
 
+> Current v0.1 reading: the [G04A amendment](../architecture/amendments/g04a-visible-mvp-simplification.md)
+> supersedes the exact clauses in its register. This accepted G03 body is
+> historical evidence, including its then-pending status wording;
+> [current closure status](../train/G04A-status.md) governs today.
+
 - Status: Accepted
 - Baseline: [Architecture Baseline 0.1](../architecture/baseline-0.1.md)
 - `IMPLEMENTATION_AUTHORIZED=false`

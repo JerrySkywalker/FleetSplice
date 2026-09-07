@@ -1,62 +1,36 @@
 # FleetSplice Goals
 
-This directory contains owner-authored development Goals for FleetSplice.
-
-The current execution program is the **Full Development Train**:
-
-- root Goal: `FLEETSPLICE-FULL-DEVELOPMENT-TRAIN-001.md`
-- machine-readable DAG: `train-manifest.v1.json`
-- roadmap: `../docs/roadmap/full-development-train.md`
-
-The train is Coordination-Loop-inspired in its development discipline only: explicit Goals, dependency gates, exact-head admission, bounded writer ownership, checkpoint receipts, and fast-track continuation. FleetSplice has **no runtime or architecture dependency on Coordination Loop**.
-
-## Model policy
-
-The owner-selected train model is:
+The [root train](FLEETSPLICE-FULL-DEVELOPMENT-TRAIN-001.md) and
+[manifest](train-manifest.v1.json) describe the full roadmap. The active Owner
+instruction is bounded [G04A](FLEETSPLICE-G04A-VISIBLE-MVP-PREDEVELOPMENT-CLOSURE-004A.md).
+See [current status](../docs/train/G04A-status.md).
 
 ```text
-MODEL=gpt-5.6-sol
-REASONING_EFFORT=ultra
+CURRENT_GOAL=G04A
+MODEL=gpt-6-astra
+REASONING_EFFORT=max
+ALLOW_MODEL_SUBSTITUTION=false
+VISIBLE_INCREMENT_RULE=true
+G05_STARTED=false
+OWNER_RESUME_REQUIRED_FOR_G05=true
 ```
 
-Root supervisor, reviewers, and implementation workers should use Sol Ultra when the model is selectable. Do not silently substitute Terra/Luna/other models.
+G04A includes final formal G04 acceptance and Station A design readiness;
+it ends before G05. Older automatic continuation/model instructions are
+historical for this run. No full-train or product execution is authorized now.
 
-## Execution rule
+Order: G01 -> G02 -> G03 -> G04 -> G04A -> Owner stop;
+after renewed admission, G05 local real Codex -> G06 Tencent remote mobile
+alpha -> G07 multi-host -> G08 durable recovery -> G09 explicit migration ->
+G10 release -> G11 -> G12/G13/G14 -> G15 -> G16.
+The manifest has 17 Goals, including the inserted bounded G04A.
 
-Running the root train Goal constitutes owner authorization to execute its listed goals subject to every hard gate in the train. It does not authorize bypassing a failed architecture, security, data-loss, destructive, or exact-head gate.
+G06 and G07 were renamed from their former two-host/daily-control titles.
+Historical receipts continue to cite their historical filenames and line
+numbers at their reviewed commits; they are not current Goal links.
 
-The train may continue automatically through PASS gates. It must stop or isolate the affected lane on `CHANGE_REQUIRED`, `BLOCKED`, `AMBIGUOUS_EFFECT`, unsafe privilege transitions, or owner-attended operations that cannot be safely automated.
-
-G04 authority is limited to G05-G10. The same root Goal independently authorizes
-its listed G11-G16 only after the accepted Architecture 0.1 commit is cited,
-G10/Station B has passed on an exact head, and each manifest dependency, child
-Goal, owner-attended operation, and independent-review gate is satisfied. No
-second owner approval is implied or required unless a child Goal explicitly
-requires one; no unlisted mutation is authorized.
-
-G03 records the immutable architecture citation in a receipt-only follow-up to
-the accepted architecture commit: literal `ACCEPTED_ARCHITECTURE_HEAD`, tree,
-and baseline path. G04 and every later product-mutation receipt cite that
-identifier; a branch name or `SELF` placeholder is not an accepted-baseline
-citation.
-
-## Goal order
-
-1. `FLEETSPLICE-ARCH-BASELINE-0_1-DRAFT-001`
-2. `FLEETSPLICE-ARCH-0_1-ADVERSARIAL-REVIEW-002`
-3. `FLEETSPLICE-ARCH-0_1-ACCEPTANCE-003`
-4. `FLEETSPLICE-V0_1-IMPLEMENTATION-CONTRACT-004`
-5. `FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005`
-6. `FLEETSPLICE-V0_1-M1-TWO-HOST-LOOP-006`
-7. `FLEETSPLICE-V0_1-M2-DAILY-CONTROL-007`
-8. `FLEETSPLICE-V0_1-M3-DURABLE-SESSION-008`
-9. `FLEETSPLICE-V0_1-M4-PROVIDER-MIGRATION-009`
-10. `FLEETSPLICE-V0_1-HARDENING-010`
-11. `FLEETSPLICE-V0_2-ACP-AGENT-011`
-12. `FLEETSPLICE-V0_2-ENVIRONMENTS-012`
-13. `FLEETSPLICE-V0_2-WORKSPACE-UX-013`
-14. `FLEETSPLICE-V0_2-TUI-014`
-15. `FLEETSPLICE-V0_2-TUI-PARITY-015`
-16. `FLEETSPLICE-SELF-HOSTING-016`
-
-Every goal must leave a machine-readable/plain-text final receipt with start head, final head, tests, acceptance, scope expansion status, and next goal disposition.
+Every implementation Goal has a visible acceptance contract. Later receipts
+cite immutable G03 promotion SHA/tree/path AND the exact accepted G04A
+amendment SHA/tree, not a branch or receipt substituted for reviewed content.
+Evidence separates source/fixture/CI/live/Owner and independent acceptance.
+Fleet core has no runtime dependency on this development train or Coordination Loop.

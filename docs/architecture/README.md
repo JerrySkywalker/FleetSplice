@@ -1,44 +1,45 @@
 # Architecture
 
-FleetSplice architecture is currently in the accepted pre-implementation
-phase.
+Architecture 0.1 is accepted. `ARCHITECTURE_0_1_READY=true`.
+Implementation remains unauthorized pending explicit Owner resume after the
+current exact-head contract gates; see [current status](../train/G04A-status.md).
 
-`ARCHITECTURE_0_1_READY=true`
+## Current normative reading order
 
-`IMPLEMENTATION_AUTHORIZED=false`
+1. [G04A visible-MVP amendment](amendments/g04a-visible-mvp-simplification.md):
+   exact supersession register, minimum safety kernel, fail-closed restore,
+   single HCP, Tencent Hub and visible G05-G10 sequence.
+2. [v0.1 implementation contract](../v0.1/acceptance-contract.md), including
+   first-use Owner decisions, [deployment](../v0.1/tencent-mobile-deployment.md)
+   and [real mobile acceptance](../v0.1/remote-mobile-acceptance.md).
+3. [Accepted Baseline 0.1](baseline-0.1.md) and [six ADRs](../adr/README.md)
+   for unchanged clauses. Their bodies are historical G03 evidence; reader
+   notices route every superseded requirement to the amendment.
+4. [WebUI models](webui-model.md) and [wireframes](webui-wireframes.md),
+   responsive renderings of the same Fleet identity/control model.
 
-## Current review path
+G03 accepted promotion is `96cb7a4965a651b8582a3ee35049d52204c3fc73`,
+tree `b554b8568b633397681307d73c7d7fec105963bd`, recorded by
+[G03 receipt](../train/receipts/G03.md). Its previously pending-promotion wording
+and one historical Low are not current status. No receipt is rewritten.
+Later implementation cites this exact object AND the accepted G04A amendment
+head/tree recorded by the new receipt.
 
-1. [`baseline-0.0.md`](baseline-0.0.md) — historical working baseline.
-2. [`research-findings-wave-01.md`](research-findings-wave-01.md) — broad architecture research consequences.
-3. [`research-findings-wave-02.md`](research-findings-wave-02.md) — semantic closure and qualification consequences.
-4. [`baseline-0.1.md`](baseline-0.1.md) — accepted Architecture 0.1 baseline;
-   implementation authority remains false pending exact-head G04 PASS.
-5. [`webui-model.md`](webui-model.md) — shared first-party interaction-surface model for the WebUI and any future TUI.
-6. [`webui-wireframes.md`](webui-wireframes.md) — owner-reviewable character wireframes and v0.1 surface priorities.
+The amendment takes precedence over all old Anchor/pin/permit/barrier/
+SafetyControl/D/O/R requirements, including supporting documents and
+qualification consequences. Retained semantics are explicit; these mechanisms
+cannot become accidental G05/G06 prerequisites.
 
-Architecture Baseline 0.1 was drafted under G01. After bounded G02 correction
-rounds, its exact content head and tree received a fresh independent content
-PASS. The Owner accepted that content and authorized the current single
-status-only G03 promotion. The promotion object still requires a fresh
-independent exact-head/tree review before its literal SHA and tree can be
-recorded by the G03 receipt; the content PASS does not accept the changed
-promotion head. Product mutation additionally requires an exact-head G04
-implementation-contract PASS; admission to G04 is insufficient.
-G04 is limited to G05-G10. G11-G16 instead use the independent authority of the
-owner-authored root train after the accepted architecture citation,
-G10/Station B, and their exact DAG/child gates all pass.
+## Evidence and supporting models
 
-## Supporting architecture documents
+[Baseline 0.0](baseline-0.0.md), research waves and prior receipts remain
+historical evidence. They do not authorize product implementation.
+Supporting [domain](domain-model.md), [session](session-model.md),
+[authority](authority-model.md), [runtime](host-runtime-model.md),
+[history](history-and-handoff.md) and [system context](system-context.md)
+describe the same hierarchy and authority boundaries under the amendment.
 
-Supporting documents cover product intent, domain semantics, authority,
-sessions, Agent/provider boundaries, Host Runtime, history/handoff, interaction
-surfaces, and safe self-iteration. The accepted clustered decisions are indexed
-in [`docs/adr/README.md`](../adr/README.md).
-
-The corrected [`domain-model.md`](domain-model.md) and
-[`session-model.md`](session-model.md) use the normative
-`LogicalSession -> SessionLane -> NativeSegment` hierarchy and the durable
-generation/runtime-instance split.
-
-[`coordination-loop-integration.md`](coordination-loop-integration.md) is retained as historical research context but is superseded for FleetSplice core architecture by the Wave-02 owner correction: Coordination Loop is independent, single-machine-first in its current scope, and no Coordination Loop integration is required for FleetSplice v0.x.
+Coordination Loop is independent and single-machine-first in its own scope;
+[its historical integration note](coordination-loop-integration.md) is not a
+FleetSplice core dependency. No product implementation or new research wave
+is authorized by G04A.

@@ -1,5 +1,7 @@
 # Accepted Architecture 0.1 Domain Model
 
+> Current semantics and milestone timing follow the [G04A amendment](amendments/g04a-visible-mvp-simplification.md) and [current status](../train/G04A-status.md).
+
 `ARCHITECTURE_0_1_READY=true`
 
 This document follows the accepted Architecture 0.1 baseline. It does not grant
@@ -80,8 +82,7 @@ the same native and managed-process identity plus unchanged durable bindings and
 generations. The successor attachment may observe and reconcile while pending,
 but if its predecessor may still effect it remains effect-inactive until
 qualified durable termination/exclusive-ownership proof plus complete
-reconciliation satisfies Path 1 or the same `PredecessorNoOverlapBarrier`
-otherwise completes. Without continuity or exclusive-ownership proof, the
+reconciliation meets the amended fail-closed recovery gate. Without continuity or exclusive-ownership proof, the
 attachment is `UNKNOWN`, `LOST`, or `AMBIGUOUS_EFFECT` until explicit
 resolution, and a changed durable binding or native identity requires a new
 segment.
@@ -135,9 +136,9 @@ FleetCommand to exact `hubRecoveryGeneration`, every selected target's exact
 One exact `stepKey + edgeCommandId` effect request with parent links,
 exact `hubRecoveryGeneration` and target `edgeRecoveryGeneration`, durable
 resource generations, runtime instances, control fences,
-authority/qualification revisions, dependencies, the complete transitive
-successor-fence/barrier/disjointness proof set, and its own idempotency record
-and receipt. Edge rejects any recovery, resource, runtime, or proof mismatch
+authority/qualification revisions, dependencies, authority incarnation, local
+predecessor-closure/reconciliation evidence, and its own idempotency record and
+receipt. Edge rejects any incarnation, recovery, resource or runtime mismatch
 before effect.
 
 ### ObservedState
@@ -146,21 +147,16 @@ A timestamped host report of actual resource state. It must be distinguishable f
 
 ## Identity and incarnation rules
 
-Durable Host, Environment, and Workspace IDs/generations are tombstoned and
-never reused. Host reenrollment/identity discontinuity, Environment
-principal/trust/configuration/installation changes, and Workspace
-root/containment identity changes bump their respective generations. Runtime
-restart changes only its boot/instance/stream ID unless a durable fact changed.
-Every stale durable generation fails closed for new admission and for observers
-that have seen its successor. This does not claim an already activated
-disconnected predecessor has stopped: it may drain only within its valid permit
-under the baseline's `PredecessorNoOverlapBarrier`, and it must observe the
-current generation and reconcile before re-entry. An old-instance stream is
-likewise rejected for new admission and by successor observers; already
-activated work remains bounded by its valid witnessed monotonic permit and
-reconciliation. Stream rejection alone is not termination proof. The same named
-barrier applies whenever a Host/Environment/Workspace generation, Hub/Edge
-recovery generation, or effect-capable runtime incarnation could overlap an
-unresolved predecessor. Qualified termination/exclusive-ownership proof may
-satisfy Path 1; non-effecting observation and exact proven-disjoint work remain
-available.
+Full identity includes the unpredictable authority-incarnation namespace plus
+its non-lossy durable generations. Hub owns Host/Environment generations; Edge
+owns Workspace resolved-root generation. Durable IDs/generations are tombstoned
+and not reused within their namespace. A restored counter alone cannot establish
+continuity. Ordinary runtime start uses fresh boot/instance/stream identity and
+begins admission-closed; uncertain lineage invalidates authority too.
+
+Old decisions and streams reject on incarnation/generation mismatch. A new
+namespace does not prove old native effects stopped. Current Edge journals,
+managed-process/native evidence and exclusive attachment must reconcile before
+new conflicting effects. No disconnected fresh native dispatch; already-started
+work may continue under its original policy. Read the amendment for exact
+restart/restore/controller behavior; no external anchor/permit path applies.

@@ -1,5 +1,7 @@
 # Edge Host Runtime Model
 
+> Current semantics and milestone timing follow the [G04A amendment](amendments/g04a-visible-mvp-simplification.md) and [current status](../train/G04A-status.md).
+
 ## Role
 
 Each admitted machine should run a small Edge Runtime that keeps execution authority close to the filesystem, Git/worktrees, process tree, credentials, and native agent protocols.
@@ -44,20 +46,15 @@ Privilege and OS execution contexts must be explicit resources. `SKYFORGE-01/win
 
 ## Failure requirement
 
-If the Hub or network disappears, already-running native sessions should
-continue under the Edge Runtime within their externally witnessed effect lease.
-Reconnection should report truth and replay durable events, not restart work
-merely to recover central state. Any Host, Environment, or Workspace
-resource-generation successor, Hub/Edge recovery-generation successor, or
-replacement effect-capable runtime incarnation does not immediately fence a
-disconnected predecessor. A new Edge or companion may observe and reconcile in
-pending mode, but cannot effect until qualified durable predecessor termination
-and complete reconciliation satisfy Path 1 or the
-[baseline's named `PredecessorNoOverlapBarrier`](baseline-0.1.md#identity-and-generation-model)
-otherwise completes. Socket/stream loss, PID reuse, or a new boot, instance, or
-timer-epoch ID is not termination proof. Old work drains only within its valid
-witnessed monotonic lease; observation-only and proven-disjoint scope may
-continue.
+No new native dispatch while Hub contact is lost. Already-started native work
+may continue under its original native policy. Reconnect reports truth and
+replays observations, never native effects. A higher generation, socket loss,
+PID reuse or new runtime ID does not prove predecessor termination. Every cold
+start closes admission, then reconciles exact native/process identity and
+exclusive ownership before explicit re-admission. Unknown effects stay blocked.
+The G04A amendment replaces witnessed leases and external predecessor barriers.
+Minimum journals are G05; complete history/blobs/recovery G08 and release storage
+G10. No separate relay, ACP/Admin/WSL or generic helper breadth blocks G05.
 
 ## Non-goal
 

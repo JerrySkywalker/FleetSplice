@@ -1,28 +1,21 @@
 # Architecture decision records
 
-## Status
+All six records were accepted with immutable G03 Architecture 0.1.
+Current v0.1 semantics apply the additive
+[G04A amendment](../architecture/amendments/g04a-visible-mvp-simplification.md)
+first. Its exact supersession register identifies each affected numbered
+decision and consequence; record bodies remain historical accepted evidence.
 
-The records below are accepted with
-[Architecture Baseline 0.1](../architecture/baseline-0.1.md).
+| ADR | Retained decision / current override |
+| --- | --- |
+| [0001](0001-hub-edge-command-and-failure-boundary.md) | Hub/Edge ownership, typed intent/plan/exact command and honest effects; anchor/permit/safety delivery replaced by minimum journaled dispatch. |
+| [0002](0002-session-identity-control-and-authority.md) | Session/Lane/Segment, exact generations, one controller and immutable grants; anchored transitions/renewal replaced by fences and cold recovery. |
+| [0003](0003-driver-compatibility-and-provider-binding.md) | Native Codex, capability qualification, explicit migration and local credentials; source closure uses amended recovery. ACP first use is G11. |
+| [0004](0004-windows-runtime-storage-and-native-helper.md) | Per-user Edge and SQLite; generic helper/Admin/WSL breadth deferred, minimum journals G05, complete recovery/storage G08-G10. |
+| [0005](0005-shared-interaction-semantics-and-ui-reuse.md) | Shared Fleet-owned WebUI/future TUI; G06 now remote mobile alpha and G07 multi-host. |
+| [0006](0006-security-provenance-and-self-iteration.md) | Secret/privilege/provenance and independent activation boundaries; external anchor/continuity profile deferred. |
 
-`ARCHITECTURE_0_1_READY=true`
-
-`IMPLEMENTATION_AUTHORIZED=false`
-
-`Accepted` records the Owner-authorized Architecture 0.1 status promotion. It
-does not mean implementation-ready or product-authorized. This promotion object
-still requires its fresh independent exact-head/tree review before G03 records
-the literal accepted object. Product mutation then requires exact-head G04 PASS.
-
-## Accepted records
-
-| ADR | Decision cluster | Status |
-| --- | --- | --- |
-| [ADR-0001](0001-hub-edge-command-and-failure-boundary.md) | Fleet-scoped AuthorityAnchor lineage, Hub/Edge authority, FleetCommand/EdgeCommand, reconnect, and ambiguity | Accepted |
-| [ADR-0002](0002-session-identity-control-and-authority.md) | LogicalSession/Lane/Segment identity, lane control, and immutable grants | Accepted |
-| [ADR-0003](0003-driver-compatibility-and-provider-binding.md) | native Codex, generic ACP, capability admission, and provider migration | Accepted |
-| [ADR-0004](0004-windows-runtime-storage-and-native-helper.md) | per-user Windows runtime, companions, SQLite/blobs, and native helper | Accepted |
-| [ADR-0005](0005-shared-interaction-semantics-and-ui-reuse.md) | shared WebUI/TUI semantics, UI reuse, and milestone terminology | Accepted |
-| [ADR-0006](0006-security-provenance-and-self-iteration.md) | AuthorityAnchor trust separation, security, donor provenance, trusted kernel, and stable-N self-iteration | Accepted |
-
-All six ADRs are Accepted in this promotion. No ADR authorizes implementation.
+`ARCHITECTURE_0_1_READY=true`. No ADR is implementation authorization.
+[Current status](../train/G04A-status.md) governs formal G04/G04A acceptance and
+the explicit stop before G05. Old pending-review wording inside a G03 body
+describes that historical object, not current repository status.

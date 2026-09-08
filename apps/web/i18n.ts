@@ -36,7 +36,7 @@ export const enUS = {
   requestFailed: 'Could not read the current evidence. ({code})', rejected: '{code}: command rejected before admission.',
   stillPending: 'Command remains pending. No new native request was sent.',
   commandOutcome: 'Command outcome: {code}', commandUncertain: '{code}. Use Check command receipt; no automatic retry.',
-  ready: 'Ready', connecting: 'Connecting', empty: 'Not started', idle: 'Idle', running: 'Responding',
+  ready: 'Ready', connecting: 'Connecting', empty: 'Not started', idle: 'Idle', running: 'Responding', pendingStatus: 'Pending',
   admitted: 'Admitted', dispatched: 'Dispatched', succeeded: 'Succeeded', rejectedStatus: 'Rejected',
   recoveryRequired: 'Recovery required', ambiguous: 'Effect unknown', observationUnknown: 'Observation unknown',
   disconnected: 'Edge disconnected', unsupportedApproval: 'Approval unsupported',
@@ -80,7 +80,7 @@ export const zhCN = {
   requestFailed: '无法读取当前状态。（{code}）', rejected: '{code}：命令在准入前被拒绝。',
   stillPending: '命令仍在处理中，未发送新的原生请求。',
   commandOutcome: '命令结果：{code}', commandUncertain: '{code}。请查询命令回执，系统不会自动重试。',
-  ready: '已连接', connecting: '连接中', empty: '尚未启动', idle: '空闲', running: '正在回复',
+  ready: '已连接', connecting: '连接中', empty: '尚未启动', idle: '空闲', running: '正在回复', pendingStatus: '处理中',
   admitted: '已准入', dispatched: '已下发', succeeded: '已成功', rejectedStatus: '已拒绝',
   recoveryRequired: '需要恢复', ambiguous: '执行结果未知', observationUnknown: '观测状态未知',
   disconnected: 'Edge 已断开', unsupportedApproval: '不支持此审批',
@@ -92,7 +92,7 @@ export function translate(locale: Locale, key: MessageKey, values: Record<string
   return catalogs[locale][key].replace(/\{(\w+)\}/g, (token, name: string) => values[name] === undefined ? token : String(values[name]));
 }
 const states: Record<string, MessageKey> = {
-  READY: 'ready', CONNECTING: 'connecting', EMPTY: 'empty', IDLE: 'idle', RUNNING: 'running',
+  READY: 'ready', CONNECTING: 'connecting', EMPTY: 'empty', IDLE: 'idle', RUNNING: 'running', PENDING: 'pendingStatus',
   ADMITTED: 'admitted', DISPATCHED: 'dispatched', SUCCEEDED: 'succeeded', REJECTED: 'rejectedStatus',
   RECOVERY_REQUIRED: 'recoveryRequired', AMBIGUOUS_EFFECT: 'ambiguous', OBSERVATION_UNKNOWN: 'observationUnknown',
   EDGE_DISCONNECTED: 'disconnected', BLOCKED_UNSUPPORTED_APPROVAL: 'unsupportedApproval',

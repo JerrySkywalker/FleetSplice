@@ -28,6 +28,10 @@ test('locale resolution gives persisted preference priority and has a bounded br
   assert.equal(resolveLocale(undefined, []), 'en-US');
   assert.equal(resolveLocale(undefined, ['fr-FR', 'zh-CN']), 'en-US');
 });
+test('normal PENDING status has explicit human labels in both languages', () => {
+  assert.equal(stateText('en-US', 'PENDING'), 'Pending');
+  assert.equal(stateText('zh-CN', 'PENDING'), '处理中');
+});
 test('locale and all four appearances persist independently and survive a new read', () => {
   const values = new Map<string, string>();
   const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };

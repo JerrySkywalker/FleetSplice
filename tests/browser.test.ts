@@ -47,7 +47,21 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     await expect(page.getByRole('button', { name: 'Continue session' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Continue session' })).toBeFocused();
     assert.equal(native.creates, 0, 'acquire only guides focus; it cannot create a native thread');
+    let releaseCreate!: () => void;
+    const heldQualification = new Promise<void>(resolve => { releaseCreate = resolve; });
+    native.qualify = () => heldQualification;
     await page.getByRole('button', { name: 'Continue session' }).click();
+    try {
+      await expect(page.getByTestId('lane-state')).toHaveAttribute('data-state', 'PENDING');
+      await expect(page.getByTestId('lane-state')).toHaveText('Pending');
+      await setPresentation(page, 'zh-CN', 'oled-black');
+      await expect(page.getByTestId('lane-state')).toHaveAttribute('data-state', 'PENDING');
+      await expect(page.getByTestId('lane-state')).toHaveText('处理中');
+      await expect(page.getByRole('navigation', { name: '会话' }).locator('small').first()).toHaveText('处理中');
+      assert.equal(native.creates, 0, 'presentation changes cannot advance the held native effect');
+      await setPresentation(page, 'en-US', 'light');
+      await expect(page.getByTestId('lane-state')).toHaveText('Pending');
+    } finally { native.qualify = async () => {}; releaseCreate(); }
     await expectState(page.getByTestId('lane-state'), 'IDLE');
 
     await expect(page.getByRole('button', { name: 'Release control' })).toBeEnabled();

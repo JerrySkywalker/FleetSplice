@@ -165,6 +165,8 @@ export function evidenceFromEdge(file: string): NativeEvidence {
   const threads: { key: string; value: any }[] = [];
   const bindings: { key: string; value: any }[] = [];
   const results: { key: string; value: any }[] = [];
+  const ambiguities: { key: string; value: any }[] = [];
+  const exits: { key: string; value: any }[] = [];
   const validProcess = (value: any): value is ProcessIdentity => !!value && Number.isInteger(value.processId) && value.processId > 0 && typeof value.creationTime === 'string' && !Number.isNaN(Date.parse(value.creationTime));
   const sameRecordedProcess = (value: any) => validProcess(value) && !!summary.process && value.processId === summary.process.processId && value.creationTime === summary.process.creationTime;
   const sameNative = (processId: unknown, instanceId: unknown) => Number.isInteger(processId) && (processId as number) > 0 && !!summary.process && processId === summary.process.processId && typeof instanceId === 'string' && !!summary.instanceId && instanceId === summary.instanceId;
@@ -182,6 +184,9 @@ export function evidenceFromEdge(file: string): NativeEvidence {
     if (row.kind === 'NATIVE_BINDING') { summary.hasNativeEvidence = true; bindings.push({ key: row.key, value }); }
     if (row.kind === 'NATIVE_RESULT') { summary.hasNativeEvidence = true; results.push({ key: row.key, value }); }
     if (row.kind === 'NATIVE_EVENT') { summary.hasNativeEvidence = true; events.push({ key: row.key, value }); }
+    if (row.kind === 'AMBIGUOUS_EFFECT') { summary.hasNativeEvidence = true; ambiguities.push({ key: row.key, value }); }
+    if (row.kind === 'NATIVE_PROCESS_EXIT_OBSERVED') { summary.hasNativeEvidence = true; exits.push({ key: row.key, value }); }
+    if (row.kind === 'REJECTED_NATIVE_OBSERVATION') { summary.hasNativeEvidence = true; summary.unboundEvidence = true; }
   }
   // A retirement proof binds every observed native effect to precisely the
   // process identity whose PID/creation-time absence is checked below.  Never
@@ -198,6 +203,9 @@ export function evidenceFromEdge(file: string): NativeEvidence {
     effect.threadId = value.threadId; displayThread(value.threadId);
   }
   const boundThreads = new Set([...effects.values()].flatMap(effect => effect.bindingThreadId ? [effect.bindingThreadId] : []));
+  for (const { key, value } of exits) {
+    if (!sameNative(value?.processId, key) || value?.exitObserved !== true) summary.unboundEvidence = true;
+  }
   for (const { key, value } of results) {
       const effect = effects.get(key);
       if (!effect) { summary.unboundEvidence = true; continue; }
@@ -228,6 +236,14 @@ export function evidenceFromEdge(file: string): NativeEvidence {
         else { observed.completed = true; effect.terminal = true; }
         if (!summary.turnId) summary.turnId = value.turnId;
       } else if (effect.turnId && value.turnId !== effect.turnId) summary.unboundEvidence = true;
+  }
+  for (const { key, value } of ambiguities) {
+    const effect = effects.get(key);
+    if (!effect) { summary.unboundEvidence = true; continue; }
+    if ((value?.nativeProcessId !== null || value?.nativeInstanceId !== null) && !sameNative(value?.nativeProcessId, value?.nativeInstanceId)) { summary.unboundEvidence = true; continue; }
+    // An explicitly ambiguous outcome wins over any damaged duplicate terminal
+    // row. It must preserve recovery debt, never authorize automatic closure.
+    effect.terminal = false;
   }
   const turns = Object.values(summary.turns);
   summary.turnAccepted = turns.some(value => value.accepted);

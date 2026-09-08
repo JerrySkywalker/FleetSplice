@@ -119,6 +119,14 @@ test('retirement binds every result to one positive native process identity and 
   const unboundEvent = fixture('none'); const unboundEventDb = new DatabaseSync(path.join(unboundEvent.directory, 'edge.sqlite'));
   unboundEventDb.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('NATIVE_EVENT', randomUUID(), JSON.stringify({ kind: 'delta', threadId: randomUUID(), turnId: randomUUID(), text: 'unbound' })); unboundEventDb.close();
   assert.equal(classifyPredecessor(unboundEvent.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const orphanedAmbiguity = fixture('none'); const ambiguityDb = new DatabaseSync(path.join(orphanedAmbiguity.directory, 'edge.sqlite'));
+  ambiguityDb.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('AMBIGUOUS_EFFECT', randomUUID(), JSON.stringify({ code: 'NATIVE_EFFECT_UNKNOWN', nativeProcessId: null, nativeInstanceId: null })); ambiguityDb.close();
+  assert.equal(classifyPredecessor(orphanedAmbiguity.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const explicitAmbiguity = fixture('terminal'); const explicitDb = new DatabaseSync(path.join(explicitAmbiguity.directory, 'edge.sqlite'));
+  const process = explicitDb.prepare("SELECT key,value FROM evidence WHERE kind='NATIVE_PROCESS_IDENTITY'").get() as { key: string; value: string };
+  const accepted = explicitDb.prepare("SELECT key FROM evidence WHERE kind='NATIVE_RESULT' AND value LIKE '%NATIVE_TURN_ACCEPTED%'").get() as { key: string };
+  explicitDb.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('AMBIGUOUS_EFFECT', accepted.key, JSON.stringify({ code: 'NATIVE_EFFECT_UNKNOWN', nativeProcessId: (JSON.parse(process.value) as { processId: number }).processId, nativeInstanceId: process.key })); explicitDb.close();
+  assert.equal(classifyPredecessor(explicitAmbiguity.base, absent, noConflicts).kind, 'AMBIGUOUS_TERMINAL');
 });
 test('multiple bound native threads remain independently correlated', () => {
   const state = fixture('terminal'); const db = new DatabaseSync(path.join(state.directory, 'edge.sqlite'));

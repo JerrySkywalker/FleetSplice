@@ -1,5 +1,22 @@
 # G05A Owner UX foundation status
 
+## Accepted externally; reconciled for G05B
+
+```text
+G05_PASS=true
+G05A_PASS=true
+G05A_DISPOSITION=PASS_M0_1_OWNER_UX_FOUNDATION
+G05A_ACCEPTED_HEAD=2064494f814d0b644b1d923e99aa8648cb231428
+G05A_ACCEPTED_TREE=612810cabe9d6eebb13c24db493df837d1c044a2
+G05B_STARTED=true
+IMPLEMENTATION_AUTHORIZED=G05B_ONLY
+PRODUCT_IMPLEMENTATION_AUTHORIZED=G05B_ONLY
+G06_STARTED=false
+```
+
+The candidate-time record below is historical and is not rewritten by this
+external acceptance reconciliation. See [G05B status](G05B-status.md).
+
 The Owner explicitly authorized
 [FLEETSPLICE-V0_1-M0_1-OWNER-UX-FOUNDATION-005A](../../goals/FLEETSPLICE-V0_1-M0_1-OWNER-UX-FOUNDATION-005A.md)
 after accepting and personally dogfooding G05. The branch starts at the exact

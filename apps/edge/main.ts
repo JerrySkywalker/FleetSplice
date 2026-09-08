@@ -54,7 +54,12 @@ export async function startEdge(config: EdgeConfig) {
   socket.on('close', () => { kernel.connected = false; process.send?.({ kind: 'edgeDisconnected' }); });
   socket.on('error', () => { kernel.connected = false; });
   return { kernel, close: async () => {
-    const provenClosed = await kernel.close(); socket.close(); journal.close(); return provenClosed;
+    const provenClosed = await kernel.close();
+    if (provenClosed && native.pid) {
+      const row = journal.db.prepare("SELECT value FROM evidence WHERE kind='NATIVE_PROCESS_IDENTITY' AND key=? ORDER BY seq DESC LIMIT 1").get(native.instanceId);
+      if (row) journal.append('NATIVE_PROCESS_EXIT_OBSERVED', native.instanceId, { ...(JSON.parse(String(row.value)) as object), exitObserved: true, observedBy: 'managed-child-handle' });
+    }
+    socket.close(); journal.close(); return provenClosed;
   } };
 }
 if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.once('message', async (config: EdgeConfig) => {
@@ -63,6 +68,11 @@ if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.
     process.on('message', async message => { if ((message as any).kind === 'stop') {
       const provenClosed = await edge.close(); process.send!({ kind: 'edgeClosed', provenClosed }); process.exit(provenClosed ? 0 : 2);
     } });
-    process.on('disconnect', () => { edge.kernel.connected = false; edge.kernel.quarantine('LAUNCHER_LOST'); });
+    process.on('disconnect', async () => {
+      edge.kernel.connected = false; edge.kernel.quarantine('SUPERVISOR_LOST');
+      // Do not orphan a managed native process. If closure is uncertain this Edge
+      // remains quarantined and visible to the OS conflict scan rather than exiting.
+      if (await edge.close()) process.exit(2);
+    });
   } catch { process.send!({ kind: 'error', code: 'EDGE_START_FAILED' }); process.exitCode = 1; }
 });

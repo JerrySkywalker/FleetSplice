@@ -1,0 +1,59 @@
+import { createServer, type Socket } from 'node:net';
+import { randomBytes } from 'node:crypto';
+import { existsSync, openSync, closeSync, writeSync, fsyncSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { localIdentity } from '../apps/edge/identity.ts';
+import { canonical, requireThat } from '../packages/contracts/index.ts';
+import { classifyPredecessor, discoverCodex, evidenceFromEdge, probeProcess, resolveProxy, type Guard } from '../packages/local-operation/index.ts';
+import { launch } from './local.ts';
+
+type Control = { token: string; command: 'status' | 'stop' };
+const durable = (file: string, value: unknown) => { const fd = openSync(file, 'wx', 0o600); try { writeSync(fd, canonical(value)); fsyncSync(fd); } finally { closeSync(fd); } };
+const reply = (socket: Socket, value: unknown) => { socket.end(canonical(value)); };
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function main() {
+  const args = process.argv.slice(2); const option = (name: string) => args[args.indexOf(name) + 1];
+  const root = option('--workspace'); const executable = option('--codex');
+  requireThat(typeof root === 'string' && typeof executable === 'string', 'SUPERVISOR_USAGE');
+  const identity = await localIdentity(root!);
+  discoverCodex([executable!]);
+  const base = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'G05');
+  const predecessor = classifyPredecessor(base);
+  requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
+  const pipe = `\\\\.\\pipe\\fleetsplice-g05-${identity.sid}`;
+  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false;
+  const server = createServer(socket => {
+    let received = ''; socket.setTimeout(10000, () => socket.destroy());
+    socket.on('data', bytes => { received += String(bytes); if (received.length > 8192) socket.destroy(); });
+    socket.on('end', async () => {
+      let request: Control;
+      try { request = JSON.parse(received) as Control; } catch { reply(socket, { code: 'CONTROL_REQUEST_INVALID' }); return; }
+      if (request.token !== token || !['status', 'stop'].includes(request.command)) { reply(socket, { code: 'CONTROL_AUTH_REJECTED' }); return; }
+      if (request.command === 'status') {
+        const health = run?.health(); const healthy = health?.hub === 'RUNNING' && health.edge === 'RUNNING';
+        let nativeCodex = 'NOT_STARTED';
+        if (run) try { const native = evidenceFromEdge(path.join(run.directory, 'edge.sqlite')); if (native.process) { const observed = probeProcess(native.process.processId); nativeCodex = observed.exists && observed.identity?.creationTime === native.process.creationTime ? 'RUNNING' : 'EXITED_OR_REUSED'; } } catch { nativeCodex = 'UNPROVABLE'; }
+        reply(socket, { code: run ? healthy ? 'RUNNING' : 'RECOVERY_REQUIRED' : 'STARTING', runId: run?.runId ?? null, supervisor: 'RUNNING', hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', nativeCodex, ...(run ? { url: run.url } : {}) }); return;
+      }
+      if (!run || stopping) { reply(socket, { code: 'STOP_NOT_ADMITTED' }); return; }
+      stopping = true; const proven = await run.stop(); reply(socket, { code: proven ? 'CLOSED' : 'UNKNOWN_CLOSURE', runId: run.runId, nativeExitObserved: proven });
+      server.close(() => process.exit(proven ? 0 : 2));
+    });
+  });
+  await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(pipe, resolve); });
+  try {
+    const proxy = resolveProxy();
+    run = await launch(root!, executable!, 43155, { environment: { ...process.env, ...proxy.environment }, onGuardCommitted: guard => {
+      durable(path.join(base, guard.runId, 'control.json'), { pipe, token, runId: guard.runId, identity: guard.identity });
+    } });
+  } catch (error) {
+    server.close(); throw error;
+  }
+  process.on('SIGTERM', async () => { if (run && !stopping) { stopping = true; await run.stop(); } server.close(() => process.exit(2)); });
+  // Detached supervisor stays alive; its stdio is ignored by the launcher.
+  while (!stopping) await delay(60000);
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch(() => process.exit(2));

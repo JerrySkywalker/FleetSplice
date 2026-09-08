@@ -10,11 +10,13 @@ citation remains commit `96cb7a4965a651b8582a3ee35049d52204c3fc73`, tree
 with that baseline. This implementation follows the
 [G05 Goal](../../goals/FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005.md).
 
-G05 is now accepted at `f798ce74ef28acbe2154b556f1400e6995f64fc6`, tree
-`05953697453fadcf79cfae7fd9a2efd89261fff0`. The subsequent Owner instruction
-authorizes only [G05A](../../goals/FLEETSPLICE-V0_1-M0_1-OWNER-UX-FOUNDATION-005A.md)
-for a local UX foundation; see [active status](../train/G05A-status.md).
-The native execution and closure rules below remain the accepted G05 rules.
+G05 is accepted at `f798ce74ef28acbe2154b556f1400e6995f64fc6`, tree
+`05953697453fadcf79cfae7fd9a2efd89261fff0`, and G05A is accepted at
+`2064494f814d0b644b1d923e99aa8648cb231428`, tree
+`612810cabe9d6eebb13c24db493df837d1c044a2`. The current Owner authorization
+is only [G05B](../../goals/FLEETSPLICE-V0_1-M0_2-SAFE-LOCAL-OPERATION-005B.md);
+see [active status](../train/G05B-status.md). The native execution and closure
+rules below remain the accepted G05 rules.
 
 ## Operate the local slice
 
@@ -25,8 +27,24 @@ credential stores nor creates or transfers provider keys. Use a selected
 existing local Workspace; registration cannot create a directory or choose
 an elevated, UNC, junction or WSL execution boundary.
 
-From the repository, with the qualified Node directory first on this terminal's
-PATH:
+For normal G05B operation, no Node/Codex path, hash calculation, guard edit,
+SQLite query, or persistent launch terminal is required:
+
+```powershell
+.\fleetsplice.ps1 start
+.\fleetsplice.ps1 status
+.\fleetsplice.ps1 stop
+.\fleetsplice.ps1 doctor
+```
+
+The launcher discovers only Node 24.20.0/SQLite 3.53.4 and the pinned native
+`codex.exe`, applies explicit environment proxy values before discoverable
+current-user or WinHTTP system proxy settings, and starts a per-user named-pipe supervisor. It
+never rewrites global proxy settings. `doctor` and `status` are read-only. An
+ambiguous predecessor is never replayed or reset; G05B's narrow attended
+retirement preserves it as `RETIRED_AMBIGUOUS` with old outcome `UNKNOWN`.
+
+The legacy attended harness remains for historical G05 evidence only:
 
 ```powershell
 npm ci --ignore-scripts --no-fund

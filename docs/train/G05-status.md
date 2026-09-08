@@ -1,5 +1,22 @@
 # G05 implementation status
 
+## Current lineage reconciliation under the Owner's G05B authorization
+
+```text
+G05_PASS=true
+G05A_PASS=true
+G05A_ACCEPTED_HEAD=2064494f814d0b644b1d923e99aa8648cb231428
+G05A_ACCEPTED_TREE=612810cabe9d6eebb13c24db493df837d1c044a2
+G05B_STARTED=true
+IMPLEMENTATION_AUTHORIZED=G05B_ONLY
+PRODUCT_IMPLEMENTATION_AUTHORIZED=G05B_ONLY
+G06_STARTED=false
+ROADMAP=G05 -> G05A -> G05B -> G06
+```
+
+See [G05B status](G05B-status.md). The accepted G05 body and its historical
+candidate record below are retained unchanged.
+
 ## Accepted status, reconciled under the Owner's G05A authorization
 
 ```text

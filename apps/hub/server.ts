@@ -129,5 +129,6 @@ if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.
   try {
     const hub = await startHub(config); process.send!({ kind: 'hubListening' });
     process.on('message', async message => { if ((message as any).kind === 'stop') { await hub.close(); process.exit(0); } });
+    process.on('disconnect', async () => { await hub.close(); process.exit(2); });
   } catch { process.send!({ kind: 'error', code: 'HUB_START_FAILED' }); process.exitCode = 1; }
 });

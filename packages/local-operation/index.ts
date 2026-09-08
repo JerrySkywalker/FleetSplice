@@ -162,22 +162,41 @@ export function evidenceFromEdge(file: string): NativeEvidence {
   const effects = new Map<string, { terminal: boolean; turnId: string | null }>();
   const turn = (turnId: string, commandId: string | null): TurnEvidence => summary.turns[turnId] ??= { turnId, commandId, accepted: false, started: false, completed: false };
   const events: { key: string; value: any }[] = [];
+  const bindings: { key: string; value: any }[] = [];
+  const results: { key: string; value: any }[] = [];
+  const validProcess = (value: any): value is ProcessIdentity => !!value && Number.isInteger(value.processId) && value.processId > 0 && typeof value.creationTime === 'string' && !Number.isNaN(Date.parse(value.creationTime));
+  const sameRecordedProcess = (value: any) => validProcess(value) && !!summary.process && value.processId === summary.process.processId && value.creationTime === summary.process.creationTime;
+  const sameNative = (processId: unknown, instanceId: unknown) => Number.isInteger(processId) && (processId as number) > 0 && !!summary.process && processId === summary.process.processId && typeof instanceId === 'string' && !!summary.instanceId && instanceId === summary.instanceId;
   for (const row of readEvidence(file)) {
     const value = row.value as any;
     if (row.kind === 'DISPATCH_ATTEMPT') { summary.hasEffectAttempt = true; effects.set(row.key, { terminal: false, turnId: null }); }
-    if (row.kind === 'NATIVE_PROCESS_IDENTITY' && value && Number.isInteger(value.processId) && typeof value.creationTime === 'string') { summary.process = value as ProcessIdentity; summary.instanceId = row.key; }
-    if (row.kind === 'THREAD_OBSERVED' && typeof value?.threadId === 'string') summary.threadId = value.threadId;
-    if (row.kind === 'NATIVE_BINDING' && typeof value?.threadId === 'string') { summary.threadId = value.threadId; summary.sessionReady = true; }
-    if (row.kind === 'NATIVE_RESULT') {
-      const effect = effects.get(row.key);
-      if (!effect) { summary.unboundEvidence = true; continue; }
-      if (value?.code === 'NATIVE_SESSION_READY') { summary.sessionReady = true; effect.terminal = true; if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId; }
-      else if (value?.code === 'NATIVE_TURN_ACCEPTED' && typeof value.nativeTurnId === 'string') {
-        const observed = turn(value.nativeTurnId, row.key); observed.accepted = true; effect.turnId = value.nativeTurnId;
-        if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId;
-      } else summary.unboundEvidence = true;
+    if (row.kind === 'NATIVE_PROCESS_IDENTITY') {
+      if (!validProcess(value) || typeof row.key !== 'string' || !row.key) { summary.unboundEvidence = true; continue; }
+      if (summary.process && (!sameRecordedProcess(value) || summary.instanceId !== row.key)) { summary.unboundEvidence = true; continue; }
+      summary.process = value as ProcessIdentity; summary.instanceId = row.key;
     }
+    if (row.kind === 'THREAD_OBSERVED' && typeof value?.threadId === 'string') summary.threadId = value.threadId;
+    if (row.kind === 'NATIVE_BINDING') bindings.push({ key: row.key, value });
+    if (row.kind === 'NATIVE_RESULT') results.push({ key: row.key, value });
     if (row.kind === 'NATIVE_EVENT' && (value?.kind === 'turnStarted' || value?.kind === 'turnCompleted')) events.push({ key: row.key, value });
+  }
+  // A retirement proof binds every observed native effect to precisely the
+  // process identity whose PID/creation-time absence is checked below.  Never
+  // infer that binding from a PID alone, and never treat a malformed identity
+  // as an absent process.
+  for (const { value } of bindings) {
+    if (!sameNative(value?.processId, value?.instanceId) || typeof value?.threadId !== 'string') { summary.unboundEvidence = true; continue; }
+    summary.threadId = value.threadId; summary.sessionReady = true;
+  }
+  for (const { key, value } of results) {
+      const effect = effects.get(key);
+      if (!effect) { summary.unboundEvidence = true; continue; }
+      if (!sameNative(value?.nativeProcessId, value?.nativeInstanceId)) { summary.unboundEvidence = true; continue; }
+      if (value?.code === 'NATIVE_SESSION_READY') { summary.sessionReady = true; effect.terminal = true; if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId; else summary.unboundEvidence = true; }
+      else if (value?.code === 'NATIVE_TURN_ACCEPTED' && typeof value.nativeTurnId === 'string') {
+        const observed = turn(value.nativeTurnId, key); observed.accepted = true; effect.turnId = value.nativeTurnId;
+        if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId; else summary.unboundEvidence = true;
+      } else summary.unboundEvidence = true;
   }
   // Codex may signal turnStarted before the associated turn/start RPC reply is
   // journaled. Correlate events only after the whole durable journal has been
@@ -204,7 +223,9 @@ export function edgeAdmissionState(file: string): EdgeAdmissionState {
     const db = new DatabaseSync(file, { readOnly: true });
     try {
       const row = db.prepare("SELECT value FROM kv WHERE key='blocked'").get() as { value?: string } | undefined;
-      return row && typeof JSON.parse(String(row.value)) === 'string' ? 'BLOCKED' : 'READY';
+      if (!row) return 'READY';
+      const blocked = JSON.parse(String(row.value));
+      return typeof blocked === 'string' && blocked.length > 0 ? 'BLOCKED' : 'UNPROVABLE';
     } finally { db.close(); }
   } catch { return 'UNPROVABLE'; }
 }
@@ -213,6 +234,10 @@ function guardIsSound(guard: Guard, base: string): boolean {
   const admission = path.join(base, guard.runId, 'admission.json');
   if (!existsSync(admission)) return false;
   try { const value = safeJson<{ runId: string; target: Target; identity: Guard['identity'] }>(admission); return value.runId === guard.runId && same(value.target, guard.target) && same(value.identity, guard.identity); } catch { return false; }
+}
+function readableSqlite(file: string): boolean {
+  if (!existsSync(file)) return false;
+  try { const db = new DatabaseSync(file, { readOnly: true }); try { db.prepare('PRAGMA schema_version').get(); return true; } finally { db.close(); } } catch { return false; }
 }
 function classifyEvidence(guard: Guard, evidence: NativeEvidence, process: (processId: number) => ProcessProbe, conflicts: ProcessProbe[]): Predecessor {
   const matchingConflicts = conflicts.filter(item => item.exists);
@@ -247,7 +272,8 @@ function retiredPredecessor(base: string, guard: Guard, process: (processId: num
   } catch { return corrupt('RETIREMENT_ARCHIVE_UNREADABLE'); }
   if (receipt?.kind !== 'G05B_OWNER_AUTHORIZED_RETIREMENT' || receipt.runId !== guard.runId || receipt.archive !== archive || receipt.oldEffectOutcome !== 'UNKNOWN' || receipt.oldCommandReplayed !== false || receipt.oldAuthorityRuntimeRetired !== true || receipt.freshIncarnationRequired !== true) return corrupt('RETIREMENT_RECEIPT_CONTRADICTORY', evidence);
   if (archivedGuard.state === 'RETIRED_AMBIGUOUS' || archivedGuard.runId !== guard.runId || !same(archivedGuard.target, guard.target) || !same(archivedGuard.identity, guard.identity) || archivedAdmission.runId !== guard.runId || !same(archivedAdmission.target, guard.target) || !same(archivedAdmission.identity, guard.identity) || !same(receipt.oldTarget, guard.target)) return corrupt('RETIREMENT_ARCHIVE_BINDING_MISMATCH', evidence);
-  if (!Array.isArray(receipt.evidence) || !receipt.evidence.some((item: any) => item?.name === 'environment-guard.json') || !receipt.evidence.some((item: any) => item?.name === 'admission.json') || !receipt.evidence.some((item: any) => item?.name === 'edge.sqlite')) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INCOMPLETE', evidence);
+  if (!readableSqlite(path.join(archive, 'hub.sqlite'))) return corrupt('RETIREMENT_HUB_EVIDENCE_UNREADABLE', evidence);
+  if (!Array.isArray(receipt.evidence) || !receipt.evidence.some((item: any) => item?.name === 'environment-guard.json') || !receipt.evidence.some((item: any) => item?.name === 'admission.json') || !receipt.evidence.some((item: any) => item?.name === 'hub.sqlite') || !receipt.evidence.some((item: any) => item?.name === 'edge.sqlite')) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INCOMPLETE', evidence);
   for (const item of receipt.evidence) {
     if (!item || typeof item.name !== 'string' || path.basename(item.name) !== item.name || !/^[A-Za-z0-9._-]+$/.test(item.name)) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INVALID', evidence);
     const preserved = path.join(archive, item.name);
@@ -267,6 +293,7 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
   if (matchingConflicts.length) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: matchingConflicts, reason: 'FLEETSPLICE_PROCESS_PRESENT' };
   if (guard.state === 'RETIRED_AMBIGUOUS') return retiredPredecessor(base, guard, process, conflicts);
   if (!guardIsSound(guard, base)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'GUARD_OR_ADMISSION_MISMATCH' };
+  if (!readableSqlite(path.join(base, guard.runId, 'hub.sqlite'))) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'HUB_EVIDENCE_UNREADABLE' };
   let evidence: NativeEvidence;
   try { evidence = evidenceFromEdge(path.join(base, guard.runId, 'edge.sqlite')); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_EVIDENCE_UNREADABLE' }; }
   return classifyEvidence(guard, evidence, process, conflicts);
@@ -278,8 +305,11 @@ export function retireOwnerAuthorizedUnknown(base = runtimeRoot(), runId = G05B_
   requireThat(predecessor.guard?.runId === runId && predecessor.kind === 'AMBIGUOUS_TERMINAL', 'OWNER_RETIREMENT_ADMISSION_FAILED');
   requireThat(predecessor.evidence.turnAccepted && predecessor.evidence.turnStarted && !predecessor.evidence.turnCompleted && predecessor.exactNativeExitProven, 'OWNER_RETIREMENT_EVIDENCE_INSUFFICIENT');
   const archive = path.join(base, 'retirements', runId);
-  requireThat(!existsSync(archive), 'OWNER_RETIREMENT_ALREADY_RECORDED'); mkdirSync(archive, { recursive: true });
-  const source = [guardPath(base), path.join(base, runId, 'admission.json'), ...['hub.sqlite', 'hub.sqlite-wal', 'hub.sqlite-shm', 'edge.sqlite', 'edge.sqlite-wal', 'edge.sqlite-shm'].map(name => path.join(base, runId, name)).filter(existsSync)];
+  const required = [guardPath(base), path.join(base, runId, 'admission.json'), path.join(base, runId, 'hub.sqlite'), path.join(base, runId, 'edge.sqlite')] as const;
+  requireThat(required.every(existsSync) && readableSqlite(required[2]) && readableSqlite(required[3]), 'OWNER_RETIREMENT_EVIDENCE_INSUFFICIENT');
+  requireThat(!existsSync(archive), 'OWNER_RETIREMENT_ALREADY_RECORDED');
+  const source = [...required, ...['hub.sqlite-wal', 'hub.sqlite-shm', 'edge.sqlite-wal', 'edge.sqlite-shm'].map(name => path.join(base, runId, name)).filter(existsSync)];
+  mkdirSync(archive, { recursive: true });
   const evidence = source.map(file => ({ name: path.basename(file), sha256: hash(file), bytes: statSync(file).size }));
   for (const file of source) { const destination = path.join(archive, path.basename(file)); copyFileSync(file, destination, 1); chmodSync(destination, 0o400); }
   const receipt = path.join(archive, 'retirement-receipt.json');

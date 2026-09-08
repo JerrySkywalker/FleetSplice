@@ -5,12 +5,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat } from '../packages/contracts/index.ts';
-import { classifyPredecessor, discoverCodex, evidenceFromEdge, probeProcess, resolveProxy, type Guard } from '../packages/local-operation/index.ts';
+import { classifyPredecessor, discoverCodex, evidenceFromEdge, probeProcess, resolveProxy, type Guard, type ProxyResolution } from '../packages/local-operation/index.ts';
 import { launch } from './local.ts';
 
 type Control = { token: string; command: 'status' | 'stop' };
 export function supervisorHealthCode(health: { hub: string; edge: string; edgeAdmission: string } | undefined, nativeCodex: string): 'RUNNING' | 'RECOVERY_REQUIRED' {
   return health?.hub === 'RUNNING' && health.edge === 'RUNNING' && health.edgeAdmission === 'READY' && !['EXITED_OR_REUSED', 'UNPROVABLE'].includes(nativeCodex) ? 'RUNNING' : 'RECOVERY_REQUIRED';
+}
+export function supervisorProxy(environment: NodeJS.ProcessEnv = process.env): ProxyResolution {
+  const resolved = resolveProxy(environment);
+  const source = environment.FLEETSPLICE_PROXY_SOURCE;
+  if (source === undefined) return resolved;
+  requireThat(['explicit-env', 'windows-user-proxy', 'windows-system-proxy', 'direct'].includes(source), 'SUPERVISOR_PROXY_METADATA_INVALID');
+  requireThat(source === 'direct' ? resolved.proxy === null : resolved.proxy !== null, 'SUPERVISOR_PROXY_METADATA_INVALID');
+  return { ...resolved, source: source as ProxyResolution['source'] };
 }
 const durable = (file: string, value: unknown) => { const fd = openSync(file, 'wx', 0o600); try { writeSync(fd, canonical(value)); fsyncSync(fd); } finally { closeSync(fd); } };
 const reply = async (socket: Socket, value: unknown) => await new Promise<void>(resolve => { const done = () => resolve(); socket.once('error', done); socket.end(canonical(value), done); });
@@ -26,7 +34,7 @@ export async function supervisorEntrypoint() {
   const predecessor = classifyPredecessor(base);
   requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
   const pipe = `\\\\.\\pipe\\fleetsplice-g05-${identity.sid}`;
-  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false; const activeProxy = resolveProxy();
+  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false; const activeProxy = supervisorProxy();
   const server = createServer(socket => {
     let received = ''; let handled = false; socket.setTimeout(10000, () => socket.destroy()); socket.on('error', () => {});
     const handle = async () => {

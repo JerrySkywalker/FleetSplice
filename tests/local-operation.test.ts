@@ -1,18 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { target } from './helpers.ts';
-import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, resolveProxy, retireOwnerAuthorizedUnknown, verifyLocalEndpointAvailability } from '../packages/local-operation/index.ts';
+import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, closeSafePredecessor, discoverCodex, discoverNode, edgeAdmissionState, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, resolveProxy, retireOwnerAuthorizedUnknown, verifyLocalEndpointAvailability } from '../packages/local-operation/index.ts';
+import { supervisorProxy } from '../scripts/supervisor.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
 function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId = randomUUID(), eventBeforeResponse = false) {
   const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-local-operation-')); const directory = path.join(base, runId); mkdirSync(directory);
   const guard = { state: 'RUNNING', runId, target: target(), identity: identity(), nativeExitObserved: false, quiescent: false };
   writeFileSync(path.join(base, 'environment-guard.json'), JSON.stringify(guard)); writeFileSync(path.join(directory, 'admission.json'), JSON.stringify({ runId, target: guard.target, identity: guard.identity }));
+  const hub = new DatabaseSync(path.join(directory, 'hub.sqlite')); hub.exec('CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL)'); hub.close();
   const edge = new DatabaseSync(path.join(directory, 'edge.sqlite'));
   edge.exec('CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL)');
   const append = (kindName: string, key: string, value: unknown) => edge.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run(kindName, key, JSON.stringify(value));
@@ -21,12 +23,12 @@ function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' =
     const sessionCommand = randomUUID(); append('DISPATCH_ATTEMPT', sessionCommand, { attempted: true });
     append('NATIVE_PROCESS_IDENTITY', instanceId, { processId: 901, creationTime: '2026-09-08T15:07:19.8913688Z', sid: 'S-fixture' });
     append('NATIVE_BINDING', sessionCommand, { threadId, processId: 901, instanceId });
-    append('NATIVE_RESULT', sessionCommand, { code: 'NATIVE_SESSION_READY', nativeThreadId: threadId });
+    append('NATIVE_RESULT', sessionCommand, { code: 'NATIVE_SESSION_READY', nativeThreadId: threadId, nativeProcessId: 901, nativeInstanceId: instanceId });
     const appendTurn = (complete: boolean) => {
       const commandId = randomUUID(), turnId = randomUUID();
       append('DISPATCH_ATTEMPT', commandId, { attempted: true });
       if (eventBeforeResponse) append('NATIVE_EVENT', commandId, { kind: 'turnStarted', threadId, turnId, status: 'RUNNING' });
-      append('NATIVE_RESULT', commandId, { code: 'NATIVE_TURN_ACCEPTED', nativeThreadId: threadId, nativeTurnId: turnId });
+      append('NATIVE_RESULT', commandId, { code: 'NATIVE_TURN_ACCEPTED', nativeThreadId: threadId, nativeTurnId: turnId, nativeProcessId: 901, nativeInstanceId: instanceId });
       if (!eventBeforeResponse) append('NATIVE_EVENT', commandId, { kind: 'turnStarted', threadId, turnId, status: 'RUNNING' });
       if (complete) append('NATIVE_EVENT', commandId, { kind: 'turnCompleted', threadId, turnId, status: 'completed' });
     };
@@ -48,6 +50,8 @@ test('proxy precedence is explicit environment, then Windows user configuration,
   assert.equal(explicit.source, 'explicit-env'); assert.equal(explicit.display, 'http://127.0.0.1:7890'); assert.equal(explicit.environment.HTTPS_PROXY, 'http://user:secret@127.0.0.1:7890');
   assert.equal(parseWindowsProxy('http=127.0.0.1:7890;https=127.0.0.1:7891'), 'http://127.0.0.1:7891');
   assert.equal(resolveProxy({}, '127.0.0.1:7890').source, 'windows-user-proxy'); assert.equal(resolveProxy({}, null, '127.0.0.1:7892').source, 'windows-system-proxy'); assert.equal(resolveProxy({}, null, null).source, 'direct');
+  const brokered = supervisorProxy({ HTTPS_PROXY: 'http://user:secret@127.0.0.1:7890', FLEETSPLICE_PROXY_SOURCE: 'windows-user-proxy' });
+  assert.equal(brokered.source, 'windows-user-proxy'); assert.equal(brokered.display, 'http://127.0.0.1:7890');
   const failed = await networkPreflight(resolveProxy({}, null), async () => false); assert.deepEqual(failed, { status: 'FAIL', networkReachable: false, provider: 'PROVIDER_NOT_YET_PROVEN', reason: 'NO_USABLE_NETWORK_ROUTE' });
 });
 test('failed qualification creates no runtime guard', () => {
@@ -77,6 +81,32 @@ test('a completed earlier turn cannot erase a later unknown turn or admit automa
   assert.equal(Object.values(predecessor.evidence.turns).filter(turn => turn.completed).length, 1);
   assert.throws(() => closeSafePredecessor(state.base, absent, noConflicts), /SAFE_PREDECESSOR_CLOSURE_NOT_ADMITTED/);
   assert.deepEqual(readFileSync(path.join(state.base, 'environment-guard.json')), before);
+});
+test('retirement binds every result to one positive native process identity and preserves Hub evidence', () => {
+  const contradictoryBinding = fixture('ambiguous');
+  const bindingDb = new DatabaseSync(path.join(contradictoryBinding.directory, 'edge.sqlite'));
+  const binding = bindingDb.prepare("SELECT value FROM evidence WHERE kind='NATIVE_BINDING'").get() as { value: string };
+  bindingDb.prepare("UPDATE evidence SET value=? WHERE kind='NATIVE_BINDING'").run(JSON.stringify({ ...JSON.parse(binding.value), processId: 902 })); bindingDb.close();
+  assert.equal(classifyPredecessor(contradictoryBinding.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const contradictoryResult = fixture('ambiguous');
+  const resultDb = new DatabaseSync(path.join(contradictoryResult.directory, 'edge.sqlite'));
+  const result = resultDb.prepare("SELECT value FROM evidence WHERE kind='NATIVE_RESULT' AND key != (SELECT key FROM evidence WHERE kind='NATIVE_RESULT' LIMIT 1) LIMIT 1").get() as { value: string } | undefined;
+  if (result) resultDb.prepare("UPDATE evidence SET value=? WHERE kind='NATIVE_RESULT' AND value=?").run(JSON.stringify({ ...JSON.parse(result.value), nativeInstanceId: randomUUID() }), result.value);
+  resultDb.close();
+  assert.equal(classifyPredecessor(contradictoryResult.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const invalidIdentity = fixture('ambiguous');
+  const identityDb = new DatabaseSync(path.join(invalidIdentity.directory, 'edge.sqlite'));
+  identityDb.prepare("UPDATE evidence SET value=? WHERE kind='NATIVE_PROCESS_IDENTITY'").run(JSON.stringify({ processId: 0, creationTime: '2026-09-08T15:07:19.8913688Z' })); identityDb.close();
+  assert.equal(classifyPredecessor(invalidIdentity.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const missingHub = fixture('ambiguous'); unlinkSync(path.join(missingHub.directory, 'hub.sqlite'));
+  assert.equal(classifyPredecessor(missingHub.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+});
+test('malformed Edge blocker data is not healthy', () => {
+  const state = fixture('none'); const db = new DatabaseSync(path.join(state.directory, 'edge.sqlite'));
+  db.exec('CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  assert.equal(edgeAdmissionState(path.join(state.directory, 'edge.sqlite')), 'READY');
+  db.prepare('INSERT INTO kv(key,value) VALUES(?,?)').run('blocked', 'null'); db.close();
+  assert.equal(edgeAdmissionState(path.join(state.directory, 'edge.sqlite')), 'UNPROVABLE');
 });
 test('unknown-effect retirement preserves evidence, records UNKNOWN, and cannot replay or reuse the old run', () => {
   const state = fixture('ambiguous', G05B_OWNER_RETIREMENT_RUN); const original = readFileSync(path.join(state.directory, 'edge.sqlite'));

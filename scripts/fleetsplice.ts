@@ -14,7 +14,7 @@ const output = (value: string) => process.stdout.write(`${value}\n`);
 const error = (value: string) => { process.stderr.write(`${value}\n`); process.exitCode = 2; };
 const code = (value: unknown) => canonical(value);
 type ControlFile = { pipe: string; token: string; runId: string };
-type SupervisorBootstrap = { taskName: string; node: string; supervisor: string; workspace: string; codex: string; localAppData: string; environment: Record<string, string> };
+type SupervisorBootstrap = { taskName: string; node: string; supervisor: string; workspace: string; codex: string; localAppData: string; environment: Record<string, string>; proxySource: string };
 const durable = (file: string, value: unknown) => { const handle = openSync(file, 'wx', 0o600); try { writeSync(handle, canonical(value)); fsyncSync(handle); } finally { closeSync(handle); } };
 
 function currentGuard(): Guard | null {
@@ -86,7 +86,7 @@ async function start(root: string) {
     // contains no browser token, and the task broker deletes it on exit.
     mkdirSync(runtime, { recursive: true });
     execFileSync('icacls.exe', [runtime, '/inheritance:r', '/grant:r', `*${qualified.identity.sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F'], { windowsHide: true, stdio: 'ignore' });
-    durable(bootstrap, { taskName, node: qualified.node.path, supervisor, workspace: qualified.identity.root, codex: qualified.codex.path, localAppData: process.env.LOCALAPPDATA!, environment: qualified.proxy.environment } satisfies SupervisorBootstrap);
+    durable(bootstrap, { taskName, node: qualified.node.path, supervisor, workspace: qualified.identity.root, codex: qualified.codex.path, localAppData: process.env.LOCALAPPDATA!, environment: qualified.proxy.environment, proxySource: qualified.proxy.source } satisfies SupervisorBootstrap);
     // The task has no trigger and is removed with the supervisor. It is a
     // launch broker, not an installed service or a network-facing daemon.
     spawn('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', supervisorLauncher, '-Bootstrap', bootstrap], { stdio: 'ignore', windowsHide: true, env: { ...process.env, ...qualified.proxy.environment } });
@@ -98,7 +98,11 @@ async function start(root: string) {
       if (state.code === 'RUNNING') { output(`FleetSplice 已启动\nMachine code: RUNNING\nRun: ${state.runId}\nBrowser bootstrap: ${state.url}\nProxy: ${qualified.proxy.display ?? 'direct'}\nSource: ${qualified.proxy.source}\nNetwork preflight: PASS\nProvider: PROVIDER_NOT_YET_PROVEN`); return; }
     } catch { /* The detached supervisor may still be acquiring the single writer. */ }
   }
-  error('START_FAILED\nSUPERVISOR_UNAVAILABLE\nNO_NATIVE_EFFECT_STARTED=true');
+  const afterTimeout = classifyPredecessor(base());
+  describePredecessor(afterTimeout).forEach(output);
+  // The detached task may have consumed its handoff while still acquiring the
+  // writer.  Its effect state is therefore unknown, never "no effect".
+  error('START_UNKNOWN\nSUPERVISOR_UNAVAILABLE\nRECOVERY_REQUIRED');
 }
 async function status(readOnly = true) {
   const predecessor = classifyPredecessor(base());

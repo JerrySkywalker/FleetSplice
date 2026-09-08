@@ -65,7 +65,7 @@ test('detached supervisor keeps one local writer, serves a second terminal, and 
   const env = { ...process.env, LOCALAPPDATA: localAppData };
   const bootstrapDirectory = path.join(localAppData, 'FleetSplice', 'G05'); mkdirSync(bootstrapDirectory, { recursive: true });
   const taskName = `FleetSplice-G05-${randomUUID()}`; const proxySecret = 'fleetsplice-test-secret';
-  const bootstrap = path.join(bootstrapDirectory, 'supervisor-bootstrap.json'); writeFileSync(bootstrap, JSON.stringify({ taskName, node: process.execPath, supervisor, workspace, codex: executable, localAppData, environment: { HTTP_PROXY: `http://user:${proxySecret}@127.0.0.1:7890`, HTTPS_PROXY: `http://user:${proxySecret}@127.0.0.1:7890`, ALL_PROXY: `http://user:${proxySecret}@127.0.0.1:7890` }, diagnosticPath: path.join(bootstrapDirectory, 'task-debug.txt') }));
+  const bootstrap = path.join(bootstrapDirectory, 'supervisor-bootstrap.json'); writeFileSync(bootstrap, JSON.stringify({ taskName, node: process.execPath, supervisor, workspace, codex: executable, localAppData, proxySource: 'explicit-env', environment: { HTTP_PROXY: `http://user:${proxySecret}@127.0.0.1:7890`, HTTPS_PROXY: `http://user:${proxySecret}@127.0.0.1:7890`, ALL_PROXY: `http://user:${proxySecret}@127.0.0.1:7890` }, diagnosticPath: path.join(bootstrapDirectory, 'task-debug.txt') }));
   const detachedLauncher = spawn('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', supervisorLauncher, '-Bootstrap', bootstrap], { cwd: process.cwd(), env, stdio: 'ignore', windowsHide: true });
   const guardPath = path.join(localAppData, 'FleetSplice', 'G05', 'environment-guard.json');
   let detail: ControlFile | null = null;

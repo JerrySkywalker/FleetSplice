@@ -86,7 +86,7 @@ async function status(readOnly = true) {
 }
 async function doctor(root: string) {
   let node = 'UNQUALIFIED', codex = 'UNQUALIFIED'; try { node = `${discoverNode([process.execPath]).version} / SQLite ${process.versions.sqlite}`; } catch { /* shown below */ }
-  try { codex = discoverCodex(candidateCodexPaths()).path; } catch { /* shown below */ }
+  try { const qualified = discoverCodex(candidateCodexPaths()); codex = `${qualified.version} / ${qualified.path}`; } catch { /* shown below */ }
   const proxy = resolveProxy(); const predecessor = classifyPredecessor(base());
   output(`FleetSplice Doctor (read-only)\nRuntime: ${node}\nCodex: ${codex}\nWorkspace: ${root}\nProxy: ${proxy.display ?? 'direct'}\nProxy source: ${proxy.source}\nNetwork preflight: NOT_RUN_READ_ONLY\nCurrent guard: ${predecessor.guard?.state ?? 'NONE'}\nProcess conflicts: ${predecessor.conflicts.length}\nSafe automatic closure: ${['SAFE_NO_EFFECT', 'SAFE_TERMINAL'].includes(predecessor.kind)}\nExplicit Owner retirement required: ${predecessor.kind === 'AMBIGUOUS_TERMINAL'}`);
   describePredecessor(predecessor).forEach(output);

@@ -9,6 +9,7 @@ import { CODEX_SHA256 } from '../driver-codex/index.ts';
 
 export const QUALIFIED_NODE = 'v24.20.0';
 export const QUALIFIED_SQLITE = '3.53.4';
+export const QUALIFIED_CODEX_VERSION = '0.153.4';
 export const G05B_OWNER_RETIREMENT_RUN = '4c3beca4-d044-47ee-a8d0-915769e74bb2';
 export type ProcessIdentity = { processId: number; creationTime: string; sid?: string; principal?: string; sessionId?: number; elevated?: boolean };
 export type ProcessProbe = { exists: boolean; identity?: ProcessIdentity; name?: string; commandLine?: string };
@@ -17,7 +18,7 @@ export type NativeEvidence = { process: ProcessIdentity | null; instanceId: stri
 export type PredecessorKind = 'NO_PREDECESSOR' | 'SAFE_NO_EFFECT' | 'SAFE_TERMINAL' | 'AMBIGUOUS_TERMINAL' | 'LIVE_OR_CONFLICTING' | 'CORRUPT_OR_UNPROVABLE' | 'RETIRED_AMBIGUOUS';
 export type Predecessor = { kind: PredecessorKind; guard: Guard | null; evidence: NativeEvidence; exactNativeExitProven: boolean; conflicts: ProcessProbe[]; reason: string; retirementReceipt?: string };
 export type QualifiedNode = { path: string; version: string; sqlite: string };
-export type QualifiedCodex = { path: string; sha256: string };
+export type QualifiedCodex = { path: string; version: string; sha256: string };
 export type ProxyResolution = { source: 'explicit-env' | 'windows-user-proxy' | 'windows-system-proxy' | 'direct' | 'invalid'; proxy: string | null; display: string | null; environment: Record<string, string>; reason?: string };
 
 const runtimeRoot = () => path.join(process.env.LOCALAPPDATA ?? '', 'FleetSplice', 'G05');
@@ -76,9 +77,13 @@ export function discoverCodex(candidates = candidateCodexPaths()): QualifiedCode
   for (const candidate of candidates) {
     if (path.basename(candidate).toLowerCase() !== 'codex.exe' || !existsSync(candidate)) continue;
     const sha256 = hash(candidate);
-    if (sha256 === CODEX_SHA256) return { path: path.resolve(candidate), sha256 };
+    if (sha256 !== CODEX_SHA256) continue;
+    try {
+      const version = execFileSync(candidate, ['--version'], { encoding: 'utf8', windowsHide: true, timeout: 7000 }).trim().match(/\b(\d+\.\d+\.\d+)\b/)?.[1];
+      if (version === QUALIFIED_CODEX_VERSION) return { path: path.resolve(candidate), version, sha256 };
+    } catch { /* A qualified artifact must also answer its non-effecting version query. */ }
   }
-  throw new Error('CODEX_ARTIFACT_UNQUALIFIED: pinned native codex.exe was not found or its SHA-256 differs');
+  throw new Error('CODEX_ARTIFACT_UNQUALIFIED: native codex.exe version/hash did not match the accepted pin');
 }
 
 function proxyUrl(value: string): string | null {

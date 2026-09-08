@@ -34,7 +34,7 @@ const noConflicts: any[] = [];
 
 test('exact Node and native Codex discovery retain the accepted pins', () => {
   const node = discoverNode([process.execPath]); assert.equal(node.version, 'v24.20.0'); assert.equal(node.sqlite, '3.53.4');
-  const codex = discoverCodex(candidateCodexPaths()); assert.match(codex.path, /codex\.exe$/i); assert.equal(codex.sha256.length, 64);
+  const codex = discoverCodex(candidateCodexPaths()); assert.match(codex.path, /codex\.exe$/i); assert.equal(codex.version, '0.153.4'); assert.equal(codex.sha256.length, 64);
 });
 test('proxy precedence is explicit environment, then Windows user configuration, then direct', async () => {
   const explicit = resolveProxy({ HTTPS_PROXY: 'http://user:secret@127.0.0.1:7890' }, 'http://127.0.0.1:9999');

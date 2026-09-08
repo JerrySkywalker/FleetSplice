@@ -107,7 +107,8 @@ primitive checks and a separately labeled **SYNTHETIC_BROWSER** test. The
 synthetic driver exists only under `tests`; it cannot satisfy product acceptance.
 The native integration regression uses the pinned installed binary with an
 isolated credential-free home and inert MCP/plugin processes. It checks startup
-suppression and its positive control without making an inference request.
+suppression, legacy notifications, image-tool policy and the final admission gate
+using fixed responses from a loopback provider. It makes no external API request.
 Leave native Codex configuration unchanged while a FleetSplice local run is
 active; detected configuration drift closes dispatch and requires local closure.
 

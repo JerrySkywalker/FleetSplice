@@ -70,8 +70,34 @@ response, and never opens a credential store. Native authentication/provider
 ownership stays unchanged. Configuration must remain frozen while this local
 run is active; a changed native configuration digest closes further dispatch.
 
-The isolated native policy test supplies an inert MCP server and cached plugin
-through a fresh credential-free native home. Both processes start and list tools
-in the positive control; neither starts or lists tools through the product
-driver. A configuration change rejects the next thread before creation. This
-test makes no model request and is separate from real browser acceptance.
+Legacy notification commands are disabled independently with `notify=[]` and
+checked in effective configuration. Image generation and image viewing are
+explicitly disabled. The private native process receives
+`CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED=1`, which this pinned binary
+consumes before worker threads to select its ephemeral disabled startup mode;
+stdio alone does not disable persisted remote control. A non-disabled native
+remote-control status closes admission. No native preference or credential is
+changed by these process-local settings.
+Multi-agent dispatch is disabled through both `agents.enabled=false` and the
+structured v2 feature switch; the model catalog can select v2 independently of
+the legacy multi-agent feature. These effective settings are checked before
+thread creation. Native sandbox and approval policy still reject file mutation;
+unsupported native tool or user-input activity closes FleetSplice admission.
+
+The isolated native policy test supplies an inert MCP server, cached plugin and
+notification command through a fresh credential-free native home. Its loopback
+HTTP provider returns a fixed text response, making no external API request.
+Both MCP processes start/list tools and the notification executes in the positive
+control; none executes through the product driver. The native request's remaining
+tool ceiling is checked as `request_user_input` only. Image-viewing availability
+is demonstrated by the control; image-generation suppression is checked in
+effective native configuration and the pin's tool-eligibility path. FleetSplice
+never answers native user-input/approval requests automatically. The fixture
+observes disabled remote-control status, rejects changed configuration and checks
+that closing admission after a configuration response prevents another thread
+or turn request. This fixture is separate from real browser acceptance.
+
+Edge owns a synchronous final effect gate invoked immediately before native
+spawn, thread/start and turn/start, after any asynchronous qualification. It
+rechecks connection, closure/quarantine, deadline and clock continuity. An abort
+retains the already durable attempt, quarantines the work and never retries it.

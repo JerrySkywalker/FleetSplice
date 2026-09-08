@@ -18,8 +18,10 @@ export class FixtureNative implements NativePort {
   failure: 'before' | 'after' | null = null;
   responseFirst = false;
   beforeWrite: () => void = () => {};
-  async start() { this.beforeWrite(); this.starts++; }
-  async create() {
+  qualify: () => Promise<void> = async () => {};
+  async start(beforeEffect: () => void) { beforeEffect(); this.beforeWrite(); this.starts++; }
+  async create(_requestId: string, _root: string, beforeEffect: () => void) {
+    await this.qualify(); beforeEffect();
     this.beforeWrite(); this.creates++;
     if (this.failure === 'before') throw new Error('response lost before known start');
     const notify = () => this.signals.emit('signal', { method: 'thread/started', params: { thread: { id: this.threadId } } });
@@ -27,7 +29,8 @@ export class FixtureNative implements NativePort {
     if (this.failure === 'after') throw new Error('response lost after known start');
     return { threadId: this.threadId, model: 'fixture', provider: 'fixture' };
   }
-  async turn() {
+  async turn(_requestId: string, _threadId: string, _root: string, _text: string, beforeEffect: () => void) {
+    await this.qualify(); beforeEffect();
     this.beforeWrite(); this.turns++; this.turnId = randomUUID();
     const notify = () => this.signals.emit('signal', { method: 'turn/started', params: { threadId: this.threadId, turn: { id: this.turnId } } });
     if (this.responseFirst) setImmediate(notify); else notify();

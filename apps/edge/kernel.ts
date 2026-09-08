@@ -108,22 +108,29 @@ export class EdgeKernel {
     });
     if (!isNative) return receipt;
     this.current = command;
+    // The driver calls this synchronously after non-effecting async qualification,
+    // immediately before spawn/thread/start/turn/start. The original attempt remains
+    // durable if this gate aborts; there is no second dispatch or retry.
+    const beforeNativeEffect = () => {
+      this.clock.check(Date.now(), performance.now());
+      requireThat(this.connected && !this.closing && !this.blocked && plan.decision.expiresAt > Date.now(), 'ADMISSION_CLOSED');
+    };
     try {
       requireThat(this.connected && plan.decision.expiresAt > Date.now(), 'DISCONNECTED_BEFORE_NATIVE');
       if (!this.nativeStarted) {
-        this.nativeStarted = true; await this.native.start(); await this.nativeProcessProof();
+        this.nativeStarted = true; await this.native.start(beforeNativeEffect); await this.nativeProcessProof();
         requireThat(this.connected && !this.blocked && plan.decision.expiresAt > Date.now(), 'ADMISSION_CLOSED');
       }
       this.clock.check(Date.now(), performance.now());
       receipt.nativeProcessId = this.native.pid; receipt.nativeInstanceId = this.native.instanceId;
       if (family === 'sessionLane.continue') {
-        const result = await this.native.create(receipt.nativeRequestId!, this.journal.get<string>('root')!);
+        const result = await this.native.create(receipt.nativeRequestId!, this.journal.get<string>('root')!, beforeNativeEffect);
         requireThat(!lane!.threadId || lane!.threadId === result.threadId, 'NATIVE_THREAD_CONFLICT');
         lane!.threadId = result.threadId; lane!.state = 'IDLE'; lane!.activeStep = null;
         this.journal.append('NATIVE_BINDING', command.edgeCommandId, { ...result, processId: this.native.pid, instanceId: this.native.instanceId });
       } else {
         requireThat(fleet.intent.family === 'turn.submit', 'INVALID_NATIVE_OPERATION');
-        const turnId = await this.native.turn(receipt.nativeRequestId!, lane!.threadId!, this.journal.get<string>('root')!, fleet.intent.body.text);
+        const turnId = await this.native.turn(receipt.nativeRequestId!, lane!.threadId!, this.journal.get<string>('root')!, fleet.intent.body.text, beforeNativeEffect);
         requireThat(!lane!.turnId || lane!.turnId === turnId || lane!.state === 'DISPATCHED', 'NATIVE_TURN_CONFLICT');
         lane!.turnId = turnId;
         if (lane!.state === 'DISPATCHED') lane!.state = 'RUNNING';

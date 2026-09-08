@@ -9,6 +9,38 @@ import { HubKernel, AdmissionRejected } from '../apps/hub/kernel.ts';
 import { EdgeKernel } from '../apps/edge/kernel.ts';
 import { FixtureNative, grant, rig } from './helpers.ts';
 
+test('final native effect gate rejects disconnect, closure, quarantine, expiry and clock drift after async qualification', async context => {
+  for (const operation of ['create', 'turn']) for (const condition of ['disconnect', 'closing', 'quarantine', 'expiry', 'clock']) {
+    const r = rig();
+    try {
+      const lane = await r.setup();
+      if (operation === 'turn') await r.admit('sessionLane.continue', {}, lane);
+      const creates = r.native.creates; const turns = r.native.turns;
+      r.native.qualify = async () => {
+        await new Promise(resolve => setImmediate(resolve));
+        if (condition === 'disconnect') r.edge.connected = false;
+        if (condition === 'closing') r.edge.closing = true;
+        if (condition === 'quarantine') r.edge.blocked = 'FIXTURE_QUARANTINE';
+        if (condition === 'expiry' || condition === 'clock') {
+          const wall = Date.now(); const mono = performance.now();
+          const jump = condition === 'expiry' ? 21 * 60_000 : 5000;
+          context.mock.method(Date, 'now', () => wall + jump);
+          if (condition === 'expiry') context.mock.method(performance, 'now', () => mono + jump);
+        }
+      };
+      const command = operation === 'turn' ? await r.make('turn.submit', { text: 'must not dispatch' }, lane) : await r.make('sessionLane.continue', {}, lane);
+      const result = await r.hub.execute(command, r.client);
+      assert.equal(result.status, 'AMBIGUOUS_EFFECT', `${operation}:${condition}`);
+      assert.equal(r.native.creates, creates); assert.equal(r.native.turns, turns);
+      const step = r.delivered.at(-1)!;
+      assert.equal(r.edgeJournal.db.prepare("select count(*) as n from evidence where kind='DISPATCH_ATTEMPT' and key=?").get(step.edgeCommandId)!.n, 1);
+      if (condition === 'clock') await assert.rejects(r.edge.execute(step), /CLOCK_CONTINUITY_UNKNOWN/);
+      else assert.equal((await r.edge.execute(step)).status, 'AMBIGUOUS_EFFECT');
+      assert.equal(r.native.creates, creates); assert.equal(r.native.turns, turns);
+    } finally { context.mock.restoreAll(); r.close(); }
+  }
+});
+
 test('strict JSON rejects erased ambiguities, Unicode and lossy values before canonicalization', () => {
   for (const text of ['{"a":1,"a":2}', '{"a":1,"\\u0061":2}', '"\\ud800"', '9007199254740993', '1e400', '-0', '1.1', '{"a":true}\u00a0', '{"a":1,}', '['.repeat(45) + '0' + ']'.repeat(45)]) assert.throws(() => parseJson(text));
   assert.equal(canonical(parseJson('{"z":"你好😀","a":[null,true,4]}')), '{"a":[null,true,4],"z":"你好😀"}');

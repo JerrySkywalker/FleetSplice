@@ -8,6 +8,10 @@ G05A_PASS=true
 G05A_ACCEPTED_HEAD=2064494f814d0b644b1d923e99aa8648cb231428
 G05A_ACCEPTED_TREE=612810cabe9d6eebb13c24db493df837d1c044a2
 G05B_STARTED=true
+G05B_DISPOSITION=PASS_M0_2_SAFE_LOCAL_OPERATION
+G05B_PRODUCT_HEAD=2c1ca0eca568c09d1933598925a73244bee61d5b
+G05B_PRODUCT_TREE=1e66b6f39bbe83fb7cad9b2e299aea0fe348c718
+G05B_LOCAL_DOGFOOD_ACCEPTANCE=PASS
 IMPLEMENTATION_AUTHORIZED=G05B_ONLY
 PRODUCT_IMPLEMENTATION_AUTHORIZED=G05B_ONLY
 G06_STARTED=false
@@ -17,4 +21,6 @@ ROADMAP=G05 -> G05A -> G05B -> G06
 The active goal is
 [FLEETSPLICE-V0_1-M0_2-SAFE-LOCAL-OPERATION-005B](../../goals/FLEETSPLICE-V0_1-M0_2-SAFE-LOCAL-OPERATION-005B.md).
 Historical G05 and G05A evidence remains immutable. G05B must stop after its
-own exact-head independent review; it does not begin G06.
+own exact-head independent review; it does not begin G06. Its Owner-local
+recovery and dogfood evidence remains outside Git, including the immutable
+retirement receipt for the exact G05A predecessor. G05B does not authorize G06.

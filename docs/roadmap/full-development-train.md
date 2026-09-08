@@ -1,9 +1,12 @@
 # FleetSplice Full Development Train Roadmap
 
-Current execution is the [bounded G04A closure](../../goals/FLEETSPLICE-G04A-VISIBLE-MVP-PREDEVELOPMENT-CLOSURE-004A.md);
-[current status](../train/G04A-status.md) governs acceptance.
-The [root train](../../goals/FLEETSPLICE-FULL-DEVELOPMENT-TRAIN-001.md)
-and [manifest](../../goals/train-manifest.v1.json) share this order.
+Current execution is the Owner-approved
+[G05A UX foundation](../../goals/FLEETSPLICE-V0_1-M0_1-OWNER-UX-FOUNDATION-005A.md);
+[current status](../train/G05A-status.md) governs its bounded authorization.
+G05 is accepted. G06 remains unstarted. The historical
+[root train](../../goals/FLEETSPLICE-FULL-DEVELOPMENT-TRAIN-001.md)
+and [manifest](../../goals/train-manifest.v1.json) retain the pre-insertion
+sequence; the active Owner-approved insertion is G05 -> G05A -> G06 below.
 
 `VISIBLE_INCREMENT_RULE=true`. Every major implementation Goal ends in
 Owner-operable, observable behavior. Infrastructure-only chains require a
@@ -13,6 +16,7 @@ concrete unavoidable dependency and shortest visible delivery path.
 | --- | --- | --- |
 | Pre-development | G01-G04 + G04A | Accepted architecture plus amended implementation contract; independent audit; stop before product. |
 | Local walking skeleton | G05 | SKYFORGE local browser real Codex create/continue/prompt/stream, minimal W1/W5. |
+| Owner UX foundation | G05A | zh-CN/en-US, system/light/dark/OLED appearance and compact preferences on the same real local Codex path. |
 | Remote mobile MVP | G06 | Phone/real remote browser -> Tencent Hub + WebUI -> outbound WSS SKYFORGE Edge -> real Codex, approval/interrupt/reconnect; v0.1-alpha.1. |
 | Multi-host | G07 | Select/operate SKYFORGE or ZenBook, exact generations and explicit controller takeover. |
 | Durable recovery | G08 | Return after close/restart/disconnect to the same honest session/history/ambiguity. |
@@ -25,7 +29,7 @@ concrete unavoidable dependency and shortest visible delivery path.
 
 ## Critical path and deployment
 
-G05-G10 are serial visible slices. One HCP semantic protocol uses same-host
+G05 -> G05A -> G06-G10 are serial visible slices. One HCP semantic protocol uses same-host
 loopback in G05 and authenticated Edge-initiated WSS from G06.
 Tencent hosts Hub + WebUI and durable Hub state. Provider credentials, Codex and
 Workspace truth stay at SKYFORGE/ZenBook. No separate Relay or public Edge port.

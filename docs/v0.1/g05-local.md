@@ -10,6 +10,12 @@ citation remains commit `96cb7a4965a651b8582a3ee35049d52204c3fc73`, tree
 with that baseline. This implementation follows the
 [G05 Goal](../../goals/FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005.md).
 
+G05 is now accepted at `f798ce74ef28acbe2154b556f1400e6995f64fc6`, tree
+`05953697453fadcf79cfae7fd9a2efd89261fff0`. The subsequent Owner instruction
+authorizes only [G05A](../../goals/FLEETSPLICE-V0_1-M0_1-OWNER-UX-FOUNDATION-005A.md)
+for a local UX foundation; see [active status](../train/G05A-status.md).
+The native execution and closure rules below remain the accepted G05 rules.
+
 ## Operate the local slice
 
 Use non-elevated `SKYFORGE-01\jerry`, Node **24.20.0** (embedded SQLite
@@ -133,5 +139,5 @@ live run does not set G05 PASS. Any final receipt-only child requires another
 fresh review; external custody can record final acceptance without a recursive
 receipt commit.
 
-G06 is proposed next and remains unstarted. No Tencent deployment, ZenBook,
+G05A is inserted before G06, which remains unstarted. No Tencent deployment, ZenBook,
 remote enrollment, ACP, TUI, Admin/WSL, migration or later hardening is included.

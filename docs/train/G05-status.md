@@ -1,5 +1,36 @@
 # G05 implementation status
 
+## Accepted status, reconciled under the Owner's G05A authorization
+
+```text
+G05_PASS=true
+G05_DISPOSITION=PASS_M0_WALKING_SKELETON
+G05_ACCEPTED_HEAD=f798ce74ef28acbe2154b556f1400e6995f64fc6
+G05_ACCEPTED_TREE=05953697453fadcf79cfae7fd9a2efd89261fff0
+G05A_STARTED=true
+IMPLEMENTATION_AUTHORIZED=G05A_ONLY
+PRODUCT_IMPLEMENTATION_AUTHORIZED=G05A_ONLY
+G06_STARTED=false
+```
+
+The final G05 object was accepted by a fresh independent read-only GPT-6 Astra
+max process with zero unresolved findings. Owner-local primary evidence remains
+under `V:\artifacts\FleetSplice\G05-005-01a07e8c`: `G05-acceptance.json`,
+`review-7-final.md`, `live-candidate-7/live-result.json` and
+`live-candidate-7/skyforge-browser.png`. It proves two real turns, one native
+thread, 171 streamed deltas and clean shutdown at the literal accepted object.
+
+The Owner subsequently reports personally accepting an attended dogfood run,
+including two real turns, same-thread continuity and the `ORBIT-731` continuity
+test. This is Owner-attested evidence; it does not retroactively relabel the
+earlier automated acceptance as Owner-attended. The active insertion is
+G05 -> [G05A](G05A-status.md) -> G06; only G05A is authorized now.
+
+## Historical pre-review status at the accepted G05 commit
+
+The following text is retained as the then-current candidate record. Its
+pending/false flags are historical, superseded by the accepted status above.
+
 The Owner accepted the final G04A object at
 `ccba0315eaba214902e93f383cd1359f042bc773` / tree
 `0def97ce0cba17ed1470aa56d3675dbdd23c1093` and explicitly authorized only

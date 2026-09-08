@@ -142,11 +142,11 @@ export async function verifyLocalEndpointAvailability(sid: string, port = 43155)
 
 export function probeProcess(processId: number): ProcessProbe {
   if (!Number.isInteger(processId) || processId <= 0) return { exists: false };
-  const script = `$p=Get-CimInstance Win32_Process -Filter \"ProcessId=${processId}\"; if($null -eq $p){@{exists=$false}|ConvertTo-Json -Compress}else{$o=Invoke-CimMethod -InputObject $p -MethodName GetOwnerSid; $d=[Management.ManagementDateTimeConverter]::ToDateTime($p.CreationDate).ToUniversalTime().ToString('o'); @{exists=$true;identity=@{processId=$p.ProcessId;creationTime=$d;sid=if($o.ReturnValue -eq 0){$o.Sid}else{$null}};name=$p.Name;commandLine=$p.CommandLine}|ConvertTo-Json -Compress}`;
+  const script = `$p=Get-Process -Id ${processId} -ErrorAction SilentlyContinue; if($null -eq $p){@{exists=$false}|ConvertTo-Json -Compress}else{@{exists=$true;identity=@{processId=$p.Id;creationTime=$p.StartTime.ToUniversalTime().ToString('o')};name=$p.ProcessName}|ConvertTo-Json -Compress}`;
   try { return JSON.parse(execFileSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 8000 })) as ProcessProbe; } catch { return { exists: true, name: 'PROCESS_PROBE_UNAVAILABLE' }; }
 }
 export function fleetSpliceProcesses(): ProcessProbe[] {
-  const script = "$p=Get-CimInstance Win32_Process | Where-Object {$_.ProcessId -ne $PID -and $_.CommandLine -match 'dist\\\\apps\\\\(hub|edge)\\\\(server|main)\\.js'}; @($p | ForEach-Object {$d=[Management.ManagementDateTimeConverter]::ToDateTime($_.CreationDate).ToUniversalTime().ToString('o'); @{exists=$true;identity=@{processId=$_.ProcessId;creationTime=$d};name=$_.Name;commandLine=$_.CommandLine}}) | ConvertTo-Json -Compress";
+  const script = "$p=Get-CimInstance Win32_Process | Where-Object {$_.ProcessId -ne $PID -and $_.CommandLine -match 'dist\\\\apps\\\\(hub|edge)\\\\(server|main)\\.js'}; @($p | ForEach-Object {@{exists=$true;name=$_.Name;commandLine=$_.CommandLine}}) | ConvertTo-Json -Compress";
   try { const raw = execFileSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 8000 }).trim(); if (!raw) return []; const value = JSON.parse(raw); return Array.isArray(value) ? value as ProcessProbe[] : [value as ProcessProbe]; } catch { return [{ exists: true, name: 'PROCESS_INVENTORY_UNAVAILABLE' }]; }
 }
 
@@ -190,6 +190,7 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
   let exactNativeExitProven = !evidence.process;
   if (evidence.process) {
     const observed = process(evidence.process.processId);
+    if (observed.exists && !observed.identity) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: [observed], reason: 'NATIVE_PROCESS_IDENTITY_UNPROVABLE' };
     if (observed.exists && observed.identity?.creationTime === evidence.process.creationTime) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence, exactNativeExitProven: false, conflicts: [observed], reason: 'EXACT_NATIVE_PROCESS_PRESENT' };
     exactNativeExitProven = !observed.exists || observed.identity?.creationTime !== evidence.process.creationTime;
   }

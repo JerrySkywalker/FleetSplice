@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { Fault, requireThat } from '../contracts/json.ts';
+import { integrationPolicy, NATIVE_POLICY_ARGS } from './policy.ts';
 
 export const CODEX_SHA256 = '444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b';
 export type NativeSignal = { method: string; params: Record<string, any>; requestId?: string | number };
@@ -22,13 +23,15 @@ export class CodexDriver implements NativePort {
   private buffer = '';
   private closed = false;
   private failed = false;
+  private policy: ReturnType<typeof integrationPolicy> | null = null;
   constructor(private executable: string, private root: string) {}
   async start(): Promise<void> {
     requireThat(!this.process, 'NATIVE_ALREADY_STARTED');
     requireThat(createHash('sha256').update(readFileSync(this.executable)).digest('hex') === CODEX_SHA256, 'NATIVE_ARTIFACT_CHANGED');
-    // Replace executable integration tables; preserve native-local authentication/provider ownership.
-    // Native Codex itself retains responsibility for its existing local authentication.
-    const child = spawn(this.executable, ['-c', 'sandbox_mode="read-only"', '-c', 'approval_policy="never"', '-c', 'web_search="disabled"', '-c', 'mcp_servers={}', '-c', 'plugins={}', '-c', 'hooks={}', '-c', 'features.hooks=false', '-c', 'features.shell_tool=false', '-c', 'features.unified_exec=false', '-c', 'features.apply_patch_freeform=false', '-c', 'features.multi_agent=false', '-c', 'features.code_mode=false', '-c', 'features.apps=false', 'app-server', '--stdio'], { cwd: this.root, stdio: 'pipe', windowsHide: true });
+    // Plugin/hooks switches apply before app-server startup. MCP starts at thread
+    // creation; explicit per-server disables are supplied there after config/read.
+    // Empty TOML tables merge and do NOT erase inherited entries in this pin.
+    const child = spawn(this.executable, [...NATIVE_POLICY_ARGS, 'app-server', '--stdio'], { cwd: this.root, stdio: 'pipe', windowsHide: true });
     this.process = child; this.pid = child.pid ?? null;
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
@@ -45,6 +48,12 @@ export class CodexDriver implements NativePort {
     child.on('exit', () => { this.closed = true; this.fail('NATIVE_EXIT'); });
     await this.rpc(randomUUID(), 'initialize', { clientInfo: { name: 'fleetsplice', title: 'FleetSplice G05', version: '0.1.0' }, capabilities: { experimentalApi: false } });
     this.write({ method: 'initialized', params: {} });
+    this.policy = await this.readPolicy();
+  }
+  private async readPolicy(): Promise<ReturnType<typeof integrationPolicy>> {
+    const policy = integrationPolicy(await this.rpc(randomUUID(), 'config/read', { cwd: this.root, includeLayers: false }));
+    requireThat(!this.policy || policy.stamp === this.policy.stamp, 'NATIVE_CONFIG_CHANGED');
+    return policy;
   }
   private fail(code: string): void {
     this.failed = true; this.buffer = '';
@@ -77,12 +86,15 @@ export class CodexDriver implements NativePort {
   }
   async create(requestId: string, root: string): Promise<{ threadId: string; model: string; provider: string }> {
     requireThat(root === this.root, 'NATIVE_ROOT_CHANGED');
-    const result = await this.rpc(requestId, 'thread/start', { cwd: root, ephemeral: true, approvalPolicy: 'never', sandbox: 'read-only', serviceName: 'fleetsplice-g05', developerInstructions: 'This G05 local conversation permits text responses only. Do not use tools, access files, execute commands, browse, or change configuration.' });
+    const policy = await this.readPolicy();
+    const result = await this.rpc(requestId, 'thread/start', { cwd: root, config: policy.overrides, ephemeral: true, approvalPolicy: 'never', sandbox: 'read-only', serviceName: 'fleetsplice-g05', developerInstructions: 'This G05 local conversation permits text responses only. Do not use tools, access files, execute commands, browse, or change configuration.' });
     requireThat(result.approvalPolicy === 'never' && result.sandbox?.type === 'readOnly' && result.sandbox.networkAccess === false && result.thread?.ephemeral === true && result.cwd?.toLowerCase() === root.toLowerCase(), 'NATIVE_POLICY_UNQUALIFIED');
     requireThat(typeof result.thread.id === 'string' && result.thread.id.length < 200, 'NATIVE_ID_UNKNOWN');
     return { threadId: result.thread.id, model: result.model, provider: result.modelProvider };
   }
   async turn(requestId: string, threadId: string, root: string, text: string): Promise<string> {
+    requireThat(root === this.root, 'NATIVE_ROOT_CHANGED');
+    await this.readPolicy();
     const result = await this.rpc(requestId, 'turn/start', { threadId, cwd: root, input: [{ type: 'text', text }], approvalPolicy: 'never', sandboxPolicy: { type: 'readOnly', networkAccess: false } });
     requireThat(typeof result.turn?.id === 'string' && result.turn.id.length < 200, 'NATIVE_ID_UNKNOWN');
     return result.turn.id;

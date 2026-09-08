@@ -105,6 +105,11 @@ recovery, retention and release lifecycle work remains later.
 `npm test` includes isolated kernel/fault tests, real Windows identity/path
 primitive checks and a separately labeled **SYNTHETIC_BROWSER** test. The
 synthetic driver exists only under `tests`; it cannot satisfy product acceptance.
+The native integration regression uses the pinned installed binary with an
+isolated credential-free home and inert MCP/plugin processes. It checks startup
+suppression and its positive control without making an inference request.
+Leave native Codex configuration unchanged while a FleetSplice local run is
+active; detected configuration drift closes dispatch and requires local closure.
 
 After L1 Workspace/scope admission, the real browser harness is:
 

@@ -59,3 +59,19 @@ alongside its conversation-only configuration. The
 [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
 documents the shell/unified-exec feature switches. Hostile output is rendered
 as text by React, never interpreted as HTML or native authority.
+
+Native integration suppression uses `features.plugins=false` before app-server
+startup and explicit `enabled=false` entries for every inherited MCP server in
+`thread/start.config`. Empty tables are not a deletion mechanism: the pinned
+native configuration loader recursively merges them. The driver reads native
+effective configuration in memory, checks the disabled feature switches and
+retains only a digest and the MCP disable map. It never logs or persists that
+response, and never opens a credential store. Native authentication/provider
+ownership stays unchanged. Configuration must remain frozen while this local
+run is active; a changed native configuration digest closes further dispatch.
+
+The isolated native policy test supplies an inert MCP server and cached plugin
+through a fresh credential-free native home. Both processes start and list tools
+in the positive control; neither starts or lists tools through the product
+driver. A configuration change rejects the next thread before creation. This
+test makes no model request and is separate from real browser acceptance.

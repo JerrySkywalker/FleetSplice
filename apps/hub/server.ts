@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Fault, parseJson, canonical, requireThat, validate, type Target, type Hcp, type EdgeCommand, type Receipt } from '../../packages/contracts/index.ts';
-import { HubKernel, type ClientGrant } from './kernel.ts';
+import { HubKernel, AdmissionRejected, type ClientGrant } from './kernel.ts';
 import { Journal } from '../../packages/journal/index.ts';
 
 export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string };
@@ -82,7 +82,11 @@ export async function startHub(config: HubConfig) {
       const filename = path.join(config.webDirectory, req.url === '/' ? 'index.html' : req.url!.slice(1));
       const bytes = readFileSync(filename);
       res.writeHead(200, { 'Content-Type': filename.endsWith('.js') ? 'text/javascript' : filename.endsWith('.css') ? 'text/css' : 'text/html' }); res.end(bytes);
-    } catch (error) { if (!res.headersSent) json(res, error instanceof Fault && error.code === 'ROUTE_NOT_FOUND' ? 404 : 403, { error: error instanceof Fault ? error.code : 'REQUEST_REJECTED' }); else res.end(); }
+    } catch (error) {
+      if (res.headersSent) res.end();
+      else if (error instanceof AdmissionRejected) json(res, 409, { error: error.code, admission: 'REJECTED_BEFORE_ADMISSION', commandId: error.commandId, intentDigest: error.intentDigest });
+      else json(res, error instanceof Fault && error.code === 'ROUTE_NOT_FOUND' ? 404 : 403, { error: error instanceof Fault ? error.code : 'REQUEST_REJECTED' });
+    }
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 262144, perMessageDeflate: false, handleProtocols: protocols => protocols.has('fleetsplice.hcp.v1') ? 'fleetsplice.hcp.v1' : false });
   server.on('upgrade', (req, socket, head) => {

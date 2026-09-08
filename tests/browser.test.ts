@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -69,6 +69,38 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     await page.getByRole('button', { name: 'Continue session' }).click();
     await expect(page.getByRole('button', { name: 'Release control' })).toBeEnabled();
     assert.equal(native.creates, 1);
+    for (let index = 1; index < 23; index++) {
+      await page.getByRole('button', { name: '＋ New session' }).click();
+      await expect(page.getByRole('navigation', { name: 'Sessions' }).getByRole('button')).toHaveCount(index + 1);
+      await expect(page.getByRole('button', { name: '＋ New session' })).toBeEnabled();
+    }
+    await page.getByRole('navigation', { name: 'Sessions' }).getByRole('button').first().click();
+    // Another admitted creation fills the last slot after this tab has formed its command.
+    await page.route('**/api/commands', async route => {
+      const original = route.request().postDataJSON();
+      const extra = await route.fetch({ postData: { ...original, commandId: randomUUID(), idempotencyKey: randomUUID() } });
+      assert.equal(extra.status(), 200);
+      const rejected = await route.fetch(); const acknowledgment = await rejected.json();
+      assert.equal(rejected.status(), 409);
+      assert.equal(acknowledgment.admission, 'REJECTED_BEFORE_ADMISSION');
+      assert.equal(acknowledgment.commandId, original.commandId);
+      assert.equal(acknowledgment.intentDigest, original.intentDigest);
+      await route.fulfill({ response: rejected });
+    }, { times: 1 });
+    await page.getByRole('button', { name: '＋ New session' }).click();
+    await expect(page.getByRole('alert')).toContainText('command rejected before admission');
+    await expect(page.getByRole('button', { name: 'Check command receipt' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '＋ New session' })).toBeDisabled();
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('fleetsplice.pending')), null);
+    await expect(page.getByRole('button', { name: 'Continue session' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Continue session' }).click();
+    await expect(page.getByRole('button', { name: 'Release control' })).toBeEnabled();
+    await page.getByLabel('Message Codex').fill('Existing session remains operable');
+    await page.getByRole('button', { name: 'Send message' }).click();
+    await expect(page.getByTestId('lane-state')).toHaveText('RUNNING');
+    native.delta('existing session output'); native.complete();
+    await expect(page.getByTestId('lane-state')).toHaveText('IDLE');
+    assert.equal(native.creates, 1); assert.equal(native.turns, 2);
     await page.getByRole('button', { name: 'Release control' }).click();
     await expect(viewer.getByRole('button', { name: 'Acquire control' })).toBeEnabled();
     await page.screenshot({ path: 'test-results/synthetic-browser.png', fullPage: true });

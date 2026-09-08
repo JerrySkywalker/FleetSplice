@@ -3,6 +3,9 @@ import { canonical, digest, next, requireThat, validate, ClockFence, Fault, type
 import { Journal } from '../../packages/journal/index.ts';
 
 export type ClientGrant = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number };
+export class AdmissionRejected extends Fault {
+  constructor(code: string, readonly commandId: string, readonly intentDigest: string) { super(code); }
+}
 export class HubKernel {
   status: string;
   private serial: Promise<unknown> = Promise.resolve();
@@ -33,15 +36,25 @@ export class HubKernel {
     // The gate must remain closed even when persisting or publishing is unavailable.
     try { this.publish(); } catch { /* A failed snapshot cannot reopen admission. */ }
   }
+  private rejection(input: unknown, error: unknown): unknown {
+    if (error instanceof Fault && !this.storageFailed) {
+      try {
+        const command = validate<FleetCommand>('command', input);
+        return new AdmissionRejected(error.code, command.commandId, command.intentDigest);
+      } catch { /* Malformed requests receive no command-specific acknowledgment. */ }
+    }
+    return error;
+  }
   execute(input: unknown, grant: ClientGrant): Promise<CommandRecord> {
-    if (this.queued >= 32) return Promise.reject(new Fault('COMMAND_BACKPRESSURE'));
+    if (this.queued >= 32) return Promise.reject(this.rejection(input, new Fault('COMMAND_BACKPRESSURE')));
     this.queued++;
-    const work = this.serial.then(() => this.admit(input, grant)).catch(error => {
-      this.failStorage(error); throw error;
+    let admitted = false;
+    const work = this.serial.then(() => this.admit(input, grant, () => { admitted = true; })).catch(error => {
+      this.failStorage(error); throw admitted ? error : this.rejection(input, error);
     }).finally(() => { this.queued--; });
     this.serial = work.catch(() => {}); return work;
   }
-  private async admit(input: unknown, grant: ClientGrant): Promise<CommandRecord> {
+  private async admit(input: unknown, grant: ClientGrant, committed: () => void): Promise<CommandRecord> {
     try { this.clock.check(Date.now(), performance.now()); } catch (error) { this.disconnect('CLOCK_CONTINUITY_UNKNOWN'); throw error; }
     const command = validate<FleetCommand>('command', input);
     const intent = command.intent;
@@ -97,6 +110,7 @@ export class HubKernel {
       if (created) this.lanes.push(created);
       this.save();
     });
+    committed();
     this.publish();
     if (created) {
       record.status = 'SUCCEEDED'; this.journal.update(command.commandId, record); this.journal.append('LOGICAL_ONLY', command.commandId, { nativeCreated: false }); this.publish(); return record;

@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { canonical, digest, parseJson, validate, Fault, ClockFence, type EdgeCommand } from '../packages/contracts/index.ts';
 import { Journal } from '../packages/journal/index.ts';
-import { HubKernel } from '../apps/hub/kernel.ts';
+import { HubKernel, AdmissionRejected } from '../apps/hub/kernel.ts';
 import { EdgeKernel } from '../apps/edge/kernel.ts';
 import { FixtureNative, grant, rig } from './helpers.ts';
 
@@ -258,5 +258,18 @@ test('the 24-lane creation limit leaves existing lanes operable', async () => {
     await r.admit('sessionLane.releaseControl', {}, lane);
     assert.equal(r.hub.snapshot().lanes[0]!.fence.controller, null);
     assert.equal(r.native.turns, 1);
+  } finally { r.close(); }
+});
+
+test('pre-admission rejection is identity-bound and never labels post-admission storage uncertainty', async () => {
+  const r = rig(); try {
+    const lane = await r.setup(); const stale = await r.make('sessionLane.continue', {}, lane);
+    await r.admit('sessionLane.releaseControl', {}, lane);
+    await assert.rejects(r.hub.execute(stale, r.client), error => error instanceof AdmissionRejected && error.code === 'STALE_FENCE' && error.commandId === stale.commandId && error.intentDigest === stale.intentDigest);
+    assert.equal(r.hub.lookup(stale.commandId), null); assert.equal(r.native.creates, 0);
+    await r.admit('sessionLane.acquireControl', {}, lane);
+    r.hubJournal.update = () => { throw new Fault('MISSING_JOURNAL_RECORD'); };
+    await assert.rejects(r.admit('sessionLane.continue', {}, lane), error => error instanceof Fault && !(error instanceof AdmissionRejected));
+    assert.equal(r.native.creates, 1); assert.equal(r.hub.status, 'RECOVERY_REQUIRED');
   } finally { r.close(); }
 });

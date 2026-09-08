@@ -6,6 +6,9 @@ import './style.css';
 
 type Client = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; csrf: string };
 const short = (id: string | null | undefined) => id ? id.slice(0, 8) : '—';
+class RequestError extends Error {
+  constructor(readonly status: number, readonly result: Record<string, unknown>) { super(typeof result.error === 'string' ? result.error : 'REQUEST_FAILED'); }
+}
 function App() {
   const [client, setClient] = useState<Client | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -24,7 +27,7 @@ function App() {
   const headers = () => ({ 'Content-Type': 'application/json', 'X-Fleet-Client': clientRef.current?.clientInstanceId ?? '', 'X-Fleet-Csrf': clientRef.current?.csrf ?? '' });
   async function request(url: string, body?: unknown) {
     const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: headers(), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-    const result = await response.json(); if (!response.ok) throw new Error(result.error ?? 'REQUEST_FAILED'); return result;
+    const result = await response.json(); if (!response.ok) throw new RequestError(response.status, result); return result;
   }
   async function refresh() {
     if (refreshing.current) { dirty.current = true; return; }
@@ -83,7 +86,12 @@ function App() {
       if (family === 'logicalSession.create') setSelected(record.plan.laneId);
       if (family === 'turn.submit' && record.status === 'SUCCEEDED') setPrompt('');
       await refresh();
-    } catch (e) { setError(`${(e as Error).message}. Use Check command receipt; no automatic retry.`); }
+    } catch (e) {
+      if (e instanceof RequestError && e.status === 409 && e.result.admission === 'REJECTED_BEFORE_ADMISSION' && e.result.commandId === value.commandId && e.result.intentDigest === value.intentDigest) {
+        sessionStorage.removeItem('fleetsplice.pending'); setPending(null);
+        setError(`${e.message}: command rejected before admission.`); await refresh();
+      } else setError(`${(e as Error).message}. Use Check command receipt; no automatic retry.`);
+    }
     finally { setBusy(false); }
   }
   return <div className="shell">
@@ -94,7 +102,7 @@ function App() {
       {!snapshot?.registered && <button disabled={!available} onClick={() => command('workspace.register', { root: snapshot?.root })}>Register selected Workspace</button>}
       <div className="section-title">Sessions <span>{snapshot?.lanes.length ?? 0}</span></div>
       <nav aria-label="Sessions">{snapshot?.lanes.map(item => <button className={`session ${selected === item.laneId ? 'selected' : ''}`} key={item.laneId} onClick={() => setSelected(item.laneId)}><span>{item.title}</span><small>{item.state}</small></button>)}</nav>
-      <form className="new-session" onSubmit={e => { e.preventDefault(); void command('logicalSession.create', { title }); }}><label htmlFor="title">New session title</label><input id="title" maxLength={80} value={title} onChange={e => setTitle(e.target.value)}/><button disabled={!available || !snapshot?.registered || !title.trim()}>＋ New session</button></form>
+      <form className="new-session" onSubmit={e => { e.preventDefault(); void command('logicalSession.create', { title }); }}><label htmlFor="title">New session title</label><input id="title" maxLength={80} value={title} onChange={e => setTitle(e.target.value)}/><button disabled={!available || !snapshot?.registered || snapshot.lanes.length >= 24 || !title.trim()}>＋ New session</button></form>
       <div className="local-note">On this machine<br/><span>Native Codex · Read-only</span></div>
     </aside>
     <main>

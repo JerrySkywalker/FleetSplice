@@ -184,14 +184,21 @@ export class EdgeKernel {
     this.emit(event);
   }
   quarantine(reason: string): void {
-    this.blocked = reason; this.journal.set('blocked', reason);
-    for (const [laneId, lane] of Object.entries(this.lanes)) {
-      if (lane.activeStep) {
-        lane.state = reason === 'BLOCKED_UNSUPPORTED_APPROVAL' ? reason : 'AMBIGUOUS_EFFECT';
-        this.emit({ laneId, edgeCommandId: lane.activeStep, kind: 'blocked', text: reason, threadId: lane.threadId, turnId: lane.turnId, status: lane.state });
+    this.blocked = reason;
+    const events: NativeEvent[] = [];
+    this.journal.transaction(() => {
+      this.journal.set('blocked', reason);
+      for (const [laneId, lane] of Object.entries(this.lanes)) {
+        const edgeCommandId = lane.activeStep ?? lane.creationStep;
+        if (edgeCommandId) {
+          lane.state = reason === 'BLOCKED_UNSUPPORTED_APPROVAL' ? reason : lane.activeStep ? 'AMBIGUOUS_EFFECT' : 'RECOVERY_REQUIRED';
+          const event: NativeEvent = { laneId, edgeCommandId, kind: 'blocked', text: reason, threadId: lane.threadId, turnId: lane.turnId, status: lane.state };
+          this.journal.append('NATIVE_EVENT', edgeCommandId, event); events.push(event);
+        }
       }
-    }
-    this.saveLanes();
+      this.saveLanes();
+    });
+    for (const event of events) this.emit(event);
   }
   async close(): Promise<boolean> {
     this.closing = true; this.connected = false; await this.serial;

@@ -182,3 +182,81 @@ test('pending command queues apply backpressure without dispatching more work', 
     await Promise.all(work); assert.equal(r.delivered.length, 1);
   } finally { r.close(); }
 });
+
+test('Hub storage failures latch recovery even after storage returns and ready is repeated', async () => {
+  for (const operation of ['insert', 'set', 'update'] as const) {
+    const r = rig(); try {
+      const lane = await r.setup(); const deliveredBefore = r.delivered.length;
+      const original = r.hubJournal[operation];
+      r.hubJournal[operation] = () => { throw new Error('injected Hub storage failure'); };
+      await assert.rejects(r.admit('sessionLane.continue', {}, lane), /injected Hub storage failure/);
+      Object.assign(r.hubJournal, { [operation]: original });
+      const nativeExpected = operation === 'update' ? 1 : 0;
+      assert.equal(r.native.creates, nativeExpected);
+      assert.equal(r.delivered.length, deliveredBefore + nativeExpected);
+      assert.equal(r.hub.status, 'RECOVERY_REQUIRED');
+      r.hub.ready(false);
+      assert.equal(r.hub.snapshot().lanes[0]!.state, 'RECOVERY_REQUIRED');
+      await assert.rejects(r.admit('sessionLane.continue', {}, lane), /RECOVERY_REQUIRED/);
+      assert.equal(r.native.creates, nativeExpected);
+    } finally { r.close(); }
+  }
+});
+
+test('control receipts preserve native completion and quarantine in either event order', async () => {
+  for (const family of ['sessionLane.acquireControl', 'sessionLane.releaseControl'] as const) {
+    for (const observation of ['completed', 'blocked'] as const) {
+      for (const eventFirst of [true, false]) {
+        const r = rig(); try {
+          const lane = await r.setup(); await r.admit('sessionLane.continue', {}, lane);
+          await r.admit('turn.submit', { text: 'in flight' }, lane);
+          if (family === 'sessionLane.acquireControl') await r.admit('sessionLane.releaseControl', {}, lane);
+          const observe = () => observation === 'completed' ? r.native.complete() : r.native.signals.emit('fault', 'NATIVE_EXITED');
+          if (eventFirst) r.beforeReceipt(command => { if (command.command.intent.family === family) observe(); });
+          const control = await r.admit(family, {}, lane);
+          if (!eventFirst) observe();
+          assert.equal(control.status, 'SUCCEEDED');
+          assert.equal(r.hub.snapshot().lanes[0]!.state, observation === 'completed' ? 'IDLE' : 'AMBIGUOUS_EFFECT');
+          if (observation === 'completed') {
+            r.beforeReceipt(() => {});
+            if (family === 'sessionLane.releaseControl') await r.admit('sessionLane.acquireControl', {}, lane);
+            await r.admit('turn.submit', { text: 'still operable' }, lane); r.native.complete();
+            assert.equal(r.native.turns, 2);
+          } else await assert.rejects(r.admit('sessionLane.continue', {}, lane), /AMBIGUOUS_EFFECT/);
+        } finally { r.close(); }
+      }
+    }
+  }
+});
+
+test('idle native exit publishes durable recovery state before and after a completed turn', async () => {
+  for (const afterTurn of [false, true]) {
+    const r = rig(); try {
+      const lane = await r.setup(); await r.admit('sessionLane.continue', {}, lane);
+      if (afterTurn) { await r.admit('turn.submit', { text: 'done' }, lane); r.native.complete(); }
+      r.native.signals.emit('fault', 'NATIVE_EXITED');
+      assert.equal(r.edge.blocked, 'NATIVE_EXITED');
+      assert.equal(r.hub.snapshot().status, 'RECOVERY_REQUIRED');
+      assert.equal(r.hub.snapshot().lanes[0]!.state, 'RECOVERY_REQUIRED');
+      const saved = r.edgeJournal.db.prepare("select value from evidence where kind='NATIVE_EVENT' order by seq desc limit 1").get()!;
+      assert.equal(JSON.parse(String(saved.value)).status, 'RECOVERY_REQUIRED');
+      await assert.rejects(r.admit('sessionLane.continue', {}, lane), /RECOVERY_REQUIRED/);
+      await assert.rejects(r.admit('turn.submit', { text: 'new' }, lane), /RECOVERY_REQUIRED/);
+      assert.equal(r.native.creates, 1); assert.equal(r.native.turns, afterTurn ? 1 : 0);
+    } finally { r.close(); }
+  }
+});
+
+test('the 24-lane creation limit leaves existing lanes operable', async () => {
+  const r = rig(); try {
+    const lane = await r.setup();
+    for (let index = 1; index < 24; index++) await r.admit('logicalSession.create', { title: `lane ${index}` });
+    await assert.rejects(r.admit('logicalSession.create', { title: 'over limit' }), /LOCAL_SESSION_LIMIT/);
+    assert.equal(r.hub.snapshot().lanes.length, 24);
+    await r.admit('sessionLane.continue', {}, lane);
+    await r.admit('turn.submit', { text: 'at the boundary' }, lane); r.native.complete();
+    await r.admit('sessionLane.releaseControl', {}, lane);
+    assert.equal(r.hub.snapshot().lanes[0]!.fence.controller, null);
+    assert.equal(r.native.turns, 1);
+  } finally { r.close(); }
+});

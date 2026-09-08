@@ -12,6 +12,7 @@ export class HubKernel {
   private outputCharacters = 0;
   private clock = new ClockFence(Date.now(), performance.now());
   private queued = 0;
+  private storageFailed = false;
   constructor(readonly journal: Journal, readonly target: Target, readonly root: string,
     private deliver: (command: EdgeCommand) => Promise<Receipt>, private changed: () => void) {
     this.status = journal.recovered ? 'RECOVERY_REQUIRED' : 'CONNECTING';
@@ -23,12 +24,21 @@ export class HubKernel {
   lookup(id: string): CommandRecord | null { return this.journal.lookup<CommandRecord>(id)?.value ?? null; }
   private publish(): void { this.cursor++; this.changed(); }
   private save(): void { this.journal.set('lanes', this.lanes); this.journal.set('registered', this.registered); }
-  ready(recovered: boolean): void { this.status = this.journal.recovered || recovered ? 'RECOVERY_REQUIRED' : 'READY'; this.publish(); }
-  disconnect(reason = 'EDGE_DISCONNECTED'): void { this.status = reason; this.publish(); }
+  ready(recovered: boolean): void { this.status = this.storageFailed || this.journal.recovered || recovered ? 'RECOVERY_REQUIRED' : 'READY'; this.publish(); }
+  disconnect(reason = 'EDGE_DISCONNECTED'): void { this.status = this.storageFailed ? 'RECOVERY_REQUIRED' : reason; this.publish(); }
+  private failStorage(error: unknown): void {
+    if (error instanceof Fault && error.code !== 'MISSING_JOURNAL_RECORD') return;
+    this.storageFailed = true; this.status = 'RECOVERY_REQUIRED';
+    for (const lane of this.lanes) lane.state = 'RECOVERY_REQUIRED';
+    // The gate must remain closed even when persisting or publishing is unavailable.
+    try { this.publish(); } catch { /* A failed snapshot cannot reopen admission. */ }
+  }
   execute(input: unknown, grant: ClientGrant): Promise<CommandRecord> {
     if (this.queued >= 32) return Promise.reject(new Fault('COMMAND_BACKPRESSURE'));
     this.queued++;
-    const work = this.serial.then(() => this.admit(input, grant)).finally(() => { this.queued--; });
+    const work = this.serial.then(() => this.admit(input, grant)).catch(error => {
+      this.failStorage(error); throw error;
+    }).finally(() => { this.queued--; });
     this.serial = work.catch(() => {}); return work;
   }
   private async admit(input: unknown, grant: ClientGrant): Promise<CommandRecord> {
@@ -45,7 +55,7 @@ export class HubKernel {
     if (priorAlias) { requireThat(priorAlias.digest === command.intentDigest, 'IDEMPOTENCY_CONFLICT'); return this.lookup(String(priorAlias.id))!; }
     requireThat(this.status === 'READY', this.status);
     requireThat(canonical(intent.target) === canonical(this.target), 'STALE_TARGET');
-    requireThat(this.journal.list<CommandRecord>().length < 500 && this.lanes.length < 24, 'LOCAL_SESSION_LIMIT');
+    requireThat(this.journal.list<CommandRecord>().length < 500, 'LOCAL_SESSION_LIMIT');
     const lane = intent.laneId ? this.lanes.find(item => item.laneId === intent.laneId) : undefined;
     const family = intent.family;
     const plan: Plan = { v: 1, planId: randomUUID(), commandId: command.commandId, intentDigest: command.intentDigest, target: structuredClone(intent.target),
@@ -55,6 +65,7 @@ export class HubKernel {
       requireThat(intent.laneId === null && intent.expected === null && intent.body.root === this.root, 'WRONG_WORKSPACE');
       requireThat(!this.registered, 'WORKSPACE_ALREADY_REGISTERED');
     } else if (family === 'logicalSession.create') {
+      requireThat(this.lanes.length < 24, 'LOCAL_SESSION_LIMIT');
       requireThat(this.registered && intent.laneId === null && intent.expected === null, 'WORKSPACE_NOT_REGISTERED');
       created = { sessionId: randomUUID(), laneId: randomUUID(), segmentId: randomUUID(), title: intent.body.title, fence: { epoch: '0', revision: '0', controller: null }, state: 'EMPTY', nativeThreadId: null, nativeTurnId: null, transcript: [] };
       plan.sessionId = created.sessionId; plan.laneId = created.laneId; plan.segmentId = created.segmentId;
@@ -105,7 +116,7 @@ export class HubKernel {
           if (family === 'turn.submit') {
             lane.nativeTurnId = receipt.nativeTurnId;
             if (lane.state === 'PENDING') lane.state = 'RUNNING';
-          } else lane.state = family === 'sessionLane.continue' ? 'IDLE' : formerState!;
+          } else if (lane.state === 'PENDING') lane.state = family === 'sessionLane.continue' ? 'IDLE' : formerState!;
         }
       }
     } catch {
@@ -116,6 +127,9 @@ export class HubKernel {
     this.publish(); return record;
   }
   event(event: NativeEvent): void {
+    try { this.observe(event); } catch (error) { this.failStorage(error); throw error; }
+  }
+  private observe(event: NativeEvent): void {
     const lane = this.lanes.find(item => item.laneId === event.laneId);
     requireThat(lane, 'EVENT_LANE_UNKNOWN');
     const command = this.journal.list<CommandRecord>().find(item => item.plan.steps[0]?.edgeCommandId === event.edgeCommandId);
@@ -125,7 +139,7 @@ export class HubKernel {
       requireThat(command.command.intent.family === 'turn.submit' && event.turnId, 'EVENT_TURN_INVALID');
       lane.nativeTurnId = event.turnId; lane.nativeThreadId = event.threadId;
       lane.transcript.push({ role: 'user', text: command.command.intent.body.text }, { role: 'assistant', text: '' });
-      if (this.status !== 'AMBIGUOUS_EFFECT') lane.state = 'RUNNING';
+      if (this.status === 'READY') lane.state = 'RUNNING';
     } else {
       if (event.kind !== 'blocked') requireThat(event.turnId === lane.nativeTurnId, 'EVENT_TURN_CONFLICT');
       if (event.kind === 'delta') {
@@ -134,7 +148,7 @@ export class HubKernel {
         const last = lane.transcript.at(-1); requireThat(last?.role === 'assistant', 'EVENT_ORDER_INVALID'); last.text += event.text;
       } else if (event.kind === 'turnCompleted') {
         requireThat(['completed', 'interrupted', 'failed'].includes(event.status), 'NATIVE_TERMINAL_UNKNOWN');
-        if (this.status !== 'AMBIGUOUS_EFFECT') lane.state = 'IDLE';
+        if (this.status === 'READY') lane.state = 'IDLE';
         lane.transcript.push({ role: 'system', text: `Turn ${event.status}` });
       } else if (event.kind === 'blocked') {
         this.status = event.status; lane.state = event.status; lane.transcript.push({ role: 'system', text: event.text });

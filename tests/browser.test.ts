@@ -72,6 +72,14 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     await page.getByRole('button', { name: 'Release control' }).click();
     await expect(viewer.getByRole('button', { name: 'Acquire control' })).toBeEnabled();
     await page.screenshot({ path: 'test-results/synthetic-browser.png', fullPage: true });
+    native.signals.emit('fault', 'NATIVE_EXITED');
+    for (const observer of [page, viewer]) {
+      await expect(observer.getByTestId('connection-status')).toHaveText('RECOVERY_REQUIRED');
+      await expect(observer.getByTestId('lane-state')).toHaveText('RECOVERY_REQUIRED');
+      await expect(observer.getByText('Native continuity unavailable', { exact: true })).toBeVisible();
+      await expect(observer.getByRole('button', { name: 'Continue session' })).toBeDisabled();
+      await expect(observer.getByRole('button', { name: 'Acquire control' })).toBeDisabled();
+    }
     assert.deepEqual(consoleErrors, []);
   } finally { await browser.close(); socket.close(); await hub.close(); journal.close(); }
 });

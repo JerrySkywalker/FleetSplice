@@ -44,10 +44,11 @@ export function rig() {
   const identity = target(); const client = grant(); const native = new FixtureNative();
   let verify: () => Promise<void> = async () => {};
   let loseReceipt = false;
+  let beforeReceipt: (command: EdgeCommand) => void = () => {};
   const delivered: EdgeCommand[] = [];
   const edge = new EdgeKernel(edgeJournal, identity, native, () => verify(), event => hub.event(event));
   edge.connected = true;
-  const hub = new HubKernel(hubJournal, identity, 'V:\\disposable-fixture', async command => { delivered.push(command); const result = await edge.execute(command); if (loseReceipt) throw new Error('receipt lost'); return result; }, () => {});
+  const hub = new HubKernel(hubJournal, identity, 'V:\\disposable-fixture', async command => { delivered.push(command); const result = await edge.execute(command); beforeReceipt(command); if (loseReceipt) throw new Error('receipt lost'); return result; }, () => {});
   hub.ready(false);
   async function make(family: Intent['family'], body: unknown = {}, laneId: string | null = null, actor = client): Promise<FleetCommand> {
     const lane = hub.snapshot().lanes.find(item => item.laneId === laneId);
@@ -63,5 +64,6 @@ export function rig() {
   }
   return { directory, hubJournal, edgeJournal, identity, client, native, delivered, hub, edge, make, admit, setup,
     verification: (fn: () => Promise<void>) => { verify = fn; }, loss: (value: boolean) => { loseReceipt = value; },
+    beforeReceipt: (fn: (command: EdgeCommand) => void) => { beforeReceipt = fn; },
     close: () => { hubJournal.close(); edgeJournal.close(); } };
 }

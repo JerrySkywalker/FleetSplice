@@ -24,6 +24,7 @@ test('loopback HTTP and HCP enforce distinct bootstrap, actor, Host, Origin, cli
     assert.equal((await fetch(`${origin}/api/bootstrap`, { method: 'POST', headers: { Origin: 'https://evil.invalid', 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })).status, 403);
     const wrongHost = await new Promise<number>(resolve => { const req = httpRequest(`${origin}/`, { headers: { Host: 'evil.invalid' } }, res => { res.resume(); resolve(res.statusCode!); }); req.end(); });
     assert.equal(wrongHost, 403);
+    assert.equal((await fetch(`${origin}/api/bootstrap`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: 'é'.repeat(64) }) })).status, 403);
     const bootstrap = await fetch(`${origin}/api/bootstrap`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
     assert.equal(bootstrap.status, 200); const cookie = bootstrap.headers.get('set-cookie')!.split(';')[0]!;
     assert.match(bootstrap.headers.get('set-cookie')!, /HttpOnly; SameSite=Strict/);
@@ -36,8 +37,12 @@ test('loopback HTTP and HCP enforce distinct bootstrap, actor, Host, Origin, cli
     assert.equal((await fetch(`${origin}/api/native`, { method: 'POST', headers: { ...headers, Origin: origin, 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
     const duplicate = await fetch(`${origin}/api/commands`, { method: 'POST', headers: { ...headers, Origin: origin, 'Content-Type': 'application/json' }, body: '{"v":1,"v":2}' });
     assert.equal((await duplicate.json() as any).error, 'DUPLICATE_KEY');
-    const rejectedSocket = new WebSocket(`ws://127.0.0.1:${port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', { origin, headers: { Authorization: `Bearer ${token}` } });
-    await new Promise<void>(resolve => rejectedSocket.once('error', () => resolve()));
+    for (const malformed of [token, 'é'.repeat(64)]) {
+      const rejectedSocket = new WebSocket(`ws://127.0.0.1:${port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', { origin, headers: { Authorization: `Bearer ${malformed}` } });
+      await new Promise<void>(resolve => rejectedSocket.once('error', () => resolve()));
+      assert.equal(hub.kernel.status, 'CONNECTING');
+      assert.equal((await fetch(`${origin}/api/snapshot`, { headers })).status, 200);
+    }
     ws = new WebSocket(`ws://127.0.0.1:${port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', { origin, headers: { Authorization: `Bearer ${hcpToken}` }, perMessageDeflate: false });
     await new Promise<void>((resolve, reject) => { ws!.once('open', resolve); ws!.once('error', reject); });
     const ready = new Promise<any>(resolve => ws!.once('message', bytes => resolve(JSON.parse(String(bytes)))));

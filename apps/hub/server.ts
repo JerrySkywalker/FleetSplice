@@ -9,7 +9,10 @@ import { HubKernel, AdmissionRejected, type ClientGrant } from './kernel.ts';
 import { Journal } from '../../packages/journal/index.ts';
 
 export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string };
-const equalSecret = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const equalSecret = (a: string, b: string) => {
+  const left = Buffer.from(a); const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+};
 export async function startHub(config: HubConfig) {
   const origin = `http://127.0.0.1:${config.port}`; const host = `127.0.0.1:${config.port}`;
   const actorId = randomUUID();
@@ -84,7 +87,7 @@ export async function startHub(config: HubConfig) {
       res.writeHead(200, { 'Content-Type': filename.endsWith('.js') ? 'text/javascript' : filename.endsWith('.css') ? 'text/css' : 'text/html' }); res.end(bytes);
     } catch (error) {
       if (res.headersSent) res.end();
-      else if (error instanceof AdmissionRejected) json(res, 409, { error: error.code, admission: 'REJECTED_BEFORE_ADMISSION', commandId: error.commandId, intentDigest: error.intentDigest });
+      else if (error instanceof AdmissionRejected) json(res, 409, { error: error.code, admission: 'REJECTED_BEFORE_ADMISSION', commandId: error.commandId, canonicalCommandId: error.canonicalCommandId, intentDigest: error.intentDigest });
       else json(res, error instanceof Fault && error.code === 'ROUTE_NOT_FOUND' ? 404 : 403, { error: error instanceof Fault ? error.code : 'REQUEST_REJECTED' });
     }
   });

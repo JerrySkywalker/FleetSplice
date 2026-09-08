@@ -4,10 +4,11 @@ import { Journal } from '../../packages/journal/index.ts';
 
 export type ClientGrant = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number };
 export class AdmissionRejected extends Fault {
-  constructor(code: string, readonly commandId: string, readonly intentDigest: string) { super(code); }
+  constructor(code: string, readonly commandId: string, readonly intentDigest: string, readonly canonicalCommandId = commandId) { super(code); }
 }
 type RejectedCommand = { command: FleetCommand; rejectionCode: string };
-type StoredCommand = CommandRecord | RejectedCommand;
+type AliasedCommand = { command: FleetCommand; canonicalCommandId: string };
+type StoredCommand = CommandRecord | RejectedCommand | AliasedCommand;
 export class HubKernel {
   status: string;
   private serial: Promise<unknown> = Promise.resolve();
@@ -27,8 +28,13 @@ export class HubKernel {
     return { status: this.status, target: this.target, root: this.root, registered: this.registered, lanes: structuredClone(this.lanes), commands: this.commands(), cursor: this.cursor.toString() };
   }
   private commands(): CommandRecord[] { return this.journal.list<StoredCommand>().filter((record): record is CommandRecord => 'plan' in record); }
-  private replay(record: StoredCommand): CommandRecord {
-    if ('rejectionCode' in record) throw new AdmissionRejected(record.rejectionCode, record.command.commandId, record.command.intentDigest);
+  private replay(record: StoredCommand, requestedId = record.command.commandId): CommandRecord {
+    if ('canonicalCommandId' in record) {
+      const canonical = this.journal.lookup<StoredCommand>(record.canonicalCommandId);
+      requireThat(canonical && canonical.digest === record.command.intentDigest && !('canonicalCommandId' in canonical.value), 'MISSING_JOURNAL_RECORD');
+      return this.replay(canonical.value, requestedId);
+    }
+    if ('rejectionCode' in record) throw new AdmissionRejected(record.rejectionCode, requestedId, record.command.intentDigest, record.command.commandId);
     return record;
   }
   lookup(id: string): CommandRecord | null {
@@ -79,7 +85,16 @@ export class HubKernel {
     if (previous) { requireThat(previous.digest === command.intentDigest && previous.value.command.idempotencyKey === command.idempotencyKey, 'COMMAND_ID_REUSE_CONFLICT'); return this.replay(previous.value); }
     const alias = canonical({ actor: intent.actorId, grant: intent.grantId, revision: intent.grantRevision, family: intent.family, target: intent.target, lane: intent.laneId, key: command.idempotencyKey });
     const priorAlias = this.journal.db.prepare('SELECT id,digest FROM aliases WHERE alias=?').get(alias);
-    if (priorAlias) { requireThat(priorAlias.digest === command.intentDigest, 'IDEMPOTENCY_CONFLICT'); return this.lookup(String(priorAlias.id))!; }
+    if (priorAlias) {
+      requireThat(priorAlias.digest === command.intentDigest, 'IDEMPOTENCY_CONFLICT');
+      requireThat(this.journal.list<StoredCommand>().length < 500, 'LOCAL_SESSION_LIMIT');
+      const aliased: AliasedCommand = { command, canonicalCommandId: String(priorAlias.id) };
+      this.journal.transaction(() => {
+        this.journal.insert(command.commandId, command.intentDigest, aliased);
+        this.journal.append('COMMAND_ID_ALIAS', command.commandId, aliased);
+      });
+      return this.replay(aliased);
+    }
     requireThat(this.journal.list<StoredCommand>().length < 500, 'LOCAL_SESSION_LIMIT');
     // Only this serialized, absent ID/alias may acquire a retained rejection.
     newIntent(command, alias);

@@ -74,7 +74,12 @@ test('command IDs, scoped aliases and Edge tuples dedupe; changed intent conflic
     const lane = await r.setup(); const command = await r.make('sessionLane.continue', {}, lane);
     const first = await r.hub.execute(command, r.client);
     assert.deepEqual(await r.hub.execute(command, r.client), first);
-    assert.deepEqual(await r.hub.execute({ ...command, commandId: randomUUID() }, r.client), first);
+    const alias = { ...command, commandId: randomUUID() };
+    assert.deepEqual(await r.hub.execute(alias, r.client), first);
+    assert.deepEqual(r.hub.lookup(alias.commandId), first);
+    const reusedAlias = await r.make('turn.submit', { text: 'must not execute' }, lane); reusedAlias.commandId = alias.commandId;
+    await assert.rejects(r.hub.execute(reusedAlias, r.client), /COMMAND_ID_REUSE_CONFLICT/);
+    assert.equal(r.native.turns, 0);
     const delivery = r.delivered.at(-1)!; await r.edge.execute(delivery); assert.equal(r.native.creates, 1);
     const changed = structuredClone(command); changed.intent.expected!.revision = '500'; changed.intentDigest = await digest('intent', changed.intent);
     await assert.rejects(r.hub.execute(changed, r.client), /COMMAND_ID_REUSE_CONFLICT/);
@@ -142,6 +147,8 @@ test('Hub, Edge and combined cold restarts reject old authority and never replay
   const r = rig();
   const lane = await r.setup(); await r.admit('sessionLane.continue', {}, lane);
   const delivery = r.delivered.at(-1)!;
+  const alias = { ...delivery.command, commandId: randomUUID() };
+  await r.hub.execute(alias, r.client);
   r.close();
   const h = new Journal(path.join(r.directory, 'hub.sqlite')); const e = new Journal(path.join(r.directory, 'edge.sqlite'));
   try {
@@ -149,6 +156,7 @@ test('Hub, Edge and combined cold restarts reject old authority and never replay
     const edge = new EdgeKernel(e, r.identity, native, async () => {}, () => {}); edge.connected = true;
     const hub = new HubKernel(h, r.identity, 'V:\\disposable-fixture', value => edge.execute(value), () => {}); hub.ready(false);
     assert.equal(hub.status, 'RECOVERY_REQUIRED'); assert.equal(edge.blocked, 'RECOVERY_REQUIRED');
+    assert.equal(hub.lookup(alias.commandId)!.command.commandId, delivery.command.commandId);
     assert.equal((await edge.execute(delivery)).status, 'SUCCEEDED'); assert.equal(native.creates, 0);
     const altered: EdgeCommand = structuredClone(delivery); altered.edgeCommandId = randomUUID(); altered.plan.steps[0]!.edgeCommandId = altered.edgeCommandId; altered.planDigest = await digest('plan', altered.plan);
     const { stepDigest: _, ...payload } = altered; altered.stepDigest = await digest('step', payload);
@@ -295,7 +303,12 @@ test('a durable busy rejection survives changed conditions and exact or alias re
     } finally { reader.close(); }
     r.native.complete();
     await assert.rejects(r.hub.execute(refused, r.client), isRetained);
-    await assert.rejects(r.hub.execute({ ...refused, commandId: randomUUID() }, r.client), isRetained);
+    const alias = { ...refused, commandId: randomUUID() };
+    const isAliasRetained = (error: unknown) => error instanceof AdmissionRejected && error.code === 'WORKSPACE_BUSY_OR_UNKNOWN' && error.commandId === alias.commandId && error.canonicalCommandId === refused.commandId;
+    await assert.rejects(r.hub.execute(alias, r.client), isAliasRetained);
+    assert.throws(() => r.hub.lookup(alias.commandId), isAliasRetained);
+    const reusedAlias = await r.make('turn.submit', { text: 'changed alias must not run' }, second); reusedAlias.commandId = alias.commandId;
+    await assert.rejects(r.hub.execute(reusedAlias, r.client), /COMMAND_ID_REUSE_CONFLICT/);
     assert.equal(r.native.turns, 1);
     const changed = structuredClone(refused); changed.intent.expected!.revision = '900'; changed.intentDigest = await digest('intent', changed.intent);
     await assert.rejects(r.hub.execute(changed, r.client), error => error instanceof Fault && !(error instanceof AdmissionRejected) && error.code === 'COMMAND_ID_REUSE_CONFLICT');
@@ -312,5 +325,15 @@ test('rejection storage failure closes admission without a definitive acknowledg
     r.hubJournal.insert = () => { throw new Error('rejection storage unavailable'); };
     await assert.rejects(r.hub.execute(stale, r.client), error => error instanceof Error && !(error instanceof AdmissionRejected) && error.message === 'rejection storage unavailable');
     assert.equal(r.hub.status, 'RECOVERY_REQUIRED'); assert.equal(r.native.creates, 0);
+  } finally { r.close(); }
+});
+
+test('alias identity storage failure cannot acknowledge the original outcome', async () => {
+  const r = rig(); try {
+    const lane = await r.setup(); const command = await r.make('sessionLane.continue', {}, lane);
+    await r.hub.execute(command, r.client);
+    r.hubJournal.insert = () => { throw new Error('alias storage unavailable'); };
+    await assert.rejects(r.hub.execute({ ...command, commandId: randomUUID() }, r.client), /alias storage unavailable/);
+    assert.equal(r.hub.status, 'RECOVERY_REQUIRED'); assert.equal(r.native.creates, 1);
   } finally { r.close(); }
 });

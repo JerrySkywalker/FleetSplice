@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat, type Target } from '../packages/contracts/index.ts';
-import { guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
+import { assertFreshIncarnation, guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
 import type { EdgeConfig } from '../apps/edge/main.ts';
 import type { HubConfig } from '../apps/hub/server.ts';
 
@@ -32,14 +32,17 @@ export async function launch(root: string, executable: string, port = 43155, opt
   // User-only evidence boundary. Control tokens never cross argv, logs, journals, or browser URLs.
   execFileSync('icacls.exe', [base, '/inheritance:r', '/grant:r', `*${identity.sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F'], { windowsHide: true, stdio: 'ignore' });
   const currentGuard = guardPath(base);
+  let predecessorTarget: Target | null = null;
   if (existsSync(currentGuard)) {
     const old = JSON.parse(readFileSync(currentGuard, 'utf8')) as Guard;
     const retired = old.state === 'RETIRED_AMBIGUOUS' && typeof old.retirementReceipt === 'string' && existsSync(old.retirementReceipt);
     requireThat(retired || old.state === 'CLOSED' && old.nativeExitObserved === true && old.quiescent === true, 'RECOVERY_REQUIRED');
+    if (retired) predecessorTarget = old.target;
     preserveGuardForRun(base, old);
   }
   const runId = randomUUID(); const directory = path.join(base, runId); mkdirSync(directory);
   const target: Target = { authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: randomUUID(), hostGeneration: '1', environmentId: randomUUID(), environmentGeneration: '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: identity.rootIdentity, agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() };
+  if (predecessorTarget) assertFreshIncarnation(predecessorTarget, target);
   const guard: Guard = { state: 'RUNNING', runId, target, identity, nativeExitObserved: false, quiescent: false };
   // Runtime commit point: no native process exists before this durable guard.
   durableWrite(currentGuard, guard);

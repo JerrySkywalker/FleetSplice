@@ -225,3 +225,7 @@ export function preserveGuardForRun(base: string, guard: Guard): string {
   if (!existsSync(file)) durable(file, guard, true);
   return file;
 }
+
+export function assertFreshIncarnation(previous: Target, next: Target): void {
+  for (const field of ['authorityId', 'hubRuntimeId', 'edgeRuntimeId', 'connectionId', 'agentBindingId', 'executionBindingId', 'providerBindingId'] as const) requireThat(previous[field] !== next[field], 'PREDECESSOR_IDENTITY_REUSE');
+}

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { target } from './helpers.ts';
-import { candidateCodexPaths, classifyPredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, resolveProxy, retireOwnerAuthorizedUnknown, verifyLocalEndpointAvailability } from '../packages/local-operation/index.ts';
+import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, resolveProxy, retireOwnerAuthorizedUnknown, verifyLocalEndpointAvailability } from '../packages/local-operation/index.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
 function fixture(kind: 'none' | 'terminal' | 'ambiguous' = 'none', runId = randomUUID()) {
@@ -67,4 +67,8 @@ test('unknown-effect retirement preserves evidence, records UNKNOWN, and cannot 
   assert.equal(receipt.oldEffectOutcome, 'UNKNOWN'); assert.equal(receipt.oldCommandReplayed, false); assert.equal(receipt.oldAuthorityRuntimeRetired, true); assert.equal(receipt.freshIncarnationRequired, true);
   assert.deepEqual(readFileSync(path.join(state.directory, 'edge.sqlite')), original); assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'RETIRED_AMBIGUOUS');
   assert.throws(() => retireOwnerAuthorizedUnknown(state.base, G05B_OWNER_RETIREMENT_RUN, absent, noConflicts), /OWNER_RETIREMENT_ADMISSION_FAILED|OWNER_RETIREMENT_ALREADY_RECORDED/);
+});
+test('a successor rejects every reusable authority, runtime, connection, or binding identifier', () => {
+  const old = target(); const fresh = target(); assert.doesNotThrow(() => assertFreshIncarnation(old, fresh));
+  assert.throws(() => assertFreshIncarnation(old, { ...fresh, authorityId: old.authorityId }), /PREDECESSOR_IDENTITY_REUSE/);
 });

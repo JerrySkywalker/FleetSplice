@@ -16,9 +16,10 @@ G05A_STARTED=true
 IMPLEMENTATION_AUTHORIZED=G05A_ONLY
 PRODUCT_IMPLEMENTATION_AUTHORIZED=G05A_ONLY
 G05A_PASS=false
-DISPOSITION=IMPLEMENTATION_IN_PROGRESS
+DISPOSITION=CANDIDATE_PENDING_REAL_ACCEPTANCE_AND_INDEPENDENT_REVIEW
 BRANCH=feat/v0.1-m0.1-owner-ux
 G06_STARTED=false
+COMPOSITE_START_RESUME_IMPLEMENTED=false
 ```
 
 G05A changes presentation and browser-local preferences. It cannot change the
@@ -30,3 +31,9 @@ read-only independent review of its literal pushed SHA/tree.
 Final acceptance may be recorded in external Owner-local custody without a
 receipt-only child commit; this candidate-time record then remains historical.
 G06 requires a separate Owner authorization. No main merge is included.
+
+The implementation uses typed zh-CN/en-US catalogs, four semantic appearance
+modes and a compact header dialog. Explicit command handlers remain separate;
+successful acquire provides next-step guidance and keyboard focus only.
+See the [Owner UX guide](../v0.1/g05a-owner-ux.md). New primary evidence is kept
+outside Git under `V:\artifacts\FleetSplice\G05A-005A-01a07e8c`.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer } from 'node:net';
@@ -12,6 +12,7 @@ import { EdgeKernel } from '../apps/edge/kernel.ts';
 import { Journal } from '../packages/journal/index.ts';
 import { canonical, type Hcp } from '../packages/contracts/index.ts';
 import { FixtureNative, target } from './helpers.ts';
+import { expectState, inspectContrast, setPresentation } from './ui-preferences.ts';
 
 test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss lookup without re-emission', async () => {
   const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
@@ -31,21 +32,90 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
   await new Promise<void>(resolve => socket.once('open', resolve));
   socket.send(canonical({ ...envelope, kind: 'hello', identity: { principal: 'fixture', sid: 'fixture', sessionId: 1, elevated: false, root: 'V:\\synthetic-workspace', rootIdentity: identity.rootIdentity }, recovered: false }));
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
-  const context = await browser.newContext({ viewport: { width: 1480, height: 960 } }); const page = await context.newPage();
+  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1480, height: 960 } }); const page = await context.newPage();
   const consoleErrors: string[] = []; page.on('pageerror', error => consoleErrors.push(error.message));
   try {
     await page.goto(`${origin}/#bootstrap=${bootstrapToken}`);
-    await expect(page.getByTestId('connection-status')).toHaveText('READY');
+    await expectState(page.getByTestId('connection-status'), 'READY');
     assert.equal(new URL(page.url()).hash, '');
     await page.getByRole('button', { name: 'Register selected Workspace' }).click();
     await expect(page.getByRole('button', { name: '＋ New session' })).toBeEnabled();
     await page.getByRole('button', { name: '＋ New session' }).click();
-    await expect(page.getByTestId('lane-state')).toHaveText('EMPTY');
+    await expectState(page.getByTestId('lane-state'), 'EMPTY');
     assert.equal(native.creates, 0);
     await page.getByRole('button', { name: 'Acquire control' }).click();
     await expect(page.getByRole('button', { name: 'Continue session' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Continue session' })).toBeFocused();
+    assert.equal(native.creates, 0, 'acquire only guides focus; it cannot create a native thread');
     await page.getByRole('button', { name: 'Continue session' }).click();
-    await expect(page.getByTestId('lane-state')).toHaveText('IDLE');
+    await expectState(page.getByTestId('lane-state'), 'IDLE');
+
+    await expect(page.getByRole('button', { name: 'Release control' })).toBeEnabled();
+    await page.getByLabel('Message Codex').fill('Draft ORBIT-731');
+    const beforePreferences = hub.kernel.snapshot();
+    let preferenceCommandPosts = 0; let preferenceClientPosts = 0;
+    const observePreferences = (request: import('@playwright/test').Request) => {
+      if (request.method() === 'POST' && request.url().endsWith('/api/commands')) preferenceCommandPosts++;
+      if (request.method() === 'POST' && request.url().endsWith('/api/client')) preferenceClientPosts++;
+    };
+    page.on('request', observePreferences);
+    const contrast: unknown[] = [];
+    for (const [locale, theme] of [['zh-CN', 'oled-black'], ['en-US', 'dark'], ['zh-CN', 'light']] as const) {
+      await setPresentation(page, locale, theme);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await expectState(page.getByTestId('lane-state'), 'IDLE', locale);
+      contrast.push({ locale, theme, rows: await inspectContrast(page) });
+      await page.getByTestId('preferences').focus(); await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog')).toBeVisible();
+      contrast.push({ locale, theme, dialog: await inspectContrast(page) });
+      for (let tab = 0; tab < 6; tab++) {
+        await page.keyboard.press('Tab');
+        assert.equal(await page.evaluate(() => document.querySelector('dialog')!.contains(document.activeElement)), true);
+      }
+      await page.keyboard.press('Escape'); await expect(page.getByTestId('preferences')).toBeFocused();
+      if (theme === 'oled-black') {
+        assert.equal(await page.locator('main').evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(0, 0, 0)');
+        await page.screenshot({ path: 'test-results/synthetic-zh-CN-oled-black.png', fullPage: true });
+      }
+      await page.emulateMedia({ colorScheme: theme === 'light' ? 'dark' : 'light' });
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    }
+    await setPresentation(page, 'en-US', 'system');
+    for (const colorScheme of ['dark', 'light'] as const) {
+      await page.emulateMedia({ colorScheme });
+      await expect(page.locator('html')).toHaveAttribute('data-theme', colorScheme);
+    }
+    for (const width of [320, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'narrow UI must not overflow');
+      await expect(page.locator('.context')).toBeVisible();
+      await page.getByRole('button', { name: 'Release control' }).scrollIntoViewIfNeeded();
+      await expect(page.getByRole('button', { name: 'Release control' })).toBeInViewport();
+      await page.getByTestId('preferences').click();
+      await expect(page.getByRole('dialog')).toBeInViewport();
+      await page.keyboard.press('Escape');
+    }
+    await page.setViewportSize({ width: 1480, height: 960 });
+    await setPresentation(page, 'en-US', 'light');
+    assert.deepEqual(await page.evaluate(() => [localStorage.getItem('fleetsplice.locale'), localStorage.getItem('fleetsplice.appearance')]), ['en-US', 'light']);
+    // Main bundle blocked: saved presentation must already apply without React or a new client.
+    for (const [locale, theme] of [['zh-CN', 'oled-black'], ['en-US', 'light']] as const) {
+      await setPresentation(page, locale, theme);
+      const prepaint = await context.newPage();
+      await prepaint.route('**/assets/index-*.js', route => route.abort());
+      await prepaint.goto(origin);
+      await expect(prepaint.locator('html')).toHaveAttribute('lang', locale);
+      await expect(prepaint.locator('html')).toHaveAttribute('data-theme', theme);
+      await expect(prepaint.locator('#root')).toBeEmpty();
+      await prepaint.close();
+    }
+    await expect(page.getByLabel('Message Codex')).toHaveValue('Draft ORBIT-731');
+    assert.deepEqual(hub.kernel.snapshot(), beforePreferences, 'preferences preserve all product state and authority');
+    assert.equal(preferenceCommandPosts, 0); assert.equal(preferenceClientPosts, 0);
+    assert.equal(native.creates, 1); assert.equal(native.turns, 0);
+    page.off('request', observePreferences);
+    await page.screenshot({ path: 'test-results/synthetic-en-US-light.png', fullPage: true });
+    writeFileSync('test-results/owner-ux-contrast.json', JSON.stringify({ qualification: 'SYNTHETIC_OWNER_UX', contrast }, null, 2));
     const viewer = await context.newPage(); await viewer.goto(origin);
     await viewer.getByRole('navigation', { name: 'Sessions' }).getByRole('button').click();
     await expect(viewer.getByRole('button', { name: 'Send message' })).toBeDisabled();
@@ -58,14 +128,21 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     }, { times: 1 });
     await page.getByRole('button', { name: 'Send message' }).click();
     await expect(page.getByRole('button', { name: 'Check command receipt' })).toBeVisible();
-    await expect(page.getByTestId('lane-state')).toHaveText('RUNNING');
+    await expectState(page.getByTestId('lane-state'), 'RUNNING');
     await expect(page.getByRole('button', { name: 'Check command receipt' })).toBeEnabled();
+    const pendingBeforeSwitch = await page.evaluate(() => sessionStorage.getItem('fleetsplice.pending'));
+    await setPresentation(page, 'zh-CN', 'oled-black');
+    await expect(page.getByRole('button', { name: '查询命令回执' })).toBeVisible();
+    await expectState(page.getByTestId('lane-state'), 'RUNNING', 'zh-CN');
+    await setPresentation(page, 'en-US', 'light');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('fleetsplice.pending')), pendingBeforeSwitch);
+    assert.equal(native.turns, 1, 'preference switches cannot retry a lost command');
     native.delta('<img src=x onerror=alert(1)> & real text is escaped'); native.complete();
     await page.getByRole('button', { name: 'Check command receipt' }).click();
     await expect(page.getByTestId('assistant-text')).toContainText('<img src=x');
     assert.equal(await page.locator('.message-text img').count(), 0);
     assert.equal(native.turns, 1);
-    await expect(page.getByTestId('lane-state')).toHaveText('IDLE');
+    await expectState(page.getByTestId('lane-state'), 'IDLE');
     await page.getByRole('button', { name: 'Continue session' }).click();
     await expect(page.getByRole('button', { name: 'Release control' })).toBeEnabled();
     assert.equal(native.creates, 1);
@@ -100,9 +177,9 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     await expect(page.getByRole('button', { name: 'Release control' })).toBeEnabled();
     await page.getByLabel('Message Codex').fill('Existing session remains operable');
     await page.getByRole('button', { name: 'Send message' }).click();
-    await expect(page.getByTestId('lane-state')).toHaveText('RUNNING');
+    await expectState(page.getByTestId('lane-state'), 'RUNNING');
     native.delta('existing session output'); native.complete();
-    await expect(page.getByTestId('lane-state')).toHaveText('IDLE');
+    await expectState(page.getByTestId('lane-state'), 'IDLE');
     assert.equal(native.creates, 1); assert.equal(native.turns, 2);
     // A lost rejection response stays pending until the retained outcome is looked up.
     await viewer.route('**/api/commands', async route => {
@@ -123,12 +200,14 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     await page.screenshot({ path: 'test-results/synthetic-browser.png', fullPage: true });
     native.signals.emit('fault', 'NATIVE_EXITED');
     for (const observer of [page, viewer]) {
-      await expect(observer.getByTestId('connection-status')).toHaveText('RECOVERY_REQUIRED');
-      await expect(observer.getByTestId('lane-state')).toHaveText('RECOVERY_REQUIRED');
+      await expectState(observer.getByTestId('connection-status'), 'RECOVERY_REQUIRED');
+      await expectState(observer.getByTestId('lane-state'), 'RECOVERY_REQUIRED');
       await expect(observer.getByText('Native continuity unavailable', { exact: true })).toBeVisible();
       await expect(observer.getByRole('button', { name: 'Continue session' })).toBeDisabled();
       await expect(observer.getByRole('button', { name: 'Acquire control' })).toBeDisabled();
     }
     assert.deepEqual(consoleErrors, []);
+    await page.setViewportSize({ width: 320, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'recovery machine code remains readable at narrow width');
   } finally { await browser.close(); socket.close(); await hub.close(); journal.close(); }
 });

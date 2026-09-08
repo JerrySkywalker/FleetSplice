@@ -12,9 +12,10 @@ The first local slice is real Codex on SKYFORGE. The first remote product is a
 phone/browser using Tencent Cloud Beijing Hub + WebUI to control SKYFORGE's
 per-user Edge. ZenBook joins in G07.
 
-The Owner has now authorized **G05 only**, the local SKYFORGE walking skeleton.
-See the [local run and verification guide](docs/v0.1/g05-local.md),
-[source provenance](docs/v0.1/g05-provenance.md), and
-[current G05 status](docs/train/G05-status.md). G05 acceptance requires a real
-browser-to-native-Codex stream and a fresh independent review; fixtures do not
-satisfy it. G06 and all remote/multi-host work remain unstarted.
+The Owner has accepted and personally dogfooded G05 and now authorizes
+**G05A only**, a local UX foundation. See the
+[language and appearance guide](docs/v0.1/g05a-owner-ux.md),
+[local run guide](docs/v0.1/g05-local.md), [source provenance](docs/v0.1/g05-provenance.md),
+and [current G05A status](docs/train/G05A-status.md). Fresh real native browser
+acceptance and independent review remain required; fixtures cannot satisfy
+product acceptance. G06 and all remote/multi-host work remain unstarted.

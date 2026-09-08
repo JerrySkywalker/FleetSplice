@@ -72,6 +72,8 @@ test('predecessor classifier distinguishes safe, terminal, ambiguous, live and c
   const result = classifyPredecessor(ambiguous.base, absent, noConflicts); assert.equal(result.kind, 'AMBIGUOUS_TERMINAL'); assert.equal(result.evidence.turnStarted, true); assert.equal(result.evidence.turnCompleted, false); assert.equal(result.exactNativeExitProven, true);
   assert.equal(createHash('sha256').update(readFileSync(edgePath)).digest('hex'), before, 'doctor/status classifier is read-only');
   const live = classifyPredecessor(ambiguous.base, () => ({ exists: true, identity: { processId: 901, creationTime: '2026-09-08T15:07:19.8913688Z' } }), noConflicts); assert.equal(live.kind, 'LIVE_OR_CONFLICTING');
+  const equivalentOffset = classifyPredecessor(ambiguous.base, () => ({ exists: true, identity: { processId: 901, creationTime: '2026-09-08T23:07:19.8913688+08:00' } }), noConflicts); assert.equal(equivalentOffset.kind, 'LIVE_OR_CONFLICTING'); assert.equal(equivalentOffset.exactNativeExitProven, false);
+  assert.equal(classifyPredecessor(ambiguous.base, () => ({ exists: true, identity: { processId: 901, creationTime: 'not-a-time' } }), noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
   assert.equal(classifyPredecessor(ambiguous.base, () => ({ exists: true }), noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
   const corrupt = fixture('none'); writeFileSync(path.join(corrupt.directory, 'admission.json'), '{}'); assert.equal(classifyPredecessor(corrupt.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
 });

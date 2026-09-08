@@ -33,6 +33,21 @@ const durable = (file: string, value: unknown, exclusive = false) => {
   try { writeSync(fd, canonical(value)); fsyncSync(fd); } finally { closeSync(fd); }
 };
 const same = (a: unknown, b: unknown) => canonical(a) === canonical(b);
+const creationTicks = (value: unknown): bigint | null => {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,7}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]), hour = Number(match[4]), minute = Number(match[5]), second = Number(match[6]);
+  const fraction = match[7] ?? '', zone = match[8]!;
+  const wall = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  if (wall.getUTCFullYear() !== year || wall.getUTCMonth() !== month - 1 || wall.getUTCDate() !== day || wall.getUTCHours() !== hour || wall.getUTCMinutes() !== minute || wall.getUTCSeconds() !== second) return null;
+  const offsetHours = Number(zone.slice(1, 3)), offsetRemainder = Number(zone.slice(4, 6));
+  if (zone !== 'Z' && (offsetHours > 23 || offsetRemainder > 59)) return null;
+  const offsetMinutes = zone === 'Z' ? 0 : (zone[0] === '+' ? 1 : -1) * (offsetHours * 60 + offsetRemainder);
+  const epochSeconds = BigInt((wall.getTime() - offsetMinutes * 60000) / 1000);
+  return epochSeconds * 10000000n + BigInt(fraction.padEnd(7, '0'));
+};
+const sameCreation = (left: unknown, right: unknown) => { const a = creationTicks(left), b = creationTicks(right); return a !== null && b !== null && a === b; };
 
 export function candidateNodePaths(env: NodeJS.ProcessEnv = process.env): string[] {
   const local = env.LOCALAPPDATA ?? '';
@@ -167,8 +182,8 @@ export function evidenceFromEdge(file: string): NativeEvidence {
   const results: { key: string; value: any }[] = [];
   const ambiguities: { key: string; value: any }[] = [];
   const exits: { key: string; value: any }[] = [];
-  const validProcess = (value: any): value is ProcessIdentity => !!value && Number.isInteger(value.processId) && value.processId > 0 && typeof value.creationTime === 'string' && !Number.isNaN(Date.parse(value.creationTime));
-  const sameRecordedProcess = (value: any) => validProcess(value) && !!summary.process && value.processId === summary.process.processId && value.creationTime === summary.process.creationTime;
+  const validProcess = (value: any): value is ProcessIdentity => !!value && Number.isInteger(value.processId) && value.processId > 0 && creationTicks(value.creationTime) !== null;
+  const sameRecordedProcess = (value: any) => validProcess(value) && !!summary.process && value.processId === summary.process.processId && sameCreation(value.creationTime, summary.process.creationTime);
   const sameNative = (processId: unknown, instanceId: unknown) => Number.isInteger(processId) && (processId as number) > 0 && !!summary.process && processId === summary.process.processId && typeof instanceId === 'string' && !!summary.instanceId && instanceId === summary.instanceId;
   const displayThread = (threadId: string) => { if (!summary.threadId) summary.threadId = threadId; };
   for (const row of readEvidence(file)) {
@@ -291,11 +306,11 @@ function classifyEvidence(guard: Guard, evidence: NativeEvidence, process: (proc
   let exactNativeExitProven = !evidence.process;
   if (evidence.process) {
     const observed = process(evidence.process.processId);
-    if (observed.exists && !observed.identity) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: [observed], reason: 'NATIVE_PROCESS_IDENTITY_UNPROVABLE' };
-    if (observed.exists && observed.identity?.creationTime === evidence.process.creationTime) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence, exactNativeExitProven: false, conflicts: [observed], reason: 'EXACT_NATIVE_PROCESS_PRESENT' };
+    if (observed.exists && (!observed.identity || !Number.isInteger(observed.identity.processId) || observed.identity.processId !== evidence.process.processId || creationTicks(observed.identity.creationTime) === null)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: [observed], reason: 'NATIVE_PROCESS_IDENTITY_UNPROVABLE' };
+    if (observed.exists && sameCreation(observed.identity!.creationTime, evidence.process.creationTime)) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence, exactNativeExitProven: false, conflicts: [observed], reason: 'EXACT_NATIVE_PROCESS_PRESENT' };
     // A different creation time is explicit PID-reuse evidence, not evidence
     // that the old process remains live.
-    exactNativeExitProven = !observed.exists || observed.identity?.creationTime !== evidence.process.creationTime;
+    exactNativeExitProven = !observed.exists || !sameCreation(observed.identity!.creationTime, evidence.process.creationTime);
   }
   if (evidence.unboundEvidence) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_EVIDENCE_UNBOUND' };
   if (!exactNativeExitProven) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: [], reason: 'NATIVE_IDENTITY_UNPROVABLE' };

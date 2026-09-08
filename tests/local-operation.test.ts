@@ -9,7 +9,7 @@ import { target } from './helpers.ts';
 import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, resolveProxy, retireOwnerAuthorizedUnknown, verifyLocalEndpointAvailability } from '../packages/local-operation/index.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
-function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId = randomUUID()) {
+function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId = randomUUID(), eventBeforeResponse = false) {
   const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-local-operation-')); const directory = path.join(base, runId); mkdirSync(directory);
   const guard = { state: 'RUNNING', runId, target: target(), identity: identity(), nativeExitObserved: false, quiescent: false };
   writeFileSync(path.join(base, 'environment-guard.json'), JSON.stringify(guard)); writeFileSync(path.join(directory, 'admission.json'), JSON.stringify({ runId, target: guard.target, identity: guard.identity }));
@@ -25,8 +25,9 @@ function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' =
     const appendTurn = (complete: boolean) => {
       const commandId = randomUUID(), turnId = randomUUID();
       append('DISPATCH_ATTEMPT', commandId, { attempted: true });
+      if (eventBeforeResponse) append('NATIVE_EVENT', commandId, { kind: 'turnStarted', threadId, turnId, status: 'RUNNING' });
       append('NATIVE_RESULT', commandId, { code: 'NATIVE_TURN_ACCEPTED', nativeThreadId: threadId, nativeTurnId: turnId });
-      append('NATIVE_EVENT', commandId, { kind: 'turnStarted', threadId, turnId, status: 'RUNNING' });
+      if (!eventBeforeResponse) append('NATIVE_EVENT', commandId, { kind: 'turnStarted', threadId, turnId, status: 'RUNNING' });
       if (complete) append('NATIVE_EVENT', commandId, { kind: 'turnCompleted', threadId, turnId, status: 'completed' });
     };
     if (kind !== 'session') appendTurn(kind === 'terminal' || kind === 'multi');
@@ -61,6 +62,7 @@ test('predecessor classifier distinguishes safe, terminal, ambiguous, live and c
   const noEffect = fixture('none'); assert.equal(classifyPredecessor(noEffect.base, absent, noConflicts).kind, 'SAFE_NO_EFFECT');
   const sessionOnly = fixture('session'); assert.equal(classifyPredecessor(sessionOnly.base, absent, noConflicts).kind, 'SAFE_TERMINAL');
   const terminal = fixture('terminal'); assert.equal(classifyPredecessor(terminal.base, absent, noConflicts).kind, 'SAFE_TERMINAL');
+  const responseAfterEvent = fixture('terminal', randomUUID(), true); assert.equal(classifyPredecessor(responseAfterEvent.base, absent, noConflicts).kind, 'SAFE_TERMINAL');
   const ambiguous = fixture('ambiguous'); const edgePath = path.join(ambiguous.directory, 'edge.sqlite'); const before = createHash('sha256').update(readFileSync(edgePath)).digest('hex');
   const result = classifyPredecessor(ambiguous.base, absent, noConflicts); assert.equal(result.kind, 'AMBIGUOUS_TERMINAL'); assert.equal(result.evidence.turnStarted, true); assert.equal(result.evidence.turnCompleted, false); assert.equal(result.exactNativeExitProven, true);
   assert.equal(createHash('sha256').update(readFileSync(edgePath)).digest('hex'), before, 'doctor/status classifier is read-only');

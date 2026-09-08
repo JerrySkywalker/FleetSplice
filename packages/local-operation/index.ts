@@ -21,6 +21,7 @@ export type Predecessor = { kind: PredecessorKind; guard: Guard | null; evidence
 export type QualifiedNode = { path: string; version: string; sqlite: string };
 export type QualifiedCodex = { path: string; version: string; sha256: string };
 export type ProxyResolution = { source: 'explicit-env' | 'windows-user-proxy' | 'windows-system-proxy' | 'direct' | 'invalid'; proxy: string | null; display: string | null; environment: Record<string, string>; reason?: string };
+export type EdgeAdmissionState = 'READY' | 'BLOCKED' | 'UNPROVABLE';
 
 const runtimeRoot = () => path.join(process.env.LOCALAPPDATA ?? '', 'FleetSplice', 'G05');
 export const guardPath = (base = runtimeRoot()) => path.join(base, 'environment-guard.json');
@@ -160,6 +161,7 @@ export function evidenceFromEdge(file: string): NativeEvidence {
   const summary = emptyEvidence();
   const effects = new Map<string, { terminal: boolean; turnId: string | null }>();
   const turn = (turnId: string, commandId: string | null): TurnEvidence => summary.turns[turnId] ??= { turnId, commandId, accepted: false, started: false, completed: false };
+  const events: { key: string; value: any }[] = [];
   for (const row of readEvidence(file)) {
     const value = row.value as any;
     if (row.kind === 'DISPATCH_ATTEMPT') { summary.hasEffectAttempt = true; effects.set(row.key, { terminal: false, turnId: null }); }
@@ -175,14 +177,18 @@ export function evidenceFromEdge(file: string): NativeEvidence {
         if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId;
       } else summary.unboundEvidence = true;
     }
-    if (row.kind === 'NATIVE_EVENT' && (value?.kind === 'turnStarted' || value?.kind === 'turnCompleted')) {
+    if (row.kind === 'NATIVE_EVENT' && (value?.kind === 'turnStarted' || value?.kind === 'turnCompleted')) events.push({ key: row.key, value });
+  }
+  // Codex may signal turnStarted before the associated turn/start RPC reply is
+  // journaled. Correlate events only after the whole durable journal has been
+  // reduced, rather than treating this valid ordering as unbound evidence.
+  for (const { key, value } of events) {
       if (typeof value.turnId !== 'string') { summary.unboundEvidence = true; continue; }
-      const effect = effects.get(row.key); const observed = turn(value.turnId, row.key);
+      const effect = effects.get(key); const observed = turn(value.turnId, key);
       if (!effect || effect.turnId !== value.turnId || !observed.accepted) { summary.unboundEvidence = true; continue; }
       if (value.kind === 'turnStarted') observed.started = true;
       else { observed.completed = true; effect.terminal = true; }
       summary.turnId = value.turnId;
-    }
   }
   const turns = Object.values(summary.turns);
   summary.turnAccepted = turns.some(value => value.accepted);
@@ -192,6 +198,15 @@ export function evidenceFromEdge(file: string): NativeEvidence {
   summary.turnCompleted = turns.length > 0 && turns.every(value => value.accepted && value.started && value.completed);
   summary.unresolvedEffectIds = [...effects.entries()].filter(([, value]) => !value.terminal).map(([key]) => key);
   return summary;
+}
+export function edgeAdmissionState(file: string): EdgeAdmissionState {
+  try {
+    const db = new DatabaseSync(file, { readOnly: true });
+    try {
+      const row = db.prepare("SELECT value FROM kv WHERE key='blocked'").get() as { value?: string } | undefined;
+      return row && typeof JSON.parse(String(row.value)) === 'string' ? 'BLOCKED' : 'READY';
+    } finally { db.close(); }
+  } catch { return 'UNPROVABLE'; }
 }
 function guardIsSound(guard: Guard, base: string): boolean {
   if (!guard || typeof guard.runId !== 'string' || !guard.target || !guard.identity || typeof guard.identity.root !== 'string') return false;

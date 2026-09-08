@@ -103,18 +103,21 @@ async function start(root: string) {
 async function status(readOnly = true) {
   const predecessor = classifyPredecessor(base());
   const proxy = resolveProxy();
+  let runtime = 'UNQUALIFIED', runtimePath = 'UNQUALIFIED', codex = 'UNQUALIFIED', codexHash = 'UNQUALIFIED';
+  try { const qualified = discoverNode([process.execPath]); runtime = `${qualified.version} / SQLite ${qualified.sqlite}`; runtimePath = qualified.path; } catch { /* shown in status */ }
+  try { const qualified = discoverCodex(candidateCodexPaths()); codex = `${qualified.version} / ${qualified.path}`; codexHash = qualified.sha256; } catch { /* shown in status */ }
   if (predecessor.guard?.state === 'RUNNING') {
-    try { const state = await control('status'); const guard = currentGuard()!; output(`FleetSplice: ${state.code}\nHost: SKYFORGE-01\nPrincipal: ${guard.identity.principal}\nElevated: ${guard.identity.elevated}\nWorkspace: ${guard.identity.root}\nSupervisor: ${state.supervisor}\nHub: ${state.hub}\nEdge: ${state.edge}\nNative Codex: ${state.nativeCodex}\nGuard: ${guard.state}\nRun: ${state.runId}\nProxy: ${proxy.display ?? 'direct'}\nProxy source: ${proxy.source}`); return; } catch { /* Stale RUNNING is handled below. */ }
+    try { const state = await control('status'); const guard = currentGuard()!; output(`FleetSplice: ${state.code}\nHost: SKYFORGE-01\nPrincipal: ${guard.identity.principal}\nElevated: ${guard.identity.elevated}\nWorkspace: ${guard.identity.root}\nSupervisor: ${state.supervisor}\nHub: ${state.hub}\nEdge: ${state.edge}\nEdge admission: ${state.edgeAdmission}\nNative Codex: ${state.nativeCodex}\nGuard: ${guard.state}\nRun: ${state.runId}\nNode: ${state.nodeVersion} / SQLite ${state.sqliteVersion}\nNode path: ${state.runtimePath}\nCodex: ${state.codexPath}\nCodex SHA-256: ${state.codexSha256}\nProxy: ${state.proxy}\nProxy source: ${state.proxySource}`); return; } catch { /* Stale RUNNING is handled below. */ }
   }
-  const identity = predecessor.guard?.identity; output(`FleetSplice: ${['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS'].includes(predecessor.kind) ? 'STOPPED' : 'RECOVERY_REQUIRED'}\nHost: SKYFORGE-01\nPrincipal: ${identity?.principal ?? 'unknown'}\nElevated: ${identity?.elevated ?? 'unknown'}\nWorkspace: ${identity?.root ?? 'unknown'}\nSupervisor: STOPPED\nHub: STOPPED\nEdge: STOPPED\nNative Codex: STOPPED\nGuard: ${predecessor.guard?.state ?? 'NONE'}\nProxy source: ${proxy.source}`);
+  const identity = predecessor.guard?.identity; output(`FleetSplice: ${['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS'].includes(predecessor.kind) ? 'STOPPED' : 'RECOVERY_REQUIRED'}\nHost: SKYFORGE-01\nPrincipal: ${identity?.principal ?? 'unknown'}\nElevated: ${identity?.elevated ?? 'unknown'}\nWorkspace: ${identity?.root ?? 'unknown'}\nSupervisor: STOPPED\nHub: STOPPED\nEdge: STOPPED\nNative Codex: STOPPED\nGuard: ${predecessor.guard?.state ?? 'NONE'}\nNode: ${runtime}\nNode path: ${runtimePath}\nCodex: ${codex}\nCodex SHA-256: ${codexHash}\nProxy: ${proxy.display ?? 'direct'}\nProxy source: ${proxy.source}`);
   describePredecessor(predecessor).forEach(output);
   if (!readOnly) output('Machine code: STATUS_NOT_READ_ONLY');
 }
 async function doctor(root: string) {
-  let node = 'UNQUALIFIED', codex = 'UNQUALIFIED'; try { node = `${discoverNode([process.execPath]).version} / SQLite ${process.versions.sqlite}`; } catch { /* shown below */ }
-  try { const qualified = discoverCodex(candidateCodexPaths()); codex = `${qualified.version} / ${qualified.path}`; } catch { /* shown below */ }
+  let node = 'UNQUALIFIED', nodePath = 'UNQUALIFIED', codex = 'UNQUALIFIED', codexHash = 'UNQUALIFIED'; try { const qualified = discoverNode([process.execPath]); node = `${qualified.version} / SQLite ${qualified.sqlite}`; nodePath = qualified.path; } catch { /* shown below */ }
+  try { const qualified = discoverCodex(candidateCodexPaths()); codex = `${qualified.version} / ${qualified.path}`; codexHash = qualified.sha256; } catch { /* shown below */ }
   const proxy = resolveProxy(); const predecessor = classifyPredecessor(base());
-  output(`FleetSplice Doctor (read-only)\nRuntime: ${node}\nCodex: ${codex}\nWorkspace: ${root}\nProxy: ${proxy.display ?? 'direct'}\nProxy source: ${proxy.source}\nNetwork preflight: NOT_RUN_READ_ONLY\nCurrent guard: ${predecessor.guard?.state ?? 'NONE'}\nProcess conflicts: ${predecessor.conflicts.length}\nSafe automatic closure: ${['SAFE_NO_EFFECT', 'SAFE_TERMINAL'].includes(predecessor.kind)}\nExplicit Owner retirement required: ${predecessor.kind === 'AMBIGUOUS_TERMINAL'}`);
+  output(`FleetSplice Doctor (read-only)\nRuntime: ${node}\nRuntime path: ${nodePath}\nCodex: ${codex}\nCodex SHA-256: ${codexHash}\nWorkspace: ${root}\nProxy: ${proxy.display ?? 'direct'}\nProxy source: ${proxy.source}\nNetwork preflight: NOT_RUN_READ_ONLY\nCurrent guard: ${predecessor.guard?.state ?? 'NONE'}\nProcess conflicts: ${predecessor.conflicts.length}\nSafe automatic closure: ${['SAFE_NO_EFFECT', 'SAFE_TERMINAL'].includes(predecessor.kind)}\nExplicit Owner retirement required: ${predecessor.kind === 'AMBIGUOUS_TERMINAL'}`);
   describePredecessor(predecessor).forEach(output);
 }
 function retire(args: string[]) {

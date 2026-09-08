@@ -9,6 +9,9 @@ import { classifyPredecessor, discoverCodex, evidenceFromEdge, probeProcess, res
 import { launch } from './local.ts';
 
 type Control = { token: string; command: 'status' | 'stop' };
+export function supervisorHealthCode(health: { hub: string; edge: string; edgeAdmission: string } | undefined, nativeCodex: string): 'RUNNING' | 'RECOVERY_REQUIRED' {
+  return health?.hub === 'RUNNING' && health.edge === 'RUNNING' && health.edgeAdmission === 'READY' && !['EXITED_OR_REUSED', 'UNPROVABLE'].includes(nativeCodex) ? 'RUNNING' : 'RECOVERY_REQUIRED';
+}
 const durable = (file: string, value: unknown) => { const fd = openSync(file, 'wx', 0o600); try { writeSync(fd, canonical(value)); fsyncSync(fd); } finally { closeSync(fd); } };
 const reply = async (socket: Socket, value: unknown) => await new Promise<void>(resolve => { const done = () => resolve(); socket.once('error', done); socket.end(canonical(value), done); });
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -18,12 +21,12 @@ export async function supervisorEntrypoint() {
   const root = option('--workspace'); const executable = option('--codex');
   requireThat(typeof root === 'string' && typeof executable === 'string', 'SUPERVISOR_USAGE');
   const identity = await localIdentity(root!);
-  discoverCodex([executable!]);
+  const qualifiedCodex = discoverCodex([executable!]);
   const base = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'G05');
   const predecessor = classifyPredecessor(base);
   requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
   const pipe = `\\\\.\\pipe\\fleetsplice-g05-${identity.sid}`;
-  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false;
+  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false; const activeProxy = resolveProxy();
   const server = createServer(socket => {
     let received = ''; let handled = false; socket.setTimeout(10000, () => socket.destroy()); socket.on('error', () => {});
     const handle = async () => {
@@ -31,10 +34,10 @@ export async function supervisorEntrypoint() {
       try { request = JSON.parse(received) as Control; } catch { await reply(socket, { code: 'CONTROL_REQUEST_INVALID' }); return; }
       if (request.token !== token || !['status', 'stop'].includes(request.command)) { await reply(socket, { code: 'CONTROL_AUTH_REJECTED' }); return; }
       if (request.command === 'status') {
-        const health = run?.health(); const healthy = health?.hub === 'RUNNING' && health.edge === 'RUNNING';
+        const health = run?.health();
         let nativeCodex = 'NOT_STARTED';
         if (run) try { const native = evidenceFromEdge(path.join(run.directory, 'edge.sqlite')); if (native.process) { const observed = probeProcess(native.process.processId); nativeCodex = observed.exists && observed.identity?.creationTime === native.process.creationTime ? 'RUNNING' : 'EXITED_OR_REUSED'; } } catch { nativeCodex = 'UNPROVABLE'; }
-        await reply(socket, { code: run ? healthy ? 'RUNNING' : 'RECOVERY_REQUIRED' : 'STARTING', runId: run?.runId ?? null, supervisor: 'RUNNING', hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', nativeCodex, ...(run ? { url: run.url } : {}) }); return;
+        await reply(socket, { code: run ? supervisorHealthCode(health, nativeCodex) : 'STARTING', runId: run?.runId ?? null, supervisor: 'RUNNING', hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', edgeAdmission: health?.edgeAdmission ?? 'STARTING', nativeCodex, runtimePath: process.execPath, nodeVersion: process.version, sqliteVersion: process.versions.sqlite, codexPath: qualifiedCodex.path, codexSha256: qualifiedCodex.sha256, proxy: activeProxy.display ?? 'direct', proxySource: activeProxy.source, ...(run ? { url: run.url } : {}) }); return;
       }
       if (!run || stopping) { await reply(socket, { code: 'STOP_NOT_ADMITTED' }); return; }
       stopping = true; const proven = await run.stop(); await reply(socket, { code: proven ? 'CLOSED' : 'UNKNOWN_CLOSURE', runId: run.runId, nativeExitObserved: proven });
@@ -48,8 +51,7 @@ export async function supervisorEntrypoint() {
   });
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(pipe, resolve); });
   try {
-    const proxy = resolveProxy();
-    run = await launch(root!, executable!, 43155, { environment: { ...process.env, ...proxy.environment }, onGuardCommitted: guard => {
+    run = await launch(root!, executable!, 43155, { environment: { ...process.env, ...activeProxy.environment }, onGuardCommitted: guard => {
       durable(path.join(base, guard.runId, 'control.json'), { pipe, token, runId: guard.runId, identity: guard.identity });
     } });
   } catch (error) {

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat, type Target } from '../packages/contracts/index.ts';
-import { assertFreshIncarnation, classifyPredecessor, guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
+import { assertFreshIncarnation, classifyPredecessor, edgeAdmissionState, guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
 import type { EdgeConfig } from '../apps/edge/main.ts';
 import type { HubConfig } from '../apps/hub/server.ts';
 
@@ -89,7 +89,10 @@ export async function launch(root: string, executable: string, port = 43155, opt
     return proven && hubStopped;
   };
   hub.on('exit', () => { if (!closing && edge?.connected) edge.disconnect(); });
-  const health = () => ({ hub: hub?.exitCode === null ? 'RUNNING' : 'STOPPED', edge: edge?.exitCode === null ? 'RUNNING' : 'STOPPED' });
+  const health = () => {
+    const hubState = hub?.exitCode === null ? 'RUNNING' : 'STOPPED'; const edgeState = edge?.exitCode === null ? 'RUNNING' : 'STOPPED';
+    return { hub: hubState, edge: edgeState, edgeAdmission: edgeState === 'RUNNING' ? edgeAdmissionState(path.join(directory, 'edge.sqlite')) : 'UNPROVABLE' as const };
+  };
   return { url: `http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`, origin: `http://127.0.0.1:${port}`, directory, runId, target, identity, stop, health };
 }
 

@@ -214,7 +214,7 @@ function classifyEvidence(guard: Guard, evidence: NativeEvidence, process: (proc
   if (!exactNativeExitProven) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: [], reason: 'NATIVE_IDENTITY_UNPROVABLE' };
   if (!evidence.hasEffectAttempt) return { kind: 'SAFE_NO_EFFECT', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'NO_NATIVE_EFFECT_ATTEMPT' };
   if (evidence.unboundEvidence) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_EVIDENCE_UNBOUND' };
-  if (evidence.unresolvedEffectIds.length > 0 || !evidence.turnCompleted) return { kind: 'AMBIGUOUS_TERMINAL', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_TERMINAL_EVIDENCE_MISSING' };
+  if (evidence.unresolvedEffectIds.length > 0) return { kind: 'AMBIGUOUS_TERMINAL', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_TERMINAL_EVIDENCE_MISSING' };
   return { kind: 'SAFE_TERMINAL', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'ALL_EFFECT_TERMINAL_EVIDENCE_AND_EXIT_PROVEN' };
 }
 function retiredPredecessor(base: string, guard: Guard, process: (processId: number) => ProcessProbe, conflicts: ProcessProbe[]): Predecessor {

@@ -9,7 +9,10 @@ G05B follows accepted G05 at
 `612810cabe9d6eebb13c24db493df837d1c044a2`.
 
 The visible local capability is safe ordinary-user operation through
-`fleetsplice.ps1 start`, `stop`, `status`, and `doctor`. It must discover the
+`fleetsplice.ps1 start`, `stop`, `status`, and `doctor`. On a host that blocks
+direct PowerShell script loading, the equivalent zero-admin repository-local
+entrypoint is `fleetsplice.cmd start`, `stop`, `status`, and `doctor`; it uses
+only a process-local execution-policy bypass and changes no user policy. It must discover the
 qualified Node/Codex artifacts, resolve a bounded local proxy configuration,
 preflight before a new guard, and use one detached per-user local supervisor.
 The current-user Task Scheduler is only a one-shot launch broker for that

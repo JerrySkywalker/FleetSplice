@@ -61,6 +61,11 @@ function App() {
   const controlled = !!lane && lane.fence.controller === client?.clientInstanceId;
   const available = snapshot?.status === 'READY' && !!client && client.expiresAt > Date.now() && !busy && !pending;
   const receipt = snapshot?.commands.at(-1);
+  function acknowledgeRejection(e: unknown, value: FleetCommand): boolean {
+    if (!(e instanceof RequestError) || e.status !== 409 || e.result.admission !== 'REJECTED_BEFORE_ADMISSION' || e.result.commandId !== value.commandId || e.result.intentDigest !== value.intentDigest) return false;
+    sessionStorage.removeItem('fleetsplice.pending'); setPending(null);
+    setError(`${e.message}: command rejected before admission.`); return true;
+  }
   async function lookupPending() {
     if (!pending) return;
     setBusy(true);
@@ -68,7 +73,7 @@ function App() {
       const record: CommandRecord = await request(`/api/commands/${pending.commandId}`);
       if (record.status === 'ADMITTED' || record.status === 'DISPATCHED') throw new Error('Command remains pending. No new native request was sent.');
       sessionStorage.removeItem('fleetsplice.pending'); setPending(null); setError(record.status === 'SUCCEEDED' ? '' : `${record.status}: ${record.receipt?.code ?? 'effect unknown'}`); await refresh();
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    } catch (e) { if (acknowledgeRejection(e, pending)) await refresh(); else setError((e as Error).message); } finally { setBusy(false); }
   }
   async function command(family: Intent['family'], body: unknown = {}) {
     if (!available || !client || !snapshot) return;
@@ -87,10 +92,8 @@ function App() {
       if (family === 'turn.submit' && record.status === 'SUCCEEDED') setPrompt('');
       await refresh();
     } catch (e) {
-      if (e instanceof RequestError && e.status === 409 && e.result.admission === 'REJECTED_BEFORE_ADMISSION' && e.result.commandId === value.commandId && e.result.intentDigest === value.intentDigest) {
-        sessionStorage.removeItem('fleetsplice.pending'); setPending(null);
-        setError(`${e.message}: command rejected before admission.`); await refresh();
-      } else setError(`${(e as Error).message}. Use Check command receipt; no automatic retry.`);
+      if (acknowledgeRejection(e, value)) await refresh();
+      else setError(`${(e as Error).message}. Use Check command receipt; no automatic retry.`);
     }
     finally { setBusy(false); }
   }

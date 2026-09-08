@@ -176,10 +176,11 @@ test('a failed Edge journal closes admission before any native write', async () 
 });
 test('pending command queues apply backpressure without dispatching more work', async () => {
   const r = rig(); try {
-    const command = await r.make('workspace.register', { root: 'V:\\disposable-fixture' });
+    const lane = await r.setup(); const deliveredBefore = r.delivered.length;
+    const command = await r.make('sessionLane.continue', {}, lane);
     const work = Array.from({ length: 32 }, () => r.hub.execute(command, r.client));
-    await assert.rejects(r.hub.execute(command, r.client), /COMMAND_BACKPRESSURE/);
-    await Promise.all(work); assert.equal(r.delivered.length, 1);
+    await assert.rejects(r.hub.execute(command, r.client), error => error instanceof Fault && !(error instanceof AdmissionRejected) && error.code === 'COMMAND_BACKPRESSURE');
+    await Promise.all(work); assert.equal(r.delivered.length, deliveredBefore + 1); assert.equal(r.native.creates, 1);
   } finally { r.close(); }
 });
 
@@ -266,10 +267,50 @@ test('pre-admission rejection is identity-bound and never labels post-admission 
     const lane = await r.setup(); const stale = await r.make('sessionLane.continue', {}, lane);
     await r.admit('sessionLane.releaseControl', {}, lane);
     await assert.rejects(r.hub.execute(stale, r.client), error => error instanceof AdmissionRejected && error.code === 'STALE_FENCE' && error.commandId === stale.commandId && error.intentDigest === stale.intentDigest);
-    assert.equal(r.hub.lookup(stale.commandId), null); assert.equal(r.native.creates, 0);
+    assert.throws(() => r.hub.lookup(stale.commandId), error => error instanceof AdmissionRejected && error.code === 'STALE_FENCE'); assert.equal(r.native.creates, 0);
     await r.admit('sessionLane.acquireControl', {}, lane);
     r.hubJournal.update = () => { throw new Fault('MISSING_JOURNAL_RECORD'); };
     await assert.rejects(r.admit('sessionLane.continue', {}, lane), error => error instanceof Fault && !(error instanceof AdmissionRejected));
     assert.equal(r.native.creates, 1); assert.equal(r.hub.status, 'RECOVERY_REQUIRED');
+  } finally { r.close(); }
+});
+
+test('a durable busy rejection survives changed conditions and exact or alias replay', async () => {
+  const r = rig(); try {
+    const first = await r.setup(); await r.admit('sessionLane.continue', {}, first);
+    const firstThread = r.native.threadId;
+    const second = (await r.admit('logicalSession.create', { title: 'second lane' })).plan.laneId!;
+    await r.admit('sessionLane.acquireControl', {}, second);
+    r.native.threadId = randomUUID(); const secondThread = r.native.threadId;
+    await r.admit('sessionLane.continue', {}, second);
+    r.native.threadId = firstThread; await r.admit('turn.submit', { text: 'running elsewhere' }, first);
+    const refused = await r.make('turn.submit', { text: 'must remain rejected' }, second);
+    const isRetained = (error: unknown) => error instanceof AdmissionRejected && error.code === 'WORKSPACE_BUSY_OR_UNKNOWN' && error.commandId === refused.commandId;
+    await assert.rejects(r.hub.execute(refused, r.client), isRetained);
+    const reader = new DatabaseSync(path.join(r.directory, 'hub.sqlite'), { readOnly: true });
+    try {
+      const row = reader.prepare('SELECT value FROM records WHERE id=?').get(refused.commandId)!;
+      assert.equal(JSON.parse(String(row.value)).rejectionCode, 'WORKSPACE_BUSY_OR_UNKNOWN');
+      assert.equal(reader.prepare('SELECT count(*) AS n FROM aliases WHERE id=?').get(refused.commandId)!.n, 1);
+    } finally { reader.close(); }
+    r.native.complete();
+    await assert.rejects(r.hub.execute(refused, r.client), isRetained);
+    await assert.rejects(r.hub.execute({ ...refused, commandId: randomUUID() }, r.client), isRetained);
+    assert.equal(r.native.turns, 1);
+    const changed = structuredClone(refused); changed.intent.expected!.revision = '900'; changed.intentDigest = await digest('intent', changed.intent);
+    await assert.rejects(r.hub.execute(changed, r.client), error => error instanceof Fault && !(error instanceof AdmissionRejected) && error.code === 'COMMAND_ID_REUSE_CONFLICT');
+    r.native.threadId = secondThread; await r.admit('turn.submit', { text: 'new explicit command' }, second); r.native.complete();
+    assert.equal(r.native.turns, 2);
+    assert.equal(r.hubJournal.db.prepare("SELECT count(*) AS n FROM evidence WHERE kind='REJECTED_BEFORE_ADMISSION' AND key=?").get(refused.commandId)!.n, 1);
+  } finally { r.close(); }
+});
+
+test('rejection storage failure closes admission without a definitive acknowledgment', async () => {
+  const r = rig(); try {
+    const lane = await r.setup(); const stale = await r.make('sessionLane.continue', {}, lane);
+    await r.admit('sessionLane.releaseControl', {}, lane);
+    r.hubJournal.insert = () => { throw new Error('rejection storage unavailable'); };
+    await assert.rejects(r.hub.execute(stale, r.client), error => error instanceof Error && !(error instanceof AdmissionRejected) && error.message === 'rejection storage unavailable');
+    assert.equal(r.hub.status, 'RECOVERY_REQUIRED'); assert.equal(r.native.creates, 0);
   } finally { r.close(); }
 });

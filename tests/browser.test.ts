@@ -75,6 +75,9 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
       await expect(page.getByRole('button', { name: '＋ New session' })).toBeEnabled();
     }
     await page.getByRole('navigation', { name: 'Sessions' }).getByRole('button').first().click();
+    await expect(viewer.getByRole('navigation', { name: 'Sessions' }).getByRole('button')).toHaveCount(23);
+    const staleSnapshot = hub.kernel.snapshot();
+    await viewer.route('**/api/snapshot', route => route.fulfill({ json: staleSnapshot }));
     // Another admitted creation fills the last slot after this tab has formed its command.
     await page.route('**/api/commands', async route => {
       const original = route.request().postDataJSON();
@@ -101,6 +104,20 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     native.delta('existing session output'); native.complete();
     await expect(page.getByTestId('lane-state')).toHaveText('IDLE');
     assert.equal(native.creates, 1); assert.equal(native.turns, 2);
+    // A lost rejection response stays pending until the retained outcome is looked up.
+    await viewer.route('**/api/commands', async route => {
+      const rejected = await route.fetch(); assert.equal(rejected.status(), 409);
+      await route.abort('failed');
+    }, { times: 1 });
+    await viewer.getByRole('button', { name: '＋ New session' }).click();
+    await expect(viewer.getByRole('button', { name: 'Check command receipt' })).toBeEnabled();
+    assert.notEqual(await viewer.evaluate(() => sessionStorage.getItem('fleetsplice.pending')), null);
+    await viewer.unroute('**/api/snapshot');
+    await viewer.getByRole('button', { name: 'Check command receipt' }).click();
+    await expect(viewer.getByRole('alert')).toContainText('command rejected before admission');
+    await expect(viewer.getByRole('button', { name: 'Check command receipt' })).toHaveCount(0);
+    await expect(viewer.getByRole('button', { name: '＋ New session' })).toBeDisabled();
+    assert.equal(native.turns, 2);
     await page.getByRole('button', { name: 'Release control' }).click();
     await expect(viewer.getByRole('button', { name: 'Acquire control' })).toBeEnabled();
     await page.screenshot({ path: 'test-results/synthetic-browser.png', fullPage: true });

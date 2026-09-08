@@ -6,6 +6,8 @@ export type ClientGrant = { actorId: string; clientInstanceId: string; grantId: 
 export class AdmissionRejected extends Fault {
   constructor(code: string, readonly commandId: string, readonly intentDigest: string) { super(code); }
 }
+type RejectedCommand = { command: FleetCommand; rejectionCode: string };
+type StoredCommand = CommandRecord | RejectedCommand;
 export class HubKernel {
   status: string;
   private serial: Promise<unknown> = Promise.resolve();
@@ -22,9 +24,16 @@ export class HubKernel {
     this.lanes = journal.get<Lane[]>('lanes') ?? []; this.registered = journal.get<boolean>('registered') ?? false;
   }
   snapshot(): Snapshot {
-    return { status: this.status, target: this.target, root: this.root, registered: this.registered, lanes: structuredClone(this.lanes), commands: this.journal.list<CommandRecord>(), cursor: this.cursor.toString() };
+    return { status: this.status, target: this.target, root: this.root, registered: this.registered, lanes: structuredClone(this.lanes), commands: this.commands(), cursor: this.cursor.toString() };
   }
-  lookup(id: string): CommandRecord | null { return this.journal.lookup<CommandRecord>(id)?.value ?? null; }
+  private commands(): CommandRecord[] { return this.journal.list<StoredCommand>().filter((record): record is CommandRecord => 'plan' in record); }
+  private replay(record: StoredCommand): CommandRecord {
+    if ('rejectionCode' in record) throw new AdmissionRejected(record.rejectionCode, record.command.commandId, record.command.intentDigest);
+    return record;
+  }
+  lookup(id: string): CommandRecord | null {
+    const stored = this.journal.lookup<StoredCommand>(id); return stored ? this.replay(stored.value) : null;
+  }
   private publish(): void { this.cursor++; this.changed(); }
   private save(): void { this.journal.set('lanes', this.lanes); this.journal.set('registered', this.registered); }
   ready(recovered: boolean): void { this.status = this.storageFailed || this.journal.recovered || recovered ? 'RECOVERY_REQUIRED' : 'READY'; this.publish(); }
@@ -36,39 +45,46 @@ export class HubKernel {
     // The gate must remain closed even when persisting or publishing is unavailable.
     try { this.publish(); } catch { /* A failed snapshot cannot reopen admission. */ }
   }
-  private rejection(input: unknown, error: unknown): unknown {
-    if (error instanceof Fault && !this.storageFailed) {
-      try {
-        const command = validate<FleetCommand>('command', input);
-        return new AdmissionRejected(error.code, command.commandId, command.intentDigest);
-      } catch { /* Malformed requests receive no command-specific acknowledgment. */ }
-    }
-    return error;
-  }
   execute(input: unknown, grant: ClientGrant): Promise<CommandRecord> {
-    if (this.queued >= 32) return Promise.reject(this.rejection(input, new Fault('COMMAND_BACKPRESSURE')));
+    // Queue pressure cannot prove that another delivery of this ID has no effect.
+    if (this.queued >= 32) return Promise.reject(new Fault('COMMAND_BACKPRESSURE'));
     this.queued++;
-    let admitted = false;
-    const work = this.serial.then(() => this.admit(input, grant, () => { admitted = true; })).catch(error => {
-      this.failStorage(error); throw admitted ? error : this.rejection(input, error);
+    const admission: { committed: boolean; newIntent: { command: FleetCommand; alias: string } | null } = { committed: false, newIntent: null };
+    const work = this.serial.then(() => this.admit(input, grant, () => { admission.committed = true; }, (command, alias) => { admission.newIntent = { command, alias }; })).catch(error => {
+      this.failStorage(error);
+      if (!admission.committed && admission.newIntent && error instanceof Fault && !this.storageFailed) {
+        const { command, alias } = admission.newIntent;
+        const rejected: RejectedCommand = { command, rejectionCode: error.code };
+        try {
+          this.journal.transaction(() => {
+            this.journal.insert(command.commandId, command.intentDigest, rejected);
+            this.journal.db.prepare('INSERT INTO aliases VALUES(?,?,?)').run(alias, command.commandId, command.intentDigest);
+            this.journal.append('REJECTED_BEFORE_ADMISSION', command.commandId, rejected);
+          });
+        } catch (storageError) { this.failStorage(storageError); throw storageError; }
+        throw new AdmissionRejected(error.code, command.commandId, command.intentDigest);
+      }
+      throw error;
     }).finally(() => { this.queued--; });
     this.serial = work.catch(() => {}); return work;
   }
-  private async admit(input: unknown, grant: ClientGrant, committed: () => void): Promise<CommandRecord> {
+  private async admit(input: unknown, grant: ClientGrant, committed: () => void, newIntent: (command: FleetCommand, alias: string) => void): Promise<CommandRecord> {
     try { this.clock.check(Date.now(), performance.now()); } catch (error) { this.disconnect('CLOCK_CONTINUITY_UNKNOWN'); throw error; }
     const command = validate<FleetCommand>('command', input);
     const intent = command.intent;
     requireThat(command.intentDigest === await digest('intent', intent), 'INTENT_DIGEST_MISMATCH');
     for (const field of ['actorId', 'clientInstanceId', 'grantId', 'grantRevision'] as const) requireThat(intent[field] === grant[field], 'WRONG_ACTOR_OR_GRANT');
     requireThat(grant.expiresAt > Date.now(), 'GRANT_EXPIRED');
-    const previous = this.journal.lookup<CommandRecord>(command.commandId);
-    if (previous) { requireThat(previous.digest === command.intentDigest && previous.value.command.idempotencyKey === command.idempotencyKey, 'COMMAND_ID_REUSE_CONFLICT'); return previous.value; }
+    const previous = this.journal.lookup<StoredCommand>(command.commandId);
+    if (previous) { requireThat(previous.digest === command.intentDigest && previous.value.command.idempotencyKey === command.idempotencyKey, 'COMMAND_ID_REUSE_CONFLICT'); return this.replay(previous.value); }
     const alias = canonical({ actor: intent.actorId, grant: intent.grantId, revision: intent.grantRevision, family: intent.family, target: intent.target, lane: intent.laneId, key: command.idempotencyKey });
     const priorAlias = this.journal.db.prepare('SELECT id,digest FROM aliases WHERE alias=?').get(alias);
     if (priorAlias) { requireThat(priorAlias.digest === command.intentDigest, 'IDEMPOTENCY_CONFLICT'); return this.lookup(String(priorAlias.id))!; }
+    requireThat(this.journal.list<StoredCommand>().length < 500, 'LOCAL_SESSION_LIMIT');
+    // Only this serialized, absent ID/alias may acquire a retained rejection.
+    newIntent(command, alias);
     requireThat(this.status === 'READY', this.status);
     requireThat(canonical(intent.target) === canonical(this.target), 'STALE_TARGET');
-    requireThat(this.journal.list<CommandRecord>().length < 500, 'LOCAL_SESSION_LIMIT');
     const lane = intent.laneId ? this.lanes.find(item => item.laneId === intent.laneId) : undefined;
     const family = intent.family;
     const plan: Plan = { v: 1, planId: randomUUID(), commandId: command.commandId, intentDigest: command.intentDigest, target: structuredClone(intent.target),
@@ -146,7 +162,7 @@ export class HubKernel {
   private observe(event: NativeEvent): void {
     const lane = this.lanes.find(item => item.laneId === event.laneId);
     requireThat(lane, 'EVENT_LANE_UNKNOWN');
-    const command = this.journal.list<CommandRecord>().find(item => item.plan.steps[0]?.edgeCommandId === event.edgeCommandId);
+    const command = this.commands().find(item => item.plan.steps[0]?.edgeCommandId === event.edgeCommandId);
     requireThat(command && command.plan.laneId === lane.laneId, 'EVENT_STEP_UNKNOWN');
     if (lane.nativeThreadId) requireThat(lane.nativeThreadId === event.threadId, 'EVENT_THREAD_CONFLICT');
     if (event.kind === 'turnStarted') {

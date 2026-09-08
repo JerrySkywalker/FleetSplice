@@ -1,13 +1,16 @@
 # FleetSplice repository rules
 
 FleetSplice Architecture 0.1 is accepted. `ARCHITECTURE_0_1_READY=true`.
-Product implementation remains gated: `IMPLEMENTATION_AUTHORIZED=false` and
-`PRODUCT_IMPLEMENTATION_AUTHORIZED=false`.
+The Owner accepted G04A at `ccba0315eaba214902e93f383cd1359f042bc773`
+and authorized G05 only. `IMPLEMENTATION_AUTHORIZED=G05_ONLY` and
+`PRODUCT_IMPLEMENTATION_AUTHORIZED=G05_ONLY`. See `docs/train/G05-status.md`
+and `goals/FLEETSPLICE-V0_1-M0-WALKING-SKELETON-005.md`. Do not begin G06.
 
 Current accepted baseline: `docs/architecture/baseline-0.1.md`.
 Current normative amendment: `docs/architecture/amendments/g04a-visible-mvp-simplification.md`.
 Read its exact supersession register before applying accepted baseline/ADR clauses.
-Current acceptance flags: `docs/train/G04A-status.md`.
+Current G05 status: `docs/train/G05-status.md`.
+Accepted pre-development flags: `docs/train/G04A-status.md`.
 Historical working baseline: `docs/architecture/baseline-0.0.md`.
 Current research program: `docs/research/research-program-0.1.md`.
 
@@ -24,5 +27,5 @@ Current research program: `docs/research/research-program-0.1.md`.
 11. Baseline 0.0 is a working hypothesis set, not implementation authority. Research is expected to challenge it.
 12. No product source tree, package manifest, runtime dependency, service, deployment, or CI workflow is authorized before exact-head G04/G04A acceptance and an explicit Owner instruction to resume G05. Contract PASS and Station A readiness alone do not start implementation.
 13. `VISIBLE_INCREMENT_RULE=true`: every major implementation Goal ends with an Owner-operable, observable capability; any infrastructure-only exception must cite a concrete unavoidable dependency.
-14. G04A is documentation only. No product, package/dependency/CI/deployment, Tencent mutation, enrollment or credential creation. `G05_STARTED=false` and `OWNER_RESUME_REQUIRED_FOR_G05=true`.
+14. G04A was documentation only; its historical stop flags are preserved. The subsequent Owner instruction authorizes only G05 on SKYFORGE. No Tencent deployment, ZenBook, G06, ACP, TUI, Admin/WSL, provider migration or later hardening.
 15. G03 Git objects, research, fixtures and historical receipts are immutable evidence. Normative corrections live in additive amendments; baseline/ADR reader notices do not rewrite their accepted bodies.

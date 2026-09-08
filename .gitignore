@@ -3,3 +3,9 @@
 Thumbs.db
 *.swp
 *~
+
+# G05 build and disposable validation output (runtime state lives outside repos)
+node_modules/
+dist/
+test-results/
+playwright-report/

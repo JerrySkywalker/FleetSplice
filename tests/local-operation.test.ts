@@ -94,6 +94,11 @@ test('retirement binds every result to one positive native process identity and 
   const threadBinding = threadDb.prepare("SELECT value FROM evidence WHERE kind='NATIVE_BINDING'").get() as { value: string };
   threadDb.prepare("UPDATE evidence SET value=? WHERE kind='NATIVE_BINDING'").run(JSON.stringify({ ...JSON.parse(threadBinding.value), threadId: randomUUID() })); threadDb.close();
   assert.equal(classifyPredecessor(contradictoryThread.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const contradictoryEvent = fixture('ambiguous');
+  const eventDb = new DatabaseSync(path.join(contradictoryEvent.directory, 'edge.sqlite'));
+  const event = eventDb.prepare("SELECT value FROM evidence WHERE kind='NATIVE_EVENT' LIMIT 1").get() as { value: string };
+  eventDb.prepare("UPDATE evidence SET value=? WHERE kind='NATIVE_EVENT' AND value=?").run(JSON.stringify({ ...JSON.parse(event.value), threadId: randomUUID() }), event.value); eventDb.close();
+  assert.equal(classifyPredecessor(contradictoryEvent.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
   const contradictoryResult = fixture('ambiguous');
   const resultDb = new DatabaseSync(path.join(contradictoryResult.directory, 'edge.sqlite'));
   const result = resultDb.prepare("SELECT value FROM evidence WHERE kind='NATIVE_RESULT' AND key != (SELECT key FROM evidence WHERE kind='NATIVE_RESULT' LIMIT 1) LIMIT 1").get() as { value: string } | undefined;
@@ -111,6 +116,23 @@ test('retirement binds every result to one positive native process identity and 
   const noEffectNative = fixture('none'); const noEffectDb = new DatabaseSync(path.join(noEffectNative.directory, 'edge.sqlite'));
   noEffectDb.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('NATIVE_PROCESS_IDENTITY', randomUUID(), JSON.stringify({ processId: 901, creationTime: '2026-09-08T15:07:19.8913688Z' })); noEffectDb.close();
   assert.equal(classifyPredecessor(noEffectNative.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const unboundEvent = fixture('none'); const unboundEventDb = new DatabaseSync(path.join(unboundEvent.directory, 'edge.sqlite'));
+  unboundEventDb.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('NATIVE_EVENT', randomUUID(), JSON.stringify({ kind: 'delta', threadId: randomUUID(), turnId: randomUUID(), text: 'unbound' })); unboundEventDb.close();
+  assert.equal(classifyPredecessor(unboundEvent.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+});
+test('multiple bound native threads remain independently correlated', () => {
+  const state = fixture('terminal'); const db = new DatabaseSync(path.join(state.directory, 'edge.sqlite'));
+  const process = db.prepare("SELECT key,value FROM evidence WHERE kind='NATIVE_PROCESS_IDENTITY'").get() as { key: string; value: string };
+  const proof = JSON.parse(process.value) as { processId: number }; const session = randomUUID(), turn = randomUUID(), thread = randomUUID(), turnId = randomUUID();
+  const append = (kind: string, key: string, value: unknown) => db.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run(kind, key, JSON.stringify(value));
+  append('DISPATCH_ATTEMPT', session, { attempted: true });
+  append('NATIVE_BINDING', session, { processId: proof.processId, instanceId: process.key, threadId: thread });
+  append('NATIVE_RESULT', session, { code: 'NATIVE_SESSION_READY', nativeProcessId: proof.processId, nativeInstanceId: process.key, nativeThreadId: thread });
+  append('DISPATCH_ATTEMPT', turn, { attempted: true });
+  append('NATIVE_RESULT', turn, { code: 'NATIVE_TURN_ACCEPTED', nativeProcessId: proof.processId, nativeInstanceId: process.key, nativeThreadId: thread, nativeTurnId: turnId });
+  append('NATIVE_EVENT', turn, { kind: 'turnStarted', threadId: thread, turnId, status: 'RUNNING' });
+  append('NATIVE_EVENT', turn, { kind: 'turnCompleted', threadId: thread, turnId, status: 'completed' }); db.close();
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'SAFE_TERMINAL');
 });
 test('malformed Edge blocker data is not healthy', () => {
   const state = fixture('none'); const db = new DatabaseSync(path.join(state.directory, 'edge.sqlite'));

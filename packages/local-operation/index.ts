@@ -15,7 +15,7 @@ export type ProcessIdentity = { processId: number; creationTime: string; sid?: s
 export type ProcessProbe = { exists: boolean; identity?: ProcessIdentity; name?: string; commandLine?: string };
 export type Guard = { state: string; runId: string; target: Target; identity: { root: string; rootIdentity: string; sid: string; principal: string; sessionId: number; elevated: false }; nativeExitObserved: boolean; quiescent: boolean; [key: string]: unknown };
 export type TurnEvidence = { turnId: string; commandId: string | null; accepted: boolean; started: boolean; completed: boolean };
-export type NativeEvidence = { process: ProcessIdentity | null; instanceId: string | null; threadId: string | null; turnId: string | null; sessionReady: boolean; turnAccepted: boolean; turnStarted: boolean; turnCompleted: boolean; hasEffectAttempt: boolean; turns: Record<string, TurnEvidence>; unresolvedEffectIds: string[]; unboundEvidence: boolean };
+export type NativeEvidence = { process: ProcessIdentity | null; instanceId: string | null; threadId: string | null; turnId: string | null; sessionReady: boolean; turnAccepted: boolean; turnStarted: boolean; turnCompleted: boolean; hasEffectAttempt: boolean; hasNativeEvidence: boolean; turns: Record<string, TurnEvidence>; unresolvedEffectIds: string[]; unboundEvidence: boolean };
 export type PredecessorKind = 'NO_PREDECESSOR' | 'SAFE_NO_EFFECT' | 'SAFE_TERMINAL' | 'AMBIGUOUS_TERMINAL' | 'LIVE_OR_CONFLICTING' | 'CORRUPT_OR_UNPROVABLE' | 'RETIRED_AMBIGUOUS';
 export type Predecessor = { kind: PredecessorKind; guard: Guard | null; evidence: NativeEvidence; exactNativeExitProven: boolean; conflicts: ProcessProbe[]; reason: string; retirementReceipt?: string };
 export type QualifiedNode = { path: string; version: string; sqlite: string };
@@ -152,7 +152,7 @@ export function fleetSpliceProcesses(): ProcessProbe[] {
   try { const raw = execFileSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 8000 }).trim(); if (!raw) return []; const value = JSON.parse(raw); return Array.isArray(value) ? value as ProcessProbe[] : [value as ProcessProbe]; } catch { return [{ exists: true, name: 'PROCESS_INVENTORY_UNAVAILABLE' }]; }
 }
 
-const emptyEvidence = (): NativeEvidence => ({ process: null, instanceId: null, threadId: null, turnId: null, sessionReady: false, turnAccepted: false, turnStarted: false, turnCompleted: false, hasEffectAttempt: false, turns: {}, unresolvedEffectIds: [], unboundEvidence: false });
+const emptyEvidence = (): NativeEvidence => ({ process: null, instanceId: null, threadId: null, turnId: null, sessionReady: false, turnAccepted: false, turnStarted: false, turnCompleted: false, hasEffectAttempt: false, hasNativeEvidence: false, turns: {}, unresolvedEffectIds: [], unboundEvidence: false });
 const readEvidence = (file: string): { kind: string; key: string; value: unknown }[] => {
   const db = new DatabaseSync(file, { readOnly: true });
   try { return db.prepare('SELECT kind,key,value FROM evidence ORDER BY seq').all().map(row => ({ kind: String(row.kind), key: String(row.key), value: JSON.parse(String(row.value)) })); } finally { db.close(); }
@@ -162,26 +162,26 @@ export function evidenceFromEdge(file: string): NativeEvidence {
   const effects = new Map<string, { terminal: boolean; turnId: string | null; bindingThreadId: string | null; threadId: string | null }>();
   const turn = (turnId: string, commandId: string | null): TurnEvidence => summary.turns[turnId] ??= { turnId, commandId, accepted: false, started: false, completed: false };
   const events: { key: string; value: any }[] = [];
+  const threads: { key: string; value: any }[] = [];
   const bindings: { key: string; value: any }[] = [];
   const results: { key: string; value: any }[] = [];
   const validProcess = (value: any): value is ProcessIdentity => !!value && Number.isInteger(value.processId) && value.processId > 0 && typeof value.creationTime === 'string' && !Number.isNaN(Date.parse(value.creationTime));
   const sameRecordedProcess = (value: any) => validProcess(value) && !!summary.process && value.processId === summary.process.processId && value.creationTime === summary.process.creationTime;
   const sameNative = (processId: unknown, instanceId: unknown) => Number.isInteger(processId) && (processId as number) > 0 && !!summary.process && processId === summary.process.processId && typeof instanceId === 'string' && !!summary.instanceId && instanceId === summary.instanceId;
+  const displayThread = (threadId: string) => { if (!summary.threadId) summary.threadId = threadId; };
   for (const row of readEvidence(file)) {
     const value = row.value as any;
     if (row.kind === 'DISPATCH_ATTEMPT') { summary.hasEffectAttempt = true; effects.set(row.key, { terminal: false, turnId: null, bindingThreadId: null, threadId: null }); }
     if (row.kind === 'NATIVE_PROCESS_IDENTITY') {
+      summary.hasNativeEvidence = true;
       if (!validProcess(value) || typeof row.key !== 'string' || !row.key) { summary.unboundEvidence = true; continue; }
       if (summary.process && (!sameRecordedProcess(value) || summary.instanceId !== row.key)) { summary.unboundEvidence = true; continue; }
       summary.process = value as ProcessIdentity; summary.instanceId = row.key;
     }
-    if (row.kind === 'THREAD_OBSERVED') {
-      if (typeof value?.threadId !== 'string' || (summary.threadId && summary.threadId !== value.threadId)) summary.unboundEvidence = true;
-      else summary.threadId = value.threadId;
-    }
-    if (row.kind === 'NATIVE_BINDING') bindings.push({ key: row.key, value });
-    if (row.kind === 'NATIVE_RESULT') results.push({ key: row.key, value });
-    if (row.kind === 'NATIVE_EVENT' && (value?.kind === 'turnStarted' || value?.kind === 'turnCompleted')) events.push({ key: row.key, value });
+    if (row.kind === 'THREAD_OBSERVED') { summary.hasNativeEvidence = true; threads.push({ key: row.key, value }); }
+    if (row.kind === 'NATIVE_BINDING') { summary.hasNativeEvidence = true; bindings.push({ key: row.key, value }); }
+    if (row.kind === 'NATIVE_RESULT') { summary.hasNativeEvidence = true; results.push({ key: row.key, value }); }
+    if (row.kind === 'NATIVE_EVENT') { summary.hasNativeEvidence = true; events.push({ key: row.key, value }); }
   }
   // A retirement proof binds every observed native effect to precisely the
   // process identity whose PID/creation-time absence is checked below.  Never
@@ -189,20 +189,27 @@ export function evidenceFromEdge(file: string): NativeEvidence {
   // as an absent process.
   for (const { key, value } of bindings) {
     const effect = effects.get(key);
-    if (!effect || !sameNative(value?.processId, value?.instanceId) || typeof value?.threadId !== 'string' || (effect.bindingThreadId && effect.bindingThreadId !== value.threadId) || (summary.threadId && summary.threadId !== value.threadId)) { summary.unboundEvidence = true; continue; }
-    effect.bindingThreadId = value.threadId; effect.threadId = value.threadId; summary.threadId = value.threadId; summary.sessionReady = true;
+    if (!effect || !sameNative(value?.processId, value?.instanceId) || typeof value?.threadId !== 'string' || (effect.bindingThreadId && effect.bindingThreadId !== value.threadId)) { summary.unboundEvidence = true; continue; }
+    effect.bindingThreadId = value.threadId; effect.threadId = value.threadId; displayThread(value.threadId); summary.sessionReady = true;
   }
+  for (const { key, value } of threads) {
+    const effect = effects.get(key);
+    if (!effect || typeof value?.threadId !== 'string' || (effect.bindingThreadId && effect.bindingThreadId !== value.threadId) || (effect.threadId && effect.threadId !== value.threadId)) { summary.unboundEvidence = true; continue; }
+    effect.threadId = value.threadId; displayThread(value.threadId);
+  }
+  const boundThreads = new Set([...effects.values()].flatMap(effect => effect.bindingThreadId ? [effect.bindingThreadId] : []));
   for (const { key, value } of results) {
       const effect = effects.get(key);
       if (!effect) { summary.unboundEvidence = true; continue; }
       if (!sameNative(value?.nativeProcessId, value?.nativeInstanceId)) { summary.unboundEvidence = true; continue; }
-      if (typeof value?.nativeThreadId !== 'string' || (effect.bindingThreadId && effect.bindingThreadId !== value.nativeThreadId) || (effect.threadId && effect.threadId !== value.nativeThreadId) || (summary.threadId && summary.threadId !== value.nativeThreadId)) { summary.unboundEvidence = true; continue; }
-      effect.threadId = value.nativeThreadId; summary.threadId = value.nativeThreadId;
+      if (typeof value?.nativeThreadId !== 'string' || (effect.bindingThreadId && effect.bindingThreadId !== value.nativeThreadId) || (effect.threadId && effect.threadId !== value.nativeThreadId)) { summary.unboundEvidence = true; continue; }
+      effect.threadId = value.nativeThreadId; displayThread(value.nativeThreadId);
       if (value?.code === 'NATIVE_SESSION_READY') {
         if (!effect.bindingThreadId) { summary.unboundEvidence = true; continue; }
         summary.sessionReady = true; effect.terminal = true;
       }
       else if (value?.code === 'NATIVE_TURN_ACCEPTED' && typeof value.nativeTurnId === 'string') {
+        if (!boundThreads.has(value.nativeThreadId)) { summary.unboundEvidence = true; continue; }
         const observed = turn(value.nativeTurnId, key); observed.accepted = true; effect.turnId = value.nativeTurnId;
       } else summary.unboundEvidence = true;
   }
@@ -210,12 +217,17 @@ export function evidenceFromEdge(file: string): NativeEvidence {
   // journaled. Correlate events only after the whole durable journal has been
   // reduced, rather than treating this valid ordering as unbound evidence.
   for (const { key, value } of events) {
-      if (typeof value.turnId !== 'string' || typeof value.threadId !== 'string') { summary.unboundEvidence = true; continue; }
-      const effect = effects.get(key); const observed = turn(value.turnId, key);
-      if (!effect || effect.turnId !== value.turnId || !effect.threadId || effect.threadId !== value.threadId || summary.threadId !== value.threadId || !observed.accepted) { summary.unboundEvidence = true; continue; }
-      if (value.kind === 'turnStarted') observed.started = true;
-      else { observed.completed = true; effect.terminal = true; }
-      summary.turnId = value.turnId;
+      const effect = effects.get(key);
+      if (!effect || typeof value?.threadId !== 'string' || !effect.threadId || effect.threadId !== value.threadId || typeof value?.kind !== 'string') { summary.unboundEvidence = true; continue; }
+      displayThread(value.threadId);
+      if (value.kind === 'turnStarted' || value.kind === 'turnCompleted') {
+        if (typeof value.turnId !== 'string') { summary.unboundEvidence = true; continue; }
+        const observed = turn(value.turnId, key);
+        if (effect.turnId !== value.turnId || !observed.accepted) { summary.unboundEvidence = true; continue; }
+        if (value.kind === 'turnStarted') observed.started = true;
+        else { observed.completed = true; effect.terminal = true; }
+        if (!summary.turnId) summary.turnId = value.turnId;
+      } else if (effect.turnId && value.turnId !== effect.turnId) summary.unboundEvidence = true;
   }
   const turns = Object.values(summary.turns);
   summary.turnAccepted = turns.some(value => value.accepted);
@@ -272,7 +284,7 @@ function classifyEvidence(guard: Guard, evidence: NativeEvidence, process: (proc
   if (evidence.unboundEvidence) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_EVIDENCE_UNBOUND' };
   if (!exactNativeExitProven) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: [], reason: 'NATIVE_IDENTITY_UNPROVABLE' };
   if (!evidence.hasEffectAttempt) {
-    if (evidence.process || evidence.instanceId || evidence.threadId || evidence.turnId || evidence.sessionReady || evidence.turnAccepted || evidence.turnStarted || evidence.turnCompleted) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'NATIVE_EVIDENCE_WITHOUT_DISPATCH_ATTEMPT' };
+    if (evidence.hasNativeEvidence || evidence.process || evidence.instanceId || evidence.threadId || evidence.turnId || evidence.sessionReady || evidence.turnAccepted || evidence.turnStarted || evidence.turnCompleted) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'NATIVE_EVIDENCE_WITHOUT_DISPATCH_ATTEMPT' };
     return { kind: 'SAFE_NO_EFFECT', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'NO_NATIVE_EFFECT_ATTEMPT' };
   }
   if (evidence.unresolvedEffectIds.length > 0) return { kind: 'AMBIGUOUS_TERMINAL', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_TERMINAL_EVIDENCE_MISSING' };
@@ -294,6 +306,7 @@ function retiredPredecessor(base: string, guard: Guard, process: (processId: num
   if (receipt?.kind !== 'G05B_OWNER_AUTHORIZED_RETIREMENT' || receipt.runId !== guard.runId || receipt.archive !== archive || receipt.oldEffectOutcome !== 'UNKNOWN' || receipt.oldCommandReplayed !== false || receipt.oldAuthorityRuntimeRetired !== true || receipt.freshIncarnationRequired !== true) return corrupt('RETIREMENT_RECEIPT_CONTRADICTORY', evidence);
   if (archivedGuard.state === 'RETIRED_AMBIGUOUS' || archivedGuard.runId !== guard.runId || !same(archivedGuard.target, guard.target) || !same(archivedGuard.identity, guard.identity) || archivedAdmission.runId !== guard.runId || !same(archivedAdmission.target, guard.target) || !same(archivedAdmission.identity, guard.identity) || !same(receipt.oldTarget, guard.target)) return corrupt('RETIREMENT_ARCHIVE_BINDING_MISMATCH', evidence);
   if (!readableFleetSpliceJournal(path.join(archive, 'hub.sqlite'))) return corrupt('RETIREMENT_HUB_JOURNAL_UNPROVABLE', evidence);
+  if (!readableFleetSpliceJournal(path.join(archive, 'edge.sqlite'))) return corrupt('RETIREMENT_EDGE_JOURNAL_UNPROVABLE', evidence);
   if (!Array.isArray(receipt.evidence) || !receipt.evidence.some((item: any) => item?.name === 'environment-guard.json') || !receipt.evidence.some((item: any) => item?.name === 'admission.json') || !receipt.evidence.some((item: any) => item?.name === 'hub.sqlite') || !receipt.evidence.some((item: any) => item?.name === 'edge.sqlite')) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INCOMPLETE', evidence);
   for (const item of receipt.evidence) {
     if (!item || typeof item.name !== 'string' || path.basename(item.name) !== item.name || !/^[A-Za-z0-9._-]+$/.test(item.name)) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INVALID', evidence);

@@ -10,13 +10,14 @@ import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, close
 import { supervisorProxy } from '../scripts/supervisor.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
+const journalSchema = 'CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL); CREATE TABLE records (id TEXT PRIMARY KEY, digest TEXT NOT NULL, value TEXT NOT NULL); CREATE TABLE aliases (alias TEXT PRIMARY KEY, id TEXT NOT NULL, digest TEXT NOT NULL)';
 function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId = randomUUID(), eventBeforeResponse = false) {
   const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-local-operation-')); const directory = path.join(base, runId); mkdirSync(directory);
   const guard = { state: 'RUNNING', runId, target: target(), identity: identity(), nativeExitObserved: false, quiescent: false };
   writeFileSync(path.join(base, 'environment-guard.json'), JSON.stringify(guard)); writeFileSync(path.join(directory, 'admission.json'), JSON.stringify({ runId, target: guard.target, identity: guard.identity }));
-  const hub = new DatabaseSync(path.join(directory, 'hub.sqlite')); hub.exec('CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL)'); hub.close();
+  const hub = new DatabaseSync(path.join(directory, 'hub.sqlite')); hub.exec(journalSchema); hub.close();
   const edge = new DatabaseSync(path.join(directory, 'edge.sqlite'));
-  edge.exec('CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL)');
+  edge.exec(journalSchema);
   const append = (kindName: string, key: string, value: unknown) => edge.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run(kindName, key, JSON.stringify(value));
   if (kind !== 'none') {
     const instanceId = randomUUID(), threadId = randomUUID();
@@ -88,6 +89,11 @@ test('retirement binds every result to one positive native process identity and 
   const binding = bindingDb.prepare("SELECT value FROM evidence WHERE kind='NATIVE_BINDING'").get() as { value: string };
   bindingDb.prepare("UPDATE evidence SET value=? WHERE kind='NATIVE_BINDING'").run(JSON.stringify({ ...JSON.parse(binding.value), processId: 902 })); bindingDb.close();
   assert.equal(classifyPredecessor(contradictoryBinding.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const contradictoryThread = fixture('ambiguous');
+  const threadDb = new DatabaseSync(path.join(contradictoryThread.directory, 'edge.sqlite'));
+  const threadBinding = threadDb.prepare("SELECT value FROM evidence WHERE kind='NATIVE_BINDING'").get() as { value: string };
+  threadDb.prepare("UPDATE evidence SET value=? WHERE kind='NATIVE_BINDING'").run(JSON.stringify({ ...JSON.parse(threadBinding.value), threadId: randomUUID() })); threadDb.close();
+  assert.equal(classifyPredecessor(contradictoryThread.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
   const contradictoryResult = fixture('ambiguous');
   const resultDb = new DatabaseSync(path.join(contradictoryResult.directory, 'edge.sqlite'));
   const result = resultDb.prepare("SELECT value FROM evidence WHERE kind='NATIVE_RESULT' AND key != (SELECT key FROM evidence WHERE kind='NATIVE_RESULT' LIMIT 1) LIMIT 1").get() as { value: string } | undefined;
@@ -100,10 +106,14 @@ test('retirement binds every result to one positive native process identity and 
   assert.equal(classifyPredecessor(invalidIdentity.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
   const missingHub = fixture('ambiguous'); unlinkSync(path.join(missingHub.directory, 'hub.sqlite'));
   assert.equal(classifyPredecessor(missingHub.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const unrelatedHub = fixture('ambiguous'); const hubDb = new DatabaseSync(path.join(unrelatedHub.directory, 'hub.sqlite')); hubDb.exec('DROP TABLE aliases'); hubDb.close();
+  assert.equal(classifyPredecessor(unrelatedHub.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  const noEffectNative = fixture('none'); const noEffectDb = new DatabaseSync(path.join(noEffectNative.directory, 'edge.sqlite'));
+  noEffectDb.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('NATIVE_PROCESS_IDENTITY', randomUUID(), JSON.stringify({ processId: 901, creationTime: '2026-09-08T15:07:19.8913688Z' })); noEffectDb.close();
+  assert.equal(classifyPredecessor(noEffectNative.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
 });
 test('malformed Edge blocker data is not healthy', () => {
   const state = fixture('none'); const db = new DatabaseSync(path.join(state.directory, 'edge.sqlite'));
-  db.exec('CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
   assert.equal(edgeAdmissionState(path.join(state.directory, 'edge.sqlite')), 'READY');
   db.prepare('INSERT INTO kv(key,value) VALUES(?,?)').run('blocked', 'null'); db.close();
   assert.equal(edgeAdmissionState(path.join(state.directory, 'edge.sqlite')), 'UNPROVABLE');

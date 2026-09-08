@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat, type Target } from '../packages/contracts/index.ts';
-import { assertFreshIncarnation, guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
+import { assertFreshIncarnation, classifyPredecessor, guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
 import type { EdgeConfig } from '../apps/edge/main.ts';
 import type { HubConfig } from '../apps/hub/server.ts';
 
@@ -35,7 +35,9 @@ export async function launch(root: string, executable: string, port = 43155, opt
   let predecessorTarget: Target | null = null;
   if (existsSync(currentGuard)) {
     const old = JSON.parse(readFileSync(currentGuard, 'utf8')) as Guard;
-    const retired = old.state === 'RETIRED_AMBIGUOUS' && typeof old.retirementReceipt === 'string' && existsSync(old.retirementReceipt);
+    // Re-validate a retirement at the lifecycle commit boundary.  A mere
+    // receipt path is never successor authority.
+    const retired = old.state === 'RETIRED_AMBIGUOUS' && classifyPredecessor(base).kind === 'RETIRED_AMBIGUOUS';
     requireThat(retired || old.state === 'CLOSED' && old.nativeExitObserved === true && old.quiescent === true, 'RECOVERY_REQUIRED');
     if (retired) predecessorTarget = old.target;
     preserveGuardForRun(base, old);

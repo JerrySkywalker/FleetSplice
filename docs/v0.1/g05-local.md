@@ -39,8 +39,11 @@ SQLite query, or persistent launch terminal is required:
 
 The launcher discovers only Node 24.20.0/SQLite 3.53.4 and the pinned native
 `codex.exe`, applies explicit environment proxy values before discoverable
-current-user or WinHTTP system proxy settings, and starts a per-user named-pipe supervisor. It
-never rewrites global proxy settings. `doctor` and `status` are read-only. An
+current-user or WinHTTP system proxy settings, and starts a per-user named-pipe supervisor.
+A no-trigger current-user scheduled task is only the terminal-independent
+launch broker; it is removed with the supervisor and is not a service or
+automatic startup mechanism. Its private, per-run handoff is deleted on exit.
+The launcher never rewrites global proxy settings. `doctor` and `status` are read-only. An
 ambiguous predecessor is never replayed or reset; G05B's narrow attended
 retirement preserves it as `RETIRED_AMBIGUOUS` with old outcome `UNKNOWN`.
 

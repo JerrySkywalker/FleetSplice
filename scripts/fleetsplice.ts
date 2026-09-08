@@ -1,6 +1,7 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { createConnection } from 'node:net';
-import { existsSync, readFileSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, writeSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
@@ -13,6 +14,8 @@ const output = (value: string) => process.stdout.write(`${value}\n`);
 const error = (value: string) => { process.stderr.write(`${value}\n`); process.exitCode = 2; };
 const code = (value: unknown) => canonical(value);
 type ControlFile = { pipe: string; token: string; runId: string };
+type SupervisorBootstrap = { taskName: string; node: string; supervisor: string; workspace: string; codex: string; localAppData: string; environment: Record<string, string> };
+const durable = (file: string, value: unknown) => { const handle = openSync(file, 'wx', 0o600); try { writeSync(handle, canonical(value)); fsyncSync(handle); } finally { closeSync(handle); } };
 
 function currentGuard(): Guard | null {
   const file = guardPath(base());
@@ -26,7 +29,7 @@ async function control(command: 'status' | 'stop'): Promise<any> {
     const socket = createConnection(detail.pipe); let received = ''; const timer = setTimeout(() => { socket.destroy(); reject(new Error('SUPERVISOR_TIMEOUT')); }, 12000);
     socket.setEncoding('utf8'); socket.once('error', reject); socket.on('data', value => { received += value; if (received.length > 16384) socket.destroy(); });
     socket.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(received)); } catch { reject(new Error('SUPERVISOR_RESPONSE_INVALID')); } });
-    socket.on('connect', () => socket.end(code({ token: detail.token, command })));
+    socket.on('connect', () => socket.write(`${code({ token: detail.token, command })}\n`));
   });
 }
 function describePredecessor(predecessor: Predecessor): string[] {
@@ -47,7 +50,17 @@ async function preflight(root: string) {
   const identity = await localIdentity(root);
   const node = discoverNode([process.execPath]);
   const codex = discoverCodex(candidateCodexPaths());
-  requireThat(existsSync(path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), 'apps', 'hub', 'server.js')), 'FLEETSPLICE_BUILD_UNAVAILABLE');
+  const installation = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const supervisorLauncher = path.resolve(installation, '..', 'scripts', 'start-supervisor.ps1');
+  const requiredBuild = [
+    path.join(installation, 'apps', 'hub', 'server.js'),
+    path.join(installation, 'apps', 'edge', 'main.js'),
+    path.join(installation, 'scripts', 'supervisor.js'),
+    path.join(installation, 'scripts', 'local.js'),
+    path.join(installation, 'web', 'index.html'),
+    supervisorLauncher
+  ];
+  requireThat(requiredBuild.every(existsSync) && readdirSync(path.join(installation, 'web', 'assets')).some(file => /\.js$/i.test(file)), 'FLEETSPLICE_BUILD_UNAVAILABLE');
   const proxy = resolveProxy(); const network = await networkPreflight(proxy); const predecessor = classifyPredecessor(base());
   if (predecessor.kind !== 'LIVE_OR_CONFLICTING' && predecessor.guard?.state !== 'RUNNING') await verifyLocalEndpointAvailability(identity.sid);
   return { identity, node, codex, proxy, network, predecessor };
@@ -63,8 +76,21 @@ async function start(root: string) {
   if (qualified.predecessor.kind === 'SAFE_NO_EFFECT' || qualified.predecessor.kind === 'SAFE_TERMINAL') {
     try { closeSafePredecessor(base()); } catch { error('RECOVERY_REQUIRED\nNO_RUNTIME_STATE_MUTATED=true'); return; }
   }
-  const supervisor = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), 'scripts', 'supervisor.js');
-  const child = spawn(process.execPath, [supervisor, '--workspace', qualified.identity.root, '--codex', qualified.codex.path], { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, ...qualified.proxy.environment } }); child.unref();
+  const installation = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const supervisor = path.join(installation, 'scripts', 'supervisor.js');
+  const supervisorLauncher = path.resolve(installation, '..', 'scripts', 'start-supervisor.ps1');
+  const runtime = base(); const taskName = `FleetSplice-G05-${randomUUID()}`; const bootstrap = path.join(runtime, `supervisor-bootstrap-${randomUUID()}.json`);
+  try {
+    // This is private, per-run handoff material for a manually started
+    // current-user task. It is created after all no-effect preflight passed,
+    // contains no browser token, and the task broker deletes it on exit.
+    mkdirSync(runtime, { recursive: true });
+    execFileSync('icacls.exe', [runtime, '/inheritance:r', '/grant:r', `*${qualified.identity.sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F'], { windowsHide: true, stdio: 'ignore' });
+    durable(bootstrap, { taskName, node: qualified.node.path, supervisor, workspace: qualified.identity.root, codex: qualified.codex.path, localAppData: process.env.LOCALAPPDATA!, environment: qualified.proxy.environment } satisfies SupervisorBootstrap);
+    // The task has no trigger and is removed with the supervisor. It is a
+    // launch broker, not an installed service or a network-facing daemon.
+    spawn('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', supervisorLauncher, '-Bootstrap', bootstrap], { stdio: 'ignore', windowsHide: true, env: { ...process.env, ...qualified.proxy.environment } });
+  } catch (reason) { error(`START_FAILED\n${reason instanceof Error ? reason.message : 'SUPERVISOR_BOOTSTRAP_FAILED'}\nNO_NATIVE_EFFECT_STARTED=true`); return; }
   for (let attempt = 0; attempt < 80; attempt++) {
     await sleep(250);
     try {
@@ -96,8 +122,8 @@ function retire(args: string[]) {
   if (requested !== G05B_OWNER_RETIREMENT_RUN) { error('OWNER_RETIREMENT_RUN_NOT_AUTHORIZED'); return; }
   try { const result = retireOwnerAuthorizedUnknown(base(), requested); output(`RETIRED_AMBIGUOUS\nMachine code: RETIRED_AMBIGUOUS\nOld effect outcome: UNKNOWN\nOld command replayed: false\nReceipt: ${result.receipt}\nFresh incarnation: required`); } catch (reason) { error(`OWNER_RETIREMENT_ADMISSION_FAILED\n${reason instanceof Error ? reason.message : 'UNKNOWN'}`); }
 }
-async function main() {
-  const args = process.argv.slice(2); const command = args[0]; const workspace = args[args.indexOf('--workspace') + 1] ?? process.cwd();
+export async function fleetspliceEntrypoint() {
+  const args = process.argv.slice(2); const command = args[0]; const workspaceIndex = args.indexOf('--workspace'); const workspace = workspaceIndex >= 0 ? args[workspaceIndex + 1] ?? process.cwd() : process.cwd();
   if (command === 'start') return await start(workspace);
   if (command === 'stop') { try { const result = await control('stop'); output(`FleetSplice stop: ${result.code}\nRun: ${result.runId ?? 'none'}\nNative exit observed: ${result.nativeExitObserved === true}`); if (result.code !== 'CLOSED') process.exitCode = 2; } catch { error('RECOVERY_REQUIRED\nSUPERVISOR_UNAVAILABLE'); } return; }
   if (command === 'status') return await status();
@@ -105,4 +131,4 @@ async function main() {
   if (command === 'retire-stale') return retire(args);
   error('USAGE: fleetsplice start|stop|status|doctor [--workspace ABSOLUTE_ROOT]');
 }
-if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch(reason => error(`PRECHECK_FAILED\n${reason instanceof Error ? reason.message : 'UNKNOWN'}\nNO_RUNTIME_STATE_MUTATED=true`));
+if (process.argv[1] === fileURLToPath(import.meta.url)) fleetspliceEntrypoint().catch(reason => error(`PRECHECK_FAILED\n${reason instanceof Error ? reason.message : 'UNKNOWN'}\nNO_RUNTIME_STATE_MUTATED=true`));

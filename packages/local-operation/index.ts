@@ -14,7 +14,8 @@ export const G05B_OWNER_RETIREMENT_RUN = '4c3beca4-d044-47ee-a8d0-915769e74bb2';
 export type ProcessIdentity = { processId: number; creationTime: string; sid?: string; principal?: string; sessionId?: number; elevated?: boolean };
 export type ProcessProbe = { exists: boolean; identity?: ProcessIdentity; name?: string; commandLine?: string };
 export type Guard = { state: string; runId: string; target: Target; identity: { root: string; rootIdentity: string; sid: string; principal: string; sessionId: number; elevated: false }; nativeExitObserved: boolean; quiescent: boolean; [key: string]: unknown };
-export type NativeEvidence = { process: ProcessIdentity | null; instanceId: string | null; threadId: string | null; turnId: string | null; sessionReady: boolean; turnAccepted: boolean; turnStarted: boolean; turnCompleted: boolean; hasEffectAttempt: boolean };
+export type TurnEvidence = { turnId: string; commandId: string | null; accepted: boolean; started: boolean; completed: boolean };
+export type NativeEvidence = { process: ProcessIdentity | null; instanceId: string | null; threadId: string | null; turnId: string | null; sessionReady: boolean; turnAccepted: boolean; turnStarted: boolean; turnCompleted: boolean; hasEffectAttempt: boolean; turns: Record<string, TurnEvidence>; unresolvedEffectIds: string[]; unboundEvidence: boolean };
 export type PredecessorKind = 'NO_PREDECESSOR' | 'SAFE_NO_EFFECT' | 'SAFE_TERMINAL' | 'AMBIGUOUS_TERMINAL' | 'LIVE_OR_CONFLICTING' | 'CORRUPT_OR_UNPROVABLE' | 'RETIRED_AMBIGUOUS';
 export type Predecessor = { kind: PredecessorKind; guard: Guard | null; evidence: NativeEvidence; exactNativeExitProven: boolean; conflicts: ProcessProbe[]; reason: string; retirementReceipt?: string };
 export type QualifiedNode = { path: string; version: string; sqlite: string };
@@ -150,24 +151,46 @@ export function fleetSpliceProcesses(): ProcessProbe[] {
   try { const raw = execFileSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 8000 }).trim(); if (!raw) return []; const value = JSON.parse(raw); return Array.isArray(value) ? value as ProcessProbe[] : [value as ProcessProbe]; } catch { return [{ exists: true, name: 'PROCESS_INVENTORY_UNAVAILABLE' }]; }
 }
 
-const emptyEvidence = (): NativeEvidence => ({ process: null, instanceId: null, threadId: null, turnId: null, sessionReady: false, turnAccepted: false, turnStarted: false, turnCompleted: false, hasEffectAttempt: false });
+const emptyEvidence = (): NativeEvidence => ({ process: null, instanceId: null, threadId: null, turnId: null, sessionReady: false, turnAccepted: false, turnStarted: false, turnCompleted: false, hasEffectAttempt: false, turns: {}, unresolvedEffectIds: [], unboundEvidence: false });
 const readEvidence = (file: string): { kind: string; key: string; value: unknown }[] => {
   const db = new DatabaseSync(file, { readOnly: true });
   try { return db.prepare('SELECT kind,key,value FROM evidence ORDER BY seq').all().map(row => ({ kind: String(row.kind), key: String(row.key), value: JSON.parse(String(row.value)) })); } finally { db.close(); }
 };
 export function evidenceFromEdge(file: string): NativeEvidence {
   const summary = emptyEvidence();
+  const effects = new Map<string, { terminal: boolean; turnId: string | null }>();
+  const turn = (turnId: string, commandId: string | null): TurnEvidence => summary.turns[turnId] ??= { turnId, commandId, accepted: false, started: false, completed: false };
   for (const row of readEvidence(file)) {
     const value = row.value as any;
-    if (row.kind === 'DISPATCH_ATTEMPT') summary.hasEffectAttempt = true;
+    if (row.kind === 'DISPATCH_ATTEMPT') { summary.hasEffectAttempt = true; effects.set(row.key, { terminal: false, turnId: null }); }
     if (row.kind === 'NATIVE_PROCESS_IDENTITY' && value && Number.isInteger(value.processId) && typeof value.creationTime === 'string') { summary.process = value as ProcessIdentity; summary.instanceId = row.key; }
     if (row.kind === 'THREAD_OBSERVED' && typeof value?.threadId === 'string') summary.threadId = value.threadId;
     if (row.kind === 'NATIVE_BINDING' && typeof value?.threadId === 'string') { summary.threadId = value.threadId; summary.sessionReady = true; }
-    if (row.kind === 'NATIVE_RESULT' && value?.code === 'NATIVE_SESSION_READY') { summary.sessionReady = true; if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId; }
-    if (row.kind === 'NATIVE_RESULT' && value?.code === 'NATIVE_TURN_ACCEPTED') { summary.turnAccepted = true; summary.hasEffectAttempt = true; if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId; if (typeof value.nativeTurnId === 'string') summary.turnId = value.nativeTurnId; }
-    if (row.kind === 'NATIVE_EVENT' && value?.kind === 'turnStarted') { summary.turnStarted = true; if (typeof value.turnId === 'string') summary.turnId = value.turnId; }
-    if (row.kind === 'NATIVE_EVENT' && value?.kind === 'turnCompleted') { summary.turnCompleted = true; if (typeof value.turnId === 'string') summary.turnId = value.turnId; }
+    if (row.kind === 'NATIVE_RESULT') {
+      const effect = effects.get(row.key);
+      if (!effect) { summary.unboundEvidence = true; continue; }
+      if (value?.code === 'NATIVE_SESSION_READY') { summary.sessionReady = true; effect.terminal = true; if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId; }
+      else if (value?.code === 'NATIVE_TURN_ACCEPTED' && typeof value.nativeTurnId === 'string') {
+        const observed = turn(value.nativeTurnId, row.key); observed.accepted = true; effect.turnId = value.nativeTurnId;
+        if (typeof value.nativeThreadId === 'string') summary.threadId = value.nativeThreadId;
+      } else summary.unboundEvidence = true;
+    }
+    if (row.kind === 'NATIVE_EVENT' && (value?.kind === 'turnStarted' || value?.kind === 'turnCompleted')) {
+      if (typeof value.turnId !== 'string') { summary.unboundEvidence = true; continue; }
+      const effect = effects.get(row.key); const observed = turn(value.turnId, row.key);
+      if (!effect || effect.turnId !== value.turnId || !observed.accepted) { summary.unboundEvidence = true; continue; }
+      if (value.kind === 'turnStarted') observed.started = true;
+      else { observed.completed = true; effect.terminal = true; }
+      summary.turnId = value.turnId;
+    }
   }
+  const turns = Object.values(summary.turns);
+  summary.turnAccepted = turns.some(value => value.accepted);
+  summary.turnStarted = turns.some(value => value.started);
+  // This is intentionally an all-turn claim: a completed earlier turn can
+  // never mask a later admitted turn whose terminal outcome is unknown.
+  summary.turnCompleted = turns.length > 0 && turns.every(value => value.accepted && value.started && value.completed);
+  summary.unresolvedEffectIds = [...effects.entries()].filter(([, value]) => !value.terminal).map(([key]) => key);
   return summary;
 }
 function guardIsSound(guard: Guard, base: string): boolean {
@@ -176,15 +199,7 @@ function guardIsSound(guard: Guard, base: string): boolean {
   if (!existsSync(admission)) return false;
   try { const value = safeJson<{ runId: string; target: Target; identity: Guard['identity'] }>(admission); return value.runId === guard.runId && same(value.target, guard.target) && same(value.identity, guard.identity); } catch { return false; }
 }
-export function classifyPredecessor(base = runtimeRoot(), process = probeProcess, conflicts = fleetSpliceProcesses()): Predecessor {
-  const file = guardPath(base);
-  if (!existsSync(file)) return { kind: 'NO_PREDECESSOR', guard: null, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: [], reason: 'NO_GUARD' };
-  let guard: Guard;
-  try { guard = safeJson<Guard>(file); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard: null, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'GUARD_UNREADABLE' }; }
-  if (guard.state === 'RETIRED_AMBIGUOUS') return { kind: 'RETIRED_AMBIGUOUS', guard, evidence: emptyEvidence(), exactNativeExitProven: guard.nativeExitObserved === true, conflicts, reason: 'RETIRED_WITH_UNKNOWN_OUTCOME', retirementReceipt: typeof guard.retirementReceipt === 'string' ? guard.retirementReceipt : undefined };
-  if (!guardIsSound(guard, base)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'GUARD_OR_ADMISSION_MISMATCH' };
-  let evidence: NativeEvidence;
-  try { evidence = evidenceFromEdge(path.join(base, guard.runId, 'edge.sqlite')); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_EVIDENCE_UNREADABLE' }; }
+function classifyEvidence(guard: Guard, evidence: NativeEvidence, process: (processId: number) => ProcessProbe, conflicts: ProcessProbe[]): Predecessor {
   const matchingConflicts = conflicts.filter(item => item.exists);
   if (matchingConflicts.length) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence, exactNativeExitProven: false, conflicts: matchingConflicts, reason: 'FLEETSPLICE_PROCESS_PRESENT' };
   let exactNativeExitProven = !evidence.process;
@@ -192,13 +207,54 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
     const observed = process(evidence.process.processId);
     if (observed.exists && !observed.identity) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: [observed], reason: 'NATIVE_PROCESS_IDENTITY_UNPROVABLE' };
     if (observed.exists && observed.identity?.creationTime === evidence.process.creationTime) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence, exactNativeExitProven: false, conflicts: [observed], reason: 'EXACT_NATIVE_PROCESS_PRESENT' };
+    // A different creation time is explicit PID-reuse evidence, not evidence
+    // that the old process remains live.
     exactNativeExitProven = !observed.exists || observed.identity?.creationTime !== evidence.process.creationTime;
   }
   if (!exactNativeExitProven) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: [], reason: 'NATIVE_IDENTITY_UNPROVABLE' };
   if (!evidence.hasEffectAttempt) return { kind: 'SAFE_NO_EFFECT', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'NO_NATIVE_EFFECT_ATTEMPT' };
-  if (evidence.turnAccepted && !evidence.turnCompleted) return { kind: 'AMBIGUOUS_TERMINAL', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'TURN_TERMINAL_EVIDENCE_MISSING' };
-  if (evidence.turnCompleted || guard.state === 'CLOSED' && guard.nativeExitObserved && guard.quiescent) return { kind: 'SAFE_TERMINAL', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'TERMINAL_EVIDENCE_AND_EXIT_PROVEN' };
-  return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_STATE_UNPROVABLE' };
+  if (evidence.unboundEvidence) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_EVIDENCE_UNBOUND' };
+  if (evidence.unresolvedEffectIds.length > 0 || !evidence.turnCompleted) return { kind: 'AMBIGUOUS_TERMINAL', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'EFFECT_TERMINAL_EVIDENCE_MISSING' };
+  return { kind: 'SAFE_TERMINAL', guard, evidence, exactNativeExitProven, conflicts: [], reason: 'ALL_EFFECT_TERMINAL_EVIDENCE_AND_EXIT_PROVEN' };
+}
+function retiredPredecessor(base: string, guard: Guard, process: (processId: number) => ProcessProbe, conflicts: ProcessProbe[]): Predecessor {
+  const corrupt = (reason: string, evidence = emptyEvidence()): Predecessor => ({ kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: conflicts.filter(value => value.exists), reason });
+  if (!guardIsSound(guard, base)) return corrupt('RETIRED_GUARD_OR_ADMISSION_MISMATCH');
+  const archive = path.join(base, 'retirements', guard.runId);
+  const receiptPath = path.join(archive, 'retirement-receipt.json');
+  if (guard.retirementReceipt !== receiptPath || !existsSync(receiptPath)) return corrupt('RETIREMENT_RECEIPT_MISSING_OR_SUBSTITUTED');
+  let receipt: any; let archivedGuard: Guard; let archivedAdmission: { runId: string; target: Target; identity: Guard['identity'] }; let evidence: NativeEvidence;
+  try {
+    receipt = safeJson<any>(receiptPath);
+    archivedGuard = safeJson<Guard>(path.join(archive, 'environment-guard.json'));
+    archivedAdmission = safeJson<{ runId: string; target: Target; identity: Guard['identity'] }>(path.join(archive, 'admission.json'));
+    evidence = evidenceFromEdge(path.join(archive, 'edge.sqlite'));
+  } catch { return corrupt('RETIREMENT_ARCHIVE_UNREADABLE'); }
+  if (receipt?.kind !== 'G05B_OWNER_AUTHORIZED_RETIREMENT' || receipt.runId !== guard.runId || receipt.archive !== archive || receipt.oldEffectOutcome !== 'UNKNOWN' || receipt.oldCommandReplayed !== false || receipt.oldAuthorityRuntimeRetired !== true || receipt.freshIncarnationRequired !== true) return corrupt('RETIREMENT_RECEIPT_CONTRADICTORY', evidence);
+  if (archivedGuard.state === 'RETIRED_AMBIGUOUS' || archivedGuard.runId !== guard.runId || !same(archivedGuard.target, guard.target) || !same(archivedGuard.identity, guard.identity) || archivedAdmission.runId !== guard.runId || !same(archivedAdmission.target, guard.target) || !same(archivedAdmission.identity, guard.identity) || !same(receipt.oldTarget, guard.target)) return corrupt('RETIREMENT_ARCHIVE_BINDING_MISMATCH', evidence);
+  if (!Array.isArray(receipt.evidence) || !receipt.evidence.some((item: any) => item?.name === 'environment-guard.json') || !receipt.evidence.some((item: any) => item?.name === 'admission.json') || !receipt.evidence.some((item: any) => item?.name === 'edge.sqlite')) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INCOMPLETE', evidence);
+  for (const item of receipt.evidence) {
+    if (!item || typeof item.name !== 'string' || path.basename(item.name) !== item.name || !/^[A-Za-z0-9._-]+$/.test(item.name)) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INVALID', evidence);
+    const preserved = path.join(archive, item.name);
+    try { if (!existsSync(preserved) || typeof item.sha256 !== 'string' || item.sha256 !== hash(preserved) || item.bytes !== statSync(preserved).size) return corrupt('RETIREMENT_EVIDENCE_HASH_MISMATCH', evidence); } catch { return corrupt('RETIREMENT_EVIDENCE_UNREADABLE', evidence); }
+  }
+  const original = classifyEvidence(archivedGuard, evidence, process, conflicts);
+  if (original.kind === 'LIVE_OR_CONFLICTING') return original;
+  if (original.kind !== 'AMBIGUOUS_TERMINAL' || !original.exactNativeExitProven) return corrupt('RETIREMENT_ORIGINAL_NOT_PROVEN_AMBIGUOUS', evidence);
+  return { kind: 'RETIRED_AMBIGUOUS', guard, evidence, exactNativeExitProven: true, conflicts: [], reason: 'RETIRED_WITH_PRESERVED_UNKNOWN_OUTCOME', retirementReceipt: receiptPath };
+}
+export function classifyPredecessor(base = runtimeRoot(), process = probeProcess, conflicts = fleetSpliceProcesses()): Predecessor {
+  const file = guardPath(base);
+  const matchingConflicts = conflicts.filter(item => item.exists);
+  if (!existsSync(file)) return matchingConflicts.length ? { kind: 'LIVE_OR_CONFLICTING', guard: null, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: matchingConflicts, reason: 'FLEETSPLICE_PROCESS_PRESENT_WITHOUT_GUARD' } : { kind: 'NO_PREDECESSOR', guard: null, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: [], reason: 'NO_GUARD' };
+  let guard: Guard;
+  try { guard = safeJson<Guard>(file); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard: null, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'GUARD_UNREADABLE' }; }
+  if (matchingConflicts.length) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: matchingConflicts, reason: 'FLEETSPLICE_PROCESS_PRESENT' };
+  if (guard.state === 'RETIRED_AMBIGUOUS') return retiredPredecessor(base, guard, process, conflicts);
+  if (!guardIsSound(guard, base)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'GUARD_OR_ADMISSION_MISMATCH' };
+  let evidence: NativeEvidence;
+  try { evidence = evidenceFromEdge(path.join(base, guard.runId, 'edge.sqlite')); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_EVIDENCE_UNREADABLE' }; }
+  return classifyEvidence(guard, evidence, process, conflicts);
 }
 
 export function retireOwnerAuthorizedUnknown(base = runtimeRoot(), runId = G05B_OWNER_RETIREMENT_RUN, process = probeProcess, conflicts = fleetSpliceProcesses()): { receipt: string; predecessor: Predecessor } {

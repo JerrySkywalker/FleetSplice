@@ -12,6 +12,9 @@ The visible local capability is safe ordinary-user operation through
 `fleetsplice.ps1 start`, `stop`, `status`, and `doctor`. It must discover the
 qualified Node/Codex artifacts, resolve a bounded local proxy configuration,
 preflight before a new guard, and use one detached per-user local supervisor.
+The current-user Task Scheduler is only a one-shot launch broker for that
+supervisor: it has no trigger or network listener and removes itself when the
+supervisor exits.
 
 G05B may classify and explain predecessor evidence. Its one-time Owner
 retirement is restricted to run `4c3beca4-d044-47ee-a8d0-915769e74bb2` and is

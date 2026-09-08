@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { target } from './helpers.ts';
-import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, resolveProxy, retireOwnerAuthorizedUnknown, verifyLocalEndpointAvailability } from '../packages/local-operation/index.ts';
+import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, resolveProxy, retireOwnerAuthorizedUnknown, verifyLocalEndpointAvailability } from '../packages/local-operation/index.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
-function fixture(kind: 'none' | 'terminal' | 'ambiguous' = 'none', runId = randomUUID()) {
+function fixture(kind: 'none' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId = randomUUID()) {
   const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-local-operation-')); const directory = path.join(base, runId); mkdirSync(directory);
   const guard = { state: 'RUNNING', runId, target: target(), identity: identity(), nativeExitObserved: false, quiescent: false };
   writeFileSync(path.join(base, 'environment-guard.json'), JSON.stringify(guard)); writeFileSync(path.join(directory, 'admission.json'), JSON.stringify({ runId, target: guard.target, identity: guard.identity }));
@@ -17,14 +17,20 @@ function fixture(kind: 'none' | 'terminal' | 'ambiguous' = 'none', runId = rando
   edge.exec('CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL)');
   const append = (kindName: string, key: string, value: unknown) => edge.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run(kindName, key, JSON.stringify(value));
   if (kind !== 'none') {
-    const instanceId = randomUUID(), threadId = randomUUID(), turnId = randomUUID();
-    append('DISPATCH_ATTEMPT', randomUUID(), { attempted: true });
+    const instanceId = randomUUID(), threadId = randomUUID();
+    const sessionCommand = randomUUID(); append('DISPATCH_ATTEMPT', sessionCommand, { attempted: true });
     append('NATIVE_PROCESS_IDENTITY', instanceId, { processId: 901, creationTime: '2026-09-08T15:07:19.8913688Z', sid: 'S-fixture' });
-    append('NATIVE_BINDING', randomUUID(), { threadId, processId: 901, instanceId });
-    append('NATIVE_RESULT', randomUUID(), { code: 'NATIVE_SESSION_READY', nativeThreadId: threadId });
-    append('NATIVE_RESULT', randomUUID(), { code: 'NATIVE_TURN_ACCEPTED', nativeThreadId: threadId, nativeTurnId: turnId });
-    append('NATIVE_EVENT', randomUUID(), { kind: 'turnStarted', threadId, turnId, status: 'RUNNING' });
-    if (kind === 'terminal') append('NATIVE_EVENT', randomUUID(), { kind: 'turnCompleted', threadId, turnId, status: 'completed' });
+    append('NATIVE_BINDING', sessionCommand, { threadId, processId: 901, instanceId });
+    append('NATIVE_RESULT', sessionCommand, { code: 'NATIVE_SESSION_READY', nativeThreadId: threadId });
+    const appendTurn = (complete: boolean) => {
+      const commandId = randomUUID(), turnId = randomUUID();
+      append('DISPATCH_ATTEMPT', commandId, { attempted: true });
+      append('NATIVE_RESULT', commandId, { code: 'NATIVE_TURN_ACCEPTED', nativeThreadId: threadId, nativeTurnId: turnId });
+      append('NATIVE_EVENT', commandId, { kind: 'turnStarted', threadId, turnId, status: 'RUNNING' });
+      if (complete) append('NATIVE_EVENT', commandId, { kind: 'turnCompleted', threadId, turnId, status: 'completed' });
+    };
+    appendTurn(kind === 'terminal' || kind === 'multi');
+    if (kind === 'multi') appendTurn(false);
   }
   edge.close();
   return { base, guard, directory };
@@ -61,6 +67,14 @@ test('predecessor classifier distinguishes safe, terminal, ambiguous, live and c
   assert.equal(classifyPredecessor(ambiguous.base, () => ({ exists: true }), noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
   const corrupt = fixture('none'); writeFileSync(path.join(corrupt.directory, 'admission.json'), '{}'); assert.equal(classifyPredecessor(corrupt.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
 });
+test('a completed earlier turn cannot erase a later unknown turn or admit automatic closure', () => {
+  const state = fixture('multi'); const before = readFileSync(path.join(state.base, 'environment-guard.json'));
+  const predecessor = classifyPredecessor(state.base, absent, noConflicts);
+  assert.equal(predecessor.kind, 'AMBIGUOUS_TERMINAL'); assert.equal(predecessor.evidence.turnAccepted, true); assert.equal(predecessor.evidence.turnCompleted, false);
+  assert.equal(Object.values(predecessor.evidence.turns).filter(turn => turn.completed).length, 1);
+  assert.throws(() => closeSafePredecessor(state.base, absent, noConflicts), /SAFE_PREDECESSOR_CLOSURE_NOT_ADMITTED/);
+  assert.deepEqual(readFileSync(path.join(state.base, 'environment-guard.json')), before);
+});
 test('unknown-effect retirement preserves evidence, records UNKNOWN, and cannot replay or reuse the old run', () => {
   const state = fixture('ambiguous', G05B_OWNER_RETIREMENT_RUN); const original = readFileSync(path.join(state.directory, 'edge.sqlite'));
   const result = retireOwnerAuthorizedUnknown(state.base, G05B_OWNER_RETIREMENT_RUN, absent, noConflicts);
@@ -68,6 +82,17 @@ test('unknown-effect retirement preserves evidence, records UNKNOWN, and cannot 
   assert.equal(receipt.oldEffectOutcome, 'UNKNOWN'); assert.equal(receipt.oldCommandReplayed, false); assert.equal(receipt.oldAuthorityRuntimeRetired, true); assert.equal(receipt.freshIncarnationRequired, true);
   assert.deepEqual(readFileSync(path.join(state.directory, 'edge.sqlite')), original); assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'RETIRED_AMBIGUOUS');
   assert.throws(() => retireOwnerAuthorizedUnknown(state.base, G05B_OWNER_RETIREMENT_RUN, absent, noConflicts), /OWNER_RETIREMENT_ADMISSION_FAILED|OWNER_RETIREMENT_ALREADY_RECORDED/);
+});
+test('retired state requires an intact bound receipt and remains blocked by live conflicts', () => {
+  const state = fixture('ambiguous', G05B_OWNER_RETIREMENT_RUN); const retired = retireOwnerAuthorizedUnknown(state.base, G05B_OWNER_RETIREMENT_RUN, absent, noConflicts);
+  const receipt = JSON.parse(readFileSync(retired.receipt, 'utf8')); chmodSync(retired.receipt, 0o600); receipt.oldCommandReplayed = true; writeFileSync(retired.receipt, JSON.stringify(receipt));
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  receipt.oldCommandReplayed = false; writeFileSync(retired.receipt, JSON.stringify(receipt));
+  assert.equal(classifyPredecessor(state.base, absent, [{ exists: true, name: 'node.exe' }]).kind, 'LIVE_OR_CONFLICTING');
+});
+test('an orphan FleetSplice process is a conflict even without a guard', () => {
+  const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-orphan-'));
+  assert.equal(classifyPredecessor(base, absent, [{ exists: true, name: 'node.exe' }]).kind, 'LIVE_OR_CONFLICTING');
 });
 test('a successor rejects every reusable authority, runtime, connection, or binding identifier', () => {
   const old = target(); const fresh = target(); assert.doesNotThrow(() => assertFreshIncarnation(old, fresh));

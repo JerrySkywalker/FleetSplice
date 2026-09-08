@@ -72,6 +72,15 @@ test('logical create and reads are native-free; private native continue preserve
     assert.equal(r.hub.snapshot().lanes[0]!.state, 'IDLE');
   } finally { r.close(); }
 });
+test('an unresolved native turn refuses a normal closed state even when the native child exits', async () => {
+  const r = rig(); try {
+    const lane = await r.setup(); await r.admit('sessionLane.continue', {}, lane);
+    await r.admit('turn.submit', { text: 'must remain unknown until terminal evidence' }, lane);
+    assert.equal(await r.edge.close(), false);
+    const closure = r.edgeJournal.db.prepare("select value from evidence where kind='LOCAL_CLOSURE' order by seq desc limit 1").get() as { value: string };
+    assert.deepEqual(JSON.parse(closure.value), { quiescent: false, nativeExited: true, nativeInstanceId: r.native.instanceId, pid: r.native.pid });
+  } finally { r.close(); }
+});
 test('native responses can precede thread/turn started notifications without inventing external writers', async () => {
   const r = rig(); try {
     r.native.responseFirst = true;

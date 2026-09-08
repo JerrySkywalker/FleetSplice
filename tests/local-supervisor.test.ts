@@ -76,6 +76,8 @@ test('detached supervisor keeps one local writer, serves a second terminal, and 
       const guard = JSON.parse(readFileSync(guardPath, 'utf8')) as { state: string; nativeExitObserved: boolean; quiescent: boolean };
       assert.equal(guard.state, 'CLOSED'); assert.equal(guard.nativeExitObserved, true); assert.equal(guard.quiescent, true); return guard;
     }, 'proven closed guard');
+    const postStop = spawnSync(process.execPath, [cli, 'status', '--workspace', workspace], { cwd: process.cwd(), env, encoding: 'utf8', windowsHide: true, timeout: 20000 });
+    assert.equal(postStop.status, 0); assert.match(postStop.stdout, /FleetSplice: STOPPED/); assert.doesNotMatch(postStop.stdout, /RECOVERY_REQUIRED/);
   } finally {
     if (detail) { try { await control(detail, 'stop'); } catch { /* The normal assertion path has already stopped it. */ } }
   }

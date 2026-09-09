@@ -2,17 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { target } from './helpers.ts';
-import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, edgeAdmissionState, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, proxyConfigurationRequired, readUserProxyConfiguration, resolveProxy, retireOwnerAuthorizedUnknown, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration } from '../packages/local-operation/index.ts';
+import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, edgeAdmissionState, G05B_OWNER_RETIREMENT_RUN, G05C_P1_OWNER_RETIREMENT_RUN, G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, proxyConfigurationRequired, readUserProxyConfiguration, resolveProxy, retireOwnerAuthorizedUnknown, retireOwnerAuthorizedUnprovable, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration } from '../packages/local-operation/index.ts';
 import { supervisorProxy } from '../scripts/supervisor.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
 const journalSchema = 'CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL); CREATE TABLE records (id TEXT PRIMARY KEY, digest TEXT NOT NULL, value TEXT NOT NULL); CREATE TABLE aliases (alias TEXT PRIMARY KEY, id TEXT NOT NULL, digest TEXT NOT NULL)';
-function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId = randomUUID(), eventBeforeResponse = false) {
+function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId: string = randomUUID(), eventBeforeResponse = false) {
   const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-local-operation-')); const directory = path.join(base, runId); mkdirSync(directory);
   const guard = { state: 'RUNNING', runId, target: target(), identity: identity(), nativeExitObserved: false, quiescent: false };
   writeFileSync(path.join(base, 'environment-guard.json'), JSON.stringify(guard)); writeFileSync(path.join(directory, 'admission.json'), JSON.stringify({ runId, target: guard.target, identity: guard.identity }));
@@ -39,6 +39,13 @@ function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' =
   }
   edge.close();
   return { base, guard, directory };
+}
+function unprovableEffectFixture(runId = G05C_P1_OWNER_RETIREMENT_RUN) {
+  const state = fixture('terminal', runId);
+  const edge = new DatabaseSync(path.join(state.directory, 'edge.sqlite'));
+  edge.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('REJECTED_NATIVE_OBSERVATION', randomUUID(), JSON.stringify({ code: 'NATIVE_TOOL_SCOPE_VIOLATION' }));
+  edge.close();
+  return state;
 }
 const absent = () => ({ exists: false });
 const noConflicts: any[] = [];
@@ -192,6 +199,50 @@ test('retired state requires an intact bound receipt and remains blocked by live
   assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
   receipt.oldCommandReplayed = false; writeFileSync(retired.receipt, JSON.stringify(receipt));
   assert.equal(classifyPredecessor(state.base, absent, [{ exists: true, name: 'node.exe' }]).kind, 'LIVE_OR_CONFLICTING');
+});
+test('only the exact unbound-effect custody state can be explicitly retired with UNKNOWN preserved', () => {
+  const state = unprovableEffectFixture(); const original = readFileSync(path.join(state.directory, 'edge.sqlite'));
+  const before = classifyPredecessor(state.base, absent, noConflicts);
+  assert.equal(before.kind, 'CORRUPT_OR_UNPROVABLE'); assert.equal(before.reason, 'EFFECT_EVIDENCE_UNBOUND'); assert.equal(before.exactNativeExitProven, true);
+  assert.equal(existsSync(path.join(state.base, 'retirements', G05C_P1_OWNER_RETIREMENT_RUN)), false, 'unbound evidence is never automatically retired');
+  const retired = retireOwnerAuthorizedUnprovable(state.base, G05C_P1_OWNER_RETIREMENT_RUN, absent, noConflicts);
+  const receipt = JSON.parse(readFileSync(retired.receipt, 'utf8'));
+  assert.equal(receipt.kind, 'G05C_P1_OWNER_AUTHORIZED_UNPROVABLE_RETIREMENT'); assert.equal(receipt.oldClassification, 'CORRUPT_OR_UNPROVABLE'); assert.equal(receipt.oldReason, 'EFFECT_EVIDENCE_UNBOUND'); assert.equal(receipt.oldEffectOutcome, 'UNKNOWN'); assert.equal(receipt.oldCommandReplayed, false); assert.equal(receipt.exactNativeExitProven, true); assert.equal(receipt.oldAuthorityRuntimeRetired, true); assert.equal(receipt.freshIncarnationRequired, true);
+  for (const item of receipt.evidence) { const preserved = path.join(path.dirname(retired.receipt), item.name); assert.equal(createHash('sha256').update(readFileSync(preserved)).digest('hex'), item.sha256); assert.equal(statSync(preserved).size, item.bytes); }
+  assert.deepEqual(readFileSync(path.join(state.directory, 'edge.sqlite')), original, 'active historical evidence is never rewritten'); assert.deepEqual(readFileSync(path.join(path.dirname(retired.receipt), 'edge.sqlite')), original, 'the archive preserves the rejected observation byte-for-byte');
+  const archive = new DatabaseSync(path.join(path.dirname(retired.receipt), 'edge.sqlite'), { readOnly: true }); try { assert.equal(archive.prepare("SELECT COUNT(*) AS count FROM evidence WHERE kind='REJECTED_NATIVE_OBSERVATION'").get()?.count, 1); } finally { archive.close(); }
+  const guard = JSON.parse(readFileSync(path.join(state.base, 'environment-guard.json'), 'utf8'));
+  assert.equal(guard.state, 'RETIRED_UNPROVABLE'); assert.notEqual(guard.state, 'CLOSED'); assert.notEqual(guard.state, 'SAFE_TERMINAL'); assert.equal(guard.oldEffectOutcome, 'UNKNOWN'); assert.equal(guard.oldCommandReplayed, false); assert.equal(guard.oldAuthorityRuntimeRetired, true); assert.equal(guard.freshIncarnationRequired, true);
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'RETIRED_UNPROVABLE'); assert.doesNotThrow(() => assertFreshIncarnation(receipt.oldTarget, target()), 'only a fresh successor identity is eligible later');
+});
+test('the separately Owner-authorized protocol-repair run is an exact additional retirement binding', () => {
+  const state = unprovableEffectFixture(G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN);
+  const retired = retireOwnerAuthorizedUnprovable(state.base, G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN, absent, noConflicts);
+  const guard = JSON.parse(readFileSync(path.join(state.base, 'environment-guard.json'), 'utf8'));
+  assert.equal(guard.state, 'RETIRED_UNPROVABLE'); assert.equal(guard.retiredBy, 'FLEETSPLICE-G05C-P1-PROTOCOL-CONFORMANCE-REPAIR-004');
+  assert.equal(JSON.parse(readFileSync(retired.receipt, 'utf8')).runId, G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN);
+});
+test('unprovable retirement rejects missing acknowledgement, wrong identity, live evidence, conflicts, damaged journals, and generic corruption', () => {
+  const cli = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'fleetsplice.js');
+  const missingAcknowledgement = spawnSync(process.execPath, [cli, 'retire-stale', '--run', G05C_P1_OWNER_RETIREMENT_RUN], { cwd: process.cwd(), env: process.env, encoding: 'utf8', windowsHide: true });
+  assert.notEqual(missingAcknowledgement.status, 0); assert.match(`${missingAcknowledgement.stdout}\n${missingAcknowledgement.stderr}`, /OWNER_RETIREMENT_ACKNOWLEDGEMENT_REQUIRED/);
+  const wrongRun = spawnSync(process.execPath, [cli, 'retire-stale', '--run', randomUUID(), '--ack-unknown-effect'], { cwd: process.cwd(), env: process.env, encoding: 'utf8', windowsHide: true });
+  assert.notEqual(wrongRun.status, 0); assert.match(`${wrongRun.stdout}\n${wrongRun.stderr}`, /OWNER_RETIREMENT_RUN_NOT_AUTHORIZED/);
+  const live = unprovableEffectFixture(); const exact = () => ({ exists: true, identity: { processId: 901, creationTime: '2026-09-08T15:07:19.8913688Z' } });
+  assert.equal(classifyPredecessor(live.base, exact, noConflicts).kind, 'LIVE_OR_CONFLICTING'); assert.throws(() => retireOwnerAuthorizedUnprovable(live.base, G05C_P1_OWNER_RETIREMENT_RUN, exact, noConflicts), /OWNER_RETIREMENT_ADMISSION_FAILED/);
+  const reused = unprovableEffectFixture(); const reusedPid = () => ({ exists: true, identity: { processId: 901, creationTime: '2026-09-08T15:07:20.8913688Z' } });
+  const reuseClassification = classifyPredecessor(reused.base, reusedPid, noConflicts); assert.equal(reuseClassification.kind, 'CORRUPT_OR_UNPROVABLE'); assert.equal(reuseClassification.exactNativeExitProven, true, 'a same PID with a distinct creation time is reuse, not the old process'); assert.doesNotThrow(() => retireOwnerAuthorizedUnprovable(reused.base, G05C_P1_OWNER_RETIREMENT_RUN, reusedPid, noConflicts));
+  const conflict = unprovableEffectFixture(); assert.equal(classifyPredecessor(conflict.base, absent, [{ exists: true, name: 'node.exe' }]).kind, 'LIVE_OR_CONFLICTING'); assert.throws(() => retireOwnerAuthorizedUnprovable(conflict.base, G05C_P1_OWNER_RETIREMENT_RUN, absent, [{ exists: true, name: 'node.exe' }]), /OWNER_RETIREMENT_ADMISSION_FAILED/);
+  const unreadableJournal = unprovableEffectFixture(); unlinkSync(path.join(unreadableJournal.directory, 'hub.sqlite')); assert.throws(() => retireOwnerAuthorizedUnprovable(unreadableJournal.base, G05C_P1_OWNER_RETIREMENT_RUN, absent, noConflicts), /OWNER_RETIREMENT_ADMISSION_FAILED/);
+  const mismatch = unprovableEffectFixture(); writeFileSync(path.join(mismatch.directory, 'admission.json'), '{}'); assert.throws(() => retireOwnerAuthorizedUnprovable(mismatch.base, G05C_P1_OWNER_RETIREMENT_RUN, absent, noConflicts), /OWNER_RETIREMENT_ADMISSION_FAILED/);
+  const unreadableGuard = unprovableEffectFixture(); writeFileSync(path.join(unreadableGuard.base, 'environment-guard.json'), '{not-json'); assert.throws(() => retireOwnerAuthorizedUnprovable(unreadableGuard.base, G05C_P1_OWNER_RETIREMENT_RUN, absent, noConflicts), /OWNER_RETIREMENT_ADMISSION_FAILED/);
+  const generic = fixture('none', G05C_P1_OWNER_RETIREMENT_RUN); const genericDb = new DatabaseSync(path.join(generic.directory, 'edge.sqlite')); genericDb.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('NATIVE_PROCESS_IDENTITY', randomUUID(), JSON.stringify({ processId: 901, creationTime: '2026-09-08T15:07:19.8913688Z' })); genericDb.close();
+  assert.equal(classifyPredecessor(generic.base, absent, noConflicts).reason, 'NATIVE_EVIDENCE_WITHOUT_DISPATCH_ATTEMPT'); assert.throws(() => retireOwnerAuthorizedUnprovable(generic.base, G05C_P1_OWNER_RETIREMENT_RUN, absent, noConflicts), /OWNER_RETIREMENT_ADMISSION_FAILED/);
+});
+test('an unprovable retirement archive is revalidated and fails closed if tampered', () => {
+  const state = unprovableEffectFixture(); const retired = retireOwnerAuthorizedUnprovable(state.base, G05C_P1_OWNER_RETIREMENT_RUN, absent, noConflicts);
+  const receipt = JSON.parse(readFileSync(retired.receipt, 'utf8')); chmodSync(retired.receipt, 0o600); receipt.oldCommandReplayed = true; writeFileSync(retired.receipt, JSON.stringify(receipt));
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
 });
 test('an orphan FleetSplice process is a conflict even without a guard', () => {
   const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-orphan-'));

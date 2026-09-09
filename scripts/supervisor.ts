@@ -32,7 +32,7 @@ export async function supervisorEntrypoint() {
   const qualifiedCodex = discoverCodex([executable!]);
   const base = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'G05');
   const predecessor = classifyPredecessor(base);
-  requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
+  requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
   const pipe = `\\\\.\\pipe\\fleetsplice-g05-${identity.sid}`;
   const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false; const activeProxy = supervisorProxy();
   const server = createServer(socket => {

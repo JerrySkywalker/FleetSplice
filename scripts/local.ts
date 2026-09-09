@@ -37,7 +37,7 @@ export async function launch(root: string, executable: string, port = 43155, opt
     const old = JSON.parse(readFileSync(currentGuard, 'utf8')) as Guard;
     // Re-validate a retirement at the lifecycle commit boundary.  A mere
     // receipt path is never successor authority.
-    const retired = old.state === 'RETIRED_AMBIGUOUS' && classifyPredecessor(base).kind === 'RETIRED_AMBIGUOUS';
+    const retired = ['RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(old.state) && classifyPredecessor(base).kind === old.state;
     requireThat(retired || old.state === 'CLOSED' && old.nativeExitObserved === true && old.quiescent === true, 'RECOVERY_REQUIRED');
     if (retired) predecessorTarget = old.target;
     preserveGuardForRun(base, old);

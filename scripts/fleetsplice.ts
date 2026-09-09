@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat } from '../packages/contracts/index.ts';
-import { candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, guardPath, networkPreflight, proxyConfigurationRequired, readUserProxyConfiguration, resolveExplicitProxy, resolveProxy, retireOwnerAuthorizedUnknown, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration, type Guard, type Predecessor, type UserProxyConfiguration } from '../packages/local-operation/index.ts';
+import { candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, G05C_P1_OWNER_RETIREMENT_RUNS, guardPath, networkPreflight, proxyConfigurationRequired, readUserProxyConfiguration, resolveExplicitProxy, resolveProxy, retireOwnerAuthorizedUnknown, retireOwnerAuthorizedUnprovable, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration, type Guard, type Predecessor, type UserProxyConfiguration } from '../packages/local-operation/index.ts';
 
 const base = () => path.join(process.env.LOCALAPPDATA ?? '', 'FleetSplice', 'G05');
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -43,6 +43,12 @@ function describePredecessor(predecessor: Predecessor): string[] {
     `? 未观察到 Turn 完成事件: ${e.turnCompleted ? '否' : '是'}`,
     `✓ 对应 native 进程现已结束: ${predecessor.exactNativeExitProven ? '是' : '否'}`,
     '结论：上一轮结果未知。FleetSplice 不会自动重试该请求。'
+  ];
+  if (predecessor.kind === 'RETIRED_UNPROVABLE') return [
+    'Machine code: RETIRED_UNPROVABLE',
+    'Old effect outcome: UNKNOWN',
+    'Old command replayed: false',
+    'Fresh incarnation required: true'
   ];
   return [`Machine code: ${predecessor.kind}`, `Reason: ${predecessor.reason}`, `Exact native exit proven: ${predecessor.exactNativeExitProven}`];
 }
@@ -126,7 +132,7 @@ async function status(readOnly = true) {
   if (predecessor.guard?.state === 'RUNNING') {
     try { const state = await control('status'); const guard = currentGuard()!; output(`FleetSplice: ${state.code}\nHost: SKYFORGE-01\nPrincipal: ${guard.identity.principal}\nElevated: ${guard.identity.elevated}\nWorkspace: ${guard.identity.root}\nSupervisor: ${state.supervisor}\nHub: ${state.hub}\nEdge: ${state.edge}\nEdge admission: ${state.edgeAdmission}\nNative Codex: ${state.nativeCodex}\nGuard: ${guard.state}\nRun: ${state.runId}\nNode: ${state.nodeVersion} / SQLite ${state.sqliteVersion}\nNode path: ${state.runtimePath}\nCodex: ${state.codexPath}\nCodex SHA-256: ${state.codexSha256}\nProxy: ${state.proxy}\nProxy source: ${state.proxySource}\nNetwork preflight: PASS\n${describeProxyConfiguration(configuration).join('\n')}`); return; } catch { /* Stale RUNNING is handled below. */ }
   }
-  const identity = predecessor.guard?.identity; output(`FleetSplice: ${['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS'].includes(predecessor.kind) ? 'STOPPED' : 'RECOVERY_REQUIRED'}\nHost: SKYFORGE-01\nPrincipal: ${identity?.principal ?? 'unknown'}\nElevated: ${identity?.elevated ?? 'unknown'}\nWorkspace: ${identity?.root ?? 'unknown'}\nSupervisor: STOPPED\nHub: STOPPED\nEdge: STOPPED\nNative Codex: STOPPED\nGuard: ${predecessor.guard?.state ?? 'NONE'}\nNode: ${runtime}\nNode path: ${runtimePath}\nCodex: ${codex}\nCodex SHA-256: ${codexHash}\nProxy: ${proxy.display ?? 'direct'}\nProxy source: ${proxy.source}\nNetwork preflight: NOT_RUN_STATUS_READ_ONLY\n${describeProxyConfiguration(configuration).join('\n')}`);
+  const identity = predecessor.guard?.identity; output(`FleetSplice: ${['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind) ? 'STOPPED' : 'RECOVERY_REQUIRED'}\nHost: SKYFORGE-01\nPrincipal: ${identity?.principal ?? 'unknown'}\nElevated: ${identity?.elevated ?? 'unknown'}\nWorkspace: ${identity?.root ?? 'unknown'}\nSupervisor: STOPPED\nHub: STOPPED\nEdge: STOPPED\nNative Codex: STOPPED\nGuard: ${predecessor.guard?.state ?? 'NONE'}\nNode: ${runtime}\nNode path: ${runtimePath}\nCodex: ${codex}\nCodex SHA-256: ${codexHash}\nProxy: ${proxy.display ?? 'direct'}\nProxy source: ${proxy.source}\nNetwork preflight: NOT_RUN_STATUS_READ_ONLY\n${describeProxyConfiguration(configuration).join('\n')}`);
   describePredecessor(predecessor).forEach(output);
   if (!readOnly) output('Machine code: STATUS_NOT_READ_ONLY');
 }
@@ -138,9 +144,14 @@ async function doctor(root: string) {
   describePredecessor(predecessor).forEach(output);
 }
 function retire(args: string[]) {
-  const requested = args[args.indexOf('--run') + 1];
-  if (requested !== G05B_OWNER_RETIREMENT_RUN) { error('OWNER_RETIREMENT_RUN_NOT_AUTHORIZED'); return; }
-  try { const result = retireOwnerAuthorizedUnknown(base(), requested); output(`RETIRED_AMBIGUOUS\nMachine code: RETIRED_AMBIGUOUS\nOld effect outcome: UNKNOWN\nOld command replayed: false\nReceipt: ${result.receipt}\nFresh incarnation: required`); } catch (reason) { error(`OWNER_RETIREMENT_ADMISSION_FAILED\n${reason instanceof Error ? reason.message : 'UNKNOWN'}`); }
+  const requested = args[2];
+  if (args.length === 3 && args[1] === '--run' && requested === G05B_OWNER_RETIREMENT_RUN) {
+    try { const result = retireOwnerAuthorizedUnknown(base(), requested); output(`RETIRED_AMBIGUOUS\nMachine code: RETIRED_AMBIGUOUS\nOld effect outcome: UNKNOWN\nOld command replayed: false\nReceipt: ${result.receipt}\nFresh incarnation: required`); } catch (reason) { error(`OWNER_RETIREMENT_ADMISSION_FAILED\n${reason instanceof Error ? reason.message : 'UNKNOWN'}`); }
+    return;
+  }
+  if (args.length !== 4 || args[1] !== '--run' || args[3] !== '--ack-unknown-effect') { error('OWNER_RETIREMENT_ACKNOWLEDGEMENT_REQUIRED'); return; }
+  if (!requested || !(G05C_P1_OWNER_RETIREMENT_RUNS as readonly string[]).includes(requested)) { error('OWNER_RETIREMENT_RUN_NOT_AUTHORIZED'); return; }
+  try { const result = retireOwnerAuthorizedUnprovable(base(), requested); output(`RETIRED_UNPROVABLE\nMachine code: RETIRED_UNPROVABLE\nOld effect outcome: UNKNOWN\nOld command replayed: false\nReceipt: ${result.receipt}\nFresh incarnation: required`); } catch (reason) { error(`OWNER_RETIREMENT_ADMISSION_FAILED\n${reason instanceof Error ? reason.message : 'UNKNOWN'}`); }
 }
 async function configure(args: string[]) {
   if (args[0] !== 'proxy') { error('USAGE: fleetsplice configure proxy --url <proxy-url>|--from-current-env|--show|--clear'); return; }

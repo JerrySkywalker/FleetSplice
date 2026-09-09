@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import { canonical, requireThat } from '../contracts/json.ts';
 
-export const DISABLED_FEATURES = ['hooks', 'plugins', 'shell_tool', 'unified_exec', 'multi_agent', 'code_mode', 'apps', 'image_generation', 'view_image'] as const;
+// Native read-only command execution is intentionally left available for P1.
+// Integrations that can expand the authority surface remain disabled.
+export const DISABLED_FEATURES = ['hooks', 'plugins', 'multi_agent', 'code_mode', 'apps', 'image_generation', 'view_image'] as const;
 export const NATIVE_POLICY_ARGS = ['-c', 'sandbox_mode="read-only"', '-c', 'approval_policy="never"', '-c', 'web_search="disabled"', '-c', 'notify=[]', '-c', 'agents.enabled=false', '-c', 'features.multi_agent_v2.enabled=false', ...DISABLED_FEATURES.flatMap(name => ['-c', `features.${name}=false`])];
 // Pinned 0.153.4 reads this marker before worker threads, selecting DisabledEphemeral.
 // Stdio alone selects ResolvePersisted and can restore a separate remote transport.

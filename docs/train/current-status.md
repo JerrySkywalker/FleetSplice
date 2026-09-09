@@ -16,11 +16,15 @@ G05A_PASS=true
 G05B_PASS=true
 G05B_R1_PASS=true
 G05C_PLANNED=true
-G05C_STARTED=false
+G05C_STARTED=true
+G05C_P1_AUTHORIZED=true
+G05C_P1_STATUS=LIVE_ACCEPTANCE_PASSED_PENDING_INDEPENDENT_REVIEW
+G05C_P2_STARTED=false
+G05C_P3_STARTED=false
 G06_STARTED=false
-IMPLEMENTATION_AUTHORIZED=NONE
-PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
-CURRENT_CHANGE_CLASS=DOCS_ONLY_PRODUCT_BOUNDARY_FREEZE
+IMPLEMENTATION_AUTHORIZED=G05C_LOCAL_CONTROL_PARITY_ONLY_SERIAL_STATIONS
+PRODUCT_IMPLEMENTATION_AUTHORIZED=G05C_LOCAL_CONTROL_PARITY_ONLY_SERIAL_STATIONS
+CURRENT_CHANGE_CLASS=G05C_P1_FINAL_ACCEPTANCE
 NEXT_PLANNED_GOAL=G05C_NATIVE_AGENT_CONTROL_PARITY
 ```
 
@@ -34,6 +38,20 @@ The current product boundary is [Owner Thesis and Product Boundary](../product/o
 That boundary narrows the next planned local step to native-agent control parity
 and explicitly keeps G06 remote deployment unstarted.
 
-No product code, Tencent deployment, remote networking, phone UI, second Host,
-embedded terminal, editor, Git IDE, worktree manager, provider migration or
-later-train implementation is authorized by this documentation maintenance.
+The later Owner authorization
+`FLEETSPLICE-G05C-NIGHT-TRAIN-20260909-001` admits local G05C only, in serial
+P1, P2A, P2B, P3 and closeout stations. Each successor requires the preceding
+station's independent PASS. P2A/P2B/P3 remain unstarted. G06, Tencent,
+remote networking, phone UI, second Host, embedded terminal, editor, Git IDE,
+worktree manager, provider migration and merges remain unauthorized.
+
+P1 real-browser acceptance on 2026-09-09 used the live native catalog and
+requested/observed `gpt-6-astra / low`, completed two turns on one thread,
+and projected seven completed native read-only command lifecycles without
+rejected observations. All 199 tracked/untracked source file hashes and Git
+diff/status fingerprints matched before and after. Run
+`69d2fb2c-fe45-4ba3-8926-33aef02556aa` stopped normally with proven native exit,
+sound guard/admission, intact journals and `SAFE_TERMINAL`. Historical retired
+runs remain UNKNOWN. This is a review candidate, not independent acceptance.
+Sanitized evidence is outside Git under the train's `V:\artifacts\FleetSplice`
+directory. No G06 implementation has begun.

@@ -11,12 +11,17 @@ export const QUALIFIED_NODE = 'v24.20.0';
 export const QUALIFIED_SQLITE = '3.53.4';
 export const QUALIFIED_CODEX_VERSION = '0.153.4';
 export const G05B_OWNER_RETIREMENT_RUN = '4c3beca4-d044-47ee-a8d0-915769e74bb2';
+export const G05C_P1_OWNER_RETIREMENT_RUN = '2566cd5b-affe-464e-ab86-d426215d0a3d';
+// Each entry is an independently Owner-authorized, exact stale run. This is
+// deliberately not a general corruption-retirement capability.
+export const G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN = '66f9b6fc-0675-4346-836d-63720859dea0';
+export const G05C_P1_OWNER_RETIREMENT_RUNS = [G05C_P1_OWNER_RETIREMENT_RUN, G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN] as const;
 export type ProcessIdentity = { processId: number; creationTime: string; sid?: string; principal?: string; sessionId?: number; elevated?: boolean };
 export type ProcessProbe = { exists: boolean; identity?: ProcessIdentity; name?: string; commandLine?: string };
 export type Guard = { state: string; runId: string; target: Target; identity: { root: string; rootIdentity: string; sid: string; principal: string; sessionId: number; elevated: false }; nativeExitObserved: boolean; quiescent: boolean; [key: string]: unknown };
 export type TurnEvidence = { turnId: string; commandId: string | null; accepted: boolean; started: boolean; completed: boolean };
 export type NativeEvidence = { process: ProcessIdentity | null; instanceId: string | null; threadId: string | null; turnId: string | null; sessionReady: boolean; turnAccepted: boolean; turnStarted: boolean; turnCompleted: boolean; hasEffectAttempt: boolean; hasNativeEvidence: boolean; turns: Record<string, TurnEvidence>; unresolvedEffectIds: string[]; unboundEvidence: boolean };
-export type PredecessorKind = 'NO_PREDECESSOR' | 'SAFE_NO_EFFECT' | 'SAFE_TERMINAL' | 'AMBIGUOUS_TERMINAL' | 'LIVE_OR_CONFLICTING' | 'CORRUPT_OR_UNPROVABLE' | 'RETIRED_AMBIGUOUS';
+export type PredecessorKind = 'NO_PREDECESSOR' | 'SAFE_NO_EFFECT' | 'SAFE_TERMINAL' | 'AMBIGUOUS_TERMINAL' | 'LIVE_OR_CONFLICTING' | 'CORRUPT_OR_UNPROVABLE' | 'RETIRED_AMBIGUOUS' | 'RETIRED_UNPROVABLE';
 export type Predecessor = { kind: PredecessorKind; guard: Guard | null; evidence: NativeEvidence; exactNativeExitProven: boolean; conflicts: ProcessProbe[]; reason: string; retirementReceipt?: string };
 export type QualifiedNode = { path: string; version: string; sqlite: string };
 export type QualifiedCodex = { path: string; version: string; sha256: string };
@@ -248,7 +253,7 @@ export function probeProcess(processId: number): ProcessProbe {
   try { return JSON.parse(execFileSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 8000 })) as ProcessProbe; } catch { return { exists: true, name: 'PROCESS_PROBE_UNAVAILABLE' }; }
 }
 export function fleetSpliceProcesses(): ProcessProbe[] {
-  const script = "$p=Get-CimInstance Win32_Process | Where-Object {$_.ProcessId -ne $PID -and $_.CommandLine -match 'dist\\\\apps\\\\(hub|edge)\\\\(server|main)\\.js'}; @($p | ForEach-Object {@{exists=$true;name=$_.Name;commandLine=$_.CommandLine}}) | ConvertTo-Json -Compress";
+  const script = `$p=Get-CimInstance Win32_Process | Where-Object {$_.ProcessId -ne $PID -and $_.ProcessId -ne ${process.pid} -and $_.CommandLine -match 'dist\\\\(apps\\\\(hub|edge)\\\\(server|main)|scripts\\\\(supervisor|local))\\.js'}; @($p | ForEach-Object {@{exists=$true;name=$_.Name;commandLine=$_.CommandLine}}) | ConvertTo-Json -Compress`;
   try { const raw = execFileSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 8000 }).trim(); if (!raw) return []; const value = JSON.parse(raw); return Array.isArray(value) ? value as ProcessProbe[] : [value as ProcessProbe]; } catch { return [{ exists: true, name: 'PROCESS_INVENTORY_UNAVAILABLE' }]; }
 }
 
@@ -310,6 +315,10 @@ export function evidenceFromEdge(file: string): NativeEvidence {
       const effect = effects.get(key);
       if (!effect) { summary.unboundEvidence = true; continue; }
       if (!sameNative(value?.nativeProcessId, value?.nativeInstanceId)) { summary.unboundEvidence = true; continue; }
+      // A catalog read (and its explicit stale-selection rejection) happens
+      // before `thread/start`. It is a journaled native interaction but cannot
+      // create a coding thread, so it has its own terminal evidence shape.
+      if (['NATIVE_CAPABILITIES_READY', 'STALE_MODEL_SELECTION', 'STALE_REASONING_SELECTION'].includes(value?.code)) { effect.terminal = true; continue; }
       if (typeof value?.nativeThreadId !== 'string' || (effect.bindingThreadId && effect.bindingThreadId !== value.nativeThreadId) || (effect.threadId && effect.threadId !== value.nativeThreadId)) { summary.unboundEvidence = true; continue; }
       effect.threadId = value.nativeThreadId; displayThread(value.nativeThreadId);
       if (value?.code === 'NATIVE_SESSION_READY') {
@@ -434,6 +443,34 @@ function retiredPredecessor(base: string, guard: Guard, process: (processId: num
   if (original.kind !== 'AMBIGUOUS_TERMINAL' || !original.exactNativeExitProven) return corrupt('RETIREMENT_ORIGINAL_NOT_PROVEN_AMBIGUOUS', evidence);
   return { kind: 'RETIRED_AMBIGUOUS', guard, evidence, exactNativeExitProven: true, conflicts: [], reason: 'RETIRED_WITH_PRESERVED_UNKNOWN_OUTCOME', retirementReceipt: receiptPath };
 }
+function retiredUnprovablePredecessor(base: string, guard: Guard, process: (processId: number) => ProcessProbe, conflicts: ProcessProbe[]): Predecessor {
+  const corrupt = (reason: string, evidence = emptyEvidence()): Predecessor => ({ kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence, exactNativeExitProven: false, conflicts: conflicts.filter(value => value.exists), reason });
+  if (!guardIsSound(guard, base)) return corrupt('RETIRED_GUARD_OR_ADMISSION_MISMATCH');
+  const archive = path.join(base, 'retirements', guard.runId);
+  const receiptPath = path.join(archive, 'retirement-receipt.json');
+  if (guard.retirementReceipt !== receiptPath || !existsSync(receiptPath)) return corrupt('RETIREMENT_RECEIPT_MISSING_OR_SUBSTITUTED');
+  let receipt: any; let archivedGuard: Guard; let archivedAdmission: { runId: string; target: Target; identity: Guard['identity'] }; let evidence: NativeEvidence;
+  try {
+    receipt = safeJson<any>(receiptPath);
+    archivedGuard = safeJson<Guard>(path.join(archive, 'environment-guard.json'));
+    archivedAdmission = safeJson<{ runId: string; target: Target; identity: Guard['identity'] }>(path.join(archive, 'admission.json'));
+    evidence = evidenceFromEdge(path.join(archive, 'edge.sqlite'));
+  } catch { return corrupt('RETIREMENT_ARCHIVE_UNREADABLE'); }
+  if (receipt?.kind !== 'G05C_P1_OWNER_AUTHORIZED_UNPROVABLE_RETIREMENT' || receipt.runId !== guard.runId || receipt.archive !== archive || receipt.oldClassification !== 'CORRUPT_OR_UNPROVABLE' || receipt.oldReason !== 'EFFECT_EVIDENCE_UNBOUND' || receipt.oldEffectOutcome !== 'UNKNOWN' || receipt.oldCommandReplayed !== false || receipt.exactNativeExitProven !== true || receipt.oldAuthorityRuntimeRetired !== true || receipt.freshIncarnationRequired !== true || guard.oldEffectOutcome !== 'UNKNOWN' || guard.oldCommandReplayed !== false || guard.oldAuthorityRuntimeRetired !== true || guard.freshIncarnationRequired !== true) return corrupt('RETIREMENT_RECEIPT_CONTRADICTORY', evidence);
+  if (archivedGuard.state !== 'RUNNING' || archivedGuard.runId !== guard.runId || !same(archivedGuard.target, guard.target) || !same(archivedGuard.identity, guard.identity) || archivedAdmission.runId !== guard.runId || !same(archivedAdmission.target, guard.target) || !same(archivedAdmission.identity, guard.identity) || !same(receipt.oldTarget, guard.target)) return corrupt('RETIREMENT_ARCHIVE_BINDING_MISMATCH', evidence);
+  if (!readableFleetSpliceJournal(path.join(archive, 'hub.sqlite'))) return corrupt('RETIREMENT_HUB_JOURNAL_UNPROVABLE', evidence);
+  if (!readableFleetSpliceJournal(path.join(archive, 'edge.sqlite'))) return corrupt('RETIREMENT_EDGE_JOURNAL_UNPROVABLE', evidence);
+  if (!Array.isArray(receipt.evidence) || !receipt.evidence.some((item: any) => item?.name === 'environment-guard.json') || !receipt.evidence.some((item: any) => item?.name === 'admission.json') || !receipt.evidence.some((item: any) => item?.name === 'hub.sqlite') || !receipt.evidence.some((item: any) => item?.name === 'edge.sqlite')) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INCOMPLETE', evidence);
+  for (const item of receipt.evidence) {
+    if (!item || typeof item.name !== 'string' || path.basename(item.name) !== item.name || !/^[A-Za-z0-9._-]+$/.test(item.name)) return corrupt('RETIREMENT_EVIDENCE_MANIFEST_INVALID', evidence);
+    const preserved = path.join(archive, item.name);
+    try { if (!existsSync(preserved) || typeof item.sha256 !== 'string' || item.sha256 !== hash(preserved) || item.bytes !== statSync(preserved).size) return corrupt('RETIREMENT_EVIDENCE_HASH_MISMATCH', evidence); } catch { return corrupt('RETIREMENT_EVIDENCE_UNREADABLE', evidence); }
+  }
+  const original = classifyEvidence(archivedGuard, evidence, process, conflicts);
+  if (original.kind === 'LIVE_OR_CONFLICTING') return original;
+  if (original.kind !== 'CORRUPT_OR_UNPROVABLE' || original.reason !== 'EFFECT_EVIDENCE_UNBOUND' || !original.exactNativeExitProven || !original.evidence.process || !original.evidence.hasEffectAttempt || !original.evidence.unboundEvidence) return corrupt('RETIREMENT_ORIGINAL_NOT_PROVEN_UNBOUND', evidence);
+  return { kind: 'RETIRED_UNPROVABLE', guard, evidence, exactNativeExitProven: true, conflicts: [], reason: 'RETIRED_WITH_PRESERVED_UNKNOWN_UNPROVABLE_OUTCOME', retirementReceipt: receiptPath };
+}
 export function classifyPredecessor(base = runtimeRoot(), process = probeProcess, conflicts = fleetSpliceProcesses()): Predecessor {
   const file = guardPath(base);
   const matchingConflicts = conflicts.filter(item => item.exists);
@@ -442,6 +479,7 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
   try { guard = safeJson<Guard>(file); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard: null, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'GUARD_UNREADABLE' }; }
   if (matchingConflicts.length) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: matchingConflicts, reason: 'FLEETSPLICE_PROCESS_PRESENT' };
   if (guard.state === 'RETIRED_AMBIGUOUS') return retiredPredecessor(base, guard, process, conflicts);
+  if (guard.state === 'RETIRED_UNPROVABLE') return retiredUnprovablePredecessor(base, guard, process, conflicts);
   if (!guardIsSound(guard, base)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'GUARD_OR_ADMISSION_MISMATCH' };
   if (!readableFleetSpliceJournal(path.join(base, guard.runId, 'hub.sqlite'))) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'HUB_JOURNAL_UNPROVABLE' };
   if (!readableFleetSpliceJournal(path.join(base, guard.runId, 'edge.sqlite'))) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_JOURNAL_UNPROVABLE' };
@@ -467,6 +505,26 @@ export function retireOwnerAuthorizedUnknown(base = runtimeRoot(), runId = G05B_
   const value = { kind: 'G05B_OWNER_AUTHORIZED_RETIREMENT', runId, retiredAt: new Date().toISOString(), oldState: predecessor.guard!.state, oldTarget: predecessor.guard!.target, native: predecessor.evidence, exactNativeExitProven: true, oldEffectOutcome: 'UNKNOWN', oldCommandReplayed: false, oldAuthorityRuntimeRetired: true, freshIncarnationRequired: true, evidence, archive };
   durable(receipt, value, true); chmodSync(receipt, 0o400);
   durable(guardPath(base), { ...predecessor.guard, state: 'RETIRED_AMBIGUOUS', nativeExitObserved: true, quiescent: false, oldEffectOutcome: 'UNKNOWN', retirementReceipt: receipt, retiredAt: value.retiredAt, retiredBy: 'G05B_OWNER_AUTHORIZATION', oldAuthorityRuntimeRetired: true, freshIncarnationRequired: true });
+  return { receipt, predecessor };
+}
+export function retireOwnerAuthorizedUnprovable(base = runtimeRoot(), runId = G05C_P1_OWNER_RETIREMENT_RUN, process = probeProcess, conflicts = fleetSpliceProcesses()): { receipt: string; predecessor: Predecessor } {
+  requireThat((G05C_P1_OWNER_RETIREMENT_RUNS as readonly string[]).includes(runId), 'OWNER_RETIREMENT_RUN_NOT_AUTHORIZED');
+  const predecessor = classifyPredecessor(base, process, conflicts);
+  requireThat(predecessor.guard?.runId === runId && predecessor.guard.state === 'RUNNING' && predecessor.kind === 'CORRUPT_OR_UNPROVABLE' && predecessor.reason === 'EFFECT_EVIDENCE_UNBOUND', 'OWNER_RETIREMENT_ADMISSION_FAILED');
+  requireThat(!!predecessor.evidence.process && predecessor.evidence.hasEffectAttempt && predecessor.evidence.hasNativeEvidence && predecessor.evidence.unboundEvidence && predecessor.exactNativeExitProven, 'OWNER_RETIREMENT_EVIDENCE_INSUFFICIENT');
+  const archive = path.join(base, 'retirements', runId);
+  const required = [guardPath(base), path.join(base, runId, 'admission.json'), path.join(base, runId, 'hub.sqlite'), path.join(base, runId, 'edge.sqlite')] as const;
+  requireThat(required.every(existsSync) && readableFleetSpliceJournal(required[2]) && readableFleetSpliceJournal(required[3]), 'OWNER_RETIREMENT_EVIDENCE_INSUFFICIENT');
+  requireThat(!existsSync(archive), 'OWNER_RETIREMENT_ALREADY_RECORDED');
+  const source = [...required, ...['hub.sqlite-wal', 'hub.sqlite-shm', 'edge.sqlite-wal', 'edge.sqlite-shm'].map(name => path.join(base, runId, name)).filter(existsSync)];
+  mkdirSync(archive, { recursive: true });
+  const evidence = source.map(file => ({ name: path.basename(file), sha256: hash(file), bytes: statSync(file).size }));
+  for (const file of source) { const destination = path.join(archive, path.basename(file)); copyFileSync(file, destination, 1); chmodSync(destination, 0o400); }
+  const receipt = path.join(archive, 'retirement-receipt.json');
+  const value = { kind: 'G05C_P1_OWNER_AUTHORIZED_UNPROVABLE_RETIREMENT', runId, retiredAt: new Date().toISOString(), oldState: predecessor.guard!.state, oldClassification: predecessor.kind, oldReason: predecessor.reason, oldTarget: predecessor.guard!.target, native: predecessor.evidence, exactNativeExitProven: true, oldEffectOutcome: 'UNKNOWN', oldCommandReplayed: false, oldAuthorityRuntimeRetired: true, freshIncarnationRequired: true, evidence, archive };
+  durable(receipt, value, true); chmodSync(receipt, 0o400);
+  const retiredBy = runId === G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN ? 'FLEETSPLICE-G05C-P1-PROTOCOL-CONFORMANCE-REPAIR-004' : 'FLEETSPLICE-G05C-P1-RUNTIME-CUSTODY-RECOVERY-002';
+  durable(guardPath(base), { ...predecessor.guard, state: 'RETIRED_UNPROVABLE', nativeExitObserved: true, quiescent: false, oldEffectOutcome: 'UNKNOWN', oldCommandReplayed: false, retirementReceipt: receipt, retiredAt: value.retiredAt, retiredBy, oldAuthorityRuntimeRetired: true, freshIncarnationRequired: true });
   return { receipt, predecessor };
 }
 

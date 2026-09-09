@@ -14,20 +14,23 @@ export const grant = (): ClientGrant => ({ actorId: randomUUID(), clientInstance
 // DISPOSABLE_INTEGRATION only. This port is never imported by product entrypoints.
 export class FixtureNative implements NativePort {
   instanceId = randomUUID(); pid = 123; signals = new EventEmitter();
-  creates = 0; turns = 0; starts = 0; threadId = randomUUID(); turnId = '';
+  creates = 0; turns = 0; starts = 0; capabilityReads = 0; threadId = randomUUID(); turnId = '';
+  catalog = { models: [{ id: 'fixture-model', displayName: 'Fixture model', isDefault: true, supportedReasoningEfforts: [{ reasoningEffort: 'fixture-reasoning', description: 'Fixture reasoning' }, { reasoningEffort: 'fixture-deep', description: 'Fixture deep reasoning' }], defaultReasoningEffort: 'fixture-reasoning' }] };
+  lastConfiguration: { model: string; reasoningEffort: string } | null = null;
   failure: 'before' | 'after' | null = null;
   responseFirst = false;
   beforeWrite: () => void = () => {};
   qualify: () => Promise<void> = async () => {};
   async start(beforeEffect: () => void) { beforeEffect(); this.beforeWrite(); this.starts++; }
-  async create(_requestId: string, _root: string, beforeEffect: () => void) {
+  async capabilities(_requestId: string, beforeEffect: () => void) { beforeEffect(); this.capabilityReads++; return structuredClone(this.catalog); }
+  async create(_requestId: string, _root: string, configuration: { model: string; reasoningEffort: string }, beforeEffect: () => void) {
     await this.qualify(); beforeEffect();
-    this.beforeWrite(); this.creates++;
+    this.beforeWrite(); this.creates++; this.lastConfiguration = structuredClone(configuration);
     if (this.failure === 'before') throw new Error('response lost before known start');
     const notify = () => this.signals.emit('signal', { method: 'thread/started', params: { thread: { id: this.threadId } } });
     if (this.responseFirst) setImmediate(notify); else notify();
     if (this.failure === 'after') throw new Error('response lost after known start');
-    return { threadId: this.threadId, model: 'fixture', provider: 'fixture' };
+    return { threadId: this.threadId, model: configuration.model, provider: 'fixture', reasoningEffort: configuration.reasoningEffort };
   }
   async turn(_requestId: string, _threadId: string, _root: string, _text: string, beforeEffect: () => void) {
     await this.qualify(); beforeEffect();
@@ -55,7 +58,9 @@ export function rig() {
   hub.ready(false);
   async function make(family: Intent['family'], body: unknown = {}, laneId: string | null = null, actor = client): Promise<FleetCommand> {
     const lane = hub.snapshot().lanes.find(item => item.laneId === laneId);
+    const effectiveBody = family === 'sessionLane.continue' && (!body || Object.keys(body as object).length === 0) ? { model: 'fixture-model', reasoningEffort: 'fixture-reasoning' } : body;
     const intent = { v: 1, actorId: actor.actorId, clientInstanceId: actor.clientInstanceId, grantId: actor.grantId, grantRevision: actor.grantRevision, target: identity, laneId, expected: lane?.fence ?? null, family, body } as Intent;
+    intent.body = effectiveBody as Intent['body'];
     return { commandId: randomUUID(), idempotencyKey: randomUUID(), intentDigest: await digest('intent', intent), intent };
   }
   async function admit(family: Intent['family'], body: unknown = {}, laneId: string | null = null) { const value = await make(family, body, laneId); return hub.execute(value, client); }

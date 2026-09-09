@@ -2,7 +2,7 @@ export const locales = ['zh-CN', 'en-US'] as const;
 export type Locale = typeof locales[number];
 
 export const enUS = {
-  pageTitle: 'FleetSplice · Local session', edition: 'LOCAL / M0.1', preferences: 'Preferences',
+  pageTitle: 'FleetSplice · Local session', edition: 'LOCAL / G05C-P1', preferences: 'Preferences',
   language: 'Language', appearance: 'Appearance', localeChinese: '简体中文', localeEnglish: 'English',
   system: 'System', light: 'Light', dark: 'Dark', oledBlack: 'OLED Black', close: 'Close',
   preferencesLocal: 'Saved in this browser. Your session stays connected.',
@@ -19,7 +19,7 @@ export const enUS = {
   emptySession: 'Acquire control, continue the session, then send a prompt. Responses stream here directly from native Codex.',
   emptyNoSession: 'Create a session from the sidebar to begin.', browser: 'Browser',
   you: 'YOU', codex: 'CODEX', session: 'SESSION', messageCodex: 'Message Codex',
-  promptPlaceholder: 'Ask a question about your work…', readOnlyHint: 'Read-only session · No tools or approval auto-allow',
+  promptPlaceholder: 'Ask a question about your work…', readOnlyHint: 'Read-only native coding · No writes, network, or approval auto-allow',
   sendMessage: 'Send message', controlContext: 'CONTROL & CONTEXT', sessionControl: 'Session control',
   controllerHint: 'This browser controls the lane.', viewerHint: 'Opening a session gives you a view. Acquire control explicitly.',
   acquireControl: 'Acquire control', continueSession: 'Continue session', releaseControl: 'Release control',
@@ -30,7 +30,10 @@ export const enUS = {
   continuity: 'Continuity', sameNative: 'Same live native session', nativeUnavailable: 'Native continuity unavailable',
   nativeNotStarted: 'Native session not started', controlRevision: 'Control epoch / revision',
   nativeThread: 'Native thread', nativeTurn: 'Native turn', commandReceipt: 'Command receipt', noCommands: 'No commands yet',
-  footer: 'Local loop · FleetSplice 0.1 / G05A',
+  nativeCapabilities: 'Native capabilities', refreshCapabilities: 'Refresh live catalog', liveCatalogHint: 'Catalog is reported by the running native Codex app-server.',
+  model: 'Model', reasoning: 'Reasoning', selectModel: 'Select a live model', selectReasoning: 'Select supported reasoning',
+  requestedConfiguration: 'Requested configuration', effectiveConfiguration: 'Native effective configuration', activity: 'Native activity', noActivity: 'No native activity yet',
+  footer: 'Local loop · FleetSplice 0.1 / G05C-P1',
   observationLost: 'Observation connection lost. Refresh evidence before any new action. ({code})',
   grantExpired: 'This browser has no new mutation authority. Close this run before starting a fresh attended local run. ({code})',
   requestFailed: 'Could not read the current evidence. ({code})', rejected: '{code}: command rejected before admission.',
@@ -46,7 +49,7 @@ export type MessageKey = keyof typeof enUS;
 export type Catalog = Record<MessageKey, string>;
 
 export const zhCN = {
-  pageTitle: 'FleetSplice · 本地会话', edition: '本地 / M0.1', preferences: '偏好设置',
+  pageTitle: 'FleetSplice · 本地会话', edition: '本地 / G05C-P1', preferences: '偏好设置',
   language: '语言', appearance: '外观', localeChinese: '简体中文', localeEnglish: 'English',
   system: '跟随系统', light: '浅色', dark: '深色', oledBlack: 'OLED 黑', close: '关闭',
   preferencesLocal: '已保存在此浏览器中，会话保持连接。',
@@ -63,7 +66,7 @@ export const zhCN = {
   emptySession: '先获取控制权，再继续会话，即可发送消息。原生 Codex 的回复将在此逐步显示。',
   emptyNoSession: '从侧栏新建会话即可开始。', browser: '浏览器',
   you: '你', codex: 'CODEX', session: '会话', messageCodex: '发送给 Codex',
-  promptPlaceholder: '输入你的问题…', readOnlyHint: '只读会话 · 不使用工具，不自动批准',
+  promptPlaceholder: '输入你的问题…', readOnlyHint: '原生只读编程 · 不写入、不联网、不自动批准',
   sendMessage: '发送消息', controlContext: '控制与上下文', sessionControl: '会话控制',
   controllerHint: '此浏览器拥有通道控制权。', viewerHint: '打开会话仅可查看，请先获取控制权。',
   acquireControl: '获取控制权', continueSession: '继续会话', releaseControl: '释放控制权',
@@ -74,7 +77,10 @@ export const zhCN = {
   continuity: '会话连续性', sameNative: '沿用同一原生会话', nativeUnavailable: '原生会话连续性不可用',
   nativeNotStarted: '原生会话尚未启动', controlRevision: '控制代次 / 修订',
   nativeThread: '原生线程', nativeTurn: '原生轮次', commandReceipt: '命令回执', noCommands: '暂无命令',
-  footer: '本地链路 · FleetSplice 0.1 / G05A',
+  nativeCapabilities: '原生能力', refreshCapabilities: '刷新实时目录', liveCatalogHint: '目录由正在运行的原生 Codex app-server 报告。',
+  model: '模型', reasoning: '推理强度', selectModel: '选择实时模型', selectReasoning: '选择支持的推理强度',
+  requestedConfiguration: '请求配置', effectiveConfiguration: '原生生效配置', activity: '原生活动', noActivity: '尚无原生活动',
+  footer: '本地链路 · FleetSplice 0.1 / G05C-P1',
   observationLost: '观测连接已断开，请先刷新状态，再执行新操作。（{code}）',
   grantExpired: '此浏览器的操作授权已过期。请先关闭本次运行，再手动启动新的本地运行。（{code}）',
   requestFailed: '无法读取当前状态。（{code}）', rejected: '{code}：命令在准入前被拒绝。',

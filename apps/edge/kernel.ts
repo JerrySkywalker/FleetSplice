@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { canonical, digest, next, requireThat, validate, Fault, ClockFence, type EdgeCommand, type Fence, type NativeEvent, type Receipt, type Target } from '../../packages/contracts/index.ts';
+import { canonical, digest, next, requireThat, validate, Fault, ClockFence, type EdgeCommand, type Fence, type NativeCapabilityCatalog, type NativeEvent, type Receipt, type Target } from '../../packages/contracts/index.ts';
 import { Journal } from '../../packages/journal/index.ts';
 import type { NativePort, NativeSignal } from '../../packages/driver-codex/index.ts';
 
 type EdgeLane = { fence: Fence; sessionId: string; segmentId: string; threadId: string | null; turnId: string | null; state: string; activeStep: string | null; creationStep: string | null; turnStartedObserved: boolean };
 type StepRecord = { command: EdgeCommand; receipt: Receipt; attempted: boolean };
+type CommandLifecycle = { laneId: string; edgeCommandId: string; threadId: string; turnId: string; itemId: string; signature: string; state: 'STARTED' | 'COMPLETED' };
 export class EdgeKernel {
   connected = false;
   blocked: string | null;
@@ -13,14 +14,20 @@ export class EdgeKernel {
   private lanes: Record<string, EdgeLane>;
   private current: EdgeCommand | null = null;
   private nativeStarted = false;
+  private capabilities: NativeCapabilityCatalog | null;
   private clock = new ClockFence(Date.now(), performance.now());
   private queued = 0;
   private outputCharacters = 0;
+  // This is deliberately separate from lane state: an app-server notification
+  // sequence is correlated by its native item id, rather than inferred from a
+  // completion-only tool observation or an incidental notification order.
+  private commandLifecycles = new Map<string, CommandLifecycle>();
   constructor(readonly journal: Journal, readonly target: Target, private native: NativePort,
     private verifyLocal: () => Promise<void>, private emit: (event: NativeEvent) => void,
     private nativeProcessProof: () => Promise<void> = async () => {}) {
     this.blocked = journal.recovered ? 'RECOVERY_REQUIRED' : null;
     this.lanes = journal.get('lanes') ?? {};
+    this.capabilities = journal.get<NativeCapabilityCatalog>('capabilities') ?? null;
     native.signals.on('signal', (signal: NativeSignal) => { try { this.signal(signal); } catch (error) {
       this.journal.append('REJECTED_NATIVE_OBSERVATION', this.target.edgeRuntimeId, { method: signal.method, threadId: typeof signal.params.threadId === 'string' ? signal.params.threadId : null, turnId: typeof signal.params.turnId === 'string' ? signal.params.turnId : null, code: error instanceof Fault ? error.code : 'NATIVE_EVIDENCE_INVALID' });
       this.quarantine(error instanceof Fault ? error.code : 'NATIVE_EVIDENCE_INVALID');
@@ -42,7 +49,7 @@ export class EdgeKernel {
   private saveLanes(): void { this.journal.set('lanes', this.lanes); }
   private receipt(command: EdgeCommand, status: Receipt['status'], code: string): Receipt {
     const lane = command.plan.laneId ? this.lanes[command.plan.laneId] : undefined;
-    return { edgeCommandId: command.edgeCommandId, status, code, nativeThreadId: lane?.threadId ?? null, nativeTurnId: lane?.turnId ?? null, nativeRequestId: null, nativeProcessId: this.native.pid, nativeInstanceId: this.nativeStarted ? this.native.instanceId : null };
+    return { edgeCommandId: command.edgeCommandId, status, code, nativeThreadId: lane?.threadId ?? null, nativeTurnId: lane?.turnId ?? null, nativeRequestId: null, nativeProcessId: this.native.pid, nativeInstanceId: this.nativeStarted ? this.native.instanceId : null, nativeCapabilities: null, nativeConfiguration: null };
   }
   private async dispatch(input: EdgeCommand): Promise<Receipt> {
     try { this.clock.check(Date.now(), performance.now()); } catch (error) { this.connected = false; this.blocked = 'CLOCK_CONTINUITY_UNKNOWN'; throw error; }
@@ -68,6 +75,8 @@ export class EdgeKernel {
     if (family === 'workspace.register') {
       requireThat(plan.laneId === null && plan.before === null && plan.after === null, 'INVALID_WORKSPACE_PLAN');
       requireThat(fleet.intent.family === 'workspace.register' && fleet.intent.body.root === this.journal.get<string>('root'), 'WRONG_WORKSPACE');
+    } else if (family === 'native.capabilities.read') {
+      requireThat(plan.laneId === null && plan.sessionId === null && plan.segmentId === null && plan.before === null && plan.after === null, 'INVALID_CAPABILITY_PLAN');
     } else {
       requireThat(family !== 'logicalSession.create' && plan.laneId && plan.sessionId && plan.segmentId && plan.before && plan.after, 'INVALID_LANE_PLAN');
       requireThat(plan.laneId === fleet.intent.laneId && canonical(plan.before) === canonical(fleet.intent.expected), 'PLAN_FENCE_MISMATCH');
@@ -91,14 +100,16 @@ export class EdgeKernel {
       if (family === 'turn.submit') requireThat(lane.threadId && lane.state === 'IDLE', 'CONTINUE_REQUIRED');
       lane.fence = after; this.lanes[plan.laneId] = lane;
     }
-    const isNative = family === 'turn.submit' || (family === 'sessionLane.continue' && !lane?.threadId);
+    const isNative = family === 'native.capabilities.read' || family === 'turn.submit' || (family === 'sessionLane.continue' && !lane?.threadId);
     const receipt = this.receipt(command, isNative ? 'DISPATCHED' : 'SUCCEEDED', isNative ? 'DISPATCH_ATTEMPTED' : 'APPLIED');
     const record: StepRecord = { command, receipt, attempted: isNative };
     if (isNative) {
       receipt.nativeRequestId = randomUUID();
-      lane!.state = 'DISPATCHED'; lane!.activeStep = command.edgeCommandId;
-      if (family === 'sessionLane.continue') lane!.creationStep = command.edgeCommandId;
-      else lane!.turnStartedObserved = false;
+      if (lane) {
+        lane.state = 'DISPATCHED'; lane.activeStep = command.edgeCommandId;
+        if (family === 'sessionLane.continue') lane.creationStep = command.edgeCommandId;
+        else lane.turnStartedObserved = false;
+      }
     }
     // COMMIT with synchronous=FULL is the linearization point. No native call before this returns.
     this.journal.transaction(() => {
@@ -123,10 +134,36 @@ export class EdgeKernel {
       }
       this.clock.check(Date.now(), performance.now());
       receipt.nativeProcessId = this.native.pid; receipt.nativeInstanceId = this.native.instanceId;
+      if (family === 'native.capabilities.read') {
+        const catalog = await this.native.capabilities(receipt.nativeRequestId!, beforeNativeEffect);
+        this.capabilities = catalog; receipt.nativeCapabilities = catalog;
+        receipt.status = 'SUCCEEDED'; receipt.code = 'NATIVE_CAPABILITIES_READY';
+        this.journal.transaction(() => {
+          this.journal.set('capabilities', catalog); this.journal.update(command.edgeCommandId, record);
+          this.journal.append('NATIVE_CAPABILITIES', command.edgeCommandId, catalog); this.journal.append('NATIVE_RESULT', command.edgeCommandId, receipt);
+          this.saveLanes();
+        });
+        return receipt;
+      }
       if (family === 'sessionLane.continue') {
-        const result = await this.native.create(receipt.nativeRequestId!, this.journal.get<string>('root')!, beforeNativeEffect);
+        const configuration = fleet.intent.body as { model: string; reasoningEffort: string };
+        const catalog = await this.native.capabilities(randomUUID(), beforeNativeEffect);
+        this.capabilities = catalog; receipt.nativeCapabilities = catalog;
+        const selected = catalog.models.find(model => model.id === configuration.model);
+        const staleCode = !selected ? 'STALE_MODEL_SELECTION' : !selected.supportedReasoningEfforts.some(choice => choice.reasoningEffort === configuration.reasoningEffort) ? 'STALE_REASONING_SELECTION' : null;
+        if (staleCode) {
+          receipt.status = 'REJECTED'; receipt.code = staleCode;
+          lane!.state = 'EMPTY'; lane!.activeStep = null; lane!.creationStep = null;
+          this.journal.transaction(() => {
+            this.journal.set('capabilities', catalog); this.journal.update(command.edgeCommandId, record);
+            this.journal.append('NATIVE_CAPABILITIES', command.edgeCommandId, catalog); this.journal.append('NATIVE_RESULT', command.edgeCommandId, receipt); this.saveLanes();
+          });
+          return receipt;
+        }
+        const result = await this.native.create(receipt.nativeRequestId!, this.journal.get<string>('root')!, configuration, beforeNativeEffect);
         requireThat(!lane!.threadId || lane!.threadId === result.threadId, 'NATIVE_THREAD_CONFLICT');
         lane!.threadId = result.threadId; lane!.state = 'IDLE'; lane!.activeStep = null;
+        receipt.nativeConfiguration = { requestedModel: configuration.model, requestedReasoningEffort: configuration.reasoningEffort, effectiveModel: result.model, effectiveReasoningEffort: result.reasoningEffort };
         this.journal.append('NATIVE_BINDING', command.edgeCommandId, { ...result, processId: this.native.pid, instanceId: this.native.instanceId });
       } else {
         requireThat(fleet.intent.family === 'turn.submit', 'INVALID_NATIVE_OPERATION');
@@ -159,8 +196,20 @@ export class EdgeKernel {
       requireThat(typeof p.thread?.id === 'string' && (!lane.threadId || lane.threadId === p.thread.id), 'NATIVE_THREAD_CONFLICT');
       lane.threadId = p.thread.id; this.saveLanes(); this.journal.append('THREAD_OBSERVED', lane.creationStep, { threadId: lane.threadId }); return;
     }
+    // The qualified 0.153.4 schema has these process/terminal notifications,
+    // but P1 has no terminal-interaction surface. They remain explicitly
+    // fail-closed rather than becoming a generic tool-event allow path.
+    if (['process/outputDelta', 'process/exited', 'item/commandExecution/terminalInteraction'].includes(signal.method)) {
+      this.quarantine('NATIVE_TERMINAL_INTERACTION_UNSUPPORTED'); return;
+    }
+    if (signal.method === 'item/commandExecution/outputDelta') {
+      this.observeCommandOutput(p); return;
+    }
     const relevant = ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed'];
-    if (!relevant.includes(signal.method)) return;
+    if (!relevant.includes(signal.method)) {
+      if (signal.method.startsWith('item/')) this.quarantine('NATIVE_TOOL_SCOPE_VIOLATION');
+      return;
+    }
     const entry = Object.entries(this.lanes).find(([, lane]) => lane.threadId === p.threadId);
     requireThat(entry, 'EXTERNAL_NATIVE_WRITER');
     const [laneId, lane] = entry;
@@ -172,23 +221,87 @@ export class EdgeKernel {
       requireThat(typeof turnId === 'string' && (lane.state === 'DISPATCHED' || lane.turnId === turnId), 'NATIVE_TURN_CONFLICT');
       if (lane.turnStartedObserved) return;
       lane.turnStartedObserved = true; lane.turnId = turnId; lane.state = 'RUNNING';
-    } else requireThat(lane.activeStep && lane.turnId === turnId, 'UNEXPECTED_NATIVE_TURN');
+    } else if (signal.method !== 'item/completed') requireThat(lane.activeStep && lane.turnId === turnId, 'UNEXPECTED_NATIVE_TURN');
     let kind: NativeEvent['kind']; let text = ''; let status = lane.state;
     if (signal.method === 'turn/started') kind = 'turnStarted';
     else if (signal.method === 'turn/completed') { kind = 'turnCompleted'; status = p.turn.status; lane.state = 'IDLE'; }
     else if (signal.method === 'item/agentMessage/delta') { kind = 'delta'; text = p.delta; }
     else {
       if (['userMessage', 'agentMessage', 'reasoning'].includes(p.item?.type)) return;
-      kind = 'tool'; text = `${p.item?.type ?? 'unknown'}: ${signal.method}`;
-      // The qualified G05 profile has no tools. Unexpected tools close admission.
-      this.quarantine('NATIVE_TOOL_SCOPE_VIOLATION');
+      requireThat(p.item?.type === 'commandExecution', 'NATIVE_TOOL_SCOPE_VIOLATION');
+      if (signal.method === 'item/started') {
+        requireThat(lane.activeStep && lane.turnId === turnId, 'UNEXPECTED_NATIVE_TURN');
+        const lifecycle = this.startCommandLifecycle(laneId, lane, p.item, turnId, p.startedAtMs);
+        this.recordNativeEvent({ laneId, edgeCommandId: lifecycle.edgeCommandId, kind: 'tool', text: this.commandActivity(p.item), threadId: lifecycle.threadId, turnId: lifecycle.turnId, status: 'inProgress' }, lane);
+        return;
+      }
+      const lifecycle = this.completeCommandLifecycle(lane, p.item, turnId, p.completedAtMs);
+      this.recordNativeEvent({ laneId: lifecycle.laneId, edgeCommandId: lifecycle.edgeCommandId, kind: 'tool', text: this.commandCompletion(p.item), threadId: lifecycle.threadId, turnId: lifecycle.turnId, status: p.item.status }, lane);
+      return;
     }
     const event: NativeEvent = { laneId, edgeCommandId: lane.activeStep!, kind, text, threadId: lane.threadId, turnId: lane.turnId, status };
-    requireThat(typeof text === 'string' && text.length <= 24000 && typeof status === 'string', 'NATIVE_EVENT_INVALID');
-    this.outputCharacters += text.length;
+    this.recordNativeEvent(event, lane, kind === 'turnCompleted');
+  }
+  private recordNativeEvent(event: NativeEvent, lane: EdgeLane, clearActiveStep = false): void {
+    requireThat(typeof event.text === 'string' && event.text.length <= 24000 && typeof event.status === 'string', 'NATIVE_EVENT_INVALID');
+    this.outputCharacters += event.text.length;
     if (this.outputCharacters > 500000) { this.quarantine('NATIVE_OUTPUT_LIMIT'); return; }
-    this.journal.transaction(() => { this.journal.append('NATIVE_EVENT', event.edgeCommandId, event); if (kind === 'turnCompleted') lane.activeStep = null; this.saveLanes(); });
+    this.journal.transaction(() => { this.journal.append('NATIVE_EVENT', event.edgeCommandId, event); if (clearActiveStep) lane.activeStep = null; this.saveLanes(); });
     this.emit(event);
+  }
+  private commandItem(item: any, phase: 'started' | 'completed'): { itemId: string; signature: string } {
+    // `source` is defaulted by the qualified schema and omitted by an observed
+    // installed-runtime event. A present value must still be one of that exact
+    // artifact's enum values; it never bypasses the command-action allowlist.
+    requireThat(item && typeof item === 'object' && !Array.isArray(item) && item.type === 'commandExecution' && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200 && (item.source === undefined || ['agent', 'userShell', 'unifiedExecStartup', 'unifiedExecInteraction'].includes(item.source)) && typeof item.command === 'string' && item.command.length > 0 && item.command.length <= 16000 && typeof item.cwd === 'string' && item.cwd.length <= 16000 && Array.isArray(item.commandActions) && item.commandActions.length > 0 && item.commandActions.length <= 64 && ['inProgress', 'completed', 'failed', 'declined'].includes(item.status), 'NATIVE_TOOL_SCOPE_VIOLATION');
+    requireThat(phase === 'started' ? item.status === 'inProgress' : ['completed', 'failed', 'declined'].includes(item.status), 'NATIVE_COMMAND_LIFECYCLE_INVALID');
+    const actions = item.commandActions.map((action: any) => {
+      requireThat(action && typeof action === 'object' && !Array.isArray(action) && typeof action.command === 'string' && action.command.length > 0 && action.command.length <= 16000 && ['read', 'listFiles', 'search', 'unknown'].includes(action.type), 'NATIVE_TOOL_SCOPE_VIOLATION');
+      if (action.type === 'read') requireThat(typeof action.name === 'string' && action.name.length > 0 && action.name.length <= 16000 && typeof action.path === 'string' && action.path.length <= 16000, 'NATIVE_TOOL_SCOPE_VIOLATION');
+      if (action.type === 'listFiles') requireThat(action.path === undefined || action.path === null || (typeof action.path === 'string' && action.path.length <= 16000), 'NATIVE_TOOL_SCOPE_VIOLATION');
+      if (action.type === 'search') requireThat((action.path === undefined || action.path === null || (typeof action.path === 'string' && action.path.length <= 16000)) && (action.query === undefined || action.query === null || (typeof action.query === 'string' && action.query.length <= 16000)), 'NATIVE_TOOL_SCOPE_VIOLATION');
+      return { type: action.type, command: action.command, name: action.name ?? null, path: action.path ?? null, query: action.query ?? null };
+    });
+    return { itemId: item.id, signature: canonical({ source: item.source ?? 'agent', command: item.command, cwd: item.cwd, actions }) };
+  }
+  private startCommandLifecycle(laneId: string, lane: EdgeLane, item: any, turnId: unknown, startedAtMs: unknown): CommandLifecycle {
+    requireThat(typeof lane.threadId === 'string' && typeof turnId === 'string' && lane.activeStep && typeof startedAtMs === 'number' && Number.isSafeInteger(startedAtMs) && startedAtMs >= 0, 'UNEXPECTED_NATIVE_TURN');
+    const checked = this.commandItem(item, 'started');
+    requireThat(!this.commandLifecycles.has(checked.itemId) && this.commandLifecycles.size < 4096, 'NATIVE_COMMAND_LIFECYCLE_INVALID');
+    const lifecycle: CommandLifecycle = { laneId, edgeCommandId: lane.activeStep, threadId: lane.threadId, turnId, itemId: checked.itemId, signature: checked.signature, state: 'STARTED' };
+    this.commandLifecycles.set(lifecycle.itemId, lifecycle); return lifecycle;
+  }
+  private lifecycleFor(itemId: unknown, threadId: unknown, turnId: unknown): CommandLifecycle {
+    requireThat(typeof itemId === 'string' && typeof threadId === 'string' && typeof turnId === 'string', 'NATIVE_COMMAND_LIFECYCLE_INVALID');
+    const lifecycle = this.commandLifecycles.get(itemId);
+    requireThat(lifecycle && lifecycle.threadId === threadId && lifecycle.turnId === turnId && lifecycle.state === 'STARTED', 'NATIVE_COMMAND_LIFECYCLE_INVALID');
+    return lifecycle;
+  }
+  private observeCommandOutput(params: any): void {
+    const lifecycle = this.lifecycleFor(params.itemId, params.threadId, params.turnId);
+    requireThat(typeof params.delta === 'string' && params.delta.length <= 256000, 'NATIVE_COMMAND_LIFECYCLE_INVALID');
+    // Output is protocol-validated and deliberately not forwarded as a shell
+    // transcript. The lifecycle's compact start/completion activity is enough.
+    void lifecycle;
+  }
+  private completeCommandLifecycle(lane: EdgeLane, item: any, turnId: unknown, completedAtMs: unknown): CommandLifecycle {
+    requireThat(typeof completedAtMs === 'number' && Number.isSafeInteger(completedAtMs) && completedAtMs >= 0, 'NATIVE_COMMAND_LIFECYCLE_INVALID');
+    const checked = this.commandItem(item, 'completed');
+    const lifecycle = this.lifecycleFor(checked.itemId, lane.threadId, turnId);
+    requireThat(lifecycle.laneId && lifecycle.signature === checked.signature, 'NATIVE_COMMAND_LIFECYCLE_INVALID');
+    lifecycle.state = 'COMPLETED'; return lifecycle;
+  }
+  private commandActivity(item: any): string {
+    const root = this.journal.get<string>('root')!;
+    const scope = (value: unknown) => typeof value === 'string' && value.toLowerCase().startsWith(root.toLowerCase()) ? (value.slice(root.length).replace(/^[\\/]+/, '') || '.') : 'workspace';
+    const action = item.commandActions[0];
+    if (action.type === 'read') return `Reading ${scope(action.path)}`;
+    if (action.type === 'search') return `Searching ${scope(action.path)}`;
+    if (action.type === 'listFiles') return `Inspecting ${scope(action.path)}`;
+    return 'Running read-only command';
+  }
+  private commandCompletion(item: any): string {
+    return item.status === 'completed' ? 'Command completed' : item.status === 'failed' ? 'Command failed' : 'Command declined';
   }
   quarantine(reason: string): void {
     this.blocked = reason;

@@ -362,6 +362,29 @@ h3 {
   font-size:11px;
   padding:9px;
   text-align:left}
+.context select {
+  width:100%;
+  margin:0 0 10px;
+  padding:8px;
+  border:1px solid var(--border);
+  border-radius:5px;
+  color:var(--text)}
+.capability-label {
+  display:block;
+  margin:13px 0 5px;
+  font-size:10px;
+  color:var(--muted)}
+.activity {
+  margin:0;
+  padding:0;
+  list-style:none;
+  border-top:1px solid var(--border);
+  font-size:11px;
+  color:var(--muted)}
+.activity li {
+  padding:7px 0;
+  border-bottom:1px solid var(--border);
+  overflow-wrap:anywhere}
 .context>button:first-of-type {
   background:var(--selected);
   border-color:var(--border)}

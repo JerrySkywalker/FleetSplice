@@ -112,7 +112,7 @@ try {
     writeFileSync(path.join(root, 'result.json'), JSON.stringify({ scenario, result: 'PASS', rows, notifyStarted: true, toolsSeen, remoteStates }));
   } else {
     await driver.start(() => {});
-    const thread = await driver.create(randomUUID(), root, () => {});
+    const thread = await driver.create(randomUUID(), root, { model: 'inert', reasoningEffort: 'low' }, () => {});
     assert.ok(thread.threadId);
     const done = completed();
     await driver.turn(randomUUID(), thread.threadId, root, 'Inert local response; do not call any tools.', () => {});
@@ -121,19 +121,22 @@ try {
     assert.equal(existsSync(marker), false);
     assert.equal(existsSync(notifyMarker), false);
     assert.ok(toolsSeen.length > 0);
-    assert.ok(toolsSeen.flat().every(name => name === 'request_user_input'), JSON.stringify(toolsSeen));
+    // P1 restores native command tools under the unchanged read-only sandbox.
+    // Inherited plugins/MCP/notify/image tools remain absent.
+    assert.ok(toolsSeen.flat().every(name => ['request_user_input', 'exec_command', 'write_stdin'].includes(name)), JSON.stringify(toolsSeen));
+    assert.ok(toolsSeen.flat().includes('exec_command'), JSON.stringify(toolsSeen));
     // Close admission after the real async config response, before the effect RPC.
     const originalRpc = (driver as any).rpc.bind(driver); let admitted = true;
     (driver as any).rpc = async (...args: any[]) => { const value = await originalRpc(...args); if (args[1] === 'config/read') admitted = false; return value; };
     const gate = () => { assert.ok(admitted, 'TEST_ADMISSION_CLOSED'); };
     const threadCount = startedThreads; const turnCount = startedTurns;
-    await assert.rejects(driver.create(randomUUID(), root, gate), /TEST_ADMISSION_CLOSED/);
+    await assert.rejects(driver.create(randomUUID(), root, { model: 'inert', reasoningEffort: 'low' }, gate), /TEST_ADMISSION_CLOSED/);
     admitted = true;
     await assert.rejects(driver.turn(randomUUID(), thread.threadId, root, 'Must not be sent', gate), /TEST_ADMISSION_CLOSED/);
     assert.equal(startedThreads, threadCount); assert.equal(startedTurns, turnCount); assert.equal(toolsSeen.length, 1);
     (driver as any).rpc = originalRpc;
     writeFileSync(configPath, toml + '\n[mcp_servers.later]\ncommand="inert-never-start"\nenabled=true\n');
-    await assert.rejects(driver.create(randomUUID(), root, () => {}), /NATIVE_CONFIG_CHANGED/);
+    await assert.rejects(driver.create(randomUUID(), root, { model: 'inert', reasoningEffort: 'low' }, () => {}), /NATIVE_CONFIG_CHANGED/);
     assert.equal(existsSync(marker), false);
     writeFileSync(path.join(root, 'result.json'), JSON.stringify({ scenario, result: 'PASS', nativeThreadCreated: true, integrationStarts: 0, toolsListed: 0, notifyStarted: false, configDriftRejected: true, finalAdmissionGateRejected: true, toolsSeen, remoteStates }));
   }

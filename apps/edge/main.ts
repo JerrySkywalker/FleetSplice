@@ -44,7 +44,7 @@ export async function startEdge(config: EdgeConfig) {
         try { receipt = await kernel.execute(message.command); }
         catch (error) {
           const record = journal.lookup<any>(message.command.edgeCommandId);
-          receipt = { edgeCommandId: message.command.edgeCommandId, status: record ? 'AMBIGUOUS_EFFECT' : 'REJECTED', code: error instanceof Fault ? error.code : 'EDGE_ADMISSION_FAILED', nativeThreadId: null, nativeTurnId: null, nativeRequestId: null, nativeProcessId: native.pid, nativeInstanceId: native.pid ? native.instanceId : null };
+          receipt = { edgeCommandId: message.command.edgeCommandId, status: record ? 'AMBIGUOUS_EFFECT' : 'REJECTED', code: error instanceof Fault ? error.code : 'EDGE_ADMISSION_FAILED', nativeThreadId: null, nativeTurnId: null, nativeRequestId: null, nativeProcessId: native.pid, nativeInstanceId: native.pid ? native.instanceId : null, nativeCapabilities: null, nativeConfiguration: null };
           if (record) kernel.quarantine('AMBIGUOUS_EFFECT');
         }
         send({ ...envelope, kind: 'receipt', receipt });

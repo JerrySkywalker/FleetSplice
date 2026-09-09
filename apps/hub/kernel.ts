@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { canonical, digest, next, requireThat, validate, ClockFence, Fault, type CommandRecord, type EdgeCommand, type FleetCommand, type Lane, type NativeEvent, type Plan, type Receipt, type Snapshot, type Target } from '../../packages/contracts/index.ts';
+import { canonical, digest, next, requireThat, validate, ClockFence, Fault, type CommandRecord, type EdgeCommand, type FleetCommand, type Lane, type NativeCapabilityCatalog, type NativeEvent, type Plan, type Receipt, type Snapshot, type Target } from '../../packages/contracts/index.ts';
 import { Journal } from '../../packages/journal/index.ts';
 
 export type ClientGrant = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number };
@@ -14,6 +14,7 @@ export class HubKernel {
   private serial: Promise<unknown> = Promise.resolve();
   private lanes: Lane[];
   private registered: boolean;
+  private capabilities: NativeCapabilityCatalog | null;
   private cursor = 0n;
   private outputCharacters = 0;
   private clock = new ClockFence(Date.now(), performance.now());
@@ -23,9 +24,10 @@ export class HubKernel {
     private deliver: (command: EdgeCommand) => Promise<Receipt>, private changed: () => void) {
     this.status = journal.recovered ? 'RECOVERY_REQUIRED' : 'CONNECTING';
     this.lanes = journal.get<Lane[]>('lanes') ?? []; this.registered = journal.get<boolean>('registered') ?? false;
+    this.capabilities = journal.get<NativeCapabilityCatalog>('capabilities') ?? null;
   }
   snapshot(): Snapshot {
-    return { status: this.status, target: this.target, root: this.root, registered: this.registered, lanes: structuredClone(this.lanes), commands: this.commands(), cursor: this.cursor.toString() };
+    return { status: this.status, target: this.target, root: this.root, registered: this.registered, capabilities: structuredClone(this.capabilities), lanes: structuredClone(this.lanes), commands: this.commands(), cursor: this.cursor.toString() };
   }
   private commands(): CommandRecord[] { return this.journal.list<StoredCommand>().filter((record): record is CommandRecord => 'plan' in record); }
   private replay(record: StoredCommand, requestedId = record.command.commandId): CommandRecord {
@@ -41,7 +43,7 @@ export class HubKernel {
     const stored = this.journal.lookup<StoredCommand>(id); return stored ? this.replay(stored.value) : null;
   }
   private publish(): void { this.cursor++; this.changed(); }
-  private save(): void { this.journal.set('lanes', this.lanes); this.journal.set('registered', this.registered); }
+  private save(): void { this.journal.set('lanes', this.lanes); this.journal.set('registered', this.registered); this.journal.set('capabilities', this.capabilities); }
   ready(recovered: boolean): void { this.status = this.storageFailed || this.journal.recovered || recovered ? 'RECOVERY_REQUIRED' : 'READY'; this.publish(); }
   disconnect(reason = 'EDGE_DISCONNECTED'): void { this.status = this.storageFailed ? 'RECOVERY_REQUIRED' : reason; this.publish(); }
   private failStorage(error: unknown): void {
@@ -111,8 +113,10 @@ export class HubKernel {
     } else if (family === 'logicalSession.create') {
       requireThat(this.lanes.length < 24, 'LOCAL_SESSION_LIMIT');
       requireThat(this.registered && intent.laneId === null && intent.expected === null, 'WORKSPACE_NOT_REGISTERED');
-      created = { sessionId: randomUUID(), laneId: randomUUID(), segmentId: randomUUID(), title: intent.body.title, fence: { epoch: '0', revision: '0', controller: null }, state: 'EMPTY', nativeThreadId: null, nativeTurnId: null, transcript: [] };
+      created = { sessionId: randomUUID(), laneId: randomUUID(), segmentId: randomUUID(), title: intent.body.title, fence: { epoch: '0', revision: '0', controller: null }, state: 'EMPTY', nativeThreadId: null, nativeTurnId: null, requestedModel: null, requestedReasoningEffort: null, effectiveModel: null, effectiveReasoningEffort: null, activity: [], transcript: [] };
       plan.sessionId = created.sessionId; plan.laneId = created.laneId; plan.segmentId = created.segmentId;
+    } else if (family === 'native.capabilities.read') {
+      requireThat(this.registered && intent.laneId === null && intent.expected === null, 'WORKSPACE_NOT_REGISTERED');
     } else {
       requireThat(lane && intent.expected && canonical(lane.fence) === canonical(intent.expected), 'STALE_FENCE');
       requireThat(!['PENDING', 'AMBIGUOUS_EFFECT', 'RECOVERY_REQUIRED'].includes(lane.state), 'LANE_BLOCKED');
@@ -152,8 +156,15 @@ export class HubKernel {
       const receipt = await this.deliver(edgeCommand);
       requireThat(receipt.edgeCommandId === edgeCommand.edgeCommandId, 'WRONG_RECEIPT');
       record.receipt = receipt; record.status = receipt.status;
+      if (receipt.nativeCapabilities) this.capabilities = receipt.nativeCapabilities;
       if (receipt.status === 'AMBIGUOUS_EFFECT' || receipt.status === 'DISPATCHED') { this.status = 'AMBIGUOUS_EFFECT'; if (lane) lane.state = 'AMBIGUOUS_EFFECT'; }
-      else if (receipt.status === 'REJECTED') { this.status = 'RECOVERY_REQUIRED'; if (lane) lane.state = 'RECOVERY_REQUIRED'; }
+      else if (receipt.status === 'REJECTED') {
+        // Fresh native catalog evidence can safely reject a browser-held stale
+        // selection before thread/start. Require an explicit reselection rather
+        // than silently changing model/reasoning or forcing recovery.
+        if (lane && ['STALE_MODEL_SELECTION', 'STALE_REASONING_SELECTION'].includes(receipt.code)) lane.state = formerState!;
+        else { this.status = 'RECOVERY_REQUIRED'; if (lane) lane.state = 'RECOVERY_REQUIRED'; }
+      }
       else {
         if (family === 'workspace.register') this.registered = true;
         if (lane) {
@@ -161,7 +172,11 @@ export class HubKernel {
           if (family === 'turn.submit') {
             lane.nativeTurnId = receipt.nativeTurnId;
             if (lane.state === 'PENDING') lane.state = 'RUNNING';
-          } else if (lane.state === 'PENDING') lane.state = family === 'sessionLane.continue' ? 'IDLE' : formerState!;
+          } else if (family === 'sessionLane.continue' && receipt.nativeConfiguration !== null) {
+            lane.requestedModel = receipt.nativeConfiguration.requestedModel; lane.requestedReasoningEffort = receipt.nativeConfiguration.requestedReasoningEffort;
+            lane.effectiveModel = receipt.nativeConfiguration.effectiveModel; lane.effectiveReasoningEffort = receipt.nativeConfiguration.effectiveReasoningEffort;
+            if (lane.state === 'PENDING') lane.state = 'IDLE';
+          } else if (lane.state === 'PENDING') lane.state = formerState!;
         }
       }
     } catch {
@@ -197,6 +212,10 @@ export class HubKernel {
         lane.transcript.push({ role: 'system', text: `Turn ${event.status}` });
       } else if (event.kind === 'blocked') {
         this.status = event.status; lane.state = event.status; lane.transcript.push({ role: 'system', text: event.text });
+      } else if (event.kind === 'tool') {
+        requireThat(typeof event.text === 'string' && event.text.length > 0 && event.text.length <= 24000 && typeof event.status === 'string' && event.status.length <= 120, 'NATIVE_EVENT_INVALID');
+        lane.activity.push({ text: event.text, status: event.status });
+        if (lane.activity.length > 100) lane.activity.splice(0, lane.activity.length - 100);
       } else lane.transcript.push({ role: 'system', text: event.text });
     }
     this.journal.transaction(() => { this.journal.append('OBSERVED_NATIVE_EVENT', event.edgeCommandId, event); this.save(); });

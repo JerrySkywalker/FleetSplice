@@ -40,6 +40,10 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     assert.equal(new URL(page.url()).hash, '');
     await page.getByRole('button', { name: 'Register selected Workspace' }).click();
     await expect(page.getByRole('button', { name: '＋ New session' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Refresh live catalog' }).click();
+    await expect(page.getByLabel('Model')).toHaveValue('fixture-model');
+    await expect(page.getByLabel('Reasoning')).toHaveValue('fixture-reasoning');
+    assert.equal(native.capabilityReads, 1);
     await page.getByRole('button', { name: '＋ New session' }).click();
     await expectState(page.getByTestId('lane-state'), 'EMPTY');
     assert.equal(native.creates, 0);

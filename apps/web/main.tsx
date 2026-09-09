@@ -37,6 +37,8 @@ function App() {
   const [client, setClient] = useState<Client | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedReasoning, setSelectedReasoning] = useState('');
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState<string | null>(null);
   const sessionTitle = title ?? t('defaultTitle');
@@ -51,6 +53,8 @@ function App() {
   const refreshing = useRef(false);
   const dirty = useRef(false);
   const timeline = useRef<HTMLDivElement>(null);
+  const catalogVersion = snapshot?.capabilities ? JSON.stringify(snapshot.capabilities) : '';
+  const catalogSeen = useRef('');
   const headers = () => ({ 'Content-Type': 'application/json', 'X-Fleet-Client': clientRef.current?.clientInstanceId ?? '', 'X-Fleet-Csrf': clientRef.current?.csrf ?? '' });
   async function request(url: string, body?: unknown) {
     const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: headers(), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -80,6 +84,21 @@ function App() {
   }, []);
   useEffect(() => { timeline.current?.scrollTo({ top: timeline.current.scrollHeight }); }, [snapshot?.cursor]);
   useEffect(() => {
+    if (!catalogVersion || catalogSeen.current === catalogVersion) return;
+    const catalog = snapshot?.capabilities!; const priorModel = selectedModel; const priorReasoning = selectedReasoning;
+    catalogSeen.current = catalogVersion;
+    const model = catalog.models.find(item => item.id === priorModel);
+    if (priorModel && !model) {
+      setSelectedModel(''); setSelectedReasoning(''); setError({ key: 'commandOutcome', code: 'STALE_MODEL_SELECTION' }); return;
+    }
+    const selectedModelValue = model ?? catalog.models.find(item => item.isDefault) ?? catalog.models[0];
+    if (!selectedModelValue) { setSelectedModel(''); setSelectedReasoning(''); return; }
+    if (!priorModel) { setSelectedModel(selectedModelValue.id); setSelectedReasoning(selectedModelValue.defaultReasoningEffort); return; }
+    if (!selectedModelValue.supportedReasoningEfforts.some(choice => choice.reasoningEffort === priorReasoning)) {
+      setSelectedReasoning(''); setError({ key: 'commandOutcome', code: 'STALE_REASONING_SELECTION' });
+    }
+  }, [catalogVersion]);
+  useEffect(() => {
     if (!client) return;
     const timer = setTimeout(() => setError({ key: 'grantExpired', code: 'GRANT_EXPIRED' }), Math.max(0, client.expiresAt - Date.now()));
     return () => clearTimeout(timer);
@@ -87,6 +106,9 @@ function App() {
   const lane = snapshot?.lanes.find(item => item.laneId === selected);
   const controlled = !!lane && lane.fence.controller === client?.clientInstanceId;
   const available = snapshot?.status === 'READY' && !!client && client.expiresAt > Date.now() && !busy && !pending;
+  const models = snapshot?.capabilities?.models ?? [];
+  const chosenModel = models.find(item => item.id === selectedModel) ?? null;
+  const configurationSelected = !!chosenModel && chosenModel.supportedReasoningEfforts.some(item => item.reasoningEffort === selectedReasoning);
   const receipt = snapshot?.commands.at(-1);
   // Guidance only: successful acquire focuses the separate explicit action. It never invokes it.
   useEffect(() => {
@@ -94,9 +116,12 @@ function App() {
     if (focusLane !== lane?.laneId || snapshot?.status !== 'READY' || document.querySelector('dialog[open]')) { setFocusLane(null); return; }
     // A successful receipt can precede its observation refresh. Wait for that observation.
     if (!controlled || pending) return;
+    // A new P1 native thread also needs a live model/reasoning selection. Keep
+    // the explicit guidance pending while the Owner refreshes that catalog.
+    if (!lane.nativeThreadId && !configurationSelected) return;
     if (available && !continueButton.current?.disabled) continueButton.current?.focus();
     setFocusLane(null);
-  }, [focusLane, busy, controlled, available, pending, lane?.laneId, snapshot?.status]);
+  }, [focusLane, busy, controlled, available, configurationSelected, pending, lane?.laneId, snapshot?.status]);
   function acknowledgeRejection(e: unknown, value: FleetCommand): boolean {
     if (!(e instanceof RequestError) || e.status !== 409 || e.result.admission !== 'REJECTED_BEFORE_ADMISSION' || e.result.commandId !== value.commandId || e.result.intentDigest !== value.intentDigest) return false;
     sessionStorage.removeItem('fleetsplice.pending'); setPending(null);
@@ -113,10 +138,10 @@ function App() {
   }
   async function command(family: Intent['family'], body: unknown = {}) {
     if (!available || !client || !snapshot) return;
-    setBusy(true); setError(null); setFocusLane(null);
+    setBusy(true); setError(null); if (family !== 'native.capabilities.read') setFocusLane(null);
     const intent = { v: 1, actorId: client.actorId, clientInstanceId: client.clientInstanceId, grantId: client.grantId, grantRevision: client.grantRevision,
-      target: snapshot.target, laneId: ['workspace.register', 'logicalSession.create'].includes(family) ? null : lane?.laneId ?? null,
-      expected: ['workspace.register', 'logicalSession.create'].includes(family) ? null : lane?.fence ?? null, family, body } as Intent;
+      target: snapshot.target, laneId: ['workspace.register', 'logicalSession.create', 'native.capabilities.read'].includes(family) ? null : lane?.laneId ?? null,
+      expected: ['workspace.register', 'logicalSession.create', 'native.capabilities.read'].includes(family) ? null : lane?.fence ?? null, family, body } as Intent;
     const value: FleetCommand = { commandId: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(), intentDigest: await digest('intent', intent), intent };
     // Storage failure prevents sending. Response loss keeps the exact intent available for lookup.
     try {
@@ -133,6 +158,10 @@ function App() {
       else setError({ key: 'commandUncertain', code: errorCode(e) });
     }
     finally { setBusy(false); }
+  }
+  function chooseModel(value: string) {
+    const model = models.find(item => item.id === value);
+    setSelectedModel(value); setSelectedReasoning(model?.defaultReasoningEffort ?? '');
   }
   return <div className="shell">
     <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('edition')}</span></div><div className="owner"><PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/><span className="owner-name">Jerry</span><span className="avatar">J</span></div></header>
@@ -155,12 +184,21 @@ function App() {
       </div>
       <form className="composer" onSubmit={e => { e.preventDefault(); void command('turn.submit', { text: prompt }); }}><label htmlFor="prompt">{t('messageCodex')}</label><textarea id="prompt" placeholder={t('promptPlaceholder')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'}/><div><span>{t('readOnlyHint')}</span><button className="primary" disabled={!available || !controlled || lane?.state !== 'IDLE' || !prompt.trim()}>{t('sendMessage')} <span aria-hidden="true">↑</span></button></div></form>
     </main>
-    <aside className="context"><div className="eyebrow">{t('controlContext')}</div><h3>{t('sessionControl')}</h3><p className="muted">{t(controlled ? 'controllerHint' : 'viewerHint')}</p>
+    <aside className="context"><div className="eyebrow">{t('controlContext')}</div><h3>{t('nativeCapabilities')}</h3><p className="muted">{t('liveCatalogHint')}</p>
+      <button disabled={!available || !snapshot?.registered} onClick={() => command('native.capabilities.read')}>{t('refreshCapabilities')}</button>
+      <label className="capability-label" htmlFor="model">{t('model')}</label><select id="model" aria-label={t('model')} value={selectedModel} disabled={!models.length || !available} onChange={event => chooseModel(event.target.value)}>
+        {!models.length && <option value="">{t('selectModel')}</option>}{models.map(model => <option key={model.id} value={model.id}>{model.displayName}{model.isDefault ? ' · default' : ''}</option>)}
+      </select>
+      <label className="capability-label" htmlFor="reasoning">{t('reasoning')}</label><select id="reasoning" aria-label={t('reasoning')} value={selectedReasoning} disabled={!chosenModel || !available} onChange={event => setSelectedReasoning(event.target.value)}>
+        {!chosenModel && <option value="">{t('selectReasoning')}</option>}{chosenModel?.supportedReasoningEfforts.map(choice => <option key={choice.reasoningEffort} value={choice.reasoningEffort}>{choice.reasoningEffort}</option>)}
+      </select>
+      <h3>{t('sessionControl')}</h3><p className="muted">{t(controlled ? 'controllerHint' : 'viewerHint')}</p>
       {available && lane && ['EMPTY', 'IDLE'].includes(lane.state) && (controlled || lane.fence.controller === null) && <p className="control-next" role="status">{t(!controlled ? 'nextAcquire' : !lane.nativeThreadId ? 'nextContinue' : 'nextPrompt')}</p>}
       <button disabled={!available || !lane || lane.fence.controller !== null} onClick={() => command('sessionLane.acquireControl')}>{t('acquireControl')}</button>
-      <button ref={continueButton} disabled={!available || !controlled || !['EMPTY', 'IDLE'].includes(lane?.state ?? '')} onClick={() => command('sessionLane.continue')}>{t('continueSession')}</button>
+      <button ref={continueButton} disabled={!available || !controlled || !configurationSelected || !['EMPTY', 'IDLE'].includes(lane?.state ?? '')} onClick={() => command('sessionLane.continue', { model: selectedModel, reasoningEffort: selectedReasoning })}>{t('continueSession')}</button>
       <button disabled={!available || !controlled} onClick={() => command('sessionLane.releaseControl')}>{t('releaseControl')}</button>
-      <h3>{t('execution')}</h3><dl><dt>{t('host')}</dt><dd>SKYFORGE-01</dd><dt>{t('environment')}</dt><dd>windows-user</dd><dt>{t('agent')}</dt><dd>{t('nativeAgent')}</dd><dt>{t('continuity')}</dt><dd>{lane?.nativeThreadId ? t(snapshot?.status === 'READY' ? 'sameNative' : 'nativeUnavailable') : t('nativeNotStarted')}</dd><dt>{t('controlRevision')}</dt><dd data-testid="control-fence">{lane ? `${lane.fence.epoch} / ${lane.fence.revision}` : '—'}</dd><dt>{t('nativeThread')}</dt><dd className="id" data-testid="native-thread">{lane?.nativeThreadId ?? '—'}</dd><dt>{t('nativeTurn')}</dt><dd className="id" data-testid="native-turn">{lane?.nativeTurnId ?? '—'}</dd></dl>
+      <h3>{t('execution')}</h3><dl><dt>{t('host')}</dt><dd>SKYFORGE-01</dd><dt>{t('environment')}</dt><dd>windows-user</dd><dt>{t('agent')}</dt><dd>{t('nativeAgent')}</dd><dt>{t('continuity')}</dt><dd>{lane?.nativeThreadId ? t(snapshot?.status === 'READY' ? 'sameNative' : 'nativeUnavailable') : t('nativeNotStarted')}</dd><dt>{t('controlRevision')}</dt><dd data-testid="control-fence">{lane ? `${lane.fence.epoch} / ${lane.fence.revision}` : '—'}</dd><dt>{t('requestedConfiguration')}</dt><dd>{lane?.requestedModel ? `${lane.requestedModel} / ${lane.requestedReasoningEffort}` : '—'}</dd><dt>{t('effectiveConfiguration')}</dt><dd>{lane?.effectiveModel ? `${lane.effectiveModel} / ${lane.effectiveReasoningEffort}` : '—'}</dd><dt>{t('nativeThread')}</dt><dd className="id" data-testid="native-thread">{lane?.nativeThreadId ?? '—'}</dd><dt>{t('nativeTurn')}</dt><dd className="id" data-testid="native-turn">{lane?.nativeTurnId ?? '—'}</dd></dl>
+      <h3>{t('activity')}</h3><ul className="activity" aria-label={t('activity')}>{lane?.activity.length ? lane.activity.slice(-8).map((item, index) => <li key={`${item.text}-${index}`}>{item.text}</li>) : <li>{t('noActivity')}</li>}</ul>
       <details><summary>{t('commandReceipt')}</summary><pre data-testid="receipt">{receipt ? JSON.stringify({ commandId: receipt.command.commandId, planId: receipt.plan.planId, status: receipt.status, receipt: receipt.receipt }, null, 2) : t('noCommands')}</pre></details>
     </aside><footer><span className={`dot ${snapshot?.status === 'READY' ? 'online' : ''}`}/><span data-testid="connection-status" data-state={snapshot?.status ?? 'CONNECTING'}>{stateText(locale, snapshot?.status ?? 'CONNECTING')}</span><span className="footer-right">{t('footer')}</span></footer>
   </div>;

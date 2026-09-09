@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
-import { Fault, requireThat } from '../contracts/json.ts';
+import { Fault, requireThat, type NativeCapabilityCatalog, type NativeSessionConfiguration } from '../contracts/index.ts';
 import { integrationPolicy, NATIVE_POLICY_ARGS, NATIVE_POLICY_ENV } from './policy.ts';
 
 export const CODEX_SHA256 = '444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b';
@@ -10,9 +10,34 @@ export type NativeSignal = { method: string; params: Record<string, any>; reques
 export interface NativePort {
   instanceId: string; pid: number | null; signals: EventEmitter;
   start(beforeEffect: () => void): Promise<void>;
-  create(requestId: string, root: string, beforeEffect: () => void): Promise<{ threadId: string; model: string; provider: string }>;
+  capabilities(requestId: string, beforeEffect: () => void): Promise<NativeCapabilityCatalog>;
+  create(requestId: string, root: string, configuration: { model: string; reasoningEffort: string }, beforeEffect: () => void): Promise<{ threadId: string; model: string; provider: string; reasoningEffort: string }>;
   turn(requestId: string, threadId: string, root: string, text: string, beforeEffect: () => void): Promise<string>;
   close(): Promise<boolean>;
+}
+
+// `model/list` is the native catalog authority. Deliberately project only the
+// fields P1 needs; no model IDs or reasoning values live in FleetSplice source.
+export function capabilityCatalog(response: any): NativeCapabilityCatalog {
+  const data = response?.data;
+  requireThat(Array.isArray(data) && data.length <= 128, 'NATIVE_CAPABILITIES_UNQUALIFIED');
+  const seen = new Set<string>();
+  const models = data.map((item: any) => {
+    requireThat(item && typeof item === 'object' && !Array.isArray(item), 'NATIVE_CAPABILITIES_UNQUALIFIED');
+    requireThat(typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200 && !seen.has(item.id), 'NATIVE_CAPABILITIES_UNQUALIFIED');
+    seen.add(item.id);
+    requireThat(typeof item.displayName === 'string' && item.displayName.length > 0 && item.displayName.length <= 300 && typeof item.isDefault === 'boolean', 'NATIVE_CAPABILITIES_UNQUALIFIED');
+    requireThat(typeof item.defaultReasoningEffort === 'string' && item.defaultReasoningEffort.length > 0 && item.defaultReasoningEffort.length <= 64 && Array.isArray(item.supportedReasoningEfforts) && item.supportedReasoningEfforts.length <= 32, 'NATIVE_CAPABILITIES_UNQUALIFIED');
+    const reasoningSeen = new Set<string>();
+    const supportedReasoningEfforts = item.supportedReasoningEfforts.map((choice: any) => {
+      requireThat(choice && typeof choice === 'object' && !Array.isArray(choice) && typeof choice.reasoningEffort === 'string' && choice.reasoningEffort.length > 0 && choice.reasoningEffort.length <= 64 && !reasoningSeen.has(choice.reasoningEffort) && typeof choice.description === 'string' && choice.description.length <= 500, 'NATIVE_CAPABILITIES_UNQUALIFIED');
+      reasoningSeen.add(choice.reasoningEffort);
+      return { reasoningEffort: choice.reasoningEffort, description: choice.description };
+    });
+    requireThat(reasoningSeen.has(item.defaultReasoningEffort), 'NATIVE_CAPABILITIES_UNQUALIFIED');
+    return { id: item.id, displayName: item.displayName, isDefault: item.isDefault, supportedReasoningEfforts, defaultReasoningEffort: item.defaultReasoningEffort };
+  });
+  return { models };
 }
 export class CodexDriver implements NativePort {
   readonly instanceId = randomUUID();
@@ -87,14 +112,24 @@ export class CodexDriver implements NativePort {
       try { beforeEffect?.(); this.write({ id, method, params }); } catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
     });
   }
-  async create(requestId: string, root: string, beforeEffect: () => void): Promise<{ threadId: string; model: string; provider: string }> {
+  async capabilities(requestId: string, beforeEffect: () => void): Promise<NativeCapabilityCatalog> {
+    requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
+    await this.readPolicy();
+    return capabilityCatalog(await this.rpc(requestId, 'model/list', {}, beforeEffect));
+  }
+  async create(requestId: string, root: string, configuration: { model: string; reasoningEffort: string }, beforeEffect: () => void): Promise<{ threadId: string; model: string; provider: string; reasoningEffort: string }> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
     requireThat(root === this.root, 'NATIVE_ROOT_CHANGED');
+    requireThat(typeof configuration?.model === 'string' && configuration.model.length > 0 && configuration.model.length <= 200 && typeof configuration.reasoningEffort === 'string' && configuration.reasoningEffort.length > 0 && configuration.reasoningEffort.length <= 64, 'NATIVE_CONFIGURATION_INVALID');
     const policy = await this.readPolicy();
-    const result = await this.rpc(requestId, 'thread/start', { cwd: root, config: policy.overrides, ephemeral: true, approvalPolicy: 'never', sandbox: 'read-only', serviceName: 'fleetsplice-g05', developerInstructions: 'This G05 local conversation permits text responses only. Do not use tools, access files, execute commands, browse, or change configuration.' }, beforeEffect);
+    // The installed app-server schema exposes `thread/start.model` and the
+    // typed config key `model_reasoning_effort`; the response supplies the
+    // observed model/reasoning pair used below as effective evidence.
+    const result = await this.rpc(requestId, 'thread/start', { cwd: root, model: configuration.model, config: { ...policy.overrides, model_reasoning_effort: configuration.reasoningEffort }, ephemeral: true, approvalPolicy: 'never', sandbox: 'read-only', serviceName: 'fleetsplice-g05c-p1', developerInstructions: 'This FleetSplice G05C-P1 session may inspect this explicit workspace using native read-only tools. Do not modify files, run write-capable commands, change configuration, browse the network, request approval, or use any path outside the read-only sandbox.' }, beforeEffect);
     requireThat(result.approvalPolicy === 'never' && result.sandbox?.type === 'readOnly' && result.sandbox.networkAccess === false && result.thread?.ephemeral === true && result.cwd?.toLowerCase() === root.toLowerCase(), 'NATIVE_POLICY_UNQUALIFIED');
     requireThat(typeof result.thread.id === 'string' && result.thread.id.length < 200, 'NATIVE_ID_UNKNOWN');
-    return { threadId: result.thread.id, model: result.model, provider: result.modelProvider };
+    requireThat(result.model === configuration.model && result.reasoningEffort === configuration.reasoningEffort && typeof result.modelProvider === 'string' && result.modelProvider.length > 0, 'NATIVE_CONFIGURATION_UNOBSERVED');
+    return { threadId: result.thread.id, model: result.model, provider: result.modelProvider, reasoningEffort: result.reasoningEffort };
   }
   async turn(requestId: string, threadId: string, root: string, text: string, beforeEffect: () => void): Promise<string> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');

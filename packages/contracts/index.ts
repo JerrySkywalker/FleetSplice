@@ -31,7 +31,7 @@ export type Decision = { decisionId: string; actorId: string; clientInstanceId: 
 export type Plan = { v: 1; planId: string; commandId: string; intentDigest: string; target: Target; decision: Decision; sessionId: string | null; laneId: string | null; segmentId: string | null; before: Fence | null; after: Fence | null; steps: { edgeCommandId: string; operation: Intent['family']; dependsOn: string[] }[] };
 export type EdgeCommand = { v: 1; edgeCommandId: string; stepDigest: string; planDigest: string; plan: Plan; command: FleetCommand };
 export type Receipt = { edgeCommandId: string; status: 'SUCCEEDED' | 'REJECTED' | 'AMBIGUOUS_EFFECT' | 'DISPATCHED'; code: string; nativeThreadId: string | null; nativeTurnId: string | null; nativeRequestId: string | null; nativeProcessId: number | null; nativeInstanceId: string | null; nativeCapabilities: NativeCapabilityCatalog | null; nativeConfiguration: NativeSessionConfiguration | null };
-export type NativeEvent = { laneId: string; edgeCommandId: string; kind: 'delta' | 'turnStarted' | 'turnCompleted' | 'blocked' | 'tool'; text: string; threadId: string | null; turnId: string | null; status: string };
+export type NativeEvent = { laneId: string; edgeCommandId: string; kind: 'delta' | 'turnStarted' | 'turnCompleted' | 'blocked' | 'tool' | 'configurationInvalidated'; text: string; threadId: string | null; turnId: string | null; status: string };
 export type Hcp = { v: 1; connectionId: string; target: Target } & (
   { kind: 'hello'; identity: { principal: string; sid: string; sessionId: number; elevated: false; root: string; rootIdentity: string }; recovered: boolean } |
   { kind: 'ready'; recoveryRequired: boolean } |
@@ -66,7 +66,7 @@ const decision = obj({ decisionId: uuid, actorId: uuid, clientInstanceId: uuid, 
 const plan = obj({ v: literal(1), planId: uuid, commandId: uuid, intentDigest: hash, target, decision, sessionId: nullable(uuid), laneId: nullable(uuid), segmentId: nullable(uuid), before: nullable(fence), after: nullable(fence), steps: arr(obj({ edgeCommandId: uuid, operation: { enum: families }, dependsOn: arr(uuid, 0) }), 1) });
 const edgeCommand = obj({ v: literal(1), edgeCommandId: uuid, stepDigest: hash, planDigest: hash, plan, command });
 const receipt = obj({ edgeCommandId: uuid, status: { enum: ['SUCCEEDED', 'REJECTED', 'AMBIGUOUS_EFFECT', 'DISPATCHED'] }, code: str(120), nativeThreadId: nullable(str(200)), nativeTurnId: nullable(str(200)), nativeRequestId: nullable(uuid), nativeProcessId: nullable({ type: 'integer', minimum: 1 }), nativeInstanceId: nullable(uuid), nativeCapabilities: nullable(capabilityCatalog), nativeConfiguration: nullable(nativeConfiguration) });
-const event = obj({ laneId: uuid, edgeCommandId: uuid, kind: { enum: ['delta', 'turnStarted', 'turnCompleted', 'blocked', 'tool'] }, text: str(24000), threadId: nullable(str(200)), turnId: nullable(str(200)), status: str(120) });
+const event = obj({ laneId: uuid, edgeCommandId: uuid, kind: { enum: ['delta', 'turnStarted', 'turnCompleted', 'blocked', 'tool', 'configurationInvalidated'] }, text: str(24000), threadId: nullable(str(200)), turnId: nullable(str(200)), status: str(120) });
 const hcpBase = { v: literal(1), connectionId: uuid, target };
 const hcp = { oneOf: [
   obj({ ...hcpBase, kind: literal('hello'), identity: obj({ principal: str(), sid: str(), sessionId: { type: 'integer', minimum: 1 }, elevated: literal(false), root: str(), rootIdentity: hash }), recovered: { type: 'boolean' } }),

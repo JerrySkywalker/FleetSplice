@@ -39,6 +39,19 @@ export function capabilityCatalog(response: any): NativeCapabilityCatalog {
   });
   return { models };
 }
+export async function completeCapabilityCatalog(readPage: (cursor?: string) => Promise<any>): Promise<NativeCapabilityCatalog> {
+  const data: any[] = []; const seen = new Set<string>(); let cursor: string | undefined;
+  for (let pageNumber = 0; pageNumber < 128; pageNumber++) {
+    const page = await readPage(cursor);
+    capabilityCatalog(page);
+    data.push(...page.data);
+    requireThat(data.length <= 128, 'NATIVE_CAPABILITIES_UNQUALIFIED');
+    if (page.nextCursor === null) return capabilityCatalog({ data });
+    requireThat(typeof page.nextCursor === 'string' && page.nextCursor.length > 0 && page.nextCursor.length <= 4096 && !seen.has(page.nextCursor), 'NATIVE_CAPABILITIES_INCOMPLETE');
+    seen.add(page.nextCursor); cursor = page.nextCursor;
+  }
+  throw new Fault('NATIVE_CAPABILITIES_INCOMPLETE');
+}
 export class CodexDriver implements NativePort {
   readonly instanceId = randomUUID();
   readonly signals = new EventEmitter();
@@ -115,7 +128,11 @@ export class CodexDriver implements NativePort {
   async capabilities(requestId: string, beforeEffect: () => void): Promise<NativeCapabilityCatalog> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
     await this.readPolicy();
-    return capabilityCatalog(await this.rpc(requestId, 'model/list', {}, beforeEffect));
+    let first = true;
+    return completeCapabilityCatalog(async cursor => {
+      const id = first ? requestId : randomUUID(); first = false;
+      return this.rpc(id, 'model/list', cursor ? { cursor } : {}, beforeEffect);
+    });
   }
   async create(requestId: string, root: string, configuration: { model: string; reasoningEffort: string }, beforeEffect: () => void): Promise<{ threadId: string; model: string; provider: string; reasoningEffort: string }> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');

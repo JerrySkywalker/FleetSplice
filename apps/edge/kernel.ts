@@ -3,7 +3,7 @@ import { canonical, digest, next, requireThat, validate, Fault, ClockFence, type
 import { Journal } from '../../packages/journal/index.ts';
 import type { NativePort, NativeSignal } from '../../packages/driver-codex/index.ts';
 
-type EdgeLane = { fence: Fence; sessionId: string; segmentId: string; threadId: string | null; turnId: string | null; state: string; activeStep: string | null; creationStep: string | null; turnStartedObserved: boolean };
+type EdgeLane = { fence: Fence; sessionId: string; segmentId: string; threadId: string | null; turnId: string | null; state: string; activeStep: string | null; creationStep: string | null; turnStartedObserved: boolean; configuration?: { model: string; reasoningEffort: string } };
 type StepRecord = { command: EdgeCommand; receipt: Receipt; attempted: boolean };
 type CommandLifecycle = { laneId: string; edgeCommandId: string; threadId: string; turnId: string; itemId: string; signature: string; state: 'STARTED' | 'COMPLETED' };
 export class EdgeKernel {
@@ -22,6 +22,7 @@ export class EdgeKernel {
   // sequence is correlated by its native item id, rather than inferred from a
   // completion-only tool observation or an incidental notification order.
   private commandLifecycles = new Map<string, CommandLifecycle>();
+  private reasoningItems = new Map<string, { threadId: string; turnId: string; completed: boolean }>();
   constructor(readonly journal: Journal, readonly target: Target, private native: NativePort,
     private verifyLocal: () => Promise<void>, private emit: (event: NativeEvent) => void,
     private nativeProcessProof: () => Promise<void> = async () => {}) {
@@ -102,6 +103,9 @@ export class EdgeKernel {
     }
     const isNative = family === 'native.capabilities.read' || family === 'turn.submit' || (family === 'sessionLane.continue' && !lane?.threadId);
     const receipt = this.receipt(command, isNative ? 'DISPATCHED' : 'SUCCEEDED', isNative ? 'DISPATCH_ATTEMPTED' : 'APPLIED');
+    if (family === 'sessionLane.continue' && lane?.threadId && (lane.configuration?.model !== fleet.intent.body.model || lane.configuration?.reasoningEffort !== fleet.intent.body.reasoningEffort)) {
+      receipt.status = 'REJECTED'; receipt.code = 'EXISTING_NATIVE_CONFIGURATION_IMMUTABLE';
+    }
     const record: StepRecord = { command, receipt, attempted: isNative };
     if (isNative) {
       receipt.nativeRequestId = randomUUID();
@@ -164,6 +168,7 @@ export class EdgeKernel {
         requireThat(!lane!.threadId || lane!.threadId === result.threadId, 'NATIVE_THREAD_CONFLICT');
         lane!.threadId = result.threadId; lane!.state = 'IDLE'; lane!.activeStep = null;
         receipt.nativeConfiguration = { requestedModel: configuration.model, requestedReasoningEffort: configuration.reasoningEffort, effectiveModel: result.model, effectiveReasoningEffort: result.reasoningEffort };
+        lane!.configuration = { ...configuration };
         this.journal.append('NATIVE_BINDING', command.edgeCommandId, { ...result, processId: this.native.pid, instanceId: this.native.instanceId });
       } else {
         requireThat(fleet.intent.family === 'turn.submit', 'INVALID_NATIVE_OPERATION');
@@ -179,7 +184,8 @@ export class EdgeKernel {
       return receipt;
     } catch (error) {
       receipt.status = 'AMBIGUOUS_EFFECT'; receipt.code = error instanceof Fault ? error.code : 'NATIVE_EFFECT_UNKNOWN';
-      receipt.nativeThreadId = lane!.threadId; receipt.nativeTurnId = lane!.turnId;
+      receipt.nativeThreadId = lane?.threadId ?? null; receipt.nativeTurnId = lane?.turnId ?? null;
+      receipt.nativeProcessId = this.native.pid; receipt.nativeInstanceId = this.nativeStarted ? this.native.instanceId : null;
       this.journal.transaction(() => { this.journal.update(command.edgeCommandId, record); this.journal.append('AMBIGUOUS_EFFECT', command.edgeCommandId, receipt); });
       this.quarantine(receipt.code); return receipt;
     } finally { this.current = null; }
@@ -205,6 +211,23 @@ export class EdgeKernel {
     if (signal.method === 'item/commandExecution/outputDelta') {
       this.observeCommandOutput(p); return;
     }
+    if (['item/reasoning/summaryTextDelta', 'item/reasoning/summaryPartAdded', 'item/reasoning/textDelta'].includes(signal.method)) {
+      const item = this.reasoningItems.get(p.itemId);
+      const lane = Object.values(this.lanes).find(value => value.threadId === p.threadId);
+      const index = signal.method === 'item/reasoning/textDelta' ? p.contentIndex : p.summaryIndex;
+      requireThat(item && !item.completed && item.threadId === p.threadId && item.turnId === p.turnId && lane?.activeStep && lane.turnId === p.turnId && Number.isSafeInteger(index) && index >= 0, 'NATIVE_REASONING_IDENTITY_INVALID');
+      requireThat(signal.method === 'item/reasoning/summaryPartAdded' || (typeof p.delta === 'string' && p.delta.length <= 256000), 'NATIVE_REASONING_INVALID');
+      // Reasoning content is validated for correlation, never projected or retained.
+      return;
+    }
+    if (signal.method === 'model/rerouted') {
+      const entry = Object.entries(this.lanes).find(([, value]) => value.threadId === p.threadId);
+      requireThat(entry && entry[1].activeStep && entry[1].turnId === p.turnId && typeof p.fromModel === 'string' && p.fromModel.length > 0 && p.fromModel.length <= 200 && typeof p.toModel === 'string' && p.toModel.length > 0 && p.toModel.length <= 200 && p.reason === 'highRiskCyberActivity', 'NATIVE_MODEL_REROUTE_INVALID');
+      const [laneId, lane] = entry;
+      this.journal.append('NATIVE_MODEL_REROUTE', lane.activeStep!, { threadId: p.threadId, turnId: p.turnId, fromModel: p.fromModel, toModel: p.toModel, reason: p.reason });
+      this.recordNativeEvent({ laneId, edgeCommandId: lane.activeStep!, kind: 'configurationInvalidated', text: 'NATIVE_MODEL_REROUTED', threadId: lane.threadId, turnId: lane.turnId, status: 'EFFECTIVE_CONFIGURATION_UNKNOWN' }, lane);
+      return;
+    }
     const relevant = ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed'];
     if (!relevant.includes(signal.method)) {
       if (signal.method.startsWith('item/')) this.quarantine('NATIVE_TOOL_SCOPE_VIOLATION');
@@ -227,7 +250,19 @@ export class EdgeKernel {
     else if (signal.method === 'turn/completed') { kind = 'turnCompleted'; status = p.turn.status; lane.state = 'IDLE'; }
     else if (signal.method === 'item/agentMessage/delta') { kind = 'delta'; text = p.delta; }
     else {
-      if (['userMessage', 'agentMessage', 'reasoning'].includes(p.item?.type)) return;
+      if (p.item?.type === 'reasoning') {
+        requireThat(lane.activeStep && lane.turnId === turnId && typeof p.item.id === 'string' && p.item.id.length > 0 && p.item.id.length <= 200, 'NATIVE_REASONING_IDENTITY_INVALID');
+        if (signal.method === 'item/started') {
+          requireThat(!this.reasoningItems.has(p.item.id) && this.reasoningItems.size < 4096, 'NATIVE_REASONING_IDENTITY_INVALID');
+          this.reasoningItems.set(p.item.id, { threadId: p.threadId, turnId, completed: false });
+        } else {
+          const item = this.reasoningItems.get(p.item.id);
+          requireThat(item && !item.completed && item.threadId === p.threadId && item.turnId === turnId, 'NATIVE_REASONING_IDENTITY_INVALID');
+          item.completed = true;
+        }
+        return;
+      }
+      if (['userMessage', 'agentMessage'].includes(p.item?.type)) return;
       requireThat(p.item?.type === 'commandExecution', 'NATIVE_TOOL_SCOPE_VIOLATION');
       if (signal.method === 'item/started') {
         requireThat(lane.activeStep && lane.turnId === turnId, 'UNEXPECTED_NATIVE_TURN');

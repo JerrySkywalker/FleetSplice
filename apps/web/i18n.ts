@@ -31,6 +31,7 @@ export const enUS = {
   nativeNotStarted: 'Native session not started', controlRevision: 'Control epoch / revision',
   nativeThread: 'Native thread', nativeTurn: 'Native turn', commandReceipt: 'Command receipt', noCommands: 'No commands yet',
   nativeCapabilities: 'Native capabilities', refreshCapabilities: 'Refresh live catalog', liveCatalogHint: 'Catalog is reported by the running native Codex app-server.',
+  newSessionConfigurationHint: 'Model and reasoning selection apply only when starting a new native session. Existing sessions keep their recorded configuration.',
   model: 'Model', reasoning: 'Reasoning', selectModel: 'Select a live model', selectReasoning: 'Select supported reasoning',
   requestedConfiguration: 'Requested configuration', effectiveConfiguration: 'Native effective configuration', activity: 'Native activity', noActivity: 'No native activity yet',
   footer: 'Local loop · FleetSplice 0.1 / G05C-P1',
@@ -49,6 +50,7 @@ export type MessageKey = keyof typeof enUS;
 export type Catalog = Record<MessageKey, string>;
 
 export const zhCN = {
+  newSessionConfigurationHint: '模型和推理选择仅用于启动新的原生会话。已有会话保持其记录的配置。',
   pageTitle: 'FleetSplice · 本地会话', edition: '本地 / G05C-P1', preferences: '偏好设置',
   language: '语言', appearance: '外观', localeChinese: '简体中文', localeEnglish: 'English',
   system: '跟随系统', light: '浅色', dark: '深色', oledBlack: 'OLED 黑', close: '关闭',

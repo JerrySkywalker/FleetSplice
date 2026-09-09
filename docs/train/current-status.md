@@ -55,3 +55,19 @@ sound guard/admission, intact journals and `SAFE_TERMINAL`. Historical retired
 runs remain UNKNOWN. This is a review candidate, not independent acceptance.
 Sanitized evidence is outside Git under the train's `V:\artifacts\FleetSplice`
 directory. No G06 implementation has begun.
+
+Independent review of candidate `c83f55f699871173e70a75a1d4dd991f762a6f58`
+returned five findings. The bounded correction handles correlated reasoning
+notifications, durable lane-less capability failures, immutable existing-thread
+configuration, complete bounded catalog pagination, and invalidation of effective
+configuration after a native model reroute. A raw pinned-native probe observed
+six catalog pages and a completed `ultra` read-only turn; reasoning deltas and
+rerouting were not emitted by that probe and are schema/fixture-qualified only.
+
+The corrected real-browser run `2829cafc-8040-4de3-81e7-fcaca9d71d4a` completed
+two turns on one native thread with requested/observed `gpt-6-astra / ultra`.
+Changing the new-session reasoning selection did not change the existing
+thread's configuration. Its 200-file pre/post fingerprints matched exactly;
+normal stop proved native exit and `SAFE_TERMINAL`. Seventy-five tests passed.
+Fresh independent review of the correction is still required. The train has
+used one protocol repair loop and zero runtime retirements. P2A remains gated.

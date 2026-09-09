@@ -162,7 +162,7 @@ export class HubKernel {
         // Fresh native catalog evidence can safely reject a browser-held stale
         // selection before thread/start. Require an explicit reselection rather
         // than silently changing model/reasoning or forcing recovery.
-        if (lane && ['STALE_MODEL_SELECTION', 'STALE_REASONING_SELECTION'].includes(receipt.code)) lane.state = formerState!;
+        if (lane && (['STALE_MODEL_SELECTION', 'STALE_REASONING_SELECTION'].includes(receipt.code) || (family === 'sessionLane.continue' && receipt.code === 'EXISTING_NATIVE_CONFIGURATION_IMMUTABLE' && receipt.nativeRequestId === null && receipt.nativeThreadId === lane.nativeThreadId))) lane.state = formerState!;
         else { this.status = 'RECOVERY_REQUIRED'; if (lane) lane.state = 'RECOVERY_REQUIRED'; }
       }
       else {
@@ -212,6 +212,10 @@ export class HubKernel {
         lane.transcript.push({ role: 'system', text: `Turn ${event.status}` });
       } else if (event.kind === 'blocked') {
         this.status = event.status; lane.state = event.status; lane.transcript.push({ role: 'system', text: event.text });
+      } else if (event.kind === 'configurationInvalidated') {
+        requireThat(event.text === 'NATIVE_MODEL_REROUTED' && event.status === 'EFFECTIVE_CONFIGURATION_UNKNOWN', 'NATIVE_CONFIGURATION_EVENT_INVALID');
+        lane.effectiveModel = null; lane.effectiveReasoningEffort = null;
+        lane.transcript.push({ role: 'system', text: event.text });
       } else if (event.kind === 'tool') {
         requireThat(typeof event.text === 'string' && event.text.length > 0 && event.text.length <= 24000 && typeof event.status === 'string' && event.status.length <= 120, 'NATIVE_EVENT_INVALID');
         lane.activity.push({ text: event.text, status: event.status });

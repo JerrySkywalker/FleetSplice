@@ -23,6 +23,32 @@ test('Workspace registry registers existing roots, selects explicitly and remove
   assert.equal(existsSync(path.join(directory, 'absent')), false);
   const removed = await changeRegistry(host, 'remove', entry.id, undefined, env, noAcl);
   assert.equal(removed.selectedId, null); assert.equal(removed.entries.length, 0); assert.equal(readFileSync(path.join(root, 'marker.txt'), 'utf8'), 'preserve');
+  const readded = await changeRegistry(host, 'add', root, 'Fixture again', env, noAcl);
+  assert.equal(readded.selectedId, null);
+  assert.equal((await changeRegistry(host, 'select', readded.entries[0]!.id, undefined, env, noAcl)).selectedId, readded.entries[0]!.id);
+});
+test('Adding a root preserves explicit reselection after removing the default with other registrations', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-selection-')); const env = { LOCALAPPDATA: directory };
+  const roots = ['a', 'b', 'c'].map(name => path.join(directory, name)); roots.forEach(root => mkdirSync(root));
+  const first = await changeRegistry(host, 'add', roots[0]!, 'A', env, noAcl);
+  await changeRegistry(host, 'add', roots[1]!, 'B', env, noAcl);
+  await changeRegistry(host, 'remove', first.selectedId!, undefined, env, noAcl);
+  const added = await changeRegistry(host, 'add', roots[2]!, 'C', env, noAcl);
+  assert.equal(added.selectedId, null); assert.equal(readRegistry(host, env)!.selectedId, null);
+  assert.equal((await changeRegistry(host, 'select', added.entries[1]!.id, undefined, env, noAcl)).selectedId, added.entries[1]!.id);
+});
+test('Overlong canonical roots are rejected without changing existing registry bytes', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-root-limit-')); const env = { LOCALAPPDATA: directory };
+  const root = path.join(directory, 'valid'); mkdirSync(root);
+  await changeRegistry(host, 'add', root, 'Valid', env, noAcl);
+  const before = readFileSync(registryPath(env));
+  const longRoot = path.join(directory, ...Array.from({ length: 12 }, (_, index) => `${index}-${'x'.repeat(90)}`));
+  mkdirSync(longRoot, { recursive: true });
+  assert.ok((await rootProof(longRoot)).root.length > 1024);
+  await assert.rejects(changeRegistry(host, 'add', longRoot, 'Too long', env, noAcl), /WORKSPACE_ROOT_TOO_LONG/);
+  assert.deepEqual(readFileSync(registryPath(env)), before);
+  assert.equal(readRegistry(host, env)!.entries.length, 1);
+  assert.equal(existsSync(`${registryPath(env)}.lock`), false);
 });
 test('Workspace registry rejects substituted root identity, malformed records and competing writers', async () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-registry-')); const env = { LOCALAPPDATA: directory };

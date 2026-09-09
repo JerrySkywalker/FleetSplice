@@ -35,12 +35,15 @@ export async function changeRegistry(host: WorkspaceHost, operation: 'add' | 're
   const lock = `${file}.lock`; const fd = openSync(lock, 'wx');
   const temporary = path.join(directory, `.workspaces-${randomUUID()}.tmp`);
   try {
-    const registry = readRegistry(host, env) ?? { version: 1, host, selectedId: null, entries: [] };
+    const existing = readRegistry(host, env);
+    const registry = existing ?? { version: 1, host, selectedId: null, entries: [] };
     if (operation === 'add') {
       requireThat(typeof displayName === 'string' && displayName.trim().length > 0 && displayName.length <= 80 && registry.entries.length < 16, 'WORKSPACE_NAME_OR_LIMIT_INVALID');
-      const proof = await rootProof(value); requireThat(!registry.entries.some(e => e.root.toLowerCase() === proof.root.toLowerCase()), 'WORKSPACE_ALREADY_REGISTERED');
+      const proof = await rootProof(value);
+      requireThat(proof.root.length <= 1024, 'WORKSPACE_ROOT_TOO_LONG');
+      requireThat(!registry.entries.some(e => e.root.toLowerCase() === proof.root.toLowerCase()), 'WORKSPACE_ALREADY_REGISTERED');
       const entry: WorkspaceEntry = { id: randomUUID(), displayName, ...proof, lastObservedAt: new Date().toISOString(), lastObservedValidity: 'VALID' };
-      registry.entries.push(entry); registry.selectedId ??= entry.id;
+      registry.entries.push(entry); if (existing === null) registry.selectedId = entry.id;
     } else {
       const entry = registry.entries.find(e => e.id === value); requireThat(entry, 'WORKSPACE_UNKNOWN');
       if (operation === 'select') { requireThat(await workspaceValidity(entry), 'WORKSPACE_MISSING_OR_REPLACED'); registry.selectedId = entry.id; }

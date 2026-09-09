@@ -92,3 +92,10 @@ All 202 source-file/Git fingerprints and fixture-file hashes matched; clean
 stop proved native exit, intact journals and `SAFE_TERMINAL`. Seventy-nine
 tests passed before live acceptance. P2A awaits fresh independent review;
 P2B and P3 have not started, and no write permission has been added.
+
+The first P2A review at `71278c0817c8af9bc158c2d4d770d5a66523ff3c`
+returned two registry findings. The correction preserves an explicit null
+selection after removal even when another root is added, and rejects canonical
+roots longer than 1,024 characters before publication. Regression tests cover
+both empty and nonempty registries after removal, and prove byte preservation
+after a real overlong-root rejection. Fresh exact-head review remains required.

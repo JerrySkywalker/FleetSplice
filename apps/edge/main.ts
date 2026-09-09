@@ -6,8 +6,10 @@ import { CodexDriver } from '../../packages/driver-codex/index.ts';
 import { Journal } from '../../packages/journal/index.ts';
 import { EdgeKernel } from './kernel.ts';
 import { localIdentity, principalProof, rootProof, type LocalIdentity } from './identity.ts';
+import { verifyWorkspace, verifyWorkspaceNow } from '../../packages/workspaces/index.ts';
+import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 
-export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string };
+export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; workspaces?: WorkspaceBinding[] };
 export async function startEdge(config: EdgeConfig) {
   const identity = await localIdentity(config.identity.root, config.identity.sid);
   requireThat(canonical(identity) === canonical(config.identity), 'EDGE_LOCAL_IDENTITY_CHANGED');
@@ -30,7 +32,7 @@ export async function startEdge(config: EdgeConfig) {
     requireThat(native.pid, 'NATIVE_PROCESS_UNKNOWN'); const proof = principalProof(native.pid);
     requireThat(proof.sid === identity.sid && proof.sessionId === identity.sessionId && !proof.elevated, 'NATIVE_PRINCIPAL_REJECTED');
     journal.append('NATIVE_PROCESS_IDENTITY', native.instanceId, proof);
-  });
+  }, config.workspaces, workspace => verifyWorkspace(workspace, { principal: identity.principal, sid: identity.sid }), workspace => verifyWorkspaceNow(workspace, { principal: identity.principal, sid: identity.sid }));
   socket.on('open', () => send({ ...envelope, kind: 'hello', identity, recovered: journal.recovered }));
   socket.on('message', async (bytes, binary) => {
     try {

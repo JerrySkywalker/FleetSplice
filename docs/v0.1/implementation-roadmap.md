@@ -6,9 +6,10 @@ updated after accepted G05/G05A/G05B/G05B-R1 work and the Owner-approved
 [product boundary](../product/owner-thesis.md). Historical receipts remain
 immutable evidence; this roadmap is the current planning view.
 
-See [current train status](../train/current-status.md). No further product
-implementation is authorized by this documentation update. `G05C_STARTED=false`
-and `G06_STARTED=false`.
+See [current train status](../train/current-status.md). The later Owner night
+train authorization admits serial local G05C stations only; P1 is accepted and
+P2A is under review. `G05C_STARTED=true` and `G06_STARTED=false`. Every next
+station requires its predecessor's independent PASS; G06 remains unauthorized.
 
 `VISIBLE_INCREMENT_RULE=true`.
 

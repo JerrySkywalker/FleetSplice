@@ -378,7 +378,7 @@ function guardIsSound(guard: Guard, base: string): boolean {
   if (!guard || typeof guard.runId !== 'string' || !guard.target || !guard.identity || typeof guard.identity.root !== 'string') return false;
   const admission = path.join(base, guard.runId, 'admission.json');
   if (!existsSync(admission)) return false;
-  try { const value = safeJson<{ runId: string; target: Target; identity: Guard['identity'] }>(admission); return value.runId === guard.runId && same(value.target, guard.target) && same(value.identity, guard.identity); } catch { return false; }
+  try { const value = safeJson<{ runId: string; target: Target; identity: Guard['identity']; workspaces?: unknown }>(admission); return value.runId === guard.runId && same(value.target, guard.target) && same(value.identity, guard.identity) && same(value.workspaces ?? null, guard.workspaces ?? null); } catch { return false; }
 }
 function readableFleetSpliceJournal(file: string): boolean {
   if (!existsSync(file)) return false;

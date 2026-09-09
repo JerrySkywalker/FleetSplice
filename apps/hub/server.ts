@@ -7,8 +7,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Fault, parseJson, canonical, requireThat, validate, type Target, type Hcp, type EdgeCommand, type Receipt } from '../../packages/contracts/index.ts';
 import { HubKernel, AdmissionRejected, type ClientGrant } from './kernel.ts';
 import { Journal } from '../../packages/journal/index.ts';
+import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 
-export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string };
+export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[] };
 const equalSecret = (a: string, b: string) => {
   const left = Buffer.from(a); const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
@@ -31,7 +32,7 @@ export async function startHub(config: HubConfig) {
     pending.set(command.edgeCommandId, { resolve, reject: () => reject(new Fault('EDGE_DISCONNECTED')), timer });
     try { send({ v: 1, kind: 'command', connectionId: config.target.connectionId, target: config.target, command }); }
     catch (error) { clearTimeout(timer); pending.delete(command.edgeCommandId); reject(error); }
-  }), () => { for (const stream of streams) if (!stream.write(`data: ${kernel.snapshot().cursor}\n\n`)) { stream.end(); streams.delete(stream); } });
+  }), () => { for (const stream of streams) if (!stream.write(`data: ${kernel.snapshot().cursor}\n\n`)) { stream.end(); streams.delete(stream); } }, config.workspaces);
   const json = (res: ServerResponse, status: number, value: unknown) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)); };
   const body = async (req: IncomingMessage) => {
     const chunks: Buffer[] = []; let size = 0;

@@ -18,13 +18,17 @@ G05B_R1_PASS=true
 G05C_PLANNED=true
 G05C_STARTED=true
 G05C_P1_AUTHORIZED=true
-G05C_P1_STATUS=LIVE_ACCEPTANCE_PASSED_PENDING_INDEPENDENT_REVIEW
-G05C_P2_STARTED=false
+G05C_P1_STATUS=PASS_G05C_P1_LIVE_CAPABILITY_READONLY_CODING
+G05C_P1_ACCEPTED_HEAD=be95b9f7796f432ba339bce6d8ddcbcfabb6f909
+G05C_P1_ACCEPTED_TREE=430b02cb6ae4dac7ad2b27c2f55d638f11309642
+G05C_P2_STARTED=true
+G05C_P2A_STATUS=LIVE_ACCEPTANCE_PASSED_PENDING_INDEPENDENT_REVIEW
+G05C_P2B_STARTED=false
 G05C_P3_STARTED=false
 G06_STARTED=false
 IMPLEMENTATION_AUTHORIZED=G05C_LOCAL_CONTROL_PARITY_ONLY_SERIAL_STATIONS
 PRODUCT_IMPLEMENTATION_AUTHORIZED=G05C_LOCAL_CONTROL_PARITY_ONLY_SERIAL_STATIONS
-CURRENT_CHANGE_CLASS=G05C_P1_FINAL_ACCEPTANCE
+CURRENT_CHANGE_CLASS=G05C_P2A_WORKSPACE_TARGETING
 NEXT_PLANNED_GOAL=G05C_NATIVE_AGENT_CONTROL_PARITY
 ```
 
@@ -41,7 +45,7 @@ and explicitly keeps G06 remote deployment unstarted.
 The later Owner authorization
 `FLEETSPLICE-G05C-NIGHT-TRAIN-20260909-001` admits local G05C only, in serial
 P1, P2A, P2B, P3 and closeout stations. Each successor requires the preceding
-station's independent PASS. P2A/P2B/P3 remain unstarted. G06, Tencent,
+station's independent PASS. P2B/P3 remain unstarted. G06, Tencent,
 remote networking, phone UI, second Host, embedded terminal, editor, Git IDE,
 worktree manager, provider migration and merges remain unauthorized.
 
@@ -71,3 +75,20 @@ thread's configuration. Its 200-file pre/post fingerprints matched exactly;
 normal stop proved native exit and `SAFE_TERMINAL`. Seventy-five tests passed.
 Fresh independent review of the correction is still required. The train has
 used one protocol repair loop and zero runtime retirements. P2A remains gated.
+
+The fresh P1 correction review returned
+`PASS_G05C_P1_LIVE_CAPABILITY_READONLY_CODING` with zero unresolved findings
+at the exact accepted head/tree above. Its receipt remains in the external
+night-train evidence directory as `p1-review-2-final.md`.
+
+P2A now provides a bounded per-user registry of explicitly registered existing
+roots, new-session Workspace selection, immutable per-session root/target
+binding, and per-root native configuration checks. It does not own repositories,
+worktrees or branches. The real run `a9c88cd5-f695-4834-8a02-3b52ae543ed6`
+completed two read-only turns in the disposable Workspace A and a third turn
+in FleetSplice source, using two distinct native threads in one managed process.
+Changing the new-session selection preserved the existing fixture thread.
+All 202 source-file/Git fingerprints and fixture-file hashes matched; clean
+stop proved native exit, intact journals and `SAFE_TERMINAL`. Seventy-nine
+tests passed before live acceptance. P2A awaits fresh independent review;
+P2B and P3 have not started, and no write permission has been added.

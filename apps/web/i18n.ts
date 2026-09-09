@@ -2,6 +2,7 @@ export const locales = ['zh-CN', 'en-US'] as const;
 export type Locale = typeof locales[number];
 
 export const enUS = {
+  newWorkspaceTarget: 'Workspace for new sessions', sessionWorkspace: 'Current session Workspace', workspaceIdentity: 'Root identity', workspaceInvalid: 'Unavailable or replaced',
   pageTitle: 'FleetSplice · Local session', edition: 'LOCAL / G05C-P1', preferences: 'Preferences',
   language: 'Language', appearance: 'Appearance', localeChinese: '简体中文', localeEnglish: 'English',
   system: 'System', light: 'Light', dark: 'Dark', oledBlack: 'OLED Black', close: 'Close',
@@ -50,6 +51,7 @@ export type MessageKey = keyof typeof enUS;
 export type Catalog = Record<MessageKey, string>;
 
 export const zhCN = {
+  newWorkspaceTarget: '新会话的工作区', sessionWorkspace: '当前会话工作区', workspaceIdentity: '根目录身份', workspaceInvalid: '不可用或已替换',
   newSessionConfigurationHint: '模型和推理选择仅用于启动新的原生会话。已有会话保持其记录的配置。',
   pageTitle: 'FleetSplice · 本地会话', edition: '本地 / G05C-P1', preferences: '偏好设置',
   language: '语言', appearance: '外观', localeChinese: '简体中文', localeEnglish: 'English',

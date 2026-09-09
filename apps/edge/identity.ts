@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
-import { digest, requireThat } from '../../packages/contracts/index.ts';
+import { canonical, requireThat } from '../../packages/contracts/index.ts';
+import { createHash } from 'node:crypto';
 
 export type LocalIdentity = { principal: string; sid: string; sessionId: number; elevated: false; root: string; rootIdentity: string };
 export function principalProof(pid = process.pid): { principal: string; sid: string; sessionId: number; elevated: boolean; processId: number; creationTime: string } {
@@ -38,7 +39,7 @@ if($owner.ReturnValue -ne 0 -or $owner.Sid -ne $identity.User.Value){throw 'WRON
 `;
   return JSON.parse(execFileSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 20000 }));
 }
-export async function rootProof(root: string): Promise<{ root: string; rootIdentity: string }> {
+export function rootProofNow(root: string): { root: string; rootIdentity: string } {
   requireThat(/^[a-zA-Z]:\\/.test(root) && !root.includes('\0'), 'LOCAL_ABSOLUTE_ROOT_REQUIRED');
   const absolute = path.resolve(root);
   let component = absolute;
@@ -49,9 +50,10 @@ export async function rootProof(root: string): Promise<{ root: string; rootIdent
   const resolved = realpathSync.native(absolute);
   const stat = lstatSync(resolved, { bigint: true });
   requireThat(stat.isDirectory() && stat.ino !== 0n && resolved.toLowerCase() === absolute.toLowerCase(), 'ROOT_IDENTITY_INVALID');
-  const rootIdentity = await digest('identity', { path: resolved.toLowerCase(), device: stat.dev.toString(), inode: stat.ino.toString(), birth: stat.birthtimeNs.toString() });
+  const rootIdentity = createHash('sha256').update(`FleetSplice.v1.identity\0${canonical({ path: resolved.toLowerCase(), device: stat.dev.toString(), inode: stat.ino.toString(), birth: stat.birthtimeNs.toString() })}`).digest('hex');
   return { root: resolved, rootIdentity };
 }
+export async function rootProof(root: string): Promise<{ root: string; rootIdentity: string }> { return rootProofNow(root); }
 export async function localIdentity(root: string, expectedSid?: string): Promise<LocalIdentity> {
   requireThat(process.env.COMPUTERNAME === 'SKYFORGE-01', 'WRONG_HOST');
   const proof = principalProof();

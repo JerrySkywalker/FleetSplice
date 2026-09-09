@@ -8,6 +8,7 @@ import { canonical, requireThat, type Target } from '../packages/contracts/index
 import { assertFreshIncarnation, classifyPredecessor, edgeAdmissionState, guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
 import type { EdgeConfig } from '../apps/edge/main.ts';
 import type { HubConfig } from '../apps/hub/server.ts';
+import { workspaceBindings } from '../packages/workspaces/index.ts';
 
 const durableWrite = (file: string, value: unknown) => {
   const fd = openSync(file, 'w', 0o600); try { writeSync(fd, canonical(value)); fsyncSync(fd); } finally { closeSync(fd); }
@@ -26,6 +27,8 @@ export async function launch(root: string, executable: string, port = 43155, opt
   requireThat(process.version === 'v24.20.0' && process.versions.sqlite === '3.53.4', 'NODE_RUNTIME_UNQUALIFIED');
   requireThat(Number.isInteger(port) && port > 1024 && port < 65536, 'INVALID_PORT');
   const identity = await localIdentity(root);
+  const target: Target = { authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: randomUUID(), hostGeneration: '1', environmentId: randomUUID(), environmentGeneration: '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: identity.rootIdentity, agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() };
+  const workspaces = await workspaceBindings(identity.root, { principal: identity.principal, sid: identity.sid }, target);
   const installation = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const base = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'G05');
   mkdirSync(base, { recursive: true });
@@ -43,12 +46,11 @@ export async function launch(root: string, executable: string, port = 43155, opt
     preserveGuardForRun(base, old);
   }
   const runId = randomUUID(); const directory = path.join(base, runId); mkdirSync(directory);
-  const target: Target = { authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: randomUUID(), hostGeneration: '1', environmentId: randomUUID(), environmentGeneration: '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: identity.rootIdentity, agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() };
   if (predecessorTarget) assertFreshIncarnation(predecessorTarget, target);
-  const guard: Guard = { state: 'RUNNING', runId, target, identity, nativeExitObserved: false, quiescent: false };
+  const guard: Guard = { state: 'RUNNING', runId, target, identity, workspaces, nativeExitObserved: false, quiescent: false };
   // Runtime commit point: no native process exists before this durable guard.
   durableWrite(currentGuard, guard);
-  durableWrite(path.join(directory, 'admission.json'), { runId, target, identity, policy: 'windows-user.read-only', nativeContinuity: 'ephemeral-private-stdio', node: process.version, sqlite: process.versions.sqlite });
+  durableWrite(path.join(directory, 'admission.json'), { runId, target, identity, workspaces, policy: 'windows-user.read-only', nativeContinuity: 'ephemeral-private-stdio', node: process.version, sqlite: process.versions.sqlite });
   await options.onGuardCommitted?.(guard);
   const hcpToken = randomBytes(32).toString('hex'); const bootstrapToken = randomBytes(32).toString('hex');
   const env = { ...(options.environment ?? process.env) };
@@ -65,10 +67,10 @@ export async function launch(root: string, executable: string, port = 43155, opt
   try {
     hub = start(path.join(installation, 'apps/hub/server.js'), hubEnv);
     const hubReady = wait(hub, 'hubListening');
-    hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken } satisfies HubConfig);
+    hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken, workspaces } satisfies HubConfig);
     await hubReady;
     edge = start(path.join(installation, 'apps/edge/main.js'), env);
-    const edgeReady = wait(edge, 'edgeReady'); edge.send({ port, target, identity, stateDirectory: directory, executable, hcpToken } satisfies EdgeConfig);
+    const edgeReady = wait(edge, 'edgeReady'); edge.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, workspaces } satisfies EdgeConfig);
     await edgeReady;
   } catch (error) {
     // Browser command admission has not been exposed: there can be no native effect.

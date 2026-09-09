@@ -10,6 +10,7 @@ export type Target = {
   agentBindingId: string; executionBindingId: string; providerBindingId: string;
 };
 export type Fence = { epoch: string; revision: string; controller: string | null };
+export type WorkspaceBinding = { registryId: string; registryManaged?: boolean; displayName: string; root: string; rootIdentity: string; target: Target; valid: boolean };
 export type NativeReasoningOption = { reasoningEffort: string; description: string };
 export type NativeModelCapability = { id: string; displayName: string; isDefault: boolean; supportedReasoningEfforts: NativeReasoningOption[]; defaultReasoningEffort: string };
 // This is a projection of a qualified app-server `model/list` response. It is
@@ -40,9 +41,9 @@ export type Hcp = { v: 1; connectionId: string; target: Target } & (
   { kind: 'event'; event: NativeEvent } |
   { kind: 'closed'; reason: string }
 );
-export type Lane = { sessionId: string; laneId: string; segmentId: string; title: string; fence: Fence; state: string; nativeThreadId: string | null; nativeTurnId: string | null; requestedModel: string | null; requestedReasoningEffort: string | null; effectiveModel: string | null; effectiveReasoningEffort: string | null; activity: { text: string; status: string }[]; transcript: { role: 'user' | 'assistant' | 'system'; text: string }[] };
+export type Lane = { sessionId: string; laneId: string; segmentId: string; title: string; target: Target; root: string; fence: Fence; state: string; nativeThreadId: string | null; nativeTurnId: string | null; requestedModel: string | null; requestedReasoningEffort: string | null; effectiveModel: string | null; effectiveReasoningEffort: string | null; activity: { text: string; status: string }[]; transcript: { role: 'user' | 'assistant' | 'system'; text: string }[] };
 export type CommandRecord = { command: FleetCommand; plan: Plan; status: string; receipt: Receipt | null };
-export type Snapshot = { status: string; target: Target; root: string; registered: boolean; capabilities: NativeCapabilityCatalog | null; lanes: Lane[]; commands: CommandRecord[]; cursor: string };
+export type Snapshot = { status: string; target: Target; root: string; registered: boolean; workspaces: (WorkspaceBinding & { registered: boolean })[]; capabilities: NativeCapabilityCatalog | null; lanes: Lane[]; commands: CommandRecord[]; cursor: string };
 
 const uuid = { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' };
 const rev = { type: 'string', pattern: '^(0|[1-9][0-9]{0,19})$' };

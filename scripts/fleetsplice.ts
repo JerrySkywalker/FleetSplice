@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat } from '../packages/contracts/index.ts';
+import { readRegistry, changeRegistry, workspaceValidity } from '../packages/workspaces/index.ts';
 import { candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, G05C_P1_OWNER_RETIREMENT_RUNS, guardPath, networkPreflight, proxyConfigurationRequired, readUserProxyConfiguration, resolveExplicitProxy, resolveProxy, retireOwnerAuthorizedUnknown, retireOwnerAuthorizedUnprovable, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration, type Guard, type Predecessor, type UserProxyConfiguration } from '../packages/local-operation/index.ts';
 
 const base = () => path.join(process.env.LOCALAPPDATA ?? '', 'FleetSplice', 'G05');
@@ -60,6 +61,9 @@ function describeProxyConfiguration(configuration: UserProxyConfiguration): stri
   ];
 }
 async function preflight(root: string) {
+  const workspaceIdentity = await localIdentity(root);
+  const registry = readRegistry({ principal: workspaceIdentity.principal, sid: workspaceIdentity.sid });
+  if (registry) requireThat(registry.entries.some(e => e.root === workspaceIdentity.root && e.rootIdentity === workspaceIdentity.rootIdentity), 'WORKSPACE_MISSING_OR_REPLACED');
   const identity = await localIdentity(root);
   const node = discoverNode([process.execPath]);
   const codex = discoverCodex(candidateCodexPaths());
@@ -186,7 +190,21 @@ async function configure(args: string[]) {
 }
 export async function fleetspliceEntrypoint() {
   const args = process.argv.slice(2); const command = args[0]; const workspaceIndex = args.indexOf('--workspace'); const workspace = workspaceIndex >= 0 ? args[workspaceIndex + 1] ?? process.cwd() : process.cwd();
-  if (command === 'start') return await start(workspace);
+  if (command === 'workspace') {
+    const identity = await localIdentity(process.cwd()); const host = { principal: identity.principal, sid: identity.sid };
+    if (args[1] === 'list' && args.length === 2) {
+      const registry = readRegistry(host); output(code({ registry, observed: await Promise.all((registry?.entries ?? []).map(async e => ({ id: e.id, valid: await workspaceValidity(e), observedAt: new Date().toISOString() }))) })); return;
+    }
+    requireThat(['add', 'remove', 'select'].includes(args[1] ?? '') && typeof args[2] === 'string' && (args[1] === 'add' ? args.length === 4 : args.length === 3), 'USAGE_WORKSPACE_ADD_ROOT_NAME_OR_LIST_OR_REMOVE_SELECT_ID');
+    output(code(await changeRegistry(host, args[1] as 'add' | 'remove' | 'select', args[2]!, args[3]))); return;
+  }
+  if (command === 'start') {
+    const identity = await localIdentity(workspace); const registry = readRegistry({ principal: identity.principal, sid: identity.sid });
+    const selected = registry?.entries.find(e => e.id === registry.selectedId);
+    if (registry && workspaceIndex < 0) requireThat(selected && await workspaceValidity(selected), 'WORKSPACE_SELECTION_REQUIRED_OR_INVALID');
+    if (registry) requireThat(registry.entries.some(e => e.root.toLowerCase() === (workspaceIndex < 0 ? selected!.root : workspace).toLowerCase()), 'WORKSPACE_NOT_REGISTERED');
+    return await start(workspaceIndex < 0 && selected ? selected.root : workspace);
+  }
   if (command === 'stop') { try { const result = await control('stop'); output(`FleetSplice stop: ${result.code}\nRun: ${result.runId ?? 'none'}\nNative exit observed: ${result.nativeExitObserved === true}`); if (result.code !== 'CLOSED') process.exitCode = 2; } catch { error('RECOVERY_REQUIRED\nSUPERVISOR_UNAVAILABLE'); } return; }
   if (command === 'status') return await status();
   if (command === 'doctor') return await doctor(workspace);

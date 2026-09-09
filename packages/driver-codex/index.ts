@@ -62,6 +62,8 @@ export class CodexDriver implements NativePort {
   private closed = false;
   private failed = false;
   private policy: ReturnType<typeof integrationPolicy> | null = null;
+  private workspacePolicies = new Map<string, ReturnType<typeof integrationPolicy>>();
+  private threadRoots = new Map<string, string>();
   constructor(private executable: string, private root: string) {}
   async start(beforeEffect: () => void): Promise<void> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
@@ -90,9 +92,11 @@ export class CodexDriver implements NativePort {
     this.write({ method: 'initialized', params: {} });
     this.policy = await this.readPolicy();
   }
-  private async readPolicy(): Promise<ReturnType<typeof integrationPolicy>> {
-    const policy = integrationPolicy(await this.rpc(randomUUID(), 'config/read', { cwd: this.root, includeLayers: false }));
-    requireThat(!this.policy || policy.stamp === this.policy.stamp, 'NATIVE_CONFIG_CHANGED');
+  private async readPolicy(root = this.root): Promise<ReturnType<typeof integrationPolicy>> {
+    const policy = integrationPolicy(await this.rpc(randomUUID(), 'config/read', { cwd: root, includeLayers: false }));
+    const previous = root === this.root ? this.policy : this.workspacePolicies.get(root);
+    requireThat(!previous || policy.stamp === previous.stamp, 'NATIVE_CONFIG_CHANGED');
+    this.workspacePolicies.set(root, policy);
     return policy;
   }
   private fail(code: string): void {
@@ -136,9 +140,8 @@ export class CodexDriver implements NativePort {
   }
   async create(requestId: string, root: string, configuration: { model: string; reasoningEffort: string }, beforeEffect: () => void): Promise<{ threadId: string; model: string; provider: string; reasoningEffort: string }> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
-    requireThat(root === this.root, 'NATIVE_ROOT_CHANGED');
     requireThat(typeof configuration?.model === 'string' && configuration.model.length > 0 && configuration.model.length <= 200 && typeof configuration.reasoningEffort === 'string' && configuration.reasoningEffort.length > 0 && configuration.reasoningEffort.length <= 64, 'NATIVE_CONFIGURATION_INVALID');
-    const policy = await this.readPolicy();
+    const policy = await this.readPolicy(root);
     // The installed app-server schema exposes `thread/start.model` and the
     // typed config key `model_reasoning_effort`; the response supplies the
     // observed model/reasoning pair used below as effective evidence.
@@ -146,12 +149,14 @@ export class CodexDriver implements NativePort {
     requireThat(result.approvalPolicy === 'never' && result.sandbox?.type === 'readOnly' && result.sandbox.networkAccess === false && result.thread?.ephemeral === true && result.cwd?.toLowerCase() === root.toLowerCase(), 'NATIVE_POLICY_UNQUALIFIED');
     requireThat(typeof result.thread.id === 'string' && result.thread.id.length < 200, 'NATIVE_ID_UNKNOWN');
     requireThat(result.model === configuration.model && result.reasoningEffort === configuration.reasoningEffort && typeof result.modelProvider === 'string' && result.modelProvider.length > 0, 'NATIVE_CONFIGURATION_UNOBSERVED');
+    requireThat(!this.threadRoots.has(result.thread.id), 'NATIVE_THREAD_CONFLICT');
+    this.threadRoots.set(result.thread.id, root);
     return { threadId: result.thread.id, model: result.model, provider: result.modelProvider, reasoningEffort: result.reasoningEffort };
   }
   async turn(requestId: string, threadId: string, root: string, text: string, beforeEffect: () => void): Promise<string> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
-    requireThat(root === this.root, 'NATIVE_ROOT_CHANGED');
-    await this.readPolicy();
+    requireThat(this.threadRoots.get(threadId) === root, 'NATIVE_ROOT_CHANGED');
+    await this.readPolicy(root);
     const result = await this.rpc(requestId, 'turn/start', { threadId, cwd: root, input: [{ type: 'text', text }], approvalPolicy: 'never', sandboxPolicy: { type: 'readOnly', networkAccess: false } }, beforeEffect);
     requireThat(typeof result.turn?.id === 'string' && result.turn.id.length < 200, 'NATIVE_ID_UNKNOWN');
     return result.turn.id;

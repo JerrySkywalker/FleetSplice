@@ -37,6 +37,7 @@ function App() {
   const [client, setClient] = useState<Client | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedReasoning, setSelectedReasoning] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -104,6 +105,7 @@ function App() {
     return () => clearTimeout(timer);
   }, [client]);
   const lane = snapshot?.lanes.find(item => item.laneId === selected);
+  const workspace = snapshot?.workspaces.find(item => selectedWorkspace ? item.registryId === selectedWorkspace : item.target.workspaceId === snapshot.target.workspaceId);
   const controlled = !!lane && lane.fence.controller === client?.clientInstanceId;
   const available = snapshot?.status === 'READY' && !!client && client.expiresAt > Date.now() && !busy && !pending;
   const models = snapshot?.capabilities?.models ?? [];
@@ -140,7 +142,7 @@ function App() {
     if (!available || !client || !snapshot) return;
     setBusy(true); setError(null); if (family !== 'native.capabilities.read') setFocusLane(null);
     const intent = { v: 1, actorId: client.actorId, clientInstanceId: client.clientInstanceId, grantId: client.grantId, grantRevision: client.grantRevision,
-      target: snapshot.target, laneId: ['workspace.register', 'logicalSession.create', 'native.capabilities.read'].includes(family) ? null : lane?.laneId ?? null,
+      target: ['workspace.register', 'logicalSession.create', 'native.capabilities.read'].includes(family) ? workspace?.target : lane?.target, laneId: ['workspace.register', 'logicalSession.create', 'native.capabilities.read'].includes(family) ? null : lane?.laneId ?? null,
       expected: ['workspace.register', 'logicalSession.create', 'native.capabilities.read'].includes(family) ? null : lane?.fence ?? null, family, body } as Intent;
     const value: FleetCommand = { commandId: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(), intentDigest: await digest('intent', intent), intent };
     // Storage failure prevents sending. Response loss keeps the exact intent available for lookup.
@@ -167,11 +169,13 @@ function App() {
     <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('edition')}</span></div><div className="owner"><PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/><span className="owner-name">Jerry</span><span className="avatar">J</span></div></header>
     <aside className="navigation">
       <div className="eyebrow">{t('yourFleet')}</div><div className="host"><span className={`dot ${snapshot?.status === 'READY' ? 'online' : ''}`}/><strong>SKYFORGE-01</strong></div><div className="environment">└ &nbsp; windows-user</div>
-      <div className="section-title">{t('workspace')}</div><div className="workspace"><span>▣</span><div><strong>{snapshot?.root.split('\\').at(-1) ?? t('localWorkspace')}</strong><small>{snapshot?.root ?? t('bootstrapHint')}</small></div></div>
-      {!snapshot?.registered && <button disabled={!available} onClick={() => command('workspace.register', { root: snapshot?.root })}>{t('registerWorkspace')}</button>}
+      <label className="section-title" htmlFor="workspace">{t('newWorkspaceTarget')}</label>
+      <select id="workspace" value={workspace?.registryId ?? ''} disabled={!available} onChange={event => setSelectedWorkspace(event.target.value)}><option value="" disabled>{t('workspace')}</option>{snapshot?.workspaces.map(item => <option key={item.registryId} value={item.registryId} disabled={!item.valid}>{item.displayName}{item.valid ? '' : ` · ${t('workspaceInvalid')}`}</option>)}</select>
+      <div className="workspace"><span>▣</span><div><strong>{workspace?.displayName ?? t('localWorkspace')}</strong><small data-testid="selected-workspace-root">{workspace?.root ?? t('bootstrapHint')}</small><small data-testid="selected-workspace-identity">{workspace?.rootIdentity ?? '—'}</small></div></div>
+      {!workspace?.registered && <button disabled={!available || !workspace?.valid} onClick={() => command('workspace.register', { root: workspace?.root })}>{t('registerWorkspace')}</button>}
       <div className="section-title">{t('sessions')} <span>{snapshot?.lanes.length ?? 0}</span></div>
       <nav aria-label={t('sessions')}>{snapshot?.lanes.map(item => <button className={`session ${selected === item.laneId ? 'selected' : ''}`} key={item.laneId} onClick={() => setSelected(item.laneId)}><span>{item.title}</span><small>{stateText(locale, item.state)}</small></button>)}</nav>
-      <form className="new-session" onSubmit={e => { e.preventDefault(); void command('logicalSession.create', { title: sessionTitle }); }}><label htmlFor="title">{t('newTitle')}</label><input id="title" maxLength={80} value={sessionTitle} onChange={e => setTitle(e.target.value)}/><button disabled={!available || !snapshot?.registered || snapshot.lanes.length >= 24 || !sessionTitle.trim()}>{t('newSession')}</button></form>
+      <form className="new-session" onSubmit={e => { e.preventDefault(); void command('logicalSession.create', { title: sessionTitle }); }}><label htmlFor="title">{t('newTitle')}</label><input id="title" maxLength={80} value={sessionTitle} onChange={e => setTitle(e.target.value)}/><button disabled={!available || !workspace?.registered || !workspace.valid || (snapshot?.lanes.length ?? 24) >= 24 || !sessionTitle.trim()}>{t('newSession')}</button></form>
       <div className="local-note">{t('onThisMachine')}<br/><span>{t('nativeReadOnly')}</span></div>
     </aside>
     <main>
@@ -185,7 +189,7 @@ function App() {
       <form className="composer" onSubmit={e => { e.preventDefault(); void command('turn.submit', { text: prompt }); }}><label htmlFor="prompt">{t('messageCodex')}</label><textarea id="prompt" placeholder={t('promptPlaceholder')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'}/><div><span>{t('readOnlyHint')}</span><button className="primary" disabled={!available || !controlled || lane?.state !== 'IDLE' || !prompt.trim()}>{t('sendMessage')} <span aria-hidden="true">↑</span></button></div></form>
     </main>
     <aside className="context"><div className="eyebrow">{t('controlContext')}</div><h3>{t('nativeCapabilities')}</h3><p className="muted">{t('liveCatalogHint')}</p><p className="muted">{t('newSessionConfigurationHint')}</p>
-      <button disabled={!available || !snapshot?.registered} onClick={() => command('native.capabilities.read')}>{t('refreshCapabilities')}</button>
+      <button disabled={!available || !workspace?.registered || !workspace.valid} onClick={() => command('native.capabilities.read')}>{t('refreshCapabilities')}</button>
       <label className="capability-label" htmlFor="model">{t('model')}</label><select id="model" aria-label={t('model')} value={selectedModel} disabled={!models.length || !available} onChange={event => chooseModel(event.target.value)}>
         {!models.length && <option value="">{t('selectModel')}</option>}{models.map(model => <option key={model.id} value={model.id}>{model.displayName}{model.isDefault ? ' · default' : ''}</option>)}
       </select>
@@ -199,6 +203,7 @@ function App() {
       <button disabled={!available || !controlled} onClick={() => command('sessionLane.releaseControl')}>{t('releaseControl')}</button>
       <h3>{t('execution')}</h3><dl><dt>{t('host')}</dt><dd>SKYFORGE-01</dd><dt>{t('environment')}</dt><dd>windows-user</dd><dt>{t('agent')}</dt><dd>{t('nativeAgent')}</dd><dt>{t('continuity')}</dt><dd>{lane?.nativeThreadId ? t(snapshot?.status === 'READY' ? 'sameNative' : 'nativeUnavailable') : t('nativeNotStarted')}</dd><dt>{t('controlRevision')}</dt><dd data-testid="control-fence">{lane ? `${lane.fence.epoch} / ${lane.fence.revision}` : '—'}</dd><dt>{t('requestedConfiguration')}</dt><dd>{lane?.requestedModel ? `${lane.requestedModel} / ${lane.requestedReasoningEffort}` : '—'}</dd><dt>{t('effectiveConfiguration')}</dt><dd>{lane?.effectiveModel ? `${lane.effectiveModel} / ${lane.effectiveReasoningEffort}` : '—'}</dd><dt>{t('nativeThread')}</dt><dd className="id" data-testid="native-thread">{lane?.nativeThreadId ?? '—'}</dd><dt>{t('nativeTurn')}</dt><dd className="id" data-testid="native-turn">{lane?.nativeTurnId ?? '—'}</dd></dl>
       <h3>{t('activity')}</h3><ul className="activity" aria-label={t('activity')}>{lane?.activity.length ? lane.activity.slice(-8).map((item, index) => <li key={`${item.text}-${index}`}>{item.text}</li>) : <li>{t('noActivity')}</li>}</ul>
+      <dl><dt>{t('sessionWorkspace')}</dt><dd data-testid="session-workspace-root">{lane?.root ?? '—'}</dd><dt>{t('workspaceIdentity')}</dt><dd className="id" data-testid="session-workspace-identity">{lane?.target.rootIdentity ?? '—'}</dd></dl>
       <details><summary>{t('commandReceipt')}</summary><pre data-testid="receipt">{receipt ? JSON.stringify({ commandId: receipt.command.commandId, planId: receipt.plan.planId, status: receipt.status, receipt: receipt.receipt }, null, 2) : t('noCommands')}</pre></details>
     </aside><footer><span className={`dot ${snapshot?.status === 'READY' ? 'online' : ''}`}/><span data-testid="connection-status" data-state={snapshot?.status ?? 'CONNECTING'}>{stateText(locale, snapshot?.status ?? 'CONNECTING')}</span><span className="footer-right">{t('footer')}</span></footer>
   </div>;

@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { canonical, digest, next, requireThat, validate, Fault, ClockFence, type EdgeCommand, type Fence, type NativeCapabilityCatalog, type NativeEvent, type Receipt, type Target } from '../../packages/contracts/index.ts';
 import { Journal } from '../../packages/journal/index.ts';
 import type { NativePort, NativeSignal } from '../../packages/driver-codex/index.ts';
+import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 
-type EdgeLane = { fence: Fence; sessionId: string; segmentId: string; threadId: string | null; turnId: string | null; state: string; activeStep: string | null; creationStep: string | null; turnStartedObserved: boolean; configuration?: { model: string; reasoningEffort: string } };
+type EdgeLane = { fence: Fence; sessionId: string; segmentId: string; target: Target; root: string; threadId: string | null; turnId: string | null; state: string; activeStep: string | null; creationStep: string | null; turnStartedObserved: boolean; configuration?: { model: string; reasoningEffort: string } };
 type StepRecord = { command: EdgeCommand; receipt: Receipt; attempted: boolean };
 type CommandLifecycle = { laneId: string; edgeCommandId: string; threadId: string; turnId: string; itemId: string; signature: string; state: 'STARTED' | 'COMPLETED' };
 export class EdgeKernel {
@@ -25,7 +26,10 @@ export class EdgeKernel {
   private reasoningItems = new Map<string, { threadId: string; turnId: string; completed: boolean }>();
   constructor(readonly journal: Journal, readonly target: Target, private native: NativePort,
     private verifyLocal: () => Promise<void>, private emit: (event: NativeEvent) => void,
-    private nativeProcessProof: () => Promise<void> = async () => {}) {
+    private nativeProcessProof: () => Promise<void> = async () => {},
+    private workspaces: WorkspaceBinding[] = [{ registryId: target.workspaceId, displayName: 'Workspace', root: journal.get<string>('root')!, rootIdentity: target.rootIdentity, target, valid: true }],
+    private verifyWorkspace: (workspace: WorkspaceBinding) => Promise<void> = async () => {},
+    private verifyWorkspaceNow: (workspace: WorkspaceBinding) => void = () => {}) {
     this.blocked = journal.recovered ? 'RECOVERY_REQUIRED' : null;
     this.lanes = journal.get('lanes') ?? {};
     this.capabilities = journal.get<NativeCapabilityCatalog>('capabilities') ?? null;
@@ -63,19 +67,21 @@ export class EdgeKernel {
     requireThat(command.planDigest === await digest('plan', plan) && fleet.intentDigest === await digest('intent', fleet.intent), 'PLAN_DIGEST_MISMATCH');
     requireThat(plan.commandId === fleet.commandId && plan.intentDigest === fleet.intentDigest && canonical(plan.target) === canonical(fleet.intent.target), 'PLAN_INTENT_MISMATCH');
     requireThat(plan.steps.length === 1 && plan.steps[0]!.edgeCommandId === command.edgeCommandId && plan.steps[0]!.operation === fleet.intent.family, 'INVALID_PLAN_STEP');
-    requireThat(canonical(plan.target) === canonical(this.target), 'STALE_TARGET');
+    const workspace = this.workspaces.find(w => canonical(w.target) === canonical(plan.target));
+    requireThat(workspace?.valid, 'STALE_TARGET');
     requireThat(this.connected && !this.closing, 'EDGE_DISCONNECTED');
     requireThat(!this.blocked, this.blocked ?? 'RECOVERY_REQUIRED');
     requireThat(plan.decision.expiresAt > Date.now() && plan.decision.expiresAt <= Date.now() + 31 * 60_000 && plan.decision.ceiling === 'windows-user.read-only', 'DECISION_EXPIRED_OR_INVALID');
     for (const key of ['actorId', 'clientInstanceId', 'grantId', 'grantRevision'] as const) requireThat(plan.decision[key] === fleet.intent[key], 'DECISION_INTENT_MISMATCH');
     await this.verifyLocal();
+    await this.verifyWorkspace(workspace);
     this.clock.check(Date.now(), performance.now());
     requireThat(this.connected && !this.blocked && plan.decision.expiresAt > Date.now(), 'ADMISSION_CLOSED');
     const family = fleet.intent.family;
     let lane: EdgeLane | undefined;
     if (family === 'workspace.register') {
       requireThat(plan.laneId === null && plan.before === null && plan.after === null, 'INVALID_WORKSPACE_PLAN');
-      requireThat(fleet.intent.family === 'workspace.register' && fleet.intent.body.root === this.journal.get<string>('root'), 'WRONG_WORKSPACE');
+      requireThat(fleet.intent.family === 'workspace.register' && fleet.intent.body.root === workspace.root, 'WRONG_WORKSPACE');
     } else if (family === 'native.capabilities.read') {
       requireThat(plan.laneId === null && plan.sessionId === null && plan.segmentId === null && plan.before === null && plan.after === null, 'INVALID_CAPABILITY_PLAN');
     } else {
@@ -84,8 +90,9 @@ export class EdgeKernel {
       lane = this.lanes[plan.laneId];
       if (!lane) {
         requireThat(family === 'sessionLane.acquireControl' && canonical(plan.before) === canonical({ epoch: '0', revision: '0', controller: null }), 'UNKNOWN_LANE');
-        lane = { fence: plan.before, sessionId: plan.sessionId, segmentId: plan.segmentId, threadId: null, turnId: null, state: 'EMPTY', activeStep: null, creationStep: null, turnStartedObserved: false };
+        lane = { fence: plan.before, sessionId: plan.sessionId, segmentId: plan.segmentId, target: structuredClone(workspace.target), root: workspace.root, threadId: null, turnId: null, state: 'EMPTY', activeStep: null, creationStep: null, turnStartedObserved: false };
       }
+      requireThat(canonical(lane.target) === canonical(workspace.target) && lane.root === workspace.root, 'SESSION_WORKSPACE_IMMUTABLE');
       requireThat(lane.sessionId === plan.sessionId && lane.segmentId === plan.segmentId && canonical(lane.fence) === canonical(plan.before), 'STALE_FENCE');
       const after: Fence = { ...lane.fence, revision: next(lane.fence.revision) };
       if (family === 'sessionLane.acquireControl') {
@@ -129,6 +136,7 @@ export class EdgeKernel {
     const beforeNativeEffect = () => {
       this.clock.check(Date.now(), performance.now());
       requireThat(this.connected && !this.closing && !this.blocked && plan.decision.expiresAt > Date.now(), 'ADMISSION_CLOSED');
+      this.verifyWorkspaceNow(workspace);
     };
     try {
       requireThat(this.connected && plan.decision.expiresAt > Date.now(), 'DISCONNECTED_BEFORE_NATIVE');
@@ -164,15 +172,15 @@ export class EdgeKernel {
           });
           return receipt;
         }
-        const result = await this.native.create(receipt.nativeRequestId!, this.journal.get<string>('root')!, configuration, beforeNativeEffect);
+        const result = await this.native.create(receipt.nativeRequestId!, lane!.root, configuration, beforeNativeEffect);
         requireThat(!lane!.threadId || lane!.threadId === result.threadId, 'NATIVE_THREAD_CONFLICT');
         lane!.threadId = result.threadId; lane!.state = 'IDLE'; lane!.activeStep = null;
         receipt.nativeConfiguration = { requestedModel: configuration.model, requestedReasoningEffort: configuration.reasoningEffort, effectiveModel: result.model, effectiveReasoningEffort: result.reasoningEffort };
         lane!.configuration = { ...configuration };
-        this.journal.append('NATIVE_BINDING', command.edgeCommandId, { ...result, processId: this.native.pid, instanceId: this.native.instanceId });
+        this.journal.append('NATIVE_BINDING', command.edgeCommandId, { ...result, root: lane!.root, workspaceTarget: workspace.target, processId: this.native.pid, instanceId: this.native.instanceId });
       } else {
         requireThat(fleet.intent.family === 'turn.submit', 'INVALID_NATIVE_OPERATION');
-        const turnId = await this.native.turn(receipt.nativeRequestId!, lane!.threadId!, this.journal.get<string>('root')!, fleet.intent.body.text, beforeNativeEffect);
+        const turnId = await this.native.turn(receipt.nativeRequestId!, lane!.threadId!, lane!.root, fleet.intent.body.text, beforeNativeEffect);
         requireThat(!lane!.turnId || lane!.turnId === turnId || lane!.state === 'DISPATCHED', 'NATIVE_TURN_CONFLICT');
         lane!.turnId = turnId;
         if (lane!.state === 'DISPATCHED') lane!.state = 'RUNNING';
@@ -195,9 +203,9 @@ export class EdgeKernel {
     const p = signal.params;
     if (signal.requestId !== undefined) { this.quarantine('BLOCKED_UNSUPPORTED_APPROVAL'); return; }
     if (signal.method === 'thread/started') {
-      const lane = this.current?.command.intent.family === 'sessionLane.continue' && this.current.plan.laneId
+      const lane = Object.values(this.lanes).find(item => item.threadId === p.thread?.id && item.creationStep) ?? (this.current?.command.intent.family === 'sessionLane.continue' && this.current.plan.laneId
         ? this.lanes[this.current.plan.laneId]
-        : Object.values(this.lanes).find(item => item.threadId === p.thread?.id && item.creationStep);
+        : undefined);
       requireThat(lane?.creationStep, 'EXTERNAL_NATIVE_WRITER');
       requireThat(typeof p.thread?.id === 'string' && (!lane.threadId || lane.threadId === p.thread.id), 'NATIVE_THREAD_CONFLICT');
       lane.threadId = p.thread.id; this.saveLanes(); this.journal.append('THREAD_OBSERVED', lane.creationStep, { threadId: lane.threadId }); return;
@@ -267,7 +275,7 @@ export class EdgeKernel {
       if (signal.method === 'item/started') {
         requireThat(lane.activeStep && lane.turnId === turnId, 'UNEXPECTED_NATIVE_TURN');
         const lifecycle = this.startCommandLifecycle(laneId, lane, p.item, turnId, p.startedAtMs);
-        this.recordNativeEvent({ laneId, edgeCommandId: lifecycle.edgeCommandId, kind: 'tool', text: this.commandActivity(p.item), threadId: lifecycle.threadId, turnId: lifecycle.turnId, status: 'inProgress' }, lane);
+        this.recordNativeEvent({ laneId, edgeCommandId: lifecycle.edgeCommandId, kind: 'tool', text: this.commandActivity(p.item, lane.root), threadId: lifecycle.threadId, turnId: lifecycle.turnId, status: 'inProgress' }, lane);
         return;
       }
       const lifecycle = this.completeCommandLifecycle(lane, p.item, turnId, p.completedAtMs);
@@ -326,8 +334,7 @@ export class EdgeKernel {
     requireThat(lifecycle.laneId && lifecycle.signature === checked.signature, 'NATIVE_COMMAND_LIFECYCLE_INVALID');
     lifecycle.state = 'COMPLETED'; return lifecycle;
   }
-  private commandActivity(item: any): string {
-    const root = this.journal.get<string>('root')!;
+  private commandActivity(item: any, root: string): string {
     const scope = (value: unknown) => typeof value === 'string' && value.toLowerCase().startsWith(root.toLowerCase()) ? (value.slice(root.length).replace(/^[\\/]+/, '') || '.') : 'workspace';
     const action = item.commandActions[0];
     if (action.type === 'read') return `Reading ${scope(action.path)}`;

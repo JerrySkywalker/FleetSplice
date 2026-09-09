@@ -488,6 +488,8 @@ dialog p { color:var(--muted); font-size:12px; line-height:1.7; margin-bottom:0;
   .shell { grid-template-columns:220px minmax(300px,1fr) 230px; }
   .edition { display:none; }
 }
+.navigation select { width:100%; min-width:0; }
+.workspace small { overflow-wrap:anywhere; }
 @media(max-width:800px) {
   .shell { grid-template-columns:minmax(0,1fr); grid-template-rows:64px auto minmax(600px,75dvh) auto auto; min-height:100dvh; }
   header { padding:0 14px; }

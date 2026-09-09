@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { canonical, digest, next, requireThat, validate, ClockFence, Fault, type CommandRecord, type EdgeCommand, type FleetCommand, type Lane, type NativeCapabilityCatalog, type NativeEvent, type Plan, type Receipt, type Snapshot, type Target } from '../../packages/contracts/index.ts';
 import { Journal } from '../../packages/journal/index.ts';
+import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 
 export type ClientGrant = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number };
 export class AdmissionRejected extends Fault {
@@ -14,6 +15,7 @@ export class HubKernel {
   private serial: Promise<unknown> = Promise.resolve();
   private lanes: Lane[];
   private registered: boolean;
+  private registeredWorkspaceIds: string[];
   private capabilities: NativeCapabilityCatalog | null;
   private cursor = 0n;
   private outputCharacters = 0;
@@ -21,13 +23,15 @@ export class HubKernel {
   private queued = 0;
   private storageFailed = false;
   constructor(readonly journal: Journal, readonly target: Target, readonly root: string,
-    private deliver: (command: EdgeCommand) => Promise<Receipt>, private changed: () => void) {
+    private deliver: (command: EdgeCommand) => Promise<Receipt>, private changed: () => void,
+    private workspaces: WorkspaceBinding[] = [{ registryId: target.workspaceId, displayName: root, root, rootIdentity: target.rootIdentity, target, valid: true }]) {
     this.status = journal.recovered ? 'RECOVERY_REQUIRED' : 'CONNECTING';
     this.lanes = journal.get<Lane[]>('lanes') ?? []; this.registered = journal.get<boolean>('registered') ?? false;
     this.capabilities = journal.get<NativeCapabilityCatalog>('capabilities') ?? null;
+    this.registeredWorkspaceIds = journal.get<string[]>('registeredWorkspaceIds') ?? (this.registered ? [target.workspaceId] : []);
   }
   snapshot(): Snapshot {
-    return { status: this.status, target: this.target, root: this.root, registered: this.registered, capabilities: structuredClone(this.capabilities), lanes: structuredClone(this.lanes), commands: this.commands(), cursor: this.cursor.toString() };
+    return { status: this.status, target: this.target, root: this.root, registered: this.registered, workspaces: structuredClone(this.workspaces.map(w => ({ ...w, registered: this.registeredWorkspaceIds.includes(w.target.workspaceId) }))), capabilities: structuredClone(this.capabilities), lanes: structuredClone(this.lanes), commands: this.commands(), cursor: this.cursor.toString() };
   }
   private commands(): CommandRecord[] { return this.journal.list<StoredCommand>().filter((record): record is CommandRecord => 'plan' in record); }
   private replay(record: StoredCommand, requestedId = record.command.commandId): CommandRecord {
@@ -43,7 +47,7 @@ export class HubKernel {
     const stored = this.journal.lookup<StoredCommand>(id); return stored ? this.replay(stored.value) : null;
   }
   private publish(): void { this.cursor++; this.changed(); }
-  private save(): void { this.journal.set('lanes', this.lanes); this.journal.set('registered', this.registered); this.journal.set('capabilities', this.capabilities); }
+  private save(): void { this.journal.set('lanes', this.lanes); this.journal.set('registered', this.registered); this.journal.set('registeredWorkspaceIds', this.registeredWorkspaceIds); this.journal.set('capabilities', this.capabilities); }
   ready(recovered: boolean): void { this.status = this.storageFailed || this.journal.recovered || recovered ? 'RECOVERY_REQUIRED' : 'READY'; this.publish(); }
   disconnect(reason = 'EDGE_DISCONNECTED'): void { this.status = this.storageFailed ? 'RECOVERY_REQUIRED' : reason; this.publish(); }
   private failStorage(error: unknown): void {
@@ -101,22 +105,24 @@ export class HubKernel {
     // Only this serialized, absent ID/alias may acquire a retained rejection.
     newIntent(command, alias);
     requireThat(this.status === 'READY', this.status);
-    requireThat(canonical(intent.target) === canonical(this.target), 'STALE_TARGET');
+    const workspace = this.workspaces.find(w => canonical(w.target) === canonical(intent.target));
+    requireThat(workspace?.valid, 'STALE_TARGET');
     const lane = intent.laneId ? this.lanes.find(item => item.laneId === intent.laneId) : undefined;
+    if (lane) requireThat(canonical(lane.target) === canonical(intent.target), 'SESSION_WORKSPACE_IMMUTABLE');
     const family = intent.family;
     const plan: Plan = { v: 1, planId: randomUUID(), commandId: command.commandId, intentDigest: command.intentDigest, target: structuredClone(intent.target),
       decision: { decisionId: randomUUID(), actorId: grant.actorId, clientInstanceId: grant.clientInstanceId, grantId: grant.grantId, grantRevision: grant.grantRevision, expiresAt: grant.expiresAt, ceiling: 'windows-user.read-only' }, sessionId: lane?.sessionId ?? null, laneId: lane?.laneId ?? null, segmentId: lane?.segmentId ?? null, before: lane ? structuredClone(lane.fence) : null, after: lane ? structuredClone(lane.fence) : null, steps: [] };
     let created: Lane | null = null;
     if (family === 'workspace.register') {
-      requireThat(intent.laneId === null && intent.expected === null && intent.body.root === this.root, 'WRONG_WORKSPACE');
-      requireThat(!this.registered, 'WORKSPACE_ALREADY_REGISTERED');
+      requireThat(intent.laneId === null && intent.expected === null && intent.body.root === workspace.root, 'WRONG_WORKSPACE');
+      requireThat(!this.registeredWorkspaceIds.includes(workspace.target.workspaceId), 'WORKSPACE_ALREADY_REGISTERED');
     } else if (family === 'logicalSession.create') {
       requireThat(this.lanes.length < 24, 'LOCAL_SESSION_LIMIT');
-      requireThat(this.registered && intent.laneId === null && intent.expected === null, 'WORKSPACE_NOT_REGISTERED');
-      created = { sessionId: randomUUID(), laneId: randomUUID(), segmentId: randomUUID(), title: intent.body.title, fence: { epoch: '0', revision: '0', controller: null }, state: 'EMPTY', nativeThreadId: null, nativeTurnId: null, requestedModel: null, requestedReasoningEffort: null, effectiveModel: null, effectiveReasoningEffort: null, activity: [], transcript: [] };
+      requireThat(this.registeredWorkspaceIds.includes(workspace.target.workspaceId) && intent.laneId === null && intent.expected === null, 'WORKSPACE_NOT_REGISTERED');
+      created = { sessionId: randomUUID(), laneId: randomUUID(), segmentId: randomUUID(), title: intent.body.title, target: structuredClone(workspace.target), root: workspace.root, fence: { epoch: '0', revision: '0', controller: null }, state: 'EMPTY', nativeThreadId: null, nativeTurnId: null, requestedModel: null, requestedReasoningEffort: null, effectiveModel: null, effectiveReasoningEffort: null, activity: [], transcript: [] };
       plan.sessionId = created.sessionId; plan.laneId = created.laneId; plan.segmentId = created.segmentId;
     } else if (family === 'native.capabilities.read') {
-      requireThat(this.registered && intent.laneId === null && intent.expected === null, 'WORKSPACE_NOT_REGISTERED');
+      requireThat(this.registeredWorkspaceIds.includes(workspace.target.workspaceId) && intent.laneId === null && intent.expected === null, 'WORKSPACE_NOT_REGISTERED');
     } else {
       requireThat(lane && intent.expected && canonical(lane.fence) === canonical(intent.expected), 'STALE_FENCE');
       requireThat(!['PENDING', 'AMBIGUOUS_EFFECT', 'RECOVERY_REQUIRED'].includes(lane.state), 'LANE_BLOCKED');
@@ -166,7 +172,7 @@ export class HubKernel {
         else { this.status = 'RECOVERY_REQUIRED'; if (lane) lane.state = 'RECOVERY_REQUIRED'; }
       }
       else {
-        if (family === 'workspace.register') this.registered = true;
+        if (family === 'workspace.register') { this.registeredWorkspaceIds.push(workspace.target.workspaceId); if (workspace.target.workspaceId === this.target.workspaceId) this.registered = true; }
         if (lane) {
           lane.nativeThreadId = receipt.nativeThreadId ?? lane.nativeThreadId;
           if (family === 'turn.submit') {

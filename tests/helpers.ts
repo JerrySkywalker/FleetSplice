@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { digest, type FleetCommand, type Intent, type EdgeCommand, type Target } from '../packages/contracts/index.ts';
+import { digest, type FleetCommand, type Intent, type EdgeCommand, type Target, type WorkspaceBinding } from '../packages/contracts/index.ts';
 import { Journal } from '../packages/journal/index.ts';
 import { HubKernel, type ClientGrant } from '../apps/hub/kernel.ts';
 import { EdgeKernel } from '../apps/edge/kernel.ts';
@@ -43,18 +43,19 @@ export class FixtureNative implements NativePort {
   complete() { this.signals.emit('signal', { method: 'turn/completed', params: { threadId: this.threadId, turn: { id: this.turnId, status: 'completed' } } }); }
   async close() { return true; }
 }
-export function rig() {
+export function rig(workspaceFactory?: (target: Target) => WorkspaceBinding[], workspaceCheck: (workspace: WorkspaceBinding) => void = () => {}) {
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-g05-test-'));
   const hubJournal = new Journal(path.join(directory, 'hub.sqlite')); const edgeJournal = new Journal(path.join(directory, 'edge.sqlite'));
   edgeJournal.set('root', 'V:\\disposable-fixture');
   const identity = target(); const client = grant(); const native = new FixtureNative();
+  const workspaces = workspaceFactory?.(identity);
   let verify: () => Promise<void> = async () => {};
   let loseReceipt = false;
   let beforeReceipt: (command: EdgeCommand) => void = () => {};
   const delivered: EdgeCommand[] = [];
-  const edge = new EdgeKernel(edgeJournal, identity, native, () => verify(), event => hub.event(event));
+  const edge = new EdgeKernel(edgeJournal, identity, native, () => verify(), event => hub.event(event), async () => {}, workspaces, async workspace => workspaceCheck(workspace), workspaceCheck);
   edge.connected = true;
-  const hub = new HubKernel(hubJournal, identity, 'V:\\disposable-fixture', async command => { delivered.push(command); const result = await edge.execute(command); beforeReceipt(command); if (loseReceipt) throw new Error('receipt lost'); return result; }, () => {});
+  const hub = new HubKernel(hubJournal, identity, 'V:\\disposable-fixture', async command => { delivered.push(command); const result = await edge.execute(command); beforeReceipt(command); if (loseReceipt) throw new Error('receipt lost'); return result; }, () => {}, workspaces);
   hub.ready(false);
   async function make(family: Intent['family'], body: unknown = {}, laneId: string | null = null, actor = client): Promise<FleetCommand> {
     const lane = hub.snapshot().lanes.find(item => item.laneId === laneId);

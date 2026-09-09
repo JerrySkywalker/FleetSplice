@@ -16,7 +16,7 @@ export function supervisorProxy(environment: NodeJS.ProcessEnv = process.env): P
   const resolved = resolveProxy(environment);
   const source = environment.FLEETSPLICE_PROXY_SOURCE;
   if (source === undefined) return resolved;
-  requireThat(['explicit-env', 'windows-user-proxy', 'windows-system-proxy', 'direct'].includes(source), 'SUPERVISOR_PROXY_METADATA_INVALID');
+  requireThat(['explicit-env', 'fleetsplice-user-config', 'windows-user-proxy', 'windows-system-proxy', 'direct'].includes(source), 'SUPERVISOR_PROXY_METADATA_INVALID');
   requireThat(source === 'direct' ? resolved.proxy === null : resolved.proxy !== null, 'SUPERVISOR_PROXY_METADATA_INVALID');
   return { ...resolved, source: source as ProxyResolution['source'] };
 }

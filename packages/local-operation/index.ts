@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, openSync, closeSync, writeSync, fsyncSync, readFileSync, readdirSync, statSync, chmodSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { copyFileSync, existsSync, mkdirSync, openSync, closeSync, writeSync, fsyncSync, readFileSync, readdirSync, statSync, chmodSync, lstatSync, renameSync, unlinkSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { createServer } from 'node:net';
 import path from 'node:path';
@@ -20,7 +20,10 @@ export type PredecessorKind = 'NO_PREDECESSOR' | 'SAFE_NO_EFFECT' | 'SAFE_TERMIN
 export type Predecessor = { kind: PredecessorKind; guard: Guard | null; evidence: NativeEvidence; exactNativeExitProven: boolean; conflicts: ProcessProbe[]; reason: string; retirementReceipt?: string };
 export type QualifiedNode = { path: string; version: string; sqlite: string };
 export type QualifiedCodex = { path: string; version: string; sha256: string };
-export type ProxyResolution = { source: 'explicit-env' | 'windows-user-proxy' | 'windows-system-proxy' | 'direct' | 'invalid'; proxy: string | null; display: string | null; environment: Record<string, string>; reason?: string };
+export type ProxySource = 'explicit-env' | 'fleetsplice-user-config' | 'windows-user-proxy' | 'windows-system-proxy' | 'direct' | 'invalid';
+export type ProxyResolution = { source: ProxySource; proxy: string | null; display: string | null; environment: Record<string, string>; reason?: string };
+export type UserProxyConfiguration = { path: string | null; present: boolean; valid: boolean; proxy: string | null; display: string | null; reason?: string };
+export type PrivateAcl = (target: string, sid: string, directory: boolean) => void;
 export type EdgeAdmissionState = 'READY' | 'BLOCKED' | 'UNPROVABLE';
 
 const runtimeRoot = () => path.join(process.env.LOCALAPPDATA ?? '', 'FleetSplice', 'G05');
@@ -103,15 +106,96 @@ export function discoverCodex(candidates = candidateCodexPaths()): QualifiedCode
   throw new Error('CODEX_ARTIFACT_UNQUALIFIED: native codex.exe version/hash did not match the accepted pin');
 }
 
-function proxyUrl(value: string): string | null {
-  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `http://${value}`;
-  try { const parsed = new URL(candidate); return ['http:', 'https:', 'socks:', 'socks5:'].includes(parsed.protocol) && !!parsed.hostname ? candidate : null; } catch { return null; }
+type ProxyUrlResult = { proxy: string; reason?: never } | { proxy: null; reason: string };
+const proxyUrl = (value: string, persistent = false): ProxyUrlResult => {
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(value.trim()) ? value.trim() : `http://${value.trim()}`;
+  try {
+    const parsed = new URL(candidate);
+    if (!['http:', 'https:', 'socks:', 'socks5:'].includes(parsed.protocol) || !parsed.hostname) return { proxy: null, reason: 'PROXY_URL_INVALID' };
+    if (persistent && (parsed.username || parsed.password)) return { proxy: null, reason: 'PROXY_CREDENTIALS_UNSUPPORTED_SECURE_STORAGE_REQUIRED' };
+    // Query and fragment fields are not proxy-routing inputs and may contain a
+    // bearer-like value.  A FleetSplice-owned persistent setting never stores
+    // them.
+    if (persistent && (parsed.search || parsed.hash)) return { proxy: null, reason: 'PROXY_URL_UNSUPPORTED_COMPONENTS' };
+    return { proxy: parsed.toString().replace(/\/$/, '') };
+  } catch { return { proxy: null, reason: 'PROXY_URL_INVALID' }; }
+};
+export function userProxyConfigPath(env: NodeJS.ProcessEnv = process.env): string {
+  const localAppData = env.LOCALAPPDATA;
+  requireThat(typeof localAppData === 'string' && path.isAbsolute(localAppData), 'LOCALAPPDATA_REQUIRED');
+  return path.join(path.resolve(localAppData), 'FleetSplice', 'config.json');
+}
+const configPathOrNull = (env: NodeJS.ProcessEnv) => {
+  try { return userProxyConfigPath(env); } catch { return null; }
+};
+const privateConfigPath = (file: string) => {
+  if (!existsSync(file)) return;
+  const entry = lstatSync(file);
+  requireThat(entry.isFile() && !entry.isSymbolicLink(), 'FLEETSPLICE_PROXY_CONFIG_PATH_INVALID');
+};
+const privateConfigDirectory = (directory: string) => {
+  if (!existsSync(directory)) { mkdirSync(directory, { recursive: true }); return; }
+  const entry = lstatSync(directory);
+  requireThat(entry.isDirectory() && !entry.isSymbolicLink(), 'FLEETSPLICE_PROXY_CONFIG_PATH_INVALID');
+};
+export const applyPrivateUserAcl: PrivateAcl = (target, sid, directory) => {
+  requireThat(/^S-\d+(?:-\d+)+$/i.test(sid), 'FLEETSPLICE_PROXY_CONFIG_OWNER_INVALID');
+  const grant = directory ? '(OI)(CI)F' : 'F';
+  execFileSync('icacls.exe', [target, '/inheritance:r', '/grant:r', `*${sid}:${grant}`, `*S-1-5-18:${grant}`], { windowsHide: true, stdio: 'ignore', timeout: 7000 });
+};
+export function readUserProxyConfiguration(env: NodeJS.ProcessEnv = process.env): UserProxyConfiguration {
+  const file = configPathOrNull(env);
+  if (!file) return { path: file, present: false, valid: true, proxy: null, display: null };
+  const directory = path.dirname(file);
+  try { if (existsSync(directory)) privateConfigDirectory(directory); } catch { return { path: file, present: true, valid: false, proxy: null, display: null, reason: 'FLEETSPLICE_PROXY_CONFIGURATION_INVALID' }; }
+  if (!existsSync(file)) return { path: file, present: false, valid: true, proxy: null, display: null };
+  try {
+    privateConfigPath(file);
+    const parsed = JSON.parse(readFileSync(file, 'utf8')) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('shape');
+    const record = parsed as Record<string, unknown>;
+    if (record.version !== 1 || typeof record.proxy !== 'string' || Object.keys(record).length !== 2) throw new Error('shape');
+    const inspected = proxyUrl(record.proxy, true);
+    if (!inspected.proxy) return { path: file, present: true, valid: false, proxy: null, display: null, reason: 'FLEETSPLICE_PROXY_CONFIGURATION_INVALID' };
+    return { path: file, present: true, valid: true, proxy: inspected.proxy, display: redact(inspected.proxy) };
+  } catch { return { path: file, present: true, valid: false, proxy: null, display: null, reason: 'FLEETSPLICE_PROXY_CONFIGURATION_INVALID' }; }
+}
+export function writeUserProxyConfiguration(value: string, sid: string, env: NodeJS.ProcessEnv = process.env, applyAcl: PrivateAcl = applyPrivateUserAcl): UserProxyConfiguration {
+  const inspected = proxyUrl(value, true);
+  if (!inspected.proxy) throw new Error(inspected.reason);
+  const proxy = inspected.proxy;
+  const file = userProxyConfigPath(env); const directory = path.dirname(file); privateConfigDirectory(directory); privateConfigPath(file);
+  applyAcl(directory, sid, true);
+  const temporary = path.join(directory, `.config-${randomUUID()}.tmp`);
+  try {
+    const fd = openSync(temporary, 'wx', 0o600);
+    try { writeSync(fd, canonical({ version: 1, proxy })); fsyncSync(fd); } finally { closeSync(fd); }
+    applyAcl(temporary, sid, false);
+    renameSync(temporary, file);
+    applyAcl(file, sid, false);
+  } finally {
+    if (existsSync(temporary)) unlinkSync(temporary);
+  }
+  return readUserProxyConfiguration(env);
+}
+export function clearUserProxyConfiguration(sid: string, env: NodeJS.ProcessEnv = process.env, applyAcl: PrivateAcl = applyPrivateUserAcl): UserProxyConfiguration {
+  const file = userProxyConfigPath(env); const directory = path.dirname(file);
+  if (!existsSync(file)) return readUserProxyConfiguration(env);
+  privateConfigDirectory(directory); privateConfigPath(file); applyAcl(directory, sid, true); unlinkSync(file);
+  return readUserProxyConfiguration(env);
+}
+export function resolveExplicitProxy(env: NodeJS.ProcessEnv = process.env): ProxyResolution | null {
+  const selected = env.HTTPS_PROXY ?? env.HTTP_PROXY ?? env.ALL_PROXY ?? env.https_proxy ?? env.http_proxy ?? env.all_proxy;
+  if (selected === undefined) return null;
+  const inspected = proxyUrl(selected);
+  if (!inspected.proxy) return { source: 'invalid', proxy: null, display: null, environment: {}, reason: inspected.reason };
+  return { source: 'explicit-env', proxy: inspected.proxy, display: redact(inspected.proxy), environment: { HTTP_PROXY: env.HTTP_PROXY ?? env.http_proxy ?? inspected.proxy, HTTPS_PROXY: env.HTTPS_PROXY ?? env.https_proxy ?? inspected.proxy, ALL_PROXY: env.ALL_PROXY ?? env.all_proxy ?? inspected.proxy } };
 }
 export function parseWindowsProxy(server: string | null | undefined): string | null {
   if (!server) return null;
   const entries = server.split(';').map(value => value.trim()).filter(Boolean);
   const preferred = entries.find(value => /^https=/i.test(value))?.replace(/^[^=]+=*/, '') ?? entries.find(value => /^http=/i.test(value))?.replace(/^[^=]+=*/, '') ?? entries.find(value => !value.includes('='));
-  return preferred ? proxyUrl(preferred) : null;
+  return preferred ? proxyUrl(preferred).proxy : null;
 }
 export function readWindowsUserProxy(): string | null {
   try {
@@ -124,16 +208,17 @@ export function readWindowsUserProxy(): string | null {
 export function readWindowsSystemProxy(): string | null {
   try { const output = execFileSync('netsh.exe', ['winhttp', 'show', 'proxy'], { encoding: 'utf8', windowsHide: true, timeout: 5000 }); return parseWindowsProxy(output.match(/Proxy Server\(s\)\s*:\s*(.+)$/im)?.[1]?.trim()); } catch { return null; }
 }
-export function resolveProxy(env: NodeJS.ProcessEnv = process.env, windowsProxy = readWindowsUserProxy(), systemProxy = readWindowsSystemProxy()): ProxyResolution {
-  const selected = env.HTTPS_PROXY ?? env.HTTP_PROXY ?? env.ALL_PROXY ?? env.https_proxy ?? env.http_proxy ?? env.all_proxy;
-  if (selected !== undefined) {
-    const proxy = proxyUrl(selected);
-    if (!proxy) return { source: 'invalid', proxy: null, display: null, environment: {}, reason: 'PROXY_URL_INVALID' };
-    return { source: 'explicit-env', proxy, display: redact(proxy), environment: { HTTP_PROXY: env.HTTP_PROXY ?? env.http_proxy ?? proxy, HTTPS_PROXY: env.HTTPS_PROXY ?? env.https_proxy ?? proxy, ALL_PROXY: env.ALL_PROXY ?? env.all_proxy ?? proxy } };
-  }
+export function resolveProxy(env: NodeJS.ProcessEnv = process.env, windowsProxy = readWindowsUserProxy(), systemProxy = readWindowsSystemProxy(), configuration = readUserProxyConfiguration(env)): ProxyResolution {
+  const explicit = resolveExplicitProxy(env);
+  if (explicit) return explicit;
+  if (!configuration.valid) return { source: 'invalid', proxy: null, display: null, environment: {}, reason: configuration.reason };
+  if (configuration.proxy) return { source: 'fleetsplice-user-config', proxy: configuration.proxy, display: configuration.display, environment: { HTTP_PROXY: configuration.proxy, HTTPS_PROXY: configuration.proxy, ALL_PROXY: configuration.proxy } };
   if (windowsProxy) return { source: 'windows-user-proxy', proxy: windowsProxy, display: redact(windowsProxy), environment: { HTTP_PROXY: windowsProxy, HTTPS_PROXY: windowsProxy, ALL_PROXY: windowsProxy } };
   if (systemProxy) return { source: 'windows-system-proxy', proxy: systemProxy, display: redact(systemProxy), environment: { HTTP_PROXY: systemProxy, HTTPS_PROXY: systemProxy, ALL_PROXY: systemProxy } };
   return { source: 'direct', proxy: null, display: null, environment: {} };
+}
+export function proxyConfigurationRequired(proxy: ProxyResolution, configuration: UserProxyConfiguration, networkReason: string | undefined): boolean {
+  return proxy.source === 'direct' && !configuration.present && networkReason === 'NO_USABLE_NETWORK_ROUTE';
 }
 
 export async function networkPreflight(proxy: ProxyResolution, probe: (host: string, port: number) => Promise<boolean> = async (host, port) => {

@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { target } from './helpers.ts';
-import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, closeSafePredecessor, discoverCodex, discoverNode, edgeAdmissionState, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, resolveProxy, retireOwnerAuthorizedUnknown, verifyLocalEndpointAvailability } from '../packages/local-operation/index.ts';
+import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, edgeAdmissionState, G05B_OWNER_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, proxyConfigurationRequired, readUserProxyConfiguration, resolveProxy, retireOwnerAuthorizedUnknown, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration } from '../packages/local-operation/index.ts';
 import { supervisorProxy } from '../scripts/supervisor.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
@@ -46,14 +47,41 @@ test('exact Node and native Codex discovery retain the accepted pins', () => {
   const node = discoverNode([process.execPath]); assert.equal(node.version, 'v24.20.0'); assert.equal(node.sqlite, '3.53.4');
   const codex = discoverCodex(candidateCodexPaths()); assert.match(codex.path, /codex\.exe$/i); assert.equal(codex.version, '0.153.4'); assert.equal(codex.sha256.length, 64);
 });
-test('proxy precedence is explicit environment, then Windows user configuration, then direct', async () => {
-  const explicit = resolveProxy({ HTTPS_PROXY: 'http://user:secret@127.0.0.1:7890' }, 'http://127.0.0.1:9999');
+test('persistent proxy configuration is private, atomic, fail-closed, and has the required precedence', async () => {
+  const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-proxy-config-'));
+  const env = { LOCALAPPDATA: localAppData }; const config = userProxyConfigPath(env);
+  const aclCalls: { target: string; sid: string; directory: boolean }[] = [];
+  const recordAcl = (target: string, sid: string, directory: boolean) => { aclCalls.push({ target, sid, directory }); };
+  const configured = writeUserProxyConfiguration('http://127.0.0.1:7890', 'S-1-5-21-100-200-300-400', env, recordAcl);
+  assert.equal(configured.proxy, 'http://127.0.0.1:7890'); assert.deepEqual(JSON.parse(readFileSync(config, 'utf8')), { proxy: 'http://127.0.0.1:7890', version: 1 });
+  assert.equal(aclCalls[0]?.target, path.dirname(config)); assert.equal(aclCalls[0]?.directory, true); assert.equal(aclCalls.at(-1)?.target, config); assert.equal(aclCalls.at(-1)?.directory, false);
+  const explicit = resolveProxy({ ...env, HTTPS_PROXY: 'http://user:secret@127.0.0.1:7890' }, 'http://127.0.0.1:9999', 'http://127.0.0.1:9998', configured);
   assert.equal(explicit.source, 'explicit-env'); assert.equal(explicit.display, 'http://127.0.0.1:7890'); assert.equal(explicit.environment.HTTPS_PROXY, 'http://user:secret@127.0.0.1:7890');
   assert.equal(parseWindowsProxy('http=127.0.0.1:7890;https=127.0.0.1:7891'), 'http://127.0.0.1:7891');
-  assert.equal(resolveProxy({}, '127.0.0.1:7890').source, 'windows-user-proxy'); assert.equal(resolveProxy({}, null, '127.0.0.1:7892').source, 'windows-system-proxy'); assert.equal(resolveProxy({}, null, null).source, 'direct');
+  assert.equal(resolveProxy(env, '127.0.0.1:7890', '127.0.0.1:7892', configured).source, 'fleetsplice-user-config');
+  const absent = readUserProxyConfiguration({ LOCALAPPDATA: mkdtempSync(path.join(tmpdir(), 'fleetsplice-proxy-none-')) });
+  assert.equal(resolveProxy({}, '127.0.0.1:7890', '127.0.0.1:7892', absent).source, 'windows-user-proxy'); assert.equal(resolveProxy({}, null, '127.0.0.1:7892', absent).source, 'windows-system-proxy'); assert.equal(resolveProxy({}, null, null, absent).source, 'direct');
   const brokered = supervisorProxy({ HTTPS_PROXY: 'http://user:secret@127.0.0.1:7890', FLEETSPLICE_PROXY_SOURCE: 'windows-user-proxy' });
   assert.equal(brokered.source, 'windows-user-proxy'); assert.equal(brokered.display, 'http://127.0.0.1:7890');
-  const failed = await networkPreflight(resolveProxy({}, null), async () => false); assert.deepEqual(failed, { status: 'FAIL', networkReachable: false, provider: 'PROVIDER_NOT_YET_PROVEN', reason: 'NO_USABLE_NETWORK_ROUTE' });
+  const failed = await networkPreflight(resolveProxy({}, null, null, absent), async () => false); assert.deepEqual(failed, { status: 'FAIL', networkReachable: false, provider: 'PROVIDER_NOT_YET_PROVEN', reason: 'NO_USABLE_NETWORK_ROUTE' });
+  assert.equal(proxyConfigurationRequired(resolveProxy({}, null, null, absent), absent, failed.reason), true);
+  const old = readFileSync(config); assert.throws(() => writeUserProxyConfiguration('http://127.0.0.1:7891', 'S-1-5-21-100-200-300-400', env, (target, sid, directory) => { if (!directory && target.endsWith('.tmp')) throw new Error('ACL_TEST_FAILURE'); recordAcl(target, sid, directory); }), /ACL_TEST_FAILURE/); assert.deepEqual(readFileSync(config), old, 'a failed replacement retains the prior valid configuration');
+  writeFileSync(config, '{not-json'); const malformed = readUserProxyConfiguration(env); assert.equal(malformed.present, true); assert.equal(malformed.valid, false); assert.equal(resolveProxy(env, '127.0.0.1:7890', '127.0.0.1:7892', malformed).source, 'invalid', 'malformed configuration cannot silently fall through');
+  assert.throws(() => writeUserProxyConfiguration('http://user:secret@127.0.0.1:7890', 'S-1-5-21-100-200-300-400', env, recordAcl), /PROXY_CREDENTIALS_UNSUPPORTED_SECURE_STORAGE_REQUIRED/);
+  const sentinel = path.join(localAppData, 'unrelated.txt'); writeFileSync(sentinel, 'preserve'); writeUserProxyConfiguration('http://127.0.0.1:7890', 'S-1-5-21-100-200-300-400', env, recordAcl); assert.equal(clearUserProxyConfiguration('S-1-5-21-100-200-300-400', env, recordAcl).present, false); assert.equal(existsSync(sentinel), true, 'clear removes only FleetSplice-owned proxy configuration');
+});
+test('configure proxy supports URL, current environment, show, clear, and read-only reporting', () => {
+  const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-configure-cli-')); const cli = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'fleetsplice.js');
+  const noProxyEnvironment: NodeJS.ProcessEnv = { ...process.env, LOCALAPPDATA: localAppData };
+  for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']) delete noProxyEnvironment[key];
+  const run = (environment: NodeJS.ProcessEnv, ...args: string[]) => spawnSync(process.execPath, [cli, 'configure', 'proxy', ...args], { cwd: process.cwd(), env: environment, encoding: 'utf8', windowsHide: true, timeout: 20000 });
+  const configured = run(noProxyEnvironment, '--url', 'http://127.0.0.1:7890'); assert.equal(configured.status, 0); assert.match(configured.stdout, /FLEETSPLICE_PROXY_CONFIGURATION_SAVED/); assert.match(configured.stdout, /fleetsplice-user-config/);
+  const show = run(noProxyEnvironment, '--show'); assert.equal(show.status, 0); assert.match(show.stdout, /Proxy: http:\/\/127\.0\.0\.1:7890/); assert.match(show.stdout, /Proxy source: fleetsplice-user-config/);
+  const status = spawnSync(process.execPath, [cli, 'status'], { cwd: process.cwd(), env: noProxyEnvironment, encoding: 'utf8', windowsHide: true, timeout: 20000 }); assert.equal(status.status, 0); assert.match(status.stdout, /Proxy source: fleetsplice-user-config/);
+  const config = userProxyConfigPath(noProxyEnvironment); const beforeDoctor = readFileSync(config); const doctor = spawnSync(process.execPath, [cli, 'doctor'], { cwd: process.cwd(), env: noProxyEnvironment, encoding: 'utf8', windowsHide: true, timeout: 20000 }); assert.equal(doctor.status, 0); assert.match(doctor.stdout, /FleetSplice Doctor \(read-only\)/); assert.match(doctor.stdout, /Persistent proxy config syntax: valid/); assert.deepEqual(readFileSync(config), beforeDoctor, 'doctor does not mutate persistent configuration'); assert.equal(existsSync(path.join(localAppData, 'FleetSplice', 'G05', 'environment-guard.json')), false, 'doctor creates no guard');
+  const fromEnvironment = { ...noProxyEnvironment, HTTP_PROXY: 'http://127.0.0.1:7891' }; const imported = run(fromEnvironment, '--from-current-env'); assert.equal(imported.status, 0); assert.match(imported.stdout, /127\.0\.0\.1:7891/); const importedShow = run(noProxyEnvironment, '--show'); assert.match(importedShow.stdout, /127\.0\.0\.1:7891/);
+  const cleared = run(noProxyEnvironment, '--clear'); assert.equal(cleared.status, 0); assert.match(cleared.stdout, /FLEETSPLICE_PROXY_CONFIGURATION_CLEARED/); assert.equal(existsSync(config), false);
+  const rejected = run(noProxyEnvironment, '--url', 'http://user:secret@127.0.0.1:7890'); assert.notEqual(rejected.status, 0); assert.match(`${rejected.stdout}\n${rejected.stderr}`, /PROXY_CREDENTIALS_UNSUPPORTED_SECURE_STORAGE_REQUIRED/); assert.equal(existsSync(config), false);
 });
 test('failed qualification creates no runtime guard', () => {
   const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-preflight-'));

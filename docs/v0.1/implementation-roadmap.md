@@ -7,9 +7,15 @@ updated after accepted G05/G05A/G05B/G05B-R1 work and the Owner-approved
 immutable evidence; this roadmap is the current planning view.
 
 See [current train status](../train/current-status.md). The later Owner night
-train authorization admits serial local G05C stations only; P1 is accepted and
-P2A is under review. `G05C_STARTED=true` and `G06_STARTED=false`. Every next
-station requires its predecessor's independent PASS; G06 remains unauthorized.
+train authorization admitted serial local G05C stations only. P1 and P2A are
+accepted. The later `FLEETSPLICE-G05C-P2B-PATH-A-RESUME-003` Owner decision
+resumed P2B with session-scoped permission presets, separate native project
+trust, and no persistent permission-config writes. Its raw and product proof
+passed with unchanged persistent config, clean stop and READ_ONLY Host ceiling.
+Exact candidate review/acceptance is recorded in that external Goal's receipt.
+`G05C_STARTED=true`, `G05C_ACCEPTED=false` and `G06_STARTED=false`.
+P3 is the next planned slice but remains unauthorized and unstarted; G06 remains
+unauthorized. The original Night Train drift remains historically unresolved.
 
 `VISIBLE_INCREMENT_RULE=true`.
 

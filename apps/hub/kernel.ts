@@ -111,7 +111,7 @@ export class HubKernel {
     if (lane) requireThat(canonical(lane.target) === canonical(intent.target), 'SESSION_WORKSPACE_IMMUTABLE');
     const family = intent.family;
     const plan: Plan = { v: 1, planId: randomUUID(), commandId: command.commandId, intentDigest: command.intentDigest, target: structuredClone(intent.target),
-      decision: { decisionId: randomUUID(), actorId: grant.actorId, clientInstanceId: grant.clientInstanceId, grantId: grant.grantId, grantRevision: grant.grantRevision, expiresAt: grant.expiresAt, ceiling: 'windows-user.read-only' }, sessionId: lane?.sessionId ?? null, laneId: lane?.laneId ?? null, segmentId: lane?.segmentId ?? null, before: lane ? structuredClone(lane.fence) : null, after: lane ? structuredClone(lane.fence) : null, steps: [] };
+      decision: { decisionId: randomUUID(), actorId: grant.actorId, clientInstanceId: grant.clientInstanceId, grantId: grant.grantId, grantRevision: grant.grantRevision, expiresAt: grant.expiresAt, ceiling: 'windows-user.local-host-policy' }, sessionId: lane?.sessionId ?? null, laneId: lane?.laneId ?? null, segmentId: lane?.segmentId ?? null, before: lane ? structuredClone(lane.fence) : null, after: lane ? structuredClone(lane.fence) : null, steps: [] };
     let created: Lane | null = null;
     if (family === 'workspace.register') {
       requireThat(intent.laneId === null && intent.expected === null && intent.body.root === workspace.root, 'WRONG_WORKSPACE');
@@ -168,7 +168,7 @@ export class HubKernel {
         // Fresh native catalog evidence can safely reject a browser-held stale
         // selection before thread/start. Require an explicit reselection rather
         // than silently changing model/reasoning or forcing recovery.
-        if (lane && (['STALE_MODEL_SELECTION', 'STALE_REASONING_SELECTION'].includes(receipt.code) || (family === 'sessionLane.continue' && receipt.code === 'EXISTING_NATIVE_CONFIGURATION_IMMUTABLE' && receipt.nativeRequestId === null && receipt.nativeThreadId === lane.nativeThreadId))) lane.state = formerState!;
+        if (lane && (['STALE_MODEL_SELECTION', 'STALE_REASONING_SELECTION', 'STALE_PERMISSION_SELECTION'].includes(receipt.code) || (receipt.code === 'HOST_PERMISSION_CEILING_REJECTED' && receipt.nativeRequestId === null) || (family === 'sessionLane.continue' && receipt.code === 'EXISTING_NATIVE_CONFIGURATION_IMMUTABLE' && receipt.nativeRequestId === null && receipt.nativeThreadId === lane.nativeThreadId))) lane.state = formerState!;
         else { this.status = 'RECOVERY_REQUIRED'; if (lane) lane.state = 'RECOVERY_REQUIRED'; }
       }
       else {
@@ -181,6 +181,7 @@ export class HubKernel {
           } else if (family === 'sessionLane.continue' && receipt.nativeConfiguration !== null) {
             lane.requestedModel = receipt.nativeConfiguration.requestedModel; lane.requestedReasoningEffort = receipt.nativeConfiguration.requestedReasoningEffort;
             lane.effectiveModel = receipt.nativeConfiguration.effectiveModel; lane.effectiveReasoningEffort = receipt.nativeConfiguration.effectiveReasoningEffort;
+            lane.requestedPermission = receipt.nativeConfiguration.requestedPermission; lane.effectivePermission = receipt.nativeConfiguration.effectivePermission;
             if (lane.state === 'PENDING') lane.state = 'IDLE';
           } else if (lane.state === 'PENDING') lane.state = formerState!;
         }

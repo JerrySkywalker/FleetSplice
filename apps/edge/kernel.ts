@@ -2,9 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { canonical, digest, next, requireThat, validate, Fault, ClockFence, type EdgeCommand, type Fence, type NativeCapabilityCatalog, type NativeEvent, type Receipt, type Target } from '../../packages/contracts/index.ts';
 import { Journal } from '../../packages/journal/index.ts';
 import type { NativePort, NativeSignal } from '../../packages/driver-codex/index.ts';
-import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
+import type { WorkspaceBinding, PermissionPreset } from '../../packages/contracts/index.ts';
+import type { SessionRequest } from '../../packages/driver-codex/index.ts';
+import { observePermission, permissionRequest } from '../../packages/driver-codex/permissions.ts';
+import path from 'node:path';
 
-type EdgeLane = { fence: Fence; sessionId: string; segmentId: string; target: Target; root: string; threadId: string | null; turnId: string | null; state: string; activeStep: string | null; creationStep: string | null; turnStartedObserved: boolean; configuration?: { model: string; reasoningEffort: string } };
+type EdgeLane = { fence: Fence; sessionId: string; segmentId: string; target: Target; root: string; threadId: string | null; turnId: string | null; state: string; activeStep: string | null; creationStep: string | null; turnStartedObserved: boolean; configuration?: SessionRequest };
 type StepRecord = { command: EdgeCommand; receipt: Receipt; attempted: boolean };
 type CommandLifecycle = { laneId: string; edgeCommandId: string; threadId: string; turnId: string; itemId: string; signature: string; state: 'STARTED' | 'COMPLETED' };
 export class EdgeKernel {
@@ -24,12 +27,14 @@ export class EdgeKernel {
   // completion-only tool observation or an incidental notification order.
   private commandLifecycles = new Map<string, CommandLifecycle>();
   private reasoningItems = new Map<string, { threadId: string; turnId: string; completed: boolean }>();
+  private fileLifecycles = new Map<string, { laneId: string; edgeCommandId: string; threadId: string; turnId: string; changes: string; completed: boolean }>();
   constructor(readonly journal: Journal, readonly target: Target, private native: NativePort,
     private verifyLocal: () => Promise<void>, private emit: (event: NativeEvent) => void,
     private nativeProcessProof: () => Promise<void> = async () => {},
     private workspaces: WorkspaceBinding[] = [{ registryId: target.workspaceId, displayName: 'Workspace', root: journal.get<string>('root')!, rootIdentity: target.rootIdentity, target, valid: true }],
     private verifyWorkspace: (workspace: WorkspaceBinding) => Promise<void> = async () => {},
-    private verifyWorkspaceNow: (workspace: WorkspaceBinding) => void = () => {}) {
+    private verifyWorkspaceNow: (workspace: WorkspaceBinding) => void = () => {},
+    private permissionAllowed: (preset: PermissionPreset) => boolean = preset => preset === 'READ_ONLY') {
     this.blocked = journal.recovered ? 'RECOVERY_REQUIRED' : null;
     this.lanes = journal.get('lanes') ?? {};
     this.capabilities = journal.get<NativeCapabilityCatalog>('capabilities') ?? null;
@@ -71,7 +76,7 @@ export class EdgeKernel {
     requireThat(workspace?.valid, 'STALE_TARGET');
     requireThat(this.connected && !this.closing, 'EDGE_DISCONNECTED');
     requireThat(!this.blocked, this.blocked ?? 'RECOVERY_REQUIRED');
-    requireThat(plan.decision.expiresAt > Date.now() && plan.decision.expiresAt <= Date.now() + 31 * 60_000 && plan.decision.ceiling === 'windows-user.read-only', 'DECISION_EXPIRED_OR_INVALID');
+    requireThat(plan.decision.expiresAt > Date.now() && plan.decision.expiresAt <= Date.now() + 31 * 60_000 && plan.decision.ceiling === 'windows-user.local-host-policy', 'DECISION_EXPIRED_OR_INVALID');
     for (const key of ['actorId', 'clientInstanceId', 'grantId', 'grantRevision'] as const) requireThat(plan.decision[key] === fleet.intent[key], 'DECISION_INTENT_MISMATCH');
     await this.verifyLocal();
     await this.verifyWorkspace(workspace);
@@ -108,9 +113,12 @@ export class EdgeKernel {
       if (family === 'turn.submit') requireThat(lane.threadId && lane.state === 'IDLE', 'CONTINUE_REQUIRED');
       lane.fence = after; this.lanes[plan.laneId] = lane;
     }
-    const isNative = family === 'native.capabilities.read' || family === 'turn.submit' || (family === 'sessionLane.continue' && !lane?.threadId);
+    const requestedPermission = family === 'sessionLane.continue' ? fleet.intent.body.permission ?? 'READ_ONLY' : lane?.configuration?.permission ?? 'READ_ONLY';
+    const permissionDenied = (family === 'sessionLane.continue' || family === 'turn.submit') && !this.permissionAllowed(requestedPermission);
+    const isNative = !permissionDenied && (family === 'native.capabilities.read' || family === 'turn.submit' || (family === 'sessionLane.continue' && !lane?.threadId));
     const receipt = this.receipt(command, isNative ? 'DISPATCHED' : 'SUCCEEDED', isNative ? 'DISPATCH_ATTEMPTED' : 'APPLIED');
-    if (family === 'sessionLane.continue' && lane?.threadId && (lane.configuration?.model !== fleet.intent.body.model || lane.configuration?.reasoningEffort !== fleet.intent.body.reasoningEffort)) {
+    if (permissionDenied) { receipt.status = 'REJECTED'; receipt.code = 'HOST_PERMISSION_CEILING_REJECTED'; }
+    if (family === 'sessionLane.continue' && lane?.threadId && (lane.configuration?.model !== fleet.intent.body.model || lane.configuration?.reasoningEffort !== fleet.intent.body.reasoningEffort || (lane.configuration?.permission ?? 'READ_ONLY') !== requestedPermission)) {
       receipt.status = 'REJECTED'; receipt.code = 'EXISTING_NATIVE_CONFIGURATION_IMMUTABLE';
     }
     const record: StepRecord = { command, receipt, attempted: isNative };
@@ -137,6 +145,7 @@ export class EdgeKernel {
       this.clock.check(Date.now(), performance.now());
       requireThat(this.connected && !this.closing && !this.blocked && plan.decision.expiresAt > Date.now(), 'ADMISSION_CLOSED');
       this.verifyWorkspaceNow(workspace);
+      requireThat(this.permissionAllowed(requestedPermission), 'HOST_PERMISSION_CEILING_CHANGED');
     };
     try {
       requireThat(this.connected && plan.decision.expiresAt > Date.now(), 'DISCONNECTED_BEFORE_NATIVE');
@@ -147,7 +156,8 @@ export class EdgeKernel {
       this.clock.check(Date.now(), performance.now());
       receipt.nativeProcessId = this.native.pid; receipt.nativeInstanceId = this.native.instanceId;
       if (family === 'native.capabilities.read') {
-        const catalog = await this.native.capabilities(receipt.nativeRequestId!, beforeNativeEffect);
+        const catalog = await this.native.capabilities(receipt.nativeRequestId!, beforeNativeEffect, workspace.root);
+        if (catalog.permissions) catalog.permissions = catalog.permissions.map(item => ({ ...item, allowed: item.allowed && this.permissionAllowed(item.preset) }));
         this.capabilities = catalog; receipt.nativeCapabilities = catalog;
         receipt.status = 'SUCCEEDED'; receipt.code = 'NATIVE_CAPABILITIES_READY';
         this.journal.transaction(() => {
@@ -158,11 +168,12 @@ export class EdgeKernel {
         return receipt;
       }
       if (family === 'sessionLane.continue') {
-        const configuration = fleet.intent.body as { model: string; reasoningEffort: string };
-        const catalog = await this.native.capabilities(randomUUID(), beforeNativeEffect);
+        const configuration = fleet.intent.body as SessionRequest;
+        const catalog = await this.native.capabilities(randomUUID(), beforeNativeEffect, workspace.root);
+        if (catalog.permissions) catalog.permissions = catalog.permissions.map(item => ({ ...item, allowed: item.allowed && this.permissionAllowed(item.preset) }));
         this.capabilities = catalog; receipt.nativeCapabilities = catalog;
         const selected = catalog.models.find(model => model.id === configuration.model);
-        const staleCode = !selected ? 'STALE_MODEL_SELECTION' : !selected.supportedReasoningEfforts.some(choice => choice.reasoningEffort === configuration.reasoningEffort) ? 'STALE_REASONING_SELECTION' : null;
+        const staleCode = !selected ? 'STALE_MODEL_SELECTION' : !selected.supportedReasoningEfforts.some(choice => choice.reasoningEffort === configuration.reasoningEffort) ? 'STALE_REASONING_SELECTION' : !catalog.permissions?.some(item => item.preset === requestedPermission && item.allowed) ? 'STALE_PERMISSION_SELECTION' : null;
         if (staleCode) {
           receipt.status = 'REJECTED'; receipt.code = staleCode;
           lane!.state = 'EMPTY'; lane!.activeStep = null; lane!.creationStep = null;
@@ -172,10 +183,19 @@ export class EdgeKernel {
           });
           return receipt;
         }
+        // P2B transitions select permission for a new native session. Existing
+        // native sessions remain immutable; their previous permission is never
+        // silently overwritten by a new-session selector or native observation.
+        const transition = { hostId: workspace.target.hostId, hostGeneration: workspace.target.hostGeneration, workspaceTarget: workspace.target, root: lane!.root, sessionId: lane!.sessionId, laneId: plan.laneId, nativeThreadId: null, previousEffectivePermission: null, requestedPermission, requestedNativeSettings: permissionRequest(requestedPermission) };
+        this.journal.append('PERMISSION_TRANSITION_REQUESTED', command.edgeCommandId, transition);
         const result = await this.native.create(receipt.nativeRequestId!, lane!.root, configuration, beforeNativeEffect);
         requireThat(!lane!.threadId || lane!.threadId === result.threadId, 'NATIVE_THREAD_CONFLICT');
         lane!.threadId = result.threadId; lane!.state = 'IDLE'; lane!.activeStep = null;
-        receipt.nativeConfiguration = { requestedModel: configuration.model, requestedReasoningEffort: configuration.reasoningEffort, effectiveModel: result.model, effectiveReasoningEffort: result.reasoningEffort };
+        requireThat(result.permission?.preset === requestedPermission, 'NATIVE_PERMISSION_UNOBSERVED');
+        const expectedSandbox = requestedPermission === 'READ_ONLY' ? { type: 'readOnly', networkAccess: false } : requestedPermission === 'YOLO' ? { type: 'dangerFullAccess' } : { type: 'workspaceWrite', writableRoots: [], networkAccess: false, excludeTmpdirEnvVar: true, excludeSlashTmp: true };
+        requireThat(canonical(result.permission) === canonical(observePermission(requestedPermission, { approvalPolicy: 'never', sandbox: expectedSandbox })), 'NATIVE_PERMISSION_UNOBSERVED');
+        this.journal.append('PERMISSION_TRANSITION_OBSERVED', command.edgeCommandId, { ...transition, nativeThreadId: result.threadId, nativeInstanceId: this.native.instanceId, nativeProcessId: this.native.pid, observedEffectivePermission: result.permission });
+        receipt.nativeConfiguration = { requestedModel: configuration.model, requestedReasoningEffort: configuration.reasoningEffort, effectiveModel: result.model, effectiveReasoningEffort: result.reasoningEffort, requestedPermission, effectivePermission: result.permission };
         lane!.configuration = { ...configuration };
         this.journal.append('NATIVE_BINDING', command.edgeCommandId, { ...result, root: lane!.root, workspaceTarget: workspace.target, processId: this.native.pid, instanceId: this.native.instanceId });
       } else {
@@ -218,6 +238,20 @@ export class EdgeKernel {
     }
     if (signal.method === 'item/commandExecution/outputDelta') {
       this.observeCommandOutput(p); return;
+    }
+    if (signal.method === 'turn/diff/updated') {
+      const lane = Object.values(this.lanes).find(item => item.threadId === p.threadId);
+      requireThat(lane?.activeStep && lane.turnId === p.turnId && typeof p.diff === 'string' && p.diff.length <= 256000, 'NATIVE_FILE_LIFECYCLE_INVALID');
+      requireThat(lane.configuration?.permission === 'WORKSPACE_AUTO' || lane.configuration?.permission === 'YOLO', 'NATIVE_TOOL_SCOPE_VIOLATION');
+      return;
+    }
+    if (['item/fileChange/outputDelta', 'item/fileChange/patchUpdated'].includes(signal.method)) {
+      const item = this.fileLifecycles.get(p.itemId);
+      requireThat(item && !item.completed && item.threadId === p.threadId && item.turnId === p.turnId, 'NATIVE_FILE_LIFECYCLE_INVALID');
+      const lane = this.lanes[item.laneId]; requireThat(lane && lane.activeStep === item.edgeCommandId && lane.turnId === p.turnId, 'NATIVE_FILE_LIFECYCLE_INVALID');
+      if (signal.method === 'item/fileChange/outputDelta') requireThat(typeof p.delta === 'string' && p.delta.length <= 256000, 'NATIVE_FILE_LIFECYCLE_INVALID');
+      else item.changes = this.fileChanges(p.changes, lane);
+      return;
     }
     if (['item/reasoning/summaryTextDelta', 'item/reasoning/summaryPartAdded', 'item/reasoning/textDelta'].includes(signal.method)) {
       const item = this.reasoningItems.get(p.itemId);
@@ -271,11 +305,25 @@ export class EdgeKernel {
         return;
       }
       if (['userMessage', 'agentMessage'].includes(p.item?.type)) return;
+      if (p.item?.type === 'fileChange') {
+        requireThat(lane.configuration?.permission === 'WORKSPACE_AUTO' || lane.configuration?.permission === 'YOLO', 'NATIVE_TOOL_SCOPE_VIOLATION');
+        requireThat(lane.activeStep && lane.turnId === turnId && typeof p.item.id === 'string' && p.item.id.length > 0 && p.item.id.length <= 200, 'NATIVE_FILE_LIFECYCLE_INVALID');
+        const changes = this.fileChanges(p.item.changes, lane);
+        if (signal.method === 'item/started') {
+          requireThat(p.item.status === 'inProgress' && !this.fileLifecycles.has(p.item.id) && this.fileLifecycles.size < 4096, 'NATIVE_FILE_LIFECYCLE_INVALID');
+          this.fileLifecycles.set(p.item.id, { laneId, edgeCommandId: lane.activeStep, threadId: p.threadId, turnId, changes, completed: false });
+        } else {
+          const item = this.fileLifecycles.get(p.item.id);
+          requireThat(item && !item.completed && item.threadId === p.threadId && item.turnId === turnId && item.edgeCommandId === lane.activeStep && item.changes === changes && ['completed', 'failed', 'declined'].includes(p.item.status), 'NATIVE_FILE_LIFECYCLE_INVALID');
+          item.completed = true;
+        }
+        this.recordNativeEvent({ laneId, edgeCommandId: lane.activeStep, kind: 'tool', text: signal.method === 'item/started' ? 'Editing file' : `File change ${p.item.status}`, threadId: lane.threadId, turnId: lane.turnId, status: p.item.status }, lane); return;
+      }
       requireThat(p.item?.type === 'commandExecution', 'NATIVE_TOOL_SCOPE_VIOLATION');
       if (signal.method === 'item/started') {
         requireThat(lane.activeStep && lane.turnId === turnId, 'UNEXPECTED_NATIVE_TURN');
         const lifecycle = this.startCommandLifecycle(laneId, lane, p.item, turnId, p.startedAtMs);
-        this.recordNativeEvent({ laneId, edgeCommandId: lifecycle.edgeCommandId, kind: 'tool', text: this.commandActivity(p.item, lane.root), threadId: lifecycle.threadId, turnId: lifecycle.turnId, status: 'inProgress' }, lane);
+        this.recordNativeEvent({ laneId, edgeCommandId: lifecycle.edgeCommandId, kind: 'tool', text: this.commandActivity(p.item, lane.root, lane.configuration?.permission ?? 'READ_ONLY'), threadId: lifecycle.threadId, turnId: lifecycle.turnId, status: 'inProgress' }, lane);
         return;
       }
       const lifecycle = this.completeCommandLifecycle(lane, p.item, turnId, p.completedAtMs);
@@ -334,13 +382,30 @@ export class EdgeKernel {
     requireThat(lifecycle.laneId && lifecycle.signature === checked.signature, 'NATIVE_COMMAND_LIFECYCLE_INVALID');
     lifecycle.state = 'COMPLETED'; return lifecycle;
   }
-  private commandActivity(item: any, root: string): string {
+  private fileChanges(changes: any, lane: EdgeLane): string {
+    requireThat(lane.configuration?.permission === 'WORKSPACE_AUTO' || lane.configuration?.permission === 'YOLO', 'NATIVE_TOOL_SCOPE_VIOLATION');
+    requireThat(Array.isArray(changes) && changes.length <= 128, 'NATIVE_FILE_LIFECYCLE_INVALID');
+    const checked = changes.map(change => {
+      requireThat(change && typeof change.path === 'string' && change.path.length > 0 && change.path.length <= 16000 && typeof change.diff === 'string' && change.diff.length <= 256000 && ['add', 'delete', 'update'].includes(change.kind?.type), 'NATIVE_FILE_LIFECYCLE_INVALID');
+      requireThat(change.kind.move_path === undefined || change.kind.move_path === null || (change.kind.type === 'update' && typeof change.kind.move_path === 'string' && change.kind.move_path.length > 0 && change.kind.move_path.length <= 16000), 'NATIVE_FILE_LIFECYCLE_INVALID');
+      if (lane.configuration!.permission === 'WORKSPACE_AUTO') {
+        for (const file of [change.path, change.kind.move_path].filter(Boolean)) {
+          const relative = path.win32.relative(lane.root, path.win32.resolve(lane.root, file));
+          requireThat(relative !== '..' && !relative.startsWith('..\\') && !path.win32.isAbsolute(relative), 'NATIVE_WRITE_SCOPE_VIOLATION');
+        }
+      }
+      // Never persist or project source diffs as an editor surface.
+      return { path: change.path, kind: change.kind, diff: change.diff };
+    });
+    return canonical(checked);
+  }
+  private commandActivity(item: any, root: string, permission: PermissionPreset): string {
     const scope = (value: unknown) => typeof value === 'string' && value.toLowerCase().startsWith(root.toLowerCase()) ? (value.slice(root.length).replace(/^[\\/]+/, '') || '.') : 'workspace';
     const action = item.commandActions[0];
     if (action.type === 'read') return `Reading ${scope(action.path)}`;
     if (action.type === 'search') return `Searching ${scope(action.path)}`;
     if (action.type === 'listFiles') return `Inspecting ${scope(action.path)}`;
-    return 'Running read-only command';
+    return permission === 'READ_ONLY' ? 'Running read-only command' : 'Running command';
   }
   private commandCompletion(item: any): string {
     return item.status === 'completed' ? 'Command completed' : item.status === 'failed' ? 'Command failed' : 'Command declined';

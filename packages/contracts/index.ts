@@ -15,8 +15,11 @@ export type NativeReasoningOption = { reasoningEffort: string; description: stri
 export type NativeModelCapability = { id: string; displayName: string; isDefault: boolean; supportedReasoningEfforts: NativeReasoningOption[]; defaultReasoningEffort: string };
 // This is a projection of a qualified app-server `model/list` response. It is
 // never a FleetSplice-maintained model table.
-export type NativeCapabilityCatalog = { models: NativeModelCapability[] };
-export type NativeSessionConfiguration = { requestedModel: string; requestedReasoningEffort: string; effectiveModel: string; effectiveReasoningEffort: string };
+export type PermissionPreset = 'READ_ONLY' | 'WORKSPACE_AUTO' | 'YOLO';
+export type PermissionCapability = { preset: PermissionPreset; nativeProfileId: string; allowed: boolean };
+export type NativePermissionEvidence = { preset: PermissionPreset; approvalPolicy: 'never'; sandbox: 'readOnly' | 'workspaceWrite' | 'dangerFullAccess'; network: 'denied' | 'native-unrestricted'; writableRoots: string[]; excludeTmpdirEnvVar: boolean; excludeSlashTmp: boolean };
+export type NativeCapabilityCatalog = { models: NativeModelCapability[]; permissions?: PermissionCapability[] };
+export type NativeSessionConfiguration = { requestedModel: string; requestedReasoningEffort: string; effectiveModel: string; effectiveReasoningEffort: string; requestedPermission?: PermissionPreset; effectivePermission?: NativePermissionEvidence };
 export type Intent = {
   v: 1; actorId: string; clientInstanceId: string; grantId: string; grantRevision: string;
   target: Target; laneId: string | null; expected: Fence | null;
@@ -24,11 +27,11 @@ export type Intent = {
   { family: 'workspace.register'; body: { root: string } } |
   { family: 'logicalSession.create'; body: { title: string } } |
   { family: 'native.capabilities.read' | 'sessionLane.acquireControl' | 'sessionLane.releaseControl'; body: Record<string, never> } |
-  { family: 'sessionLane.continue'; body: { model: string; reasoningEffort: string } } |
+  { family: 'sessionLane.continue'; body: { model: string; reasoningEffort: string; permission?: PermissionPreset } } |
   { family: 'turn.submit'; body: { text: string } }
 );
 export type FleetCommand = { commandId: string; idempotencyKey: string; intentDigest: string; intent: Intent };
-export type Decision = { decisionId: string; actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; ceiling: 'windows-user.read-only' };
+export type Decision = { decisionId: string; actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; ceiling: 'windows-user.local-host-policy' };
 export type Plan = { v: 1; planId: string; commandId: string; intentDigest: string; target: Target; decision: Decision; sessionId: string | null; laneId: string | null; segmentId: string | null; before: Fence | null; after: Fence | null; steps: { edgeCommandId: string; operation: Intent['family']; dependsOn: string[] }[] };
 export type EdgeCommand = { v: 1; edgeCommandId: string; stepDigest: string; planDigest: string; plan: Plan; command: FleetCommand };
 export type Receipt = { edgeCommandId: string; status: 'SUCCEEDED' | 'REJECTED' | 'AMBIGUOUS_EFFECT' | 'DISPATCHED'; code: string; nativeThreadId: string | null; nativeTurnId: string | null; nativeRequestId: string | null; nativeProcessId: number | null; nativeInstanceId: string | null; nativeCapabilities: NativeCapabilityCatalog | null; nativeConfiguration: NativeSessionConfiguration | null };
@@ -41,7 +44,7 @@ export type Hcp = { v: 1; connectionId: string; target: Target } & (
   { kind: 'event'; event: NativeEvent } |
   { kind: 'closed'; reason: string }
 );
-export type Lane = { sessionId: string; laneId: string; segmentId: string; title: string; target: Target; root: string; fence: Fence; state: string; nativeThreadId: string | null; nativeTurnId: string | null; requestedModel: string | null; requestedReasoningEffort: string | null; effectiveModel: string | null; effectiveReasoningEffort: string | null; activity: { text: string; status: string }[]; transcript: { role: 'user' | 'assistant' | 'system'; text: string }[] };
+export type Lane = { sessionId: string; laneId: string; segmentId: string; title: string; target: Target; root: string; fence: Fence; state: string; nativeThreadId: string | null; nativeTurnId: string | null; requestedModel: string | null; requestedReasoningEffort: string | null; effectiveModel: string | null; effectiveReasoningEffort: string | null; requestedPermission?: PermissionPreset; effectivePermission?: NativePermissionEvidence; activity: { text: string; status: string }[]; transcript: { role: 'user' | 'assistant' | 'system'; text: string }[] };
 export type CommandRecord = { command: FleetCommand; plan: Plan; status: string; receipt: Receipt | null };
 export type Snapshot = { status: string; target: Target; root: string; registered: boolean; workspaces: (WorkspaceBinding & { registered: boolean })[]; capabilities: NativeCapabilityCatalog | null; lanes: Lane[]; commands: CommandRecord[]; cursor: string };
 
@@ -52,18 +55,21 @@ const str = (maxLength = 1024) => ({ type: 'string', maxLength });
 const nullable = (schema: object) => ({ anyOf: [schema, { type: 'null' }] });
 const arr = (items: object, maxItems = 64) => ({ type: 'array', items, maxItems });
 const obj = (properties: Record<string, object>) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
+const optional = (required: Record<string, object>, extra: Record<string, object>) => ({ ...obj(required), properties: { ...required, ...extra } });
 const literal = (value: string | number | boolean) => ({ const: value });
 const target = obj({ authorityId: uuid, hubRuntimeId: uuid, edgeRuntimeId: uuid, connectionId: uuid, hubRecoveryGeneration: rev, edgeRecoveryGeneration: rev, hostId: uuid, hostGeneration: rev, environmentId: uuid, environmentGeneration: rev, workspaceId: uuid, workspaceGeneration: rev, rootIdentity: hash, agentBindingId: uuid, executionBindingId: uuid, providerBindingId: uuid });
 const fence = obj({ epoch: rev, revision: rev, controller: nullable(uuid) });
 const reasoningOption = obj({ reasoningEffort: { type: 'string', minLength: 1, maxLength: 64 }, description: str(500) });
 const modelCapability = obj({ id: { type: 'string', minLength: 1, maxLength: 200 }, displayName: { type: 'string', minLength: 1, maxLength: 300 }, isDefault: { type: 'boolean' }, supportedReasoningEfforts: arr(reasoningOption, 32), defaultReasoningEffort: { type: 'string', minLength: 1, maxLength: 64 } });
-const capabilityCatalog = obj({ models: arr(modelCapability, 128) });
-const nativeConfiguration = obj({ requestedModel: { type: 'string', minLength: 1, maxLength: 200 }, requestedReasoningEffort: { type: 'string', minLength: 1, maxLength: 64 }, effectiveModel: { type: 'string', minLength: 1, maxLength: 200 }, effectiveReasoningEffort: { type: 'string', minLength: 1, maxLength: 64 } });
+const permission = { enum: ['READ_ONLY', 'WORKSPACE_AUTO', 'YOLO'] };
+const permissionEvidence = obj({ preset: permission, approvalPolicy: literal('never'), sandbox: { enum: ['readOnly', 'workspaceWrite', 'dangerFullAccess'] }, network: { enum: ['denied', 'native-unrestricted'] }, writableRoots: arr(str(), 16), excludeTmpdirEnvVar: { type: 'boolean' }, excludeSlashTmp: { type: 'boolean' } });
+const capabilityCatalog = optional({ models: arr(modelCapability, 128) }, { permissions: arr(obj({ preset: permission, nativeProfileId: str(200), allowed: { type: 'boolean' } }), 3) });
+const nativeConfiguration = optional({ requestedModel: { type: 'string', minLength: 1, maxLength: 200 }, requestedReasoningEffort: { type: 'string', minLength: 1, maxLength: 64 }, effectiveModel: { type: 'string', minLength: 1, maxLength: 200 }, effectiveReasoningEffort: { type: 'string', minLength: 1, maxLength: 64 } }, { requestedPermission: permission, effectivePermission: permissionEvidence });
 const families = ['workspace.register', 'logicalSession.create', 'native.capabilities.read', 'sessionLane.acquireControl', 'sessionLane.releaseControl', 'sessionLane.continue', 'turn.submit'] as const;
 const intentBase = { v: literal(1), actorId: uuid, clientInstanceId: uuid, grantId: uuid, grantRevision: rev, target, laneId: nullable(uuid), expected: nullable(fence) };
-const intent = { oneOf: families.map(family => obj({ ...intentBase, family: literal(family), body: family === 'workspace.register' ? obj({ root: str() }) : family === 'logicalSession.create' ? obj({ title: { type: 'string', minLength: 1, maxLength: 80 } }) : family === 'sessionLane.continue' ? obj({ model: { type: 'string', minLength: 1, maxLength: 200 }, reasoningEffort: { type: 'string', minLength: 1, maxLength: 64 } }) : family === 'turn.submit' ? obj({ text: { type: 'string', minLength: 1, maxLength: 16000 } }) : obj({}) })) };
+const intent = { oneOf: families.map(family => obj({ ...intentBase, family: literal(family), body: family === 'workspace.register' ? obj({ root: str() }) : family === 'logicalSession.create' ? obj({ title: { type: 'string', minLength: 1, maxLength: 80 } }) : family === 'sessionLane.continue' ? optional({ model: { type: 'string', minLength: 1, maxLength: 200 }, reasoningEffort: { type: 'string', minLength: 1, maxLength: 64 } }, { permission }) : family === 'turn.submit' ? obj({ text: { type: 'string', minLength: 1, maxLength: 16000 } }) : obj({}) })) };
 const command = obj({ commandId: uuid, idempotencyKey: uuid, intentDigest: hash, intent });
-const decision = obj({ decisionId: uuid, actorId: uuid, clientInstanceId: uuid, grantId: uuid, grantRevision: rev, expiresAt: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER }, ceiling: literal('windows-user.read-only') });
+const decision = obj({ decisionId: uuid, actorId: uuid, clientInstanceId: uuid, grantId: uuid, grantRevision: rev, expiresAt: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER }, ceiling: literal('windows-user.local-host-policy') });
 const plan = obj({ v: literal(1), planId: uuid, commandId: uuid, intentDigest: hash, target, decision, sessionId: nullable(uuid), laneId: nullable(uuid), segmentId: nullable(uuid), before: nullable(fence), after: nullable(fence), steps: arr(obj({ edgeCommandId: uuid, operation: { enum: families }, dependsOn: arr(uuid, 0) }), 1) });
 const edgeCommand = obj({ v: literal(1), edgeCommandId: uuid, stepDigest: hash, planDigest: hash, plan, command });
 const receipt = obj({ edgeCommandId: uuid, status: { enum: ['SUCCEEDED', 'REJECTED', 'AMBIGUOUS_EFFECT', 'DISPATCHED'] }, code: str(120), nativeThreadId: nullable(str(200)), nativeTurnId: nullable(str(200)), nativeRequestId: nullable(uuid), nativeProcessId: nullable({ type: 'integer', minimum: 1 }), nativeInstanceId: nullable(uuid), nativeCapabilities: nullable(capabilityCatalog), nativeConfiguration: nullable(nativeConfiguration) });

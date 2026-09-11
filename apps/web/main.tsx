@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { digest } from '../../packages/contracts/json.ts';
-import type { FleetCommand, Intent, Snapshot, CommandRecord } from '../../packages/contracts/index.ts';
+import type { FleetCommand, Intent, Snapshot, CommandRecord, PermissionPreset } from '../../packages/contracts/index.ts';
 import { stateText, systemText, translate, type MessageKey, type Locale } from './i18n.ts';
 import { browserStorage, persistPreference, readPreferences, resolveTheme, type Appearance } from './preferences.ts';
 import { PreferencesControl } from './PreferencesControl.tsx';
@@ -40,6 +40,7 @@ function App() {
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedReasoning, setSelectedReasoning] = useState('');
+  const [selectedPermission, setSelectedPermission] = useState<PermissionPreset>('READ_ONLY');
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState<string | null>(null);
   const sessionTitle = title ?? t('defaultTitle');
@@ -110,7 +111,8 @@ function App() {
   const available = snapshot?.status === 'READY' && !!client && client.expiresAt > Date.now() && !busy && !pending;
   const models = snapshot?.capabilities?.models ?? [];
   const chosenModel = models.find(item => item.id === selectedModel) ?? null;
-  const configurationSelected = !!chosenModel && chosenModel.supportedReasoningEfforts.some(item => item.reasoningEffort === selectedReasoning);
+  const permissions = snapshot?.capabilities?.permissions ?? [];
+  const configurationSelected = !!chosenModel && chosenModel.supportedReasoningEfforts.some(item => item.reasoningEffort === selectedReasoning) && permissions.some(item => item.preset === selectedPermission && item.allowed);
   const receipt = snapshot?.commands.at(-1);
   // Guidance only: successful acquire focuses the separate explicit action. It never invokes it.
   useEffect(() => {
@@ -196,12 +198,16 @@ function App() {
       <label className="capability-label" htmlFor="reasoning">{t('reasoning')}</label><select id="reasoning" aria-label={t('reasoning')} value={selectedReasoning} disabled={!chosenModel || !available} onChange={event => setSelectedReasoning(event.target.value)}>
         {!chosenModel && <option value="">{t('selectReasoning')}</option>}{chosenModel?.supportedReasoningEfforts.map(choice => <option key={choice.reasoningEffort} value={choice.reasoningEffort}>{choice.reasoningEffort}</option>)}
       </select>
+      <label className="capability-label" htmlFor="permission">{t('permission')}</label><select id="permission" aria-label={t('permission')} value={selectedPermission} disabled={!permissions.length || !available} onChange={event => setSelectedPermission(event.target.value as PermissionPreset)}>
+        {permissions.map(item => <option key={item.preset} value={item.preset} disabled={!item.allowed}>{t(item.preset)}{item.allowed ? '' : ` · ${t('permissionUnavailable')}`}</option>)}
+      </select><p className="muted">{t('permissionHint')}</p>
       <h3>{t('sessionControl')}</h3><p className="muted">{t(controlled ? 'controllerHint' : 'viewerHint')}</p>
       {available && lane && ['EMPTY', 'IDLE'].includes(lane.state) && (controlled || lane.fence.controller === null) && <p className="control-next" role="status">{t(!controlled ? 'nextAcquire' : !lane.nativeThreadId ? 'nextContinue' : 'nextPrompt')}</p>}
       <button disabled={!available || !lane || lane.fence.controller !== null} onClick={() => command('sessionLane.acquireControl')}>{t('acquireControl')}</button>
-      <button ref={continueButton} disabled={!available || !controlled || (!lane?.nativeThreadId && !configurationSelected) || !['EMPTY', 'IDLE'].includes(lane?.state ?? '')} onClick={() => command('sessionLane.continue', { model: lane?.nativeThreadId ? lane.requestedModel : selectedModel, reasoningEffort: lane?.nativeThreadId ? lane.requestedReasoningEffort : selectedReasoning })}>{t('continueSession')}</button>
+      <button ref={continueButton} disabled={!available || !controlled || (!lane?.nativeThreadId && !configurationSelected) || !['EMPTY', 'IDLE'].includes(lane?.state ?? '')} onClick={() => command('sessionLane.continue', { model: lane?.nativeThreadId ? lane.requestedModel : selectedModel, reasoningEffort: lane?.nativeThreadId ? lane.requestedReasoningEffort : selectedReasoning, permission: lane?.nativeThreadId ? lane.requestedPermission ?? 'READ_ONLY' : selectedPermission })}>{t('continueSession')}</button>
       <button disabled={!available || !controlled} onClick={() => command('sessionLane.releaseControl')}>{t('releaseControl')}</button>
       <h3>{t('execution')}</h3><dl><dt>{t('host')}</dt><dd>SKYFORGE-01</dd><dt>{t('environment')}</dt><dd>windows-user</dd><dt>{t('agent')}</dt><dd>{t('nativeAgent')}</dd><dt>{t('continuity')}</dt><dd>{lane?.nativeThreadId ? t(snapshot?.status === 'READY' ? 'sameNative' : 'nativeUnavailable') : t('nativeNotStarted')}</dd><dt>{t('controlRevision')}</dt><dd data-testid="control-fence">{lane ? `${lane.fence.epoch} / ${lane.fence.revision}` : '—'}</dd><dt>{t('requestedConfiguration')}</dt><dd>{lane?.requestedModel ? `${lane.requestedModel} / ${lane.requestedReasoningEffort}` : '—'}</dd><dt>{t('effectiveConfiguration')}</dt><dd>{lane?.effectiveModel ? `${lane.effectiveModel} / ${lane.effectiveReasoningEffort}` : '—'}</dd><dt>{t('nativeThread')}</dt><dd className="id" data-testid="native-thread">{lane?.nativeThreadId ?? '—'}</dd><dt>{t('nativeTurn')}</dt><dd className="id" data-testid="native-turn">{lane?.nativeTurnId ?? '—'}</dd></dl>
+      <dl><dt>{t('requestedPermission')}</dt><dd data-testid="requested-permission">{lane?.requestedPermission ? t(lane.requestedPermission) : '—'}</dd><dt>{t('effectivePermission')}</dt><dd data-testid="effective-permission">{lane?.effectivePermission ? `${t(lane.effectivePermission.preset)} · ${lane.effectivePermission.sandbox} · approval=${lane.effectivePermission.approvalPolicy} · network=${lane.effectivePermission.network}` : '—'}</dd></dl>
       <h3>{t('activity')}</h3><ul className="activity" aria-label={t('activity')}>{lane?.activity.length ? lane.activity.slice(-8).map((item, index) => <li key={`${item.text}-${index}`}>{item.text}</li>) : <li>{t('noActivity')}</li>}</ul>
       <dl><dt>{t('sessionWorkspace')}</dt><dd data-testid="session-workspace-root">{lane?.root ?? '—'}</dd><dt>{t('workspaceIdentity')}</dt><dd className="id" data-testid="session-workspace-identity">{lane?.target.rootIdentity ?? '—'}</dd></dl>
       <details><summary>{t('commandReceipt')}</summary><pre data-testid="receipt">{receipt ? JSON.stringify({ commandId: receipt.command.commandId, planId: receipt.plan.planId, status: receipt.status, receipt: receipt.receipt }, null, 2) : t('noCommands')}</pre></details>

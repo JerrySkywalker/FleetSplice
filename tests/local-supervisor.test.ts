@@ -99,7 +99,11 @@ test('detached supervisor keeps one local writer, serves a second terminal, and 
     }, 'proven closed guard');
     const postStop = spawnSync(process.execPath, [cli, 'status', '--workspace', workspace], { cwd: process.cwd(), env, encoding: 'utf8', windowsHide: true, timeout: 20000 });
     assert.equal(postStop.status, 0); assert.match(postStop.stdout, /FleetSplice: STOPPED/); assert.doesNotMatch(postStop.stdout, /RECOVERY_REQUIRED/);
-    assert.equal(existsSync(bootstrap), false); assert.notEqual(spawnSync('schtasks.exe', ['/Query', '/TN', taskName], { encoding: 'utf8', windowsHide: true }).status, 0, 'the one-shot broker task is removed after shutdown');
+    assert.equal(existsSync(bootstrap), false);
+    await eventually(() => {
+      assert.notEqual(spawnSync('schtasks.exe', ['/Query', '/TN', taskName], { encoding: 'utf8', windowsHide: true }).status, 0, 'the one-shot broker task is removed after shutdown');
+      return true;
+    }, 'one-shot broker task removal after shutdown');
   } finally {
     if (detail) { try { await control(detail, 'stop'); } catch { /* The normal assertion path has already stopped it. */ } }
   }

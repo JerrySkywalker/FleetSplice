@@ -3,11 +3,13 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { digest, type FleetCommand, type Intent, type EdgeCommand, type Target, type WorkspaceBinding } from '../packages/contracts/index.ts';
+import { digest, type FleetCommand, type Intent, type EdgeCommand, type Target, type WorkspaceBinding, type PermissionPreset, type NativeCapabilityCatalog } from '../packages/contracts/index.ts';
 import { Journal } from '../packages/journal/index.ts';
 import { HubKernel, type ClientGrant } from '../apps/hub/kernel.ts';
 import { EdgeKernel } from '../apps/edge/kernel.ts';
 import type { NativePort } from '../packages/driver-codex/index.ts';
+import type { SessionRequest } from '../packages/driver-codex/index.ts';
+import { observePermission } from '../packages/driver-codex/permissions.ts';
 
 export const target = (): Target => ({ authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: randomUUID(), hostGeneration: '1', environmentId: randomUUID(), environmentGeneration: '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: 'a'.repeat(64), agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() });
 export const grant = (): ClientGrant => ({ actorId: randomUUID(), clientInstanceId: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt: Date.now() + 20 * 60_000 });
@@ -15,7 +17,7 @@ export const grant = (): ClientGrant => ({ actorId: randomUUID(), clientInstance
 export class FixtureNative implements NativePort {
   instanceId = randomUUID(); pid = 123; signals = new EventEmitter();
   creates = 0; turns = 0; starts = 0; capabilityReads = 0; threadId = randomUUID(); turnId = '';
-  catalog = { models: [{ id: 'fixture-model', displayName: 'Fixture model', isDefault: true, supportedReasoningEfforts: [{ reasoningEffort: 'fixture-reasoning', description: 'Fixture reasoning' }, { reasoningEffort: 'fixture-deep', description: 'Fixture deep reasoning' }], defaultReasoningEffort: 'fixture-reasoning' }] };
+  catalog: NativeCapabilityCatalog = { models: [{ id: 'fixture-model', displayName: 'Fixture model', isDefault: true, supportedReasoningEfforts: [{ reasoningEffort: 'fixture-reasoning', description: 'Fixture reasoning' }, { reasoningEffort: 'fixture-deep', description: 'Fixture deep reasoning' }], defaultReasoningEffort: 'fixture-reasoning' }], permissions: [{ preset: 'READ_ONLY', nativeProfileId: ':read-only', allowed: true }] };
   lastConfiguration: { model: string; reasoningEffort: string } | null = null;
   failure: 'before' | 'after' | null = null;
   responseFirst = false;
@@ -23,14 +25,16 @@ export class FixtureNative implements NativePort {
   qualify: () => Promise<void> = async () => {};
   async start(beforeEffect: () => void) { beforeEffect(); this.beforeWrite(); this.starts++; }
   async capabilities(_requestId: string, beforeEffect: () => void) { beforeEffect(); this.capabilityReads++; return structuredClone(this.catalog); }
-  async create(_requestId: string, _root: string, configuration: { model: string; reasoningEffort: string }, beforeEffect: () => void) {
+  async create(_requestId: string, _root: string, configuration: SessionRequest, beforeEffect: () => void) {
     await this.qualify(); beforeEffect();
     this.beforeWrite(); this.creates++; this.lastConfiguration = structuredClone(configuration);
     if (this.failure === 'before') throw new Error('response lost before known start');
     const notify = () => this.signals.emit('signal', { method: 'thread/started', params: { thread: { id: this.threadId } } });
     if (this.responseFirst) setImmediate(notify); else notify();
     if (this.failure === 'after') throw new Error('response lost after known start');
-    return { threadId: this.threadId, model: configuration.model, provider: 'fixture', reasoningEffort: configuration.reasoningEffort };
+    const preset = configuration.permission ?? 'READ_ONLY';
+    const sandbox = preset === 'READ_ONLY' ? { type: 'readOnly', networkAccess: false } : preset === 'YOLO' ? { type: 'dangerFullAccess' } : { type: 'workspaceWrite', networkAccess: false, writableRoots: [], excludeTmpdirEnvVar: true, excludeSlashTmp: true };
+    return { threadId: this.threadId, model: configuration.model, provider: 'fixture', reasoningEffort: configuration.reasoningEffort, permission: observePermission(preset, { approvalPolicy: 'never', sandbox }) };
   }
   async turn(_requestId: string, _threadId: string, _root: string, _text: string, beforeEffect: () => void) {
     await this.qualify(); beforeEffect();
@@ -43,7 +47,7 @@ export class FixtureNative implements NativePort {
   complete() { this.signals.emit('signal', { method: 'turn/completed', params: { threadId: this.threadId, turn: { id: this.turnId, status: 'completed' } } }); }
   async close() { return true; }
 }
-export function rig(workspaceFactory?: (target: Target) => WorkspaceBinding[], workspaceCheck: (workspace: WorkspaceBinding) => void = () => {}) {
+export function rig(workspaceFactory?: (target: Target) => WorkspaceBinding[], workspaceCheck: (workspace: WorkspaceBinding) => void = () => {}, permissionAllowed: (preset: PermissionPreset) => boolean = preset => preset === 'READ_ONLY') {
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-g05-test-'));
   const hubJournal = new Journal(path.join(directory, 'hub.sqlite')); const edgeJournal = new Journal(path.join(directory, 'edge.sqlite'));
   edgeJournal.set('root', 'V:\\disposable-fixture');
@@ -53,7 +57,7 @@ export function rig(workspaceFactory?: (target: Target) => WorkspaceBinding[], w
   let loseReceipt = false;
   let beforeReceipt: (command: EdgeCommand) => void = () => {};
   const delivered: EdgeCommand[] = [];
-  const edge = new EdgeKernel(edgeJournal, identity, native, () => verify(), event => hub.event(event), async () => {}, workspaces, async workspace => workspaceCheck(workspace), workspaceCheck);
+  const edge = new EdgeKernel(edgeJournal, identity, native, () => verify(), event => hub.event(event), async () => {}, workspaces, async workspace => workspaceCheck(workspace), workspaceCheck, permissionAllowed);
   edge.connected = true;
   const hub = new HubKernel(hubJournal, identity, 'V:\\disposable-fixture', async command => { delivered.push(command); const result = await edge.execute(command); beforeReceipt(command); if (loseReceipt) throw new Error('receipt lost'); return result; }, () => {}, workspaces);
   hub.ready(false);

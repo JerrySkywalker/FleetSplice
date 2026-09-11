@@ -3,15 +3,19 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { Fault, requireThat, type NativeCapabilityCatalog, type NativeSessionConfiguration } from '../contracts/index.ts';
-import { integrationPolicy, NATIVE_POLICY_ARGS, NATIVE_POLICY_ENV } from './policy.ts';
+import { assertPolicyUnchanged, integrationPolicy, NATIVE_POLICY_ARGS, NATIVE_POLICY_ENV } from './policy.ts';
+import type { NativePermissionEvidence, PermissionPreset } from '../contracts/index.ts';
+import { observePermission, permissionCapabilities, permissionRequest, turnPermission } from './permissions.ts';
+export type SessionRequest = { model: string; reasoningEffort: string; permission?: PermissionPreset };
+export type SessionResult = { threadId: string; model: string; provider: string; reasoningEffort: string; permission: NativePermissionEvidence };
 
 export const CODEX_SHA256 = '444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b';
 export type NativeSignal = { method: string; params: Record<string, any>; requestId?: string | number };
 export interface NativePort {
   instanceId: string; pid: number | null; signals: EventEmitter;
   start(beforeEffect: () => void): Promise<void>;
-  capabilities(requestId: string, beforeEffect: () => void): Promise<NativeCapabilityCatalog>;
-  create(requestId: string, root: string, configuration: { model: string; reasoningEffort: string }, beforeEffect: () => void): Promise<{ threadId: string; model: string; provider: string; reasoningEffort: string }>;
+  capabilities(requestId: string, beforeEffect: () => void, root?: string): Promise<NativeCapabilityCatalog>;
+  create(requestId: string, root: string, configuration: SessionRequest, beforeEffect: () => void): Promise<SessionResult>;
   turn(requestId: string, threadId: string, root: string, text: string, beforeEffect: () => void): Promise<string>;
   close(): Promise<boolean>;
 }
@@ -64,6 +68,7 @@ export class CodexDriver implements NativePort {
   private policy: ReturnType<typeof integrationPolicy> | null = null;
   private workspacePolicies = new Map<string, ReturnType<typeof integrationPolicy>>();
   private threadRoots = new Map<string, string>();
+  private threadPermissions = new Map<string, NativePermissionEvidence>();
   constructor(private executable: string, private root: string) {}
   async start(beforeEffect: () => void): Promise<void> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
@@ -93,9 +98,9 @@ export class CodexDriver implements NativePort {
     this.policy = await this.readPolicy();
   }
   private async readPolicy(root = this.root): Promise<ReturnType<typeof integrationPolicy>> {
-    const policy = integrationPolicy(await this.rpc(randomUUID(), 'config/read', { cwd: root, includeLayers: false }));
+    const policy = integrationPolicy(await this.rpc(randomUUID(), 'config/read', { cwd: root, includeLayers: false }), root);
     const previous = root === this.root ? this.policy : this.workspacePolicies.get(root);
-    requireThat(!previous || policy.stamp === previous.stamp, 'NATIVE_CONFIG_CHANGED');
+    assertPolicyUnchanged(previous, policy);
     this.workspacePolicies.set(root, policy);
     return policy;
   }
@@ -129,35 +134,58 @@ export class CodexDriver implements NativePort {
       try { beforeEffect?.(); this.write({ id, method, params }); } catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }
     });
   }
-  async capabilities(requestId: string, beforeEffect: () => void): Promise<NativeCapabilityCatalog> {
+  private async permissions(root: string, beforeEffect: () => void) {
+    const data: any[] = []; const seen = new Set<string>(); let cursor: string | undefined;
+    for (let page = 0; page < 128; page++) {
+      const result = await this.rpc(randomUUID(), 'permissionProfile/list', { cwd: root, ...(cursor ? { cursor } : {}) }, beforeEffect);
+      requireThat(Array.isArray(result?.data) && data.length + result.data.length <= 128, 'NATIVE_PERMISSION_CAPABILITIES_INVALID');
+      data.push(...result.data);
+      if (result.nextCursor === null || result.nextCursor === undefined) return permissionCapabilities(data);
+      requireThat(typeof result.nextCursor === 'string' && result.nextCursor.length > 0 && result.nextCursor.length <= 4096 && !seen.has(result.nextCursor), 'NATIVE_PERMISSION_CAPABILITIES_INVALID');
+      seen.add(result.nextCursor); cursor = result.nextCursor;
+    }
+    throw new Fault('NATIVE_PERMISSION_CAPABILITIES_INVALID');
+  }
+  async capabilities(requestId: string, beforeEffect: () => void, root = this.root): Promise<NativeCapabilityCatalog> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
-    await this.readPolicy();
+    await this.readPolicy(root);
     let first = true;
-    return completeCapabilityCatalog(async cursor => {
+    const catalog = await completeCapabilityCatalog(async cursor => {
       const id = first ? requestId : randomUUID(); first = false;
       return this.rpc(id, 'model/list', cursor ? { cursor } : {}, beforeEffect);
     });
+    return { ...catalog, permissions: await this.permissions(root, beforeEffect) };
   }
-  async create(requestId: string, root: string, configuration: { model: string; reasoningEffort: string }, beforeEffect: () => void): Promise<{ threadId: string; model: string; provider: string; reasoningEffort: string }> {
+  async create(requestId: string, root: string, configuration: SessionRequest, beforeEffect: () => void): Promise<SessionResult> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
     requireThat(typeof configuration?.model === 'string' && configuration.model.length > 0 && configuration.model.length <= 200 && typeof configuration.reasoningEffort === 'string' && configuration.reasoningEffort.length > 0 && configuration.reasoningEffort.length <= 64, 'NATIVE_CONFIGURATION_INVALID');
     const policy = await this.readPolicy(root);
+    const preset = configuration.permission ?? 'READ_ONLY';
+    requireThat(preset === 'READ_ONLY' || policy.activeTrust === 'trusted', 'NATIVE_WORKSPACE_TRUST_REQUIRED');
+    requireThat((await this.permissions(root, beforeEffect)).some(item => item.preset === preset && item.allowed), 'STALE_PERMISSION_SELECTION');
+    const permission = permissionRequest(preset);
     // The installed app-server schema exposes `thread/start.model` and the
     // typed config key `model_reasoning_effort`; the response supplies the
     // observed model/reasoning pair used below as effective evidence.
-    const result = await this.rpc(requestId, 'thread/start', { cwd: root, model: configuration.model, config: { ...policy.overrides, model_reasoning_effort: configuration.reasoningEffort }, ephemeral: true, approvalPolicy: 'never', sandbox: 'read-only', serviceName: 'fleetsplice-g05c-p1', developerInstructions: 'This FleetSplice G05C-P1 session may inspect this explicit workspace using native read-only tools. Do not modify files, run write-capable commands, change configuration, browse the network, request approval, or use any path outside the read-only sandbox.' }, beforeEffect);
-    requireThat(result.approvalPolicy === 'never' && result.sandbox?.type === 'readOnly' && result.sandbox.networkAccess === false && result.thread?.ephemeral === true && result.cwd?.toLowerCase() === root.toLowerCase(), 'NATIVE_POLICY_UNQUALIFIED');
+    const result = await this.rpc(requestId, 'thread/start', { cwd: root, model: configuration.model, config: { ...policy.overrides, ...permission.config, model_reasoning_effort: configuration.reasoningEffort }, ephemeral: true, approvalPolicy: permission.approvalPolicy, approvalsReviewer: 'user', sandbox: permission.sandbox, serviceName: 'fleetsplice-g05c-p2b', developerInstructions: preset === 'READ_ONLY' ? 'Inspect the explicit workspace using native read-only tools. Do not modify files, run write-capable commands, change configuration, browse the network, request approval, or use paths outside the native read-only sandbox.' : 'Use native coding tools only for the explicit Owner task. Do not access secrets, change system security or services, use network, or modify unrelated files. No subagents, remote transport or external integrations. This instruction limits task intent; actual effective sandbox authority is shown separately.' }, beforeEffect);
+    requireThat(result.thread?.ephemeral === true && result.cwd?.toLowerCase() === root.toLowerCase(), 'NATIVE_POLICY_UNQUALIFIED');
+    const observedPermission = observePermission(preset, result);
+    requireThat(result.approvalsReviewer === 'user', 'NATIVE_PERMISSION_UNOBSERVED');
+    await this.readPolicy(root);
     requireThat(typeof result.thread.id === 'string' && result.thread.id.length < 200, 'NATIVE_ID_UNKNOWN');
     requireThat(result.model === configuration.model && result.reasoningEffort === configuration.reasoningEffort && typeof result.modelProvider === 'string' && result.modelProvider.length > 0, 'NATIVE_CONFIGURATION_UNOBSERVED');
     requireThat(!this.threadRoots.has(result.thread.id), 'NATIVE_THREAD_CONFLICT');
     this.threadRoots.set(result.thread.id, root);
-    return { threadId: result.thread.id, model: result.model, provider: result.modelProvider, reasoningEffort: result.reasoningEffort };
+    this.threadPermissions.set(result.thread.id, observedPermission);
+    return { threadId: result.thread.id, model: result.model, provider: result.modelProvider, reasoningEffort: result.reasoningEffort, permission: observedPermission };
   }
   async turn(requestId: string, threadId: string, root: string, text: string, beforeEffect: () => void): Promise<string> {
     requireThat(typeof beforeEffect === 'function', 'NATIVE_EFFECT_GATE_REQUIRED');
     requireThat(this.threadRoots.get(threadId) === root, 'NATIVE_ROOT_CHANGED');
     await this.readPolicy(root);
-    const result = await this.rpc(requestId, 'turn/start', { threadId, cwd: root, input: [{ type: 'text', text }], approvalPolicy: 'never', sandboxPolicy: { type: 'readOnly', networkAccess: false } }, beforeEffect);
+    const permission = this.threadPermissions.get(threadId); requireThat(permission, 'NATIVE_PERMISSION_UNOBSERVED');
+    requireThat((await this.permissions(root, beforeEffect)).some(item => item.preset === permission.preset && item.allowed), 'STALE_PERMISSION_SELECTION');
+    const result = await this.rpc(requestId, 'turn/start', { threadId, cwd: root, input: [{ type: 'text', text }], approvalPolicy: permission.approvalPolicy, sandboxPolicy: turnPermission(permission) }, beforeEffect);
     requireThat(typeof result.turn?.id === 'string' && result.turn.id.length < 200, 'NATIVE_ID_UNKNOWN');
     return result.turn.id;
   }

@@ -50,6 +50,26 @@ function unprovableEffectFixture(runId = G05C_P1_OWNER_RETIREMENT_RUN) {
 const absent = () => ({ exists: false });
 const noConflicts: any[] = [];
 
+test('stale permission rejection closes safely but malformed and ambiguous results remain unresolved', () => {
+  for (const variant of ['safe', 'wrong-status', 'thread', 'ambiguous'] as const) {
+    const state = fixture(); const edge = new DatabaseSync(path.join(state.directory, 'edge.sqlite'));
+    const instanceId = randomUUID(), commandId = randomUUID();
+    const append = (kind: string, key: string, value: unknown) => edge.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run(kind, key, JSON.stringify(value));
+    append('DISPATCH_ATTEMPT', commandId, { attempted: true });
+    append('NATIVE_PROCESS_IDENTITY', instanceId, { processId: 901, creationTime: '2026-09-08T15:07:19.8913688Z', sid: 'S-fixture' });
+    const receipt = { code: 'STALE_PERMISSION_SELECTION', status: variant === 'wrong-status' ? 'SUCCEEDED' : 'REJECTED', nativeThreadId: variant === 'thread' ? randomUUID() : null, nativeTurnId: null, nativeProcessId: 901, nativeInstanceId: instanceId };
+    append('NATIVE_RESULT', commandId, receipt);
+    if (variant === 'ambiguous') append('AMBIGUOUS_EFFECT', commandId, { ...receipt, code: 'NATIVE_EFFECT_UNKNOWN', status: 'AMBIGUOUS_EFFECT' });
+    edge.close();
+    const classified = classifyPredecessor(state.base, absent, noConflicts);
+    if (variant === 'safe') {
+      assert.equal(classified.kind, 'SAFE_TERMINAL'); assert.equal(classified.exactNativeExitProven, true);
+      closeSafePredecessor(state.base, absent, noConflicts);
+      assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'SAFE_TERMINAL');
+    } else assert.notEqual(classified.kind, 'SAFE_TERMINAL');
+  }
+});
+
 test('exact Node and native Codex discovery retain the accepted pins', () => {
   const node = discoverNode([process.execPath]); assert.equal(node.version, 'v24.20.0'); assert.equal(node.sqlite, '3.53.4');
   const codex = discoverCodex(candidateCodexPaths()); assert.match(codex.path, /codex\.exe$/i); assert.equal(codex.version, '0.153.4'); assert.equal(codex.sha256.length, 64);
@@ -221,6 +241,17 @@ test('the separately Owner-authorized protocol-repair run is an exact additional
   const guard = JSON.parse(readFileSync(path.join(state.base, 'environment-guard.json'), 'utf8'));
   assert.equal(guard.state, 'RETIRED_UNPROVABLE'); assert.equal(guard.retiredBy, 'FLEETSPLICE-G05C-P1-PROTOCOL-CONFORMANCE-REPAIR-004');
   assert.equal(JSON.parse(readFileSync(retired.receipt, 'utf8')).runId, G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN);
+});
+test('night-train retirement authorizes only its exact run and preserves UNKNOWN under unchanged predicates', () => {
+  const runId = '5d35b881-f3cd-4c8d-8f8f-07d8adca4fc2';
+  const state = unprovableEffectFixture(runId);
+  assert.throws(() => retireOwnerAuthorizedUnprovable(state.base, randomUUID(), absent, noConflicts), /NOT_AUTHORIZED/);
+  const retired = retireOwnerAuthorizedUnprovable(state.base, runId, absent, noConflicts);
+  const guard = JSON.parse(readFileSync(path.join(state.base, 'environment-guard.json'), 'utf8'));
+  const receipt = JSON.parse(readFileSync(retired.receipt, 'utf8'));
+  assert.equal(guard.retiredBy, 'FLEETSPLICE-G05C-NIGHT-TRAIN-20260909-001');
+  assert.equal(receipt.oldEffectOutcome, 'UNKNOWN'); assert.equal(receipt.oldCommandReplayed, false);
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'RETIRED_UNPROVABLE');
 });
 test('unprovable retirement rejects missing acknowledgement, wrong identity, live evidence, conflicts, damaged journals, and generic corruption', () => {
   const cli = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'fleetsplice.js');

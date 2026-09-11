@@ -15,7 +15,11 @@ export const G05C_P1_OWNER_RETIREMENT_RUN = '2566cd5b-affe-464e-ab86-d426215d0a3
 // Each entry is an independently Owner-authorized, exact stale run. This is
 // deliberately not a general corruption-retirement capability.
 export const G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN = '66f9b6fc-0675-4346-836d-63720859dea0';
-export const G05C_P1_OWNER_RETIREMENT_RUNS = [G05C_P1_OWNER_RETIREMENT_RUN, G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN] as const;
+// Owner authorization: FLEETSPLICE-G05C-NIGHT-TRAIN-20260909-001, retirement 1
+// of at most 2. Only this train-created exact run is added; all integrity,
+// effect-unbound, exact-exit and zero-conflict admission predicates stay intact.
+export const G05C_NIGHT_TRAIN_RETIREMENT_RUN = '5d35b881-f3cd-4c8d-8f8f-07d8adca4fc2';
+export const G05C_P1_OWNER_RETIREMENT_RUNS = [G05C_P1_OWNER_RETIREMENT_RUN, G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN, G05C_NIGHT_TRAIN_RETIREMENT_RUN] as const;
 export type ProcessIdentity = { processId: number; creationTime: string; sid?: string; principal?: string; sessionId?: number; elevated?: boolean };
 export type ProcessProbe = { exists: boolean; identity?: ProcessIdentity; name?: string; commandLine?: string };
 export type Guard = { state: string; runId: string; target: Target; identity: { root: string; rootIdentity: string; sid: string; principal: string; sessionId: number; elevated: false }; nativeExitObserved: boolean; quiescent: boolean; [key: string]: unknown };
@@ -319,6 +323,7 @@ export function evidenceFromEdge(file: string): NativeEvidence {
       // before `thread/start`. It is a journaled native interaction but cannot
       // create a coding thread, so it has its own terminal evidence shape.
       if (['NATIVE_CAPABILITIES_READY', 'STALE_MODEL_SELECTION', 'STALE_REASONING_SELECTION'].includes(value?.code)) { effect.terminal = true; continue; }
+      if (value?.code === 'STALE_PERMISSION_SELECTION' && value.status === 'REJECTED' && value.nativeThreadId === null && value.nativeTurnId === null && !effect.threadId && !effect.bindingThreadId) { effect.terminal = true; continue; }
       if (typeof value?.nativeThreadId !== 'string' || (effect.bindingThreadId && effect.bindingThreadId !== value.nativeThreadId) || (effect.threadId && effect.threadId !== value.nativeThreadId)) { summary.unboundEvidence = true; continue; }
       effect.threadId = value.nativeThreadId; displayThread(value.nativeThreadId);
       if (value?.code === 'NATIVE_SESSION_READY') {
@@ -523,7 +528,7 @@ export function retireOwnerAuthorizedUnprovable(base = runtimeRoot(), runId = G0
   const receipt = path.join(archive, 'retirement-receipt.json');
   const value = { kind: 'G05C_P1_OWNER_AUTHORIZED_UNPROVABLE_RETIREMENT', runId, retiredAt: new Date().toISOString(), oldState: predecessor.guard!.state, oldClassification: predecessor.kind, oldReason: predecessor.reason, oldTarget: predecessor.guard!.target, native: predecessor.evidence, exactNativeExitProven: true, oldEffectOutcome: 'UNKNOWN', oldCommandReplayed: false, oldAuthorityRuntimeRetired: true, freshIncarnationRequired: true, evidence, archive };
   durable(receipt, value, true); chmodSync(receipt, 0o400);
-  const retiredBy = runId === G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN ? 'FLEETSPLICE-G05C-P1-PROTOCOL-CONFORMANCE-REPAIR-004' : 'FLEETSPLICE-G05C-P1-RUNTIME-CUSTODY-RECOVERY-002';
+  const retiredBy = runId === G05C_NIGHT_TRAIN_RETIREMENT_RUN ? 'FLEETSPLICE-G05C-NIGHT-TRAIN-20260909-001' : runId === G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN ? 'FLEETSPLICE-G05C-P1-PROTOCOL-CONFORMANCE-REPAIR-004' : 'FLEETSPLICE-G05C-P1-RUNTIME-CUSTODY-RECOVERY-002';
   durable(guardPath(base), { ...predecessor.guard, state: 'RETIRED_UNPROVABLE', nativeExitObserved: true, quiescent: false, oldEffectOutcome: 'UNKNOWN', oldCommandReplayed: false, retirementReceipt: receipt, retiredAt: value.retiredAt, retiredBy, oldAuthorityRuntimeRetired: true, freshIncarnationRequired: true });
   return { receipt, predecessor };
 }

@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat } from '../packages/contracts/index.ts';
 import { readRegistry, changeRegistry, workspaceValidity } from '../packages/workspaces/index.ts';
+import { readCeiling, writeCeiling, PRESETS } from '../packages/permissions/index.ts';
+import type { PermissionPreset } from '../packages/contracts/index.ts';
 import { candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, G05C_P1_OWNER_RETIREMENT_RUNS, guardPath, networkPreflight, proxyConfigurationRequired, readUserProxyConfiguration, resolveExplicitProxy, resolveProxy, retireOwnerAuthorizedUnknown, retireOwnerAuthorizedUnprovable, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration, type Guard, type Predecessor, type UserProxyConfiguration } from '../packages/local-operation/index.ts';
 
 const base = () => path.join(process.env.LOCALAPPDATA ?? '', 'FleetSplice', 'G05');
@@ -62,6 +64,7 @@ function describeProxyConfiguration(configuration: UserProxyConfiguration): stri
 }
 async function preflight(root: string) {
   const workspaceIdentity = await localIdentity(root);
+  readCeiling({ principal: workspaceIdentity.principal, sid: workspaceIdentity.sid });
   const registry = readRegistry({ principal: workspaceIdentity.principal, sid: workspaceIdentity.sid });
   if (registry) requireThat(registry.entries.some(e => e.root === workspaceIdentity.root && e.rootIdentity === workspaceIdentity.rootIdentity), 'WORKSPACE_MISSING_OR_REPLACED');
   const identity = await localIdentity(root);
@@ -190,6 +193,12 @@ async function configure(args: string[]) {
 }
 export async function fleetspliceEntrypoint() {
   const args = process.argv.slice(2); const command = args[0]; const workspaceIndex = args.indexOf('--workspace'); const workspace = workspaceIndex >= 0 ? args[workspaceIndex + 1] ?? process.cwd() : process.cwd();
+  if (command === 'permission') {
+    const identity = await localIdentity(process.cwd()); const host = { principal: identity.principal, sid: identity.sid };
+    if (args[1] === 'show' && args.length === 2) { output(code({ maximum: readCeiling(host), authority: 'LOCAL_HOST' })); return; }
+    requireThat(args[1] === 'ceiling' && args.length === 3 && PRESETS.includes(args[2] as PermissionPreset), 'USAGE_PERMISSION_SHOW_OR_CEILING_PRESET');
+    writeCeiling(host, args[2] as PermissionPreset); output(code({ maximum: readCeiling(host), authority: 'LOCAL_HOST' })); return;
+  }
   if (command === 'workspace') {
     const identity = await localIdentity(process.cwd()); const host = { principal: identity.principal, sid: identity.sid };
     if (args[1] === 'list' && args.length === 2) {

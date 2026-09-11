@@ -3,6 +3,18 @@
 This file is the current train-status pointer. Historical goal receipts and
 accepted status files remain evidence and are not rewritten by this summary.
 
+The later Owner decision `FLEETSPLICE-G05C-P2B-PATH-A-RESUME-003` selects
+session-scoped permissions and treats native project trust as a separate
+prerequisite. P2B raw proof and real product stages passed in the already-trusted
+disposable fixture with byte-identical persistent config and unchanged source
+during dogfood. READ_ONLY, Workspace Auto file/test work and bounded YOLO outside
+the Workspace were observed; stop was CLOSED/SAFE_TERMINAL with native exit and
+Host ceiling restored to READ_ONLY. The exact candidate's fresh independent
+review and final Git identity are recorded in the external Goal receipt under
+`V:\artifacts\FleetSplice\FLEETSPLICE-G05C-P2B-PATH-A-RESUME-003`.
+P3 and G06 remain unstarted and unauthorized. The older chronological entries
+below retain their historical review/stop state and do not override this update.
+
 ```text
 ARCHITECTURE_0_1_READY=true
 LAST_ACCEPTED_TRAIN_HEAD=dabde5d60f211c4a16075443901ab3465ee16b2c
@@ -22,13 +34,17 @@ G05C_P1_STATUS=PASS_G05C_P1_LIVE_CAPABILITY_READONLY_CODING
 G05C_P1_ACCEPTED_HEAD=be95b9f7796f432ba339bce6d8ddcbcfabb6f909
 G05C_P1_ACCEPTED_TREE=430b02cb6ae4dac7ad2b27c2f55d638f11309642
 G05C_P2_STARTED=true
-G05C_P2A_STATUS=LIVE_ACCEPTANCE_PASSED_PENDING_INDEPENDENT_REVIEW
-G05C_P2B_STARTED=false
+G05C_P2A_STATUS=PASS_G05C_P2A_WORKSPACE_TARGETING
+G05C_P2A_ACCEPTED_HEAD=1a1ab9b7ffd5e768d26a9bf95d7ed0f9378d1f70
+G05C_P2A_ACCEPTED_TREE=6754673e5358d26ee96422112c2ac7822b2c6f0b
+G05C_P2B_STARTED=true
+G05C_P2B_STATUS=PATH_A_PROOF_COMPLETE_REVIEW_RECEIPT_EXTERNAL
+G05C_ACCEPTED=false
 G05C_P3_STARTED=false
 G06_STARTED=false
-IMPLEMENTATION_AUTHORIZED=G05C_LOCAL_CONTROL_PARITY_ONLY_SERIAL_STATIONS
-PRODUCT_IMPLEMENTATION_AUTHORIZED=G05C_LOCAL_CONTROL_PARITY_ONLY_SERIAL_STATIONS
-CURRENT_CHANGE_CLASS=G05C_P2A_WORKSPACE_TARGETING
+IMPLEMENTATION_AUTHORIZED=G05C_P2B_ONLY
+PRODUCT_IMPLEMENTATION_AUTHORIZED=G05C_P2B_ONLY
+CURRENT_CHANGE_CLASS=G05C_P2B_PATH_A_CANDIDATE
 NEXT_PLANNED_GOAL=G05C_NATIVE_AGENT_CONTROL_PARITY
 ```
 
@@ -99,3 +115,42 @@ selection after removal even when another root is added, and rejects canonical
 roots longer than 1,024 characters before publication. Regression tests cover
 both empty and nonempty registries after removal, and prove byte preservation
 after a real overlong-root rejection. Fresh exact-head review remains required.
+
+The fresh P2A correction review accepted head
+`1a1ab9b7ffd5e768d26a9bf95d7ed0f9378d1f70`, tree
+`6754673e5358d26ee96422112c2ac7822b2c6f0b`, with zero unresolved findings
+and 81 passing tests (`p2a-review-2-final.md`, external artifacts).
+
+The night train then entered P2B on `feat/g05c-p2b-permission-write-yolo`.
+Its uncommitted implementation projects native permission profiles, a local
+Host ceiling, separate requested/effective permission evidence and bounded
+file-change activity. Eighty-six tests passed before live acceptance.
+Native schema/configuration probes observed all three profiles and exact
+workspace-write/danger-full-access mappings. A separate raw disposable write
+probe changed its two designated files; its test command failed, so it is not
+test-pass acceptance evidence.
+
+Real product run `5d35b881-f3cd-4c8d-8f8f-07d8adca4fc2` completed its
+read-only fixture turn. It created a Workspace Auto thread with proven native
+permission, then failed the next dispatch at `NATIVE_CONFIG_CHANGED`. No write
+turn was accepted. All 206 source-file/Git fingerprints matched. Normal stop
+returned `UNKNOWN_CLOSURE`, not SAFE_TERMINAL. Subsequent read-only proof found
+exact native exit, zero live conflicts, sound guard/admission, intact SQLite
+journals and `EFFECT_EVIDENCE_UNBOUND`. The exact run alone is admitted to the
+Owner-authorized narrow retirement rule; its effect outcome must remain UNKNOWN.
+
+Two configuration-only raw probes did not reproduce the config-stamp change.
+The original driver retains only the full config/origins stamp, so its changed
+field and cause are unproven. The train stops rather than relax that integrity
+gate or reissue the command. P2B is not accepted or pushed; P3 and G06 never
+started. Preserved work requires an Owner-reviewed bounded investigation before
+any further product run. No G05C closeout or G06 readiness claim is made.
+
+Stop custody completed through the normal `retire-stale --run ...
+--ack-unknown-effect` entrypoint after the unchanged narrow predicates passed.
+The run is `RETIRED_UNPROVABLE`, its old effect remains UNKNOWN, replay is false,
+and this train has used one of its two authorized retirement slots. Final
+status is STOPPED, not SAFE_TERMINAL for this run. The train's Host ceiling was
+reduced back to READ_ONLY. Final check/build and 87 tests pass, but neither those
+tests nor retirement qualify P2B or G05C acceptance. All historical receipts and
+the dirty P2B patch remain preserved; no branch was merged or deleted.

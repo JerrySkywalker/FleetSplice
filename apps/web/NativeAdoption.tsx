@@ -46,11 +46,12 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     setError(receipt.status === 'SUCCEEDED' ? '' : `${receipt.status}: ${receipt.code}`);
     if (receipt.status === 'SUCCEEDED' && ['native.submit', 'native.steer'].includes(receipt.family)) setText('');
   }
-  async function command(family: AdoptionCommand['family']) {
+  async function command(family: AdoptionCommand['family'], approval?: AdoptionCommand['approval']) {
     if (!available || !snapshot || !thread) return;
     const value: AdoptionCommand = { commandId: crypto.randomUUID(), runtimeId: snapshot.runtimeId,
       incarnation: snapshot.incarnation, clientInstanceId: client.clientInstanceId, expectedFence: snapshot.fence,
       threadId: thread.id, stateToken: thread.stateToken, activeTurnId: thread.activeTurnId, family, text: ['native.submit', 'native.steer'].includes(family) ? text : '' };
+    if (approval) value.approval = approval;
     setBusy(true); setError('');
     try {
       sessionStorage.setItem('fleetsplice.native.pending', JSON.stringify(value)); setPending(value);
@@ -68,8 +69,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('NATIVE ADOPTION · LOCAL DEMO', '原生会话接入 · 本地演示')}</span></div>{preferences}</header>
     <aside className="navigation"><div className="eyebrow">{t('Running Native Agents', '正在运行的原生代理')}</div>
       <p className="muted">{t('Start Codex in Windows Terminal, then attach here.', '在 Windows Terminal 中启动 Codex，然后在此接入。')}</p>
-      <code>codex --yolo</code>
-      {!snapshot?.threads.length && <p>{t('Waiting for an existing native thread with a completed first turn.', '等待原生会话完成第一轮对话。')}</p>}
+      <code>codex --sandbox read-only --ask-for-approval on-request</code>
+      {!snapshot?.threads.length && <p>{t('Waiting for an existing native thread.', '等待已有原生会话。')}</p>}
       {snapshot?.threads.map(item => <button className={`session ${thread?.id === item.id ? 'selected' : ''}`} onClick={() => setSelected(item.id)} key={item.id}>
         <strong>Codex</strong><span>{t('Native adopted', '原生接入')}</span><small>{item.workspace}</small><small>{item.status}{item.activeTurnId ? ` · ${t('active turn', '活动轮次')}` : ''}</small><small>{item.permission ?? t('Permission not yet observed', '权限尚未观察')}</small>
       </button>)}
@@ -96,6 +97,19 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         </React.Fragment>)}
         {thread?.historyLimited && <p className="muted">{t('Showing bounded recent history.', '仅显示最近的有限历史。')}</p>}
       </div>
+      {thread?.attached && <section className="native-approvals" aria-label={t('Approvals', '审批')}>
+        {!snapshot?.compatibility.capabilities.approvalResolve.available && <p>APPROVAL_UNAVAILABLE</p>}
+        {snapshot?.approvals?.filter(a => a.threadId === thread.id).slice(-8).map(a => <article key={`${typeof a.requestId}:${a.requestId}`}>
+          <strong>{a.status === 'PENDING' ? t('Needs approval', '需要审批') : a.status === 'RESOLVED' ? t('Native request resolved', '原生请求已解决') : a.status === 'STALE' ? 'STALE_NATIVE_REQUEST' : a.status}</strong>
+          <p>{a.summary}</p><small>{a.workspace} · {a.requestType} · {t('Turn', '轮次')} {a.turnId}</small>
+          {!a.supported && <p>APPROVAL_UNAVAILABLE</p>}
+          {a.supported && a.status === 'PENDING' && <div>
+            {(['ALLOW_ONCE', 'DENY'] as const).map(decision => <button key={decision} disabled={!available || !controlled || !a.authority || !snapshot.compatibility.capabilities.approvalResolve.available}
+              onClick={() => void command('native.approval', { requestId: a.requestId, threadId: a.threadId, turnId: a.turnId,
+                itemId: a.itemId, requestType: a.requestType, digest: a.digest, authority: a.authority!, decision })}>{decision === 'ALLOW_ONCE' ? t('Allow once', '允许一次') : t('Deny', '拒绝')}</button>)}
+          </div>}
+        </article>)}
+      </section>}
       <form className="composer" onSubmit={event => { event.preventDefault(); void command('native.submit'); }}>
         <label htmlFor="native-prompt">{t('Continue this native conversation', '继续此原生对话')}</label><textarea id="native-prompt" maxLength={16000} value={text} onChange={event => setText(event.target.value)} disabled={!canControl}/>
         <div className="native-controls"><button type="submit" className="primary" disabled={!canControl || thread?.status !== 'idle' || !text.trim()}>{t('Send continuation', '发送后续对话')}</button>

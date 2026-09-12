@@ -4,11 +4,12 @@ import { assertSameIncarnation, classifyCapabilities, incarnationOf } from './co
 import { NativeRpcError, type NativeRpc, type NativeMessage } from './transport.ts';
 import { NativeActivityJournal } from './activity-journal.ts';
 import { commandTerminal, projectTurn } from './projection.ts';
+import { NativeApprovals } from './approvals.ts';
 import type { AdoptionClient, AdoptionContinuity, AdoptionCommand, AdoptionReceipt, AdoptionSnapshot, CapabilityName, Compatibility, NativeArtifactIdentity, NativeThread } from './types.ts';
 
 const hash = (value: unknown) => createHash('sha256').update(canonical(value)).digest('hex');
 const keys: CapabilityName[] = ['sharedDaemon', 'threadList', 'threadRead', 'resume', 'events', 'turnStart', 'activeTurn', 'interrupt', 'steer', 'approvalObserve', 'approvalResolve', 'models', 'effectiveState'];
-const families = ['native.attach', 'native.reviewState', 'native.release', 'native.submit', 'native.steer', 'native.interrupt'];
+const families = ['native.attach', 'native.reviewState', 'native.release', 'native.submit', 'native.steer', 'native.interrupt', 'native.approval'];
 const id = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(value);
 const failCode = (error: unknown) => error instanceof Fault ? error.code : 'NATIVE_OPERATION_UNPROVABLE';
 type Binding = { view: NativeThread; userState: Map<string, string>; tools: Map<string, NativeThread['activity'][number]>; interrupted: Set<string> };
@@ -36,6 +37,8 @@ export class NativeAdoptionAdapter {
   private observationThread: string | null = null;
   private observationFailure: AdoptionSnapshot['observationFailure'] = null;
   private excludedCandidates = new Set<string>();
+  private approvals = new NativeApprovals();
+  private subscribingThread: string | null = null;
   // Restore attribution only from an exact successful journaled input, never
   // from matching text or an interrupted/unknown delivery attempt.
   restoreInput(command: AdoptionCommand, receipt: AdoptionReceipt) {
@@ -117,17 +120,20 @@ export class NativeAdoptionAdapter {
     const p = message.params;
     const threadId = p?.threadId ?? p?.thread?.id;
     const binding = this.threads.get(threadId);
-    if (!binding?.view.attached) return; // Never retain foreign thread payloads.
+    if (!binding || (!binding.view.attached && this.subscribingThread !== threadId)) return; // Never retain foreign thread payloads.
     const turnId = p.turnId ?? p.turn?.id;
     if (['turn/started', 'turn/completed', 'thread/status/changed', 'thread/settings/updated', 'serverRequest/resolved'].includes(message.method ?? '') || p.item?.type === 'userMessage') this.nativeStateEvents++;
     if (message.method === 'thread/settings/updated') { binding.view.permission = null; binding.view.externalAdvance = true; }
     if (message.method === 'turn/started' && !this.effectPending && !binding.userState.has(turnId) && !this.ownedTurns.has(turnId)) binding.view.externalAdvance = true;
-    if (message.id !== undefined && message.method?.includes('requestApproval')) {
-      this.capability('approvalObserve', true, 'Approval request observed on this exact attached thread');
-      binding.view.externalAdvance = true;
-      // The native TUI resolves approvals in D0. Never automatically respond.
+    if (message.id !== undefined) {
+      const supported = this.approvals.observe(message, this.workspace);
+      if (supported) {
+        this.capability('approvalObserve', true, 'Exact native coding approval and decision semantics observed on this connection');
+        this.capability('approvalResolve', !!this.rpc.respond, 'Observed coding approval with native response transport; outcome requires exact serverRequest/resolved');
+      }
     }
-    if (message.method === 'serverRequest/resolved') this.capability('approvalResolve', true, 'Native serverRequest/resolved observed; no Web approval control implemented');
+    if (message.method === 'serverRequest/resolved') this.approvals.resolved(threadId, p.requestId);
+    if (message.method === 'turn/completed') this.approvals.invalidate(threadId, turnId);
     if (p.item?.type === 'commandExecution' && id(p.item.id) && id(turnId)) {
       this.observeTool(binding.tools, p.item, turnId, threadId);
     }
@@ -192,6 +198,7 @@ export class NativeAdoptionAdapter {
     const turns: any[] = page.data;
     requireThat(turns.every(turn => id(turn.id) && Array.isArray(turn.items) && ['inProgress', 'completed', 'interrupted', 'failed'].includes(turn.status)), 'NATIVE_TURN_STATE_UNPROVABLE');
     const active = turns.filter(turn => turn.status === 'inProgress');
+    for (const turn of turns) if (turn.status !== 'inProgress') this.approvals.invalidate(threadId, turn.id);
     requireThat(active.length <= 1 && (thread.status?.type !== 'active' || active.length === 1), 'NATIVE_ACTIVE_TURN_UNPROVABLE');
     const prior = this.threads.get(threadId);
     const users = new Map<string, string>();
@@ -280,7 +287,7 @@ export class NativeAdoptionAdapter {
           }
         }
         for (const [threadId, binding] of this.threads) if (!candidates.has(threadId)) {
-          if (binding.view.attached) { binding.view.status = 'notLoaded'; binding.view.externalAdvance = true; }
+          if (binding.view.attached) { binding.view.status = 'notLoaded'; binding.view.externalAdvance = true; this.approvals.invalidate(threadId); }
           else this.threads.delete(threadId);
         }
       } catch (error) {
@@ -307,7 +314,13 @@ export class NativeAdoptionAdapter {
     return JSON.parse(JSON.stringify({ runtimeId: this.runtimeId, state: this.state, incarnation: this.incarnation,
       daemon: this.identity, compatibility: this.compatibility, workspace: this.workspace,
       controller: this.controller, fence: this.fence, threads: [...this.threads.values()].map(b => b.view),
-      receipts: [...this.receipts.values()].slice(-20).map(r => r.receipt), controlMode: 'COOPERATIVE', observationFailure: this.observationFailure }));
+      receipts: [...this.receipts.values()].slice(-20).map(r => r.receipt), controlMode: 'COOPERATIVE', observationFailure: this.observationFailure,
+      approvals: this.approvals.views().map(view => ({ ...view, authority: this.state === 'READY' && this.controller &&
+        this.controllerExpires > this.now() && this.threads.get(view.threadId)?.view.attached ? this.approvalAuthority(view.digest) : null })) }));
+  }
+  private approvalAuthority(digest: string): string {
+    return hash({ runtimeId: this.runtimeId, incarnation: this.incarnation, digest, controller: this.controller,
+      fence: this.fence, grant: this.controllerGrant });
   }
   lookup(commandId: string): AdoptionReceipt | null { return this.receipts.get(commandId)?.receipt ?? null; }
   private sameGrant(a: AdoptionClient, b: AdoptionClient | null): boolean {
@@ -345,7 +358,7 @@ export class NativeAdoptionAdapter {
     return this.serial(async () => {
       const { clientInstanceId: authenticatedClient, expiresAt } = client;
       const c = value as AdoptionCommand;
-      requireThat(c && typeof c === 'object' && Object.keys(c).filter(key => !['clientDisplayLabel', 'deviceLabel'].includes(key)).sort().join(',') === 'activeTurnId,clientInstanceId,commandId,expectedFence,family,incarnation,runtimeId,stateToken,text,threadId' &&
+      requireThat(c && typeof c === 'object' && Object.keys(c).filter(key => !['clientDisplayLabel', 'deviceLabel', ...(c.family === 'native.approval' ? ['approval'] : [])].includes(key)).sort().join(',') === 'activeTurnId,clientInstanceId,commandId,expectedFence,family,incarnation,runtimeId,stateToken,text,threadId' &&
         [c.clientDisplayLabel, c.deviceLabel].every(label => label === undefined || (typeof label === 'string' && label.trim().length > 0 && label.length <= 80 && !/[\u0000-\u001f\u007f]/.test(label))) &&
         id(c.commandId) && id(c.threadId) && id(c.runtimeId) && c.clientInstanceId === authenticatedClient && families.includes(c.family) &&
         Number.isSafeInteger(c.expectedFence) && typeof c.incarnation === 'string' && typeof c.stateToken === 'string' &&
@@ -361,17 +374,27 @@ export class NativeAdoptionAdapter {
         this.admitGrant(client);
         requireThat(c.runtimeId === this.runtimeId && c.incarnation === this.incarnation, 'NATIVE_SERVER_INCARCATION_CHANGED');
         requireThat(expiresAt > this.now() && c.expectedFence === this.fence, 'STALE_FLEET_CONTROLLER_FENCE');
+        if (c.family === 'native.approval') {
+          requireThat(this.controller === authenticatedClient && this.sameGrant(client, this.controllerGrant), 'FLEET_VIEWER_CANNOT_CONTROL');
+          requireThat(c.approval && Object.keys(c.approval).sort().join(',') === 'authority,decision,digest,itemId,requestId,requestType,threadId,turnId' &&
+            ['ALLOW_ONCE', 'DENY'].includes(c.approval.decision), 'NATIVE_APPROVAL_DECISION_INVALID');
+          requireThat(c.approval && c.approval.threadId === c.threadId && c.approval.turnId === c.activeTurnId &&
+            c.approval.authority === this.approvalAuthority(c.approval.digest), 'STALE_NATIVE_REQUEST');
+          this.approvals.exact(c.approval);
+        }
         requireThat(this.compatibility.profile === 'ADOPT_FULL', 'NATIVE_ADOPT_FULL_REQUIRED');
         requireThat(this.threads.has(c.threadId) && (await this.loaded()).has(c.threadId), 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
         const baseline = this.nativeStateEvents;
         const binding = await this.readThread(c.threadId);
         requireThat(this.state === 'READY', this.state);
+        if (c.family === 'native.approval') this.approvals.exact(c.approval!);
         requireThat(binding.view.stateToken === c.stateToken && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
         if (c.family === 'native.attach') {
           requireThat(!this.controller || this.controller === authenticatedClient, 'FLEET_CONTROLLER_ALREADY_HELD');
           requireThat(!binding.view.attached || this.controller !== authenticatedClient, 'NATIVE_ALREADY_ATTACHED_USE_REVIEW_STATE');
           // Exact loaded ID only; no path, history, model or permission overrides.
           this.evidence.append('NATIVE_ATTACH_ATTEMPT', c.commandId, { command: c, daemon: this.identity, createdNativeThread: false });
+          this.subscribingThread = c.threadId;
           const resumed = await this.rpc.call('thread/resume', { threadId: c.threadId, excludeTurns: true });
           this.assertThread(resumed.thread, c.threadId);
           this.revalidate(); requireThat((await this.loaded()).has(c.threadId), 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
@@ -387,6 +410,19 @@ export class NativeAdoptionAdapter {
           requireThat(binding.view.attached && this.controller === authenticatedClient && this.controllerExpires > this.now(), 'FLEET_VIEWER_CANNOT_CONTROL');
           requireThat(this.sameGrant(client, this.controllerGrant), 'STALE_FLEET_GRANT');
           if (c.family === 'native.release') { this.controller = null; this.fence++; code = 'FLEET_CONTROL_RELEASED_NATIVE_UNCHANGED'; }
+          else if (c.family === 'native.approval') {
+            requireThat(c.approval && this.rpc.respond && this.compatibility.capabilities.approvalResolve.available, 'APPROVAL_UNAVAILABLE');
+            requireThat(binding.view.activeTurnId === c.approval.turnId && binding.view.status === 'active', 'STALE_NATIVE_REQUEST');
+            this.revalidate();
+            requireThat(this.controllerExpires > this.now() && c.expectedFence === this.fence &&
+              c.approval.authority === this.approvalAuthority(c.approval.digest), 'STALE_FLEET_CONTROLLER_FENCE');
+            this.approvals.exact(c.approval);
+            this.evidence.append('NATIVE_EFFECT_ATTEMPT', c.commandId, { command: c, daemon: this.identity, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
+            effectSent = true; this.fence++;
+            await this.approvals.respond(c.approval, c.approval.decision, (id, result) => this.rpc.respond!(id, result));
+            this.revalidate();
+            code = 'NATIVE_APPROVAL_RESOLVED';
+          }
           else if (c.family === 'native.reviewState') {
             await this.readThread(c.threadId, true, view => {
               requireThat(view.stateToken === c.stateToken && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
@@ -434,7 +470,7 @@ export class NativeAdoptionAdapter {
         code = failCode(error); status = effectSent ? 'AMBIGUOUS_EFFECT' : 'REJECTED';
         if (code === 'NATIVE_STATE_ADVANCED_EXTERNALLY') { const b = this.threads.get(c.threadId); if (b) b.view.externalAdvance = true; }
         if (effectSent) { this.state = 'NATIVE_EFFECT_UNKNOWN_NO_REPLAY'; this.controller = null; this.fence++; }
-      } finally { this.effectPending = false; }
+      } finally { this.effectPending = false; this.subscribingThread = null; }
       const receipt: AdoptionReceipt = { commandId: c.commandId, family: c.family, status, code, daemon: this.identity,
         threadId: c.threadId, turnId, origin: 'NATIVE_ADOPTED', createdNativeThread: false, processTerminationClaim: false };
       try { this.evidence.append('NATIVE_ADOPTION_RECEIPT', c.commandId, receipt); }

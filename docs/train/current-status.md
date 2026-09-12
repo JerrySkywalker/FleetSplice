@@ -1,5 +1,15 @@
 # Current FleetSplice development status
 
+The bounded [P3 approval slice](../../goals/FLEETSPLICE-G05C-P3-APPROVAL-CONTROL-001.md)
+adds Allow once / Deny for observed native coding approvals on an adopted ordinary
+TUI thread. All 146 tests passed, including the preserved 134. Real headed Web/TUI
+acceptance exercised late attach, Allow once, Deny, both sequential race
+directions, viewer rejection, same-browser renewal and return to the same TUI.
+Dedicated file-change requests are schema/fixture qualified; turn/session
+permission grants remain unavailable. The candidate requires a fresh separate
+exact-head read-only review; its final Git identity and review receipt are in the
+external Goal directory. No merge or G06 is authorized.
+
 The bounded [D0 long-session correction](../../goals/FLEETSPLICE-G05C-D0-LONG-SESSION-R2-003.md)
 adds explicit ClientGrant/controller renewal and durable native-command evidence
 with bounded recent activity. Typecheck/build and 134 tests passed. Real local

@@ -5,7 +5,7 @@ import { Fault, requireThat } from '../contracts/json.ts';
 import type { NativeArtifactIdentity } from './types.ts';
 
 export type NativeMessage = { id?: string | number; method?: string; params?: any; result?: any; error?: { code: number; message: string } };
-export interface NativeRpc { call(method: string, params: unknown): Promise<any>; onEvent: (message: NativeMessage) => void; onClose: () => void; close(): void; }
+export interface NativeRpc { call(method: string, params: unknown): Promise<any>; respond?(id: string | number, result: unknown): Promise<void>; onEvent: (message: NativeMessage) => void; onClose: () => void; close(): void; }
 export class NativeRpcError extends Error { constructor(readonly code: number, message: string) { super(message); } }
 
 // Codex's official proxy owns AF_UNIX portability. These bytes are the native
@@ -72,5 +72,11 @@ export class OfficialNativeRpc implements NativeRpc {
     });
   }
   initialized() { this.ws.send(JSON.stringify({ method: 'initialized' })); }
+  respond(id: string | number, result: unknown): Promise<void> {
+    requireThat(this.ws.readyState === WebSocket.OPEN, 'NATIVE_DISCONNECTED');
+    return new Promise((resolve, reject) => this.ws.send(JSON.stringify({ id, result }), error => {
+      if (error) reject(new Fault('NATIVE_APPROVAL_OUTCOME_UNKNOWN')); else resolve();
+    }));
+  }
   close() { this.ws.terminate(); this.transport.destroy(); } // Only the client connection closes.
 }

@@ -16,6 +16,125 @@ import { createServer } from 'node:net';
 import { chromium, expect } from '@playwright/test';
 import { startHub } from '../apps/hub/server.ts';
 import { target } from './helpers.ts';
+import { NativeApprovals } from '../packages/native-adoption/approvals.ts';
+
+async function approvalRig(options: Parameters<typeof setup>[0] = {}) {
+  const r = await setup(options);
+  const responses: { id: string | number; result: any }[] = [];
+  const rpc = r.rpc as Rpc & { respond: (id: string | number, result: unknown) => Promise<void> };
+  rpc.respond = async (id, result) => { responses.push({ id, result }); r.rpc.onEvent({ method: 'serverRequest/resolved', params: { threadId: r.rpc.thread.id, requestId: id } }); };
+  await r.attach();
+  await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
+  const message = { id: 0, method: 'item/commandExecution/requestApproval', params: { threadId: r.rpc.thread.id,
+    turnId: r.rpc.turns[0].id, itemId: 'approval-item', kind: 'command', cwd: workspace,
+    command: 'harmless fixture action', availableDecisions: ['accept', 'cancel'] } };
+  r.rpc.onEvent(message);
+  const approvalCommand = async (decision: 'ALLOW_ONCE' | 'DENY' = 'ALLOW_ONCE') => {
+    const snapshot = await r.adapter.snapshot(); const a = snapshot.approvals![0]!;
+    return r.command(snapshot, 'native.approval', { approval: { requestId: a.requestId, threadId: a.threadId,
+      turnId: a.turnId, itemId: a.itemId, requestType: a.requestType, digest: a.digest, authority: a.authority!, decision } });
+  };
+  return { ...r, responses, message, approvalCommand };
+}
+
+test('approval Allow Once and Deny use exact native request ID zero and offered decisions', async () => {
+  for (const decision of ['ALLOW_ONCE', 'DENY'] as const) {
+    const r = await approvalRig();
+    const c = await r.approvalCommand(decision);
+    assert.equal((await r.execute(c)).status, 'SUCCEEDED');
+    assert.deepEqual(r.responses, [{ id: 0, result: { decision: decision === 'ALLOW_ONCE' ? 'accept' : 'cancel' } }]);
+    assert.equal((await r.adapter.snapshot()).approvals![0]!.status, 'RESOLVED');
+    assert.equal((await r.execute(c)).status, 'SUCCEEDED'); assert.equal(r.responses.length, 1);
+  }
+});
+
+test('approval rejects wrong request, thread, turn, item, request type and digest without a response', async () => {
+  for (const change of [{ requestId: '0' }, { requestId: 1 }, { threadId: 'wrong' }, { turnId: 'wrong' },
+    { itemId: 'wrong' }, { requestType: 'item/tool/call' }, { digest: 'wrong' }]) {
+    const r = await approvalRig(); const c = await r.approvalCommand(); Object.assign(c.approval!, change);
+    assert.equal((await r.execute(c)).status, 'REJECTED'); assert.equal(r.responses.length, 0);
+  }
+});
+
+test('approval rejects wrong daemon incarnation and stale controller fence', async () => {
+  for (const change of [{ incarnation: 'wrong' }, { expectedFence: -1 }]) {
+    const r = await approvalRig(); const c = await r.approvalCommand(); Object.assign(c, change);
+    assert.equal((await r.execute(c)).status, 'REJECTED'); assert.equal(r.responses.length, 0);
+  }
+});
+
+test('TUI-first approval race and resolution during native preflight never send a second response', async () => {
+  for (const duringPreflight of [false, true]) {
+    const r = await approvalRig(); const c = await r.approvalCommand();
+    const resolve = () => r.rpc.onEvent({ method: 'serverRequest/resolved', params: { threadId: r.rpc.thread.id, requestId: 0 } });
+    if (duringPreflight) r.rpc.before = method => { if (method === 'thread/read') resolve(); }; else resolve();
+    const receipt = await r.execute(c);
+    assert.equal(receipt.code, 'NATIVE_APPROVAL_ALREADY_RESOLVED'); assert.equal(receipt.status, 'REJECTED'); assert.equal(r.responses.length, 0);
+  }
+});
+
+test('Web-first approval race leaves repeated native notification and stale Web command unavailable', async () => {
+  const r = await approvalRig(); const c = await r.approvalCommand();
+  assert.equal((await r.execute(c)).status, 'SUCCEEDED');
+  r.rpc.onEvent({ method: 'serverRequest/resolved', params: { threadId: r.rpc.thread.id, requestId: 0 } });
+  const fresh = await r.approvalCommand(); assert.equal((await r.execute(fresh)).code, 'NATIVE_APPROVAL_ALREADY_RESOLVED');
+  assert.equal(r.responses.length, 1);
+});
+
+test('viewer and new client cannot inherit approval authority', async () => {
+  const r = await approvalRig(); const c = await r.approvalCommand(); const viewer = randomUUID(); c.clientInstanceId = viewer;
+  assert.equal((await r.execute(c, viewer)).code, 'FLEET_VIEWER_CANNOT_CONTROL'); assert.equal(r.responses.length, 0);
+});
+
+test('same browser renewal retains controller but invalidates old approval grant and fence', async () => {
+  let now = 1000; const r = await approvalRig({ now: () => now }); const old = await r.approvalCommand();
+  const snapshot = await r.adapter.snapshot(); const next = { ...r.authority, grantRevision: '2', expiresAt: r.expiresAt + 1000 };
+  await r.adapter.renewClient(r.authority, next, { runtimeId: snapshot.runtimeId, incarnation: snapshot.incarnation, controller: snapshot.controller, fence: snapshot.fence });
+  assert.equal((await r.execute(old)).status, 'REJECTED');
+  const fresh = await r.approvalCommand(); assert.notEqual(fresh.approval!.authority, old.approval!.authority);
+  assert.equal((await r.adapter.execute(fresh, next)).status, 'SUCCEEDED'); assert.equal(r.responses.length, 1);
+});
+
+test('controller release or expiry invalidates old approval controls', async () => {
+  for (const expire of [false, true]) {
+    let now = 1000; const r = await approvalRig({ now: () => now }); const c = await r.approvalCommand();
+    if (expire) now = r.expiresAt; else await r.execute(r.command(await r.adapter.snapshot(), 'native.release'));
+    assert.equal((await r.execute(c)).status, 'REJECTED'); assert.equal(r.responses.length, 0);
+    assert.equal((await r.adapter.snapshot()).approvals![0]!.authority, null);
+  }
+});
+
+test('approval Interrupt and Steer preserve exact active turn and invalidate interrupted request', async () => {
+  const r = await approvalRig();
+  const steer = r.command(await r.adapter.snapshot(), 'native.steer'); assert.equal((await r.execute(steer)).status, 'SUCCEEDED');
+  assert.equal(r.rpc.calls.findLast(x => x.method === 'turn/steer')!.params.expectedTurnId, r.message.params.turnId);
+  const interrupt = r.command(await r.adapter.snapshot(), 'native.interrupt'); assert.equal((await r.execute(interrupt)).status, 'SUCCEEDED');
+  assert.equal(r.rpc.calls.findLast(x => x.method === 'turn/interrupt')!.params.turnId, r.message.params.turnId);
+  assert.equal((await r.adapter.snapshot()).approvals![0]!.status, 'STALE');
+  assert.equal((await r.execute(await r.approvalCommand())).status, 'REJECTED'); assert.equal(r.responses.length, 0);
+});
+
+test('approval capability is observed without version or SHA allowlists', async () => {
+  const r = await approvalRig({ version: 'unknown-future', sha: 'not-a-release' });
+  assert.equal((await r.adapter.snapshot()).compatibility.capabilities.approvalResolve.available, true);
+  assert.equal((await r.execute(await r.approvalCommand())).status, 'SUCCEEDED');
+});
+
+test('file approval, unknown requests and turn-scoped permission grants have distinct admission', () => {
+  for (const method of ['item/fileChange/requestApproval', 'item/permissions/requestApproval', 'item/tool/call', 'unknown/requestApproval']) {
+    const store = new NativeApprovals();
+    const supported = store.observe({ id: 'request', method, params: { threadId: 'thread', turnId: 'turn', itemId: 'item' } }, workspace);
+    assert.equal(supported, method === 'item/fileChange/requestApproval');
+    if (!supported) assert.throws(() => store.exact(store.views()[0]!), /APPROVAL_UNAVAILABLE/);
+  }
+});
+
+test('approval ID reuse and persistent file grants remain fail closed', () => {
+  const store = new NativeApprovals();
+  const message = { id: 0, method: 'item/fileChange/requestApproval', params: { threadId: 'thread', turnId: 'turn', itemId: 'item', grantRoot: 'V:\\' } };
+  assert.equal(store.observe(message, workspace), false);
+  assert.throws(() => store.observe({ ...message, params: { ...message.params, itemId: 'another' } }, workspace), /NATIVE_REQUEST_ID_REUSED/);
+});
 
 const workspace = 'V:\\disposable-native-demo';
 class Rpc implements NativeRpc {

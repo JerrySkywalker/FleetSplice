@@ -1,4 +1,5 @@
 // Deliberately Codex-specific. Artifact metadata never selects compatibility.
+import type { ApprovalIdentity, ApprovalView } from './approvals.ts';
 export type AgentOrigin = 'NATIVE_ADOPTED' | 'FLEETSPLICE_MANAGED';
 export type NativeArtifactIdentity = {
   executablePath: string | null; reportedVersion: string | null; sha256: string | null;
@@ -33,7 +34,8 @@ export type NativeThread = {
 export type AdoptionCommand = {
   commandId: string; runtimeId: string; clientInstanceId: string; expectedFence: number;
   incarnation: string; threadId: string; stateToken: string; activeTurnId: string | null;
-  family: 'native.attach' | 'native.reviewState' | 'native.release' | 'native.submit' | 'native.steer' | 'native.interrupt';
+  family: 'native.attach' | 'native.reviewState' | 'native.release' | 'native.submit' | 'native.steer' | 'native.interrupt' | 'native.approval';
+  approval?: ApprovalIdentity & { decision: 'ALLOW_ONCE' | 'DENY'; authority: string };
   text: string;
   clientDisplayLabel?: string; deviceLabel?: string;
 };
@@ -51,6 +53,7 @@ export type AdoptionSnapshot = {
     nativeCode: number | null; reason: string; errorFingerprint: string;
     incarnation: string; threadId: string | null;
   } | null;
+  approvals?: (ApprovalView & { authority: string | null })[];
 };
 export type AdoptionClient = { clientInstanceId: string; sessionBinding: string; grantId: string; grantRevision: string; expiresAt: number };
 export type AdoptionContinuity = Pick<AdoptionSnapshot, 'runtimeId' | 'incarnation' | 'controller' | 'fence'>;

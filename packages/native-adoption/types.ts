@@ -6,6 +6,14 @@ export type NativeArtifactIdentity = {
   endpointIdentity: string; serverIncarnation: string | null;
 };
 export type Capability = { available: boolean; evidence: string };
+export type MessageSource =
+  | { kind: 'FLEETSPLICE_WEB'; clientInstanceId: string; clientDisplayLabel?: string; deviceLabel?: string }
+  | { kind: 'NATIVE_EXTERNAL' };
+export type NativeTurn = {
+  id: string; state: 'RUNNING' | 'COMPLETED' | 'INTERRUPTED' | 'FAILED';
+  /** Native Unix seconds; null means unavailable, never a local observation time. */
+  startedAt: number | null; completedAt: number | null; durationMs: number | null;
+};
 export type CapabilityName = 'sharedDaemon' | 'threadList' | 'threadRead' | 'resume' |
   'events' | 'turnStart' | 'activeTurn' | 'interrupt' | 'steer' | 'approvalObserve' |
   'approvalResolve' | 'models' | 'effectiveState';
@@ -17,15 +25,17 @@ export type NativeThread = {
   id: string; workspace: string; workspaceIdentity: string; origin: 'NATIVE_ADOPTED';
   status: string; activeTurnId: string | null; lastTurnStatus: string | null; model: string | null; permission: string | null;
   attached: boolean; stateToken: string; externalAdvance: boolean;
-  history: { role: 'user' | 'assistant'; text: string; turnId: string }[];
+  history: { role: 'user' | 'assistant'; text: string; turnId: string; source?: MessageSource }[];
+  turns: NativeTurn[];
   activity: { id: string; turnId: string; text: string; status: string }[];
-  historyLimited: boolean; residualCommandState: 'NONE_OBSERVED' | 'MAY_STILL_BE_RUNNING';
+  historyLimited: boolean; residualCommandState: 'NONE_OBSERVED' | 'MAY_STILL_BE_RUNNING' | 'OBSERVED_DRAINED';
 };
 export type AdoptionCommand = {
   commandId: string; runtimeId: string; clientInstanceId: string; expectedFence: number;
   incarnation: string; threadId: string; stateToken: string; activeTurnId: string | null;
   family: 'native.attach' | 'native.reviewState' | 'native.release' | 'native.submit' | 'native.steer' | 'native.interrupt';
   text: string;
+  clientDisplayLabel?: string; deviceLabel?: string;
 };
 export type AdoptionReceipt = {
   commandId: string; family: AdoptionCommand['family']; status: 'SUCCEEDED' | 'REJECTED' | 'AMBIGUOUS_EFFECT';

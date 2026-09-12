@@ -514,3 +514,5 @@ dialog p { color:var(--muted); font-size:12px; line-height:1.7; margin-bottom:0;
   footer { padding:10px 14px; flex-wrap:wrap; }
   .pending { padding:12px 18px; flex-wrap:wrap; }
 }
+.native-source-badge { display: inline-block; margin-inline-start: .6rem; padding: .1rem .4rem; border: 1px solid currentColor; border-radius: .4rem; font-weight: normal; }
+.native-turn-marker { padding: .5rem 1rem; opacity: .8; font-size: .85rem; }

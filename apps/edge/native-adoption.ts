@@ -12,14 +12,18 @@ export async function nativeAdoptionEdge(workspace: string, stateDirectory: stri
   const root = rootProofNow(workspace);
   const journal = new Journal(path.join(stateDirectory, 'native-edge.sqlite'));
   // Cold restart does not replay or forget any possibly dispatched operation.
-  const attempts = journal.db.prepare("SELECT key FROM evidence WHERE kind='NATIVE_EFFECT_ATTEMPT'").all();
+  const attempts = journal.db.prepare("SELECT key,value FROM evidence WHERE kind='NATIVE_EFFECT_ATTEMPT'").all();
+  const provenance: { command: any; receipt: any }[] = [];
   for (const attempt of attempts) {
     const receipt = journal.db.prepare("SELECT value FROM evidence WHERE kind='NATIVE_ADOPTION_RECEIPT' AND key=? ORDER BY seq DESC LIMIT 1").get(attempt.key!);
     requireThat(receipt && JSON.parse(String(receipt.value)).status === 'SUCCEEDED', 'NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY');
+    const command = JSON.parse(String(attempt.value)).command;
+    if (['native.submit', 'native.steer'].includes(command?.family)) provenance.push({ command, receipt: JSON.parse(String(receipt.value)) });
   }
   const identity = discoverDaemon(); const rpc = await OfficialNativeRpc.connect(identity);
   const adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, discoverDaemon, () => rootProofNow(root.root), journal);
   try {
+    for (const input of provenance) adapter.restoreInput(input.command, input.receipt);
     const initialized = await rpc.call('initialize', { clientInfo: { name: 'fleetsplice_native_adoption', version: '0.1.0' }, capabilities: { experimentalApi: true } });
     requireThat(typeof initialized.codexHome === 'string' && initialized.codexHome.toLowerCase() === nativeHome().toLowerCase(), 'NATIVE_SERVER_HOME_MISMATCH');
     rpc.initialized(); assertSameIncarnation(identity, discoverDaemon());

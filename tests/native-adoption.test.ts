@@ -43,7 +43,7 @@ class Rpc implements NativeRpc {
     if (method === 'model/list') { this.onEvent({ method: 'remoteControl/status/changed', params: { status: 'disabled' } }); return { data: [] }; }
     if (method === 'turn/start') {
       const item = { id: randomUUID(), clientId: params.clientUserMessageId, type: 'userMessage', content: params.input };
-      const turn = { id: randomUUID(), status: 'inProgress', items: this.delayInput ? [] : [item] };
+      const turn = { id: randomUUID(), status: 'inProgress', startedAt: Math.floor(Date.now() / 1000), items: this.delayInput ? [] : [item] };
       if (this.delayInput) this.delayedInputs.push({ turnId: turn.id, item });
       this.turns.unshift(turn); this.thread.status.type = 'active'; this.onEvent({ method: 'turn/started', params: { threadId: this.thread.id, turn } }); return { turn: structuredClone(turn) };
     }
@@ -84,6 +84,94 @@ test('adoption version and SHA are evidence rather than an allowlist; runtime ca
     assert.equal(r.adapter.identity.reportedVersion, version); assert.equal(r.adapter.identity.sha256, sha);
     assert.equal(r.rpc.calls.filter(c => c.method === 'thread/start').length, 0);
   }
+});
+
+test('source uses exact client ID on the same native thread, preserves explicit labels, never attributes equal text', async () => {
+  const r = await setup(); await r.attach();
+  const text = 'Original TUI conversation';
+  const command = r.command(await r.adapter.snapshot(), 'native.submit', { text, clientDisplayLabel: 'Personal Web', deviceLabel: 'Jerry Fold' });
+  assert.equal((await r.execute(command)).status, 'SUCCEEDED');
+  let view = (await r.adapter.snapshot()).threads[0]!;
+  assert.equal(view.id, r.rpc.thread.id);
+  assert.deepEqual(view.history[0]!.source, { kind: 'NATIVE_EXTERNAL' });
+  assert.deepEqual(view.history.find(message => message.turnId === r.rpc.turns[0].id)!.source,
+    { kind: 'FLEETSPLICE_WEB', clientInstanceId: r.client, clientDisplayLabel: 'Personal Web', deviceLabel: 'Jerry Fold' });
+  r.rpc.turns[0].items.push({ id: 'external-identical-text', type: 'userMessage', content: [{ type: 'text', text }] });
+  view = (await r.adapter.snapshot()).threads[0]!;
+  assert.deepEqual(view.history.at(-1)!.source, { kind: 'NATIVE_EXTERNAL' });
+  assert.equal(view.externalAdvance, true);
+});
+
+test('turn states preserve structured native timing and degrade absent or invalid fields', async () => {
+  const r = await setup(); await r.attach();
+  for (const [status, state] of [['inProgress', 'RUNNING'], ['completed', 'COMPLETED'], ['interrupted', 'INTERRUPTED'], ['failed', 'FAILED']]) {
+    Object.assign(r.rpc.turns[0], { status, startedAt: 1700000000, completedAt: status === 'inProgress' ? null : 1700000133, durationMs: status === 'inProgress' ? null : 133000 });
+    r.rpc.thread.status.type = status === 'inProgress' ? 'active' : 'idle';
+    const view = (await r.adapter.snapshot()).threads[0]!;
+    assert.deepEqual(view.turns[0], { id: r.rpc.turns[0].id, state, startedAt: 1700000000, completedAt: status === 'inProgress' ? null : 1700000133, durationMs: status === 'inProgress' ? null : 133000 });
+    assert.equal(view.activeTurnId, status === 'inProgress' ? r.rpc.turns[0].id : null);
+  }
+  delete r.rpc.turns[0].startedAt; r.rpc.turns[0].completedAt = 'yesterday'; r.rpc.turns[0].durationMs = -1;
+  const turn = (await r.adapter.snapshot()).threads[0]!.turns[0]!;
+  assert.equal(turn.startedAt, null); assert.equal(turn.completedAt, null); assert.equal(turn.durationMs, null);
+});
+
+test('successful journal input restores source after reconnect without replay or text attribution', async () => {
+  const r = await setup(); await r.attach();
+  const command = r.command(await r.adapter.snapshot(), 'native.submit', { deviceLabel: 'Jerry Fold' });
+  const receipt = await r.execute(command);
+  const next = new NativeAdoptionAdapter(r.adapter.identity, r.rpc, workspace, 'workspace-identity', () => r.adapter.identity,
+    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: () => {} });
+  next.restoreInput(command, receipt);
+  await next.qualify();
+  const view = (await next.snapshot()).threads[0]!;
+  assert.deepEqual(view.history.at(-1)!.source, { kind: 'FLEETSPLICE_WEB', clientInstanceId: r.client, deviceLabel: 'Jerry Fold' });
+  assert.equal(r.rpc.calls.filter(call => call.method === 'turn/start' && call.params.threadId === r.rpc.thread.id).length, 1);
+  assert.throws(() => next.restoreInput(command, { ...receipt, status: 'AMBIGUOUS_EFFECT' }), /NATIVE_SOURCE_EVIDENCE_UNPROVABLE/);
+  assert.throws(() => next.restoreInput(command, { ...receipt, threadId: 'different-thread' }), /NATIVE_SOURCE_EVIDENCE_UNPROVABLE/);
+});
+
+test('interrupt residual commands drain only after every observed command is terminal; stale reads cannot resurrect them', async () => {
+  const r = await setup(); await r.attach();
+  await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
+  const turn = r.rpc.turns[0];
+  turn.items.push(...['one', 'two'].map(id => ({ id, type: 'commandExecution', command: 'harmless sleep', status: 'inProgress' })));
+  await r.execute(r.command(await r.adapter.snapshot(), 'native.interrupt'));
+  assert.equal((await r.adapter.snapshot()).threads[0]!.residualCommandState, 'MAY_STILL_BE_RUNNING');
+  const complete = (id: string) => r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id, turnId: turn.id, item: { id, type: 'commandExecution', status: 'completed' } } });
+  complete('one'); assert.equal((await r.adapter.snapshot()).threads[0]!.residualCommandState, 'MAY_STILL_BE_RUNNING');
+  complete('two'); const view = (await r.adapter.snapshot()).threads[0]!;
+  assert.equal(view.residualCommandState, 'OBSERVED_DRAINED'); assert.equal(view.turns.at(-1)!.state, 'INTERRUPTED'); assert.equal(view.activeTurnId, null);
+});
+
+test('completed commands and interruptions without commands cannot leave stale warnings', async () => {
+  for (const withCommand of [false, true]) {
+    const r = await setup(); await r.attach(); await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
+    if (withCommand) r.rpc.turns[0].items.push({ id: 'already-completed', type: 'commandExecution', status: 'completed' });
+    await r.execute(r.command(await r.adapter.snapshot(), 'native.interrupt'));
+    assert.equal((await r.adapter.snapshot()).threads[0]!.residualCommandState, withCommand ? 'OBSERVED_DRAINED' : 'NONE_OBSERVED');
+  }
+});
+
+test('activity bound holds without evicting terminal identity or resurrecting drained warnings after 64 commands', async () => {
+  const r = await setup(); await r.attach(); await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
+  const turn = r.rpc.turns[0];
+  turn.items.push({ id: 'retained-terminal', type: 'commandExecution', status: 'inProgress' });
+  await r.execute(r.command(await r.adapter.snapshot(), 'native.interrupt'));
+  const event = (id: string, status: string, turnId = turn.id) => r.rpc.onEvent({ method: status === 'completed' ? 'item/completed' : 'item/started',
+    params: { threadId: r.rpc.thread.id, turnId, item: { id, type: 'commandExecution', status } } });
+  event('retained-terminal', 'completed');
+  assert.equal((await r.adapter.snapshot()).threads[0]!.residualCommandState, 'OBSERVED_DRAINED');
+  for (let index = 0; index < 64; index++) event(`later-${index}`, 'completed', 'later-turn');
+  event('retained-terminal', 'inProgress');
+  const callCount = r.rpc.calls.length;
+  const snapshot = await r.adapter.snapshot();
+  assert.equal(snapshot.state, 'NATIVE_ACTIVITY_BOUND_EXCEEDED');
+  assert.equal(snapshot.controller, null); assert.equal(r.rpc.calls.length, callCount);
+  assert.equal(snapshot.threads[0]!.residualCommandState, 'OBSERVED_DRAINED');
+  assert.equal(snapshot.threads[0]!.lastTurnStatus, 'interrupted');
+  const rejected = await r.execute(r.command(snapshot, 'native.submit'));
+  assert.equal(rejected.status, 'REJECTED'); assert.equal(r.rpc.calls.length, callCount);
 });
 test('capability modes downgrade without requiring optional controls', async () => {
   const r = await setup(); const c = structuredClone(r.adapter.compatibility.capabilities);
@@ -128,6 +216,7 @@ test('same-thread history, continuation, steer and interrupt retain native ident
   const continuation = await r.execute(r.command(snapshot, 'native.submit')); assert.equal(continuation.threadId, r.rpc.thread.id);
   snapshot = await r.adapter.snapshot(); assert.equal(snapshot.threads[0]!.activeTurnId, continuation.turnId);
   const steer = await r.execute(r.command(snapshot, 'native.steer')); assert.equal(steer.turnId, continuation.turnId);
+  r.rpc.turns[0].items.push({ id: 'residual-command', type: 'commandExecution', command: 'harmless sleep', status: 'inProgress' });
   const interrupted = await r.execute(r.command(await r.adapter.snapshot(), 'native.interrupt'));
   assert.equal(interrupted.status, 'SUCCEEDED'); assert.equal(interrupted.turnId, continuation.turnId); assert.equal(interrupted.processTerminationClaim, false);
   snapshot = await r.adapter.snapshot(); assert.equal(snapshot.threads[0]!.lastTurnStatus, 'interrupted');
@@ -239,6 +328,7 @@ test('managed and adopted origins are distinguishable without changing the manag
 });
 test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-turn steer and honest interrupt', async () => {
   const r = await setup();
+  r.rpc.turns[0].durationMs = 133000;
   const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
   const port = (probe.address() as { port: number }).port; await new Promise<void>(resolve => probe.close(() => resolve()));
   const bootstrapToken = randomUUID();
@@ -251,17 +341,26 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
     const page = await context.newPage(); await page.goto(`http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`);
     await page.getByRole('button', { name: 'Attach', exact: true }).click();
     await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-source="NATIVE_EXTERNAL"]')).toBeVisible();
+    await expect(page.getByText('Done · Worked for 2m 13s', { exact: true })).toBeVisible();
     await expect(page.getByText('CONTROL_MODE=COOPERATIVE', { exact: true })).toBeVisible();
     await expect(page.getByTestId('adopted-thread-id')).toHaveText(r.rpc.thread.id);
     await page.locator('#native-prompt').fill('Browser continuation'); await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
     await expect(page.getByTestId('adopted-turn-id')).not.toHaveText('—');
+    await expect(page.locator('.session-heading [data-turn-state="RUNNING"]')).toContainText(/Working · \d+m \d+s/);
+    await expect(page.locator('[data-source="FLEETSPLICE_WEB"]')).toBeVisible();
     const active = await page.getByTestId('adopted-turn-id').innerText();
     await page.locator('#native-prompt').fill('Guide this turn'); await page.getByRole('button', { name: 'Steer', exact: true }).click();
     await expect(page.getByText('Guide this turn', { exact: true })).toBeVisible();
     await expect(page.getByTestId('adopted-turn-id')).toHaveText(active);
+    r.rpc.turns[0].items.push({ id: 'browser-residual', type: 'commandExecution', command: 'harmless sleep', status: 'inProgress' });
     await page.getByRole('button', { name: 'Interrupt turn', exact: true }).click();
     await expect(page.getByText('Turn interrupted', { exact: true })).toBeVisible();
     await expect(page.getByText(/A native command may still be finishing/)).toBeVisible();
+    r.rpc.turns[0].items.find((item: any) => item.id === 'browser-residual').status = 'completed';
+    await expect(page.locator('[data-residual-state="OBSERVED_DRAINED"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/A native command may still be finishing/)).toHaveCount(0);
+    await expect(page.getByText('Turn interrupted', { exact: true })).toBeVisible();
     const viewer = await context.newPage(); await viewer.goto(`http://127.0.0.1:${port}/`);
     await expect(viewer.getByTestId('adopted-thread-id')).toHaveText(r.rpc.thread.id);
     await expect(viewer.getByRole('button', { name: 'Send continuation', exact: true })).toBeDisabled();

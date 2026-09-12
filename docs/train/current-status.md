@@ -1,5 +1,13 @@
 # Current FleetSplice development status
 
+The Owner reports successful personal D0 dogfood and authorizes only the three
+UX corrections in [FLEETSPLICE-G05C-D0-DOGFOOD-UX-R1-002](../../goals/FLEETSPLICE-G05C-D0-DOGFOOD-UX-R1-002.md):
+exact message-source badges, native turn timing/lifecycle, and residual-command
+drain. The candidate remains on `fix/g05c-d0-dogfood-ux-r1`; its exact acceptance
+and separate review receipts are retained in the external Goal directory.
+The Windows popup is native code-mode-host owned; no FleetSplice shell
+workaround was added. P3 and G06 remain unstarted and unauthorized.
+
 This file is the current train-status pointer. Historical goal receipts and
 accepted status files remain evidence and are not rewritten by this summary.
 

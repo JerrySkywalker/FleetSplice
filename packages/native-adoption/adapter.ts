@@ -2,6 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { canonical, Fault, requireThat } from '../contracts/json.ts';
 import { assertSameIncarnation, classifyCapabilities, incarnationOf } from './compatibility.ts';
 import { NativeRpcError, type NativeRpc, type NativeMessage } from './transport.ts';
+import { commandTerminal, projectTurn, residualState } from './projection.ts';
 import type { AdoptionCommand, AdoptionReceipt, AdoptionSnapshot, CapabilityName, Compatibility, NativeArtifactIdentity, NativeThread } from './types.ts';
 
 const hash = (value: unknown) => createHash('sha256').update(canonical(value)).digest('hex');
@@ -9,7 +10,7 @@ const keys: CapabilityName[] = ['sharedDaemon', 'threadList', 'threadRead', 'res
 const families = ['native.attach', 'native.reviewState', 'native.release', 'native.submit', 'native.steer', 'native.interrupt'];
 const id = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(value);
 const failCode = (error: unknown) => error instanceof Fault ? error.code : 'NATIVE_OPERATION_UNPROVABLE';
-type Binding = { view: NativeThread; userState: Map<string, string>; tools: Map<string, NativeThread['activity'][number]> };
+type Binding = { view: NativeThread; userState: Map<string, string>; tools: Map<string, NativeThread['activity'][number]>; interrupted: Set<string> };
 export type AdoptionEvidence = { append(kind: string, key: string, value: unknown): void };
 
 export class NativeAdoptionAdapter {
@@ -27,11 +28,20 @@ export class NativeAdoptionAdapter {
   private nativeStateEvents = 0;
   private effectPending = false;
   private ownedTurns = new Set<string>();
-  private ownedInputs = new Map<string, { threadId: string; turnId: string | null; text: string }>();
+  private ownedInputs = new Map<string, { threadId: string; turnId: string | null; text: string; clientInstanceId: string; clientDisplayLabel?: string; deviceLabel?: string }>();
   private observationPhase = 'identity';
   private observationThread: string | null = null;
   private observationFailure: AdoptionSnapshot['observationFailure'] = null;
   private excludedCandidates = new Set<string>();
+  // Restore attribution only from an exact successful journaled input, never
+  // from matching text or an interrupted/unknown delivery attempt.
+  restoreInput(command: AdoptionCommand, receipt: AdoptionReceipt) {
+    requireThat(['native.submit', 'native.steer'].includes(command.family) && receipt.status === 'SUCCEEDED' &&
+      receipt.commandId === command.commandId && receipt.family === command.family && receipt.threadId === command.threadId && id(receipt.turnId) &&
+      id(command.commandId) && id(command.clientInstanceId) && typeof command.text === 'string', 'NATIVE_SOURCE_EVIDENCE_UNPROVABLE');
+    this.ownedInputs.set(command.commandId, { threadId: command.threadId, turnId: receipt.turnId, text: command.text,
+      clientInstanceId: command.clientInstanceId, clientDisplayLabel: command.clientDisplayLabel, deviceLabel: command.deviceLabel });
+  }
   constructor(readonly identity: NativeArtifactIdentity, private readonly rpc: NativeRpc,
     readonly workspace: string, private readonly workspaceIdentity: string,
     private readonly identityNow: () => NativeArtifactIdentity,
@@ -114,15 +124,26 @@ export class NativeAdoptionAdapter {
     }
     if (message.method === 'serverRequest/resolved') this.capability('approvalResolve', true, 'Native serverRequest/resolved observed; no Web approval control implemented');
     if (p.item?.type === 'commandExecution' && id(p.item.id) && id(turnId)) {
-      binding.tools.set(p.item.id, { id: p.item.id, turnId, text: String(p.item.command ?? 'Native command').slice(0,1000), status: String(p.item.status ?? 'unknown') });
-      if (binding.tools.size > 64) binding.tools.delete(binding.tools.keys().next().value!);
+      this.observeTool(binding.tools, p.item, turnId);
     }
     if (message.method === 'turn/completed' && p.turn?.status === 'interrupted') {
-      binding.view.residualCommandState = 'MAY_STILL_BE_RUNNING';
+      binding.interrupted.add(turnId);
     }
+    binding.view.residualCommandState = residualState(binding.tools.values(), binding.interrupted);
     // Keep compact native lifecycle evidence, never raw/global native payloads.
     if (/^(turn\/|item\/(started|completed)|serverRequest\/)/.test(message.method ?? '')) this.evidence.append('NATIVE_ADOPTED_EVENT', threadId,
       { method: message.method, threadId, turnId: turnId ?? null, itemId: p.item?.id ?? null, type: p.item?.type ?? null, status: p.turn?.status ?? p.item?.status ?? null });
+  }
+  private observeTool(tools: Binding['tools'], item: any, turnId: string) {
+    const previous = tools.get(item.id);
+    // A lagging history read must not resurrect an observed terminal command.
+    if (previous && commandTerminal(previous.status)) return;
+    // Terminal identities are drain evidence, not a disposable display cache.
+    // Keep the bounded evidence intact and hold before admitting a 65th item.
+    if (!previous && tools.size >= 64) {
+      this.state = 'NATIVE_ACTIVITY_BOUND_EXCEEDED'; this.controller = null; this.fence++; return;
+    }
+    tools.set(item.id, { id: item.id, turnId, text: String(item.command ?? 'Native command').slice(0,1000), status: String(item.status ?? 'unknown') });
   }
   private assertThread(thread: any, expectedId: string) {
     requireThat(thread && thread.id === expectedId && typeof thread.cwd === 'string' && thread.cwd.toLowerCase() === this.workspace.toLowerCase(), 'NATIVE_THREAD_IDENTITY_MISMATCH');
@@ -168,7 +189,9 @@ export class NativeAdoptionAdapter {
     const users = new Map<string, string>();
     const history: NativeThread['history'] = [];
     const tools = prior?.tools ?? new Map<string, NativeThread['activity'][number]>();
+    const interrupted = prior?.interrupted ?? new Set<string>();
     for (const turn of [...turns].reverse()) {
+      if (turn.status === 'interrupted') interrupted.add(turn.id);
       const messages = turn.items.filter((item: any) => item.type === 'userMessage');
       const externalMessages = messages.filter((message: any) => {
         const expected = this.ownedInputs.get(message.clientId ?? message.id);
@@ -182,8 +205,13 @@ export class NativeAdoptionAdapter {
       for (const item of turn.items) {
         if (item.type === 'userMessage' || item.type === 'agentMessage') {
           const text = item.type === 'agentMessage' ? item.text : item.content?.filter((x: any) => x.type === 'text').map((x: any) => x.text).join('\n');
-          if (typeof text === 'string') history.push({ role: item.type === 'userMessage' ? 'user' : 'assistant', text: text.slice(0,24000), turnId: turn.id });
-        } else if (item.type === 'commandExecution' && id(item.id)) tools.set(item.id, { id: item.id, turnId: turn.id, text: String(item.command ?? 'Native command').slice(0,1000), status: String(item.status ?? 'unknown') });
+          const owned = item.type === 'userMessage' ? this.ownedInputs.get(item.clientId ?? item.id) : undefined;
+          const source = owned ? { kind: 'FLEETSPLICE_WEB' as const, clientInstanceId: owned.clientInstanceId,
+            ...(owned.clientDisplayLabel !== undefined ? { clientDisplayLabel: owned.clientDisplayLabel } : {}),
+            ...(owned.deviceLabel !== undefined ? { deviceLabel: owned.deviceLabel } : {}) } : { kind: 'NATIVE_EXTERNAL' as const };
+          if (typeof text === 'string') history.push({ role: item.type === 'userMessage' ? 'user' : 'assistant', text: text.slice(0,24000), turnId: turn.id,
+            ...(item.type === 'userMessage' ? { source } : {}) });
+        } else if (item.type === 'commandExecution' && id(item.id)) this.observeTool(tools, item, turn.id);
       }
     }
     let externalAdvance = prior?.view.externalAdvance ?? false;
@@ -202,11 +230,11 @@ export class NativeAdoptionAdapter {
       permission: prior?.view.permission ?? null, attached: prior?.view.attached ?? false, stateToken,
       externalAdvance: accept ? false : externalAdvance, history: history.slice(-48), activity: [...tools.values()].slice(-16),
       historyLimited: !!page.nextCursor || history.length > 48,
-      residualCommandState: prior?.view.residualCommandState ?? 'NONE_OBSERVED' };
+      turns: [...turns].reverse().map(projectTurn), residualCommandState: residualState(tools.values(), interrupted) };
     // Acknowledgement commits only the exact reviewed state. No await follows
     // this final admission check before the accepted baseline is replaced.
     admit?.(view);
-    const binding = { view, tools, userState: accept || !prior ? users : prior.userState };
+    const binding = { view, tools, interrupted, userState: accept || !prior ? users : prior.userState };
     this.threads.set(threadId, binding); return binding;
   }
   snapshot(): Promise<AdoptionSnapshot> { return this.serial(async () => {
@@ -271,7 +299,8 @@ export class NativeAdoptionAdapter {
   execute(value: unknown, authenticatedClient: string, expiresAt: number): Promise<AdoptionReceipt> {
     return this.serial(async () => {
       const c = value as AdoptionCommand;
-      requireThat(c && typeof c === 'object' && Object.keys(c).sort().join(',') === 'activeTurnId,clientInstanceId,commandId,expectedFence,family,incarnation,runtimeId,stateToken,text,threadId' &&
+      requireThat(c && typeof c === 'object' && Object.keys(c).filter(key => !['clientDisplayLabel', 'deviceLabel'].includes(key)).sort().join(',') === 'activeTurnId,clientInstanceId,commandId,expectedFence,family,incarnation,runtimeId,stateToken,text,threadId' &&
+        [c.clientDisplayLabel, c.deviceLabel].every(label => label === undefined || (typeof label === 'string' && label.trim().length > 0 && label.length <= 80 && !/[\u0000-\u001f\u007f]/.test(label))) &&
         id(c.commandId) && id(c.threadId) && id(c.runtimeId) && c.clientInstanceId === authenticatedClient && families.includes(c.family) &&
         Number.isSafeInteger(c.expectedFence) && typeof c.incarnation === 'string' && typeof c.stateToken === 'string' &&
         (c.activeTurnId === null || id(c.activeTurnId)) && typeof c.text === 'string' && c.text.length <= 16000, 'NATIVE_COMMAND_INVALID');
@@ -331,7 +360,8 @@ export class NativeAdoptionAdapter {
             requireThat(expiresAt > Date.now() && this.controllerExpires > Date.now() && this.controller === authenticatedClient && this.fence === c.expectedFence, 'STALE_FLEET_CONTROLLER_FENCE');
             this.evidence.append('NATIVE_EFFECT_ATTEMPT', c.commandId, { command: c, daemon: this.identity, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
             effectSent = true; this.effectPending = true; this.fence++;
-            if (c.family !== 'native.interrupt') this.ownedInputs.set(c.commandId, { threadId: c.threadId, turnId: c.activeTurnId, text: c.text });
+            if (c.family !== 'native.interrupt') this.ownedInputs.set(c.commandId, { threadId: c.threadId, turnId: c.activeTurnId, text: c.text,
+              clientInstanceId: authenticatedClient, clientDisplayLabel: c.clientDisplayLabel, deviceLabel: c.deviceLabel });
             const input = [{ type: 'text', text: c.text, text_elements: [] }];
             const result = await this.rpc.call(isSubmit ? 'turn/start' : c.family === 'native.steer' ? 'turn/steer' : 'turn/interrupt', isSubmit ?
               { threadId: c.threadId, clientUserMessageId: c.commandId, input } : c.family === 'native.steer' ? { threadId: c.threadId, expectedTurnId: c.activeTurnId, clientUserMessageId: c.commandId, input } : { threadId: c.threadId, turnId: c.activeTurnId });
@@ -344,7 +374,6 @@ export class NativeAdoptionAdapter {
             const afterEffect = await this.readThread(c.threadId);
             requireThat(!afterEffect.view.externalAdvance, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
             if (c.family === 'native.interrupt') {
-              this.threads.get(c.threadId)!.view.residualCommandState = 'MAY_STILL_BE_RUNNING';
               code = 'NATIVE_INTERRUPT_REQUEST_ACCEPTED';
             } else code = isSubmit ? 'NATIVE_CONTINUATION_ACCEPTED' : 'NATIVE_STEER_SAME_TURN_ACCEPTED';
           }

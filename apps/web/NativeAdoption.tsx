@@ -1,6 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { AdoptionCommand, AdoptionReceipt, AdoptionSnapshot } from '../../packages/native-adoption/types.ts';
+import type { AdoptionCommand, AdoptionReceipt, AdoptionSnapshot, NativeTurn } from '../../packages/native-adoption/types.ts';
 import type { Locale } from './i18n.ts';
+
+function TurnStatus({ turn, locale, live }: { turn: NativeTurn; locale: Locale; live: boolean }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { if (turn.state !== 'RUNNING' || !live) return; setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer);
+  }, [turn.id, turn.state, live]);
+  const zh = locale === 'zh-CN';
+  const duration = turn.state === 'RUNNING' ? (turn.startedAt === null || !live ? null : Math.max(0, now - turn.startedAt * 1000)) : turn.durationMs;
+  const seconds = duration === null ? null : Math.floor(duration / 1000);
+  const formatted = seconds === null ? null : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  const label = { RUNNING: zh ? '正在工作' : 'Working', COMPLETED: zh ? '完成' : 'Done', INTERRUPTED: zh ? '轮次已中断' : 'Turn interrupted', FAILED: zh ? '失败' : 'Failed' }[turn.state];
+  return <span className="native-turn-status" data-turn-id={turn.id} data-turn-state={turn.state}><span>{label}</span>{formatted ? ` · ${turn.state === 'RUNNING' ? '' : zh ? '工作用时 ' : 'Worked for '}${formatted}` : ` · ${zh ? '计时不可用' : 'Timing unavailable'}`}</span>;
+}
 
 export function NativeAdoption({ client, request, locale, preferences }: {
   client: { clientInstanceId: string; expiresAt: number }; request: (url: string, body?: unknown) => Promise<any>;
@@ -65,16 +78,22 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     </aside>
     <main>
       <div className="session-heading"><div><div className="eyebrow">{t('Existing native conversation', '已有的原生对话')}</div><h1>{thread ? 'Codex · Native adopted' : t('Running Native Agents', '正在运行的原生代理')}</h1>
-        <div className="subtitle">{thread?.workspace}</div></div><span className="status">{thread?.lastTurnStatus === 'interrupted' ? t('Turn interrupted', '轮次已中断') : thread?.status ?? 'WAITING'}</span></div>
+        <div className="subtitle">{thread?.workspace}</div></div><span className="status">{thread?.activeTurnId && thread.turns.find(turn => turn.id === thread.activeTurnId) ? <TurnStatus turn={thread.turns.find(turn => turn.id === thread.activeTurnId)!} locale={locale} live={snapshot?.state === 'READY'}/> : thread?.status ?? 'WAITING'}</span></div>
       <div className="native-cooperative"><strong>CONTROL_MODE=COOPERATIVE</strong><p>{t('Local Codex TUI remains connected and may still issue native input.', '本地 Codex TUI 仍保持连接，也可以继续输入。')}</p></div>
       {(error || (snapshot && snapshot.state !== 'READY')) && <div role="alert" className="alert">{error || snapshot?.state}</div>}
       {pending && <div className="pending">{t('Pending command receipt', '等待命令回执')} <code>{pending.commandId}</code><button disabled={busy} onClick={lookup}>{t('Check receipt', '查询回执')}</button></div>}
       {thread?.externalAdvance && <div className="alert">NATIVE_STATE_ADVANCED_EXTERNALLY<p>{t('Native state changed outside this Web controller. Read the updated conversation, then acknowledge it before controlling.', '原生状态已由此网页控制器之外的输入改变。请阅读更新后的对话，再确认当前状态以继续控制。')}</p>
         <button disabled={!available || !controlled} onClick={() => void command('native.reviewState')}>{t('I reviewed the current native state', '我已查看当前原生状态')}</button></div>}
       {thread?.residualCommandState === 'MAY_STILL_BE_RUNNING' && <div className="alert">{t('A native command may still be finishing in the background. Interrupt does not terminate the daemon, TUI or command process.', '原生命令可能仍在后台收尾。中断轮次不代表守护进程、TUI 或命令进程已终止。')}</div>}
+      {thread?.residualCommandState === 'OBSERVED_DRAINED' && <p className="muted" data-residual-state="OBSERVED_DRAINED">{t('Observed interrupted-turn commands have finished. The turn remains interrupted.', '已观察到的中断轮次命令已结束。轮次仍为已中断。')}</p>}
       {!thread?.attached && <div className="native-attach"><button className="primary" disabled={!available || !thread || (!!snapshot?.controller && !controlled)} onClick={() => void command('native.attach')}>{t('Attach', '接入')}</button></div>}
       <div className="timeline" role="log" aria-label={t('Native conversation', '原生对话')}>
-        {thread?.attached && thread.history.map((message, index) => <article className={`message ${message.role}`} key={`${message.turnId}-${index}`}><div className="message-label">{message.role === 'user' ? t('Native user input', '原生用户输入') : 'Codex'}</div><div className="message-text">{message.text}</div></article>)}
+        {thread?.attached && thread.turns.map(turn => <React.Fragment key={turn.id}>
+          {thread.history.filter(message => message.turnId === turn.id).map((message, index) => <article className={`message ${message.role}`} key={`${message.turnId}-${index}`}><div className="message-label">{message.role === 'user' ? t('Native user input', '原生用户输入') : 'Codex'}
+            {message.role === 'user' && <small className="native-source-badge" data-source={message.source?.kind ?? 'NATIVE_EXTERNAL'} title={message.source?.kind === 'FLEETSPLICE_WEB' ? message.source.clientInstanceId : undefined}>{message.source?.kind === 'FLEETSPLICE_WEB' ? `Web${message.source.deviceLabel || message.source.clientDisplayLabel ? ` · ${message.source.deviceLabel || message.source.clientDisplayLabel}` : ''}` : t('Native external client', '原生外部客户端')}</small>}
+          </div><div className="message-text">{message.text}</div></article>)}
+          <div className="native-turn-marker"><TurnStatus turn={turn} locale={locale} live={snapshot?.state === 'READY'}/></div>
+        </React.Fragment>)}
         {thread?.historyLimited && <p className="muted">{t('Showing bounded recent history.', '仅显示最近的有限历史。')}</p>}
       </div>
       <form className="composer" onSubmit={event => { event.preventDefault(); void command('native.submit'); }}>

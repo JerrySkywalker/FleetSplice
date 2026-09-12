@@ -1,4 +1,7 @@
 import test from 'node:test';
+import { Journal } from '../packages/journal/index.ts';
+import { NativeActivityJournal } from '../packages/native-adoption/activity-journal.ts';
+import { BrowserClientSession } from '../apps/web/client-session.ts';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { NativeAdoptionAdapter } from '../packages/native-adoption/adapter.ts';
@@ -60,22 +63,25 @@ class Rpc implements NativeRpc {
     throw Error('unexpected fixture RPC');
   }
 }
-async function setup(options: { version?: string; sha?: string; missing?: string[] } = {}) {
+async function setup(options: { version?: string; sha?: string; missing?: string[]; now?: () => number } = {}) {
   const rpc = new Rpc(); for (const method of options.missing ?? []) rpc.missing.add(method);
   let identity: NativeArtifactIdentity = { executablePath: 'C:\\official\\codex.exe', reportedVersion: options.version ?? 'future-build', sha256: options.sha ?? 'b'.repeat(64),
     processId: 100, processCreationTime: '123456', endpoint: 'C:\\user\\native.sock', endpointIdentity: 'socket-birth', serverIncarnation: null };
   const evidence: any[] = [];
+  const journal = new Journal(path.join(mkdtempSync(path.join(tmpdir(), 'fleet-activity-')), 'native.sqlite'));
+  const activity = new NativeActivityJournal(journal);
   const adapter = new NativeAdoptionAdapter(structuredClone(identity), rpc, workspace, 'workspace-identity', () => identity,
-    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) });
+    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) }, activity, options.now);
   await adapter.qualify();
-  const client = randomUUID(); const expiresAt = Date.now() + 600000;
+  const client = randomUUID(); const expiresAt = (options.now ?? Date.now)() + 600000;
+  const authority = { clientInstanceId: client, sessionBinding: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt };
   const command = (snapshot: AdoptionSnapshot, family: AdoptionCommand['family'], changes: Partial<AdoptionCommand> = {}): AdoptionCommand => ({ commandId: randomUUID(),
     runtimeId: snapshot.runtimeId, clientInstanceId: client, expectedFence: snapshot.fence, incarnation: snapshot.incarnation,
     threadId: rpc.thread.id, stateToken: snapshot.threads[0]?.stateToken ?? '', activeTurnId: snapshot.threads[0]?.activeTurnId ?? null,
     family, text: ['native.submit', 'native.steer'].includes(family) ? 'A harmless continuation' : '', ...changes });
-  const execute = (value: AdoptionCommand, actor = client) => adapter.execute(value, actor, expiresAt);
+  const execute = (value: AdoptionCommand, actor = client) => adapter.execute(value, { ...authority, clientInstanceId: actor });
   const attach = async () => execute(command(await adapter.snapshot(), 'native.attach'));
-  return { rpc, adapter, command, execute, attach, client, expiresAt, evidence, replace: (change: Partial<NativeArtifactIdentity>) => { identity = { ...identity, ...change }; } };
+  return { rpc, adapter, command, execute, attach, client, expiresAt, evidence, journal, activity, authority, replace: (change: Partial<NativeArtifactIdentity>) => { identity = { ...identity, ...change }; } };
 }
 test('adoption version and SHA are evidence rather than an allowlist; runtime capabilities admit ADOPT_FULL', async () => {
   for (const [version, sha] of [['future.9000', 'a'.repeat(64)], ['unversioned-development', 'c'.repeat(64)]]) {
@@ -121,7 +127,7 @@ test('successful journal input restores source after reconnect without replay or
   const command = r.command(await r.adapter.snapshot(), 'native.submit', { deviceLabel: 'Jerry Fold' });
   const receipt = await r.execute(command);
   const next = new NativeAdoptionAdapter(r.adapter.identity, r.rpc, workspace, 'workspace-identity', () => r.adapter.identity,
-    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: () => {} });
+    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: () => {} }, r.activity);
   next.restoreInput(command, receipt);
   await next.qualify();
   const view = (await next.snapshot()).threads[0]!;
@@ -153,7 +159,7 @@ test('completed commands and interruptions without commands cannot leave stale w
   }
 });
 
-test('activity bound holds without evicting terminal identity or resurrecting drained warnings after 64 commands', async () => {
+test('terminal archive retains identity without resurrecting drained warnings after 64 commands', async () => {
   const r = await setup(); await r.attach(); await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
   const turn = r.rpc.turns[0];
   turn.items.push({ id: 'retained-terminal', type: 'commandExecution', status: 'inProgress' });
@@ -166,15 +172,15 @@ test('activity bound holds without evicting terminal identity or resurrecting dr
   event('retained-terminal', 'inProgress');
   const callCount = r.rpc.calls.length;
   const snapshot = await r.adapter.snapshot();
-  assert.equal(snapshot.state, 'NATIVE_ACTIVITY_BOUND_EXCEEDED');
-  assert.equal(snapshot.controller, null); assert.equal(r.rpc.calls.length, callCount);
+  assert.equal(snapshot.state, 'READY');
+  assert.equal(snapshot.controller, r.client); assert.ok(r.rpc.calls.length > callCount);
   assert.equal(snapshot.threads[0]!.residualCommandState, 'OBSERVED_DRAINED');
   assert.equal(snapshot.threads[0]!.lastTurnStatus, 'interrupted');
-  const rejected = await r.execute(r.command(snapshot, 'native.submit'));
-  assert.equal(rejected.status, 'REJECTED'); assert.equal(r.rpc.calls.length, callCount);
+  const continued = await r.execute(r.command(snapshot, 'native.submit'));
+  assert.equal(continued.status, 'SUCCEEDED');
 });
 
-for (const phase of ['initial', 'final'] as const) test(`attach ${phase} refresh overflow cannot dispatch after hold or restore control`, async () => {
+for (const phase of ['initial', 'final'] as const) test(`attach ${phase} refresh archives terminal overflow before granting control`, async () => {
   const r = await setup();
   r.rpc.turns[0].items.push(...Array.from({ length: 64 }, (_, index) => ({ id: `command-${index}`, type: 'commandExecution', status: 'completed' })));
   const command = r.command(await r.adapter.snapshot(), 'native.attach');
@@ -186,11 +192,11 @@ for (const phase of ['initial', 'final'] as const) test(`attach ${phase} refresh
     }
   };
   const receipt = await r.execute(command);
-  assert.equal(injected, true); assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_ACTIVITY_BOUND_EXCEEDED');
-  assert.equal(r.rpc.calls.filter(call => call.method === 'thread/resume' && call.params.threadId === r.rpc.thread.id).length, phase === 'initial' ? 0 : 1);
-  const snapshot = await r.adapter.snapshot(); assert.equal(snapshot.state, 'NATIVE_ACTIVITY_BOUND_EXCEEDED'); assert.equal(snapshot.controller, null);
-  const calls = r.rpc.calls.length;
-  assert.equal((await r.execute(r.command(snapshot, 'native.attach'))).status, 'REJECTED'); assert.equal(r.rpc.calls.length, calls);
+  assert.equal(injected, true); assert.equal(receipt.status, 'SUCCEEDED');
+  assert.equal(r.rpc.calls.filter(call => call.method === 'thread/resume' && call.params.threadId === r.rpc.thread.id).length, 1);
+  const snapshot = await r.adapter.snapshot(); assert.equal(snapshot.state, 'READY'); assert.equal(snapshot.controller, r.client);
+  assert.equal(Number(r.journal.db.prepare('SELECT COUNT(*) AS n FROM native_commands WHERE terminal=1').get()!.n), 65);
+  assert.ok(snapshot.threads[0]!.activity.length <= 16);
 });
 test('capability modes downgrade without requiring optional controls', async () => {
   const r = await setup(); const c = structuredClone(r.adapter.compatibility.capabilities);
@@ -330,13 +336,14 @@ test('delayed own submit and steer observations correlate exact client IDs witho
   assert.equal((await r.adapter.snapshot()).threads[0]!.externalAdvance, true);
 });
 test('a client expiring during the final native read is rejected before effect dispatch', async () => {
-  const r = await setup(); await r.attach(); const c = r.command(await r.adapter.snapshot(), 'native.submit');
-  let reads = 0; const deadline = Date.now() + 40;
-  r.rpc.before = method => { if (method === 'thread/read' && ++reads === 2) while (Date.now() <= deadline) { /* Bounded fixture-only expiry. */ } };
-  const receipt = await r.adapter.execute(c, r.client, deadline);
+  let now = 1000000; const r = await setup({ now: () => now }); await r.attach(); const c = r.command(await r.adapter.snapshot(), 'native.submit');
+  let reads = 0;
+  r.rpc.before = method => { if (method === 'thread/read' && ++reads === 2) now = r.expiresAt; };
+  const receipt = await r.adapter.execute(c, r.authority);
   assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'STALE_FLEET_CONTROLLER_FENCE');
   assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start' && c.params.threadId === r.rpc.thread.id).length, 0);
 });
+
 test('managed and adopted origins are distinguishable without changing the managed native driver', async () => {
   const r = await setup(); await r.attach(); assert.equal((await r.adapter.snapshot()).threads[0]!.origin, 'NATIVE_ADOPTED');
   const managed = rig(); try {
@@ -353,7 +360,7 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
   const bootstrapToken = randomUUID();
   const hub = await startHub({ port, target: target(), root: workspace, sid: 'fixture', principal: 'fixture', sessionId: 1,
     stateDirectory: mkdtempSync(path.join(tmpdir(), 'fleet-native-browser-')), webDirectory: path.resolve('dist/web'), hcpToken: randomUUID(), bootstrapToken }, {
-    snapshot: () => r.adapter.snapshot(), execute: (command, client, expiresAt) => r.adapter.execute(command, client, expiresAt), lookup: async commandId => r.adapter.lookup(commandId) });
+    snapshot: () => r.adapter.snapshot(), execute: (command, client) => r.adapter.execute(command, client), renewClient: (previous, next, continuity) => r.adapter.renewClient(previous, next, continuity), lookup: async commandId => r.adapter.lookup(commandId) });
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   try {
     const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1480, height: 1000 } });
@@ -384,4 +391,182 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
     await expect(viewer.getByTestId('adopted-thread-id')).toHaveText(r.rpc.thread.id);
     await expect(viewer.getByRole('button', { name: 'Send continuation', exact: true })).toBeDisabled();
   } finally { await browser.close(); await hub.close(); }
+});
+
+test('exact grant renewal binds client/session/revision/controller/fence without any native call', async () => {
+  let now = 1000000; const r = await setup({ now: () => now }); await r.attach();
+  const before = await r.adapter.snapshot(); const calls = r.rpc.calls.length;
+  now += 300000;
+  const next = { ...r.authority, grantRevision: '2', expiresAt: now + 600000 };
+  for (const change of [{ clientInstanceId: randomUUID() }, { sessionBinding: 'wrong' }, { grantId: randomUUID() }, { grantRevision: '0' }]) {
+    const old = { ...r.authority, ...change };
+    await assert.rejects(r.adapter.renewClient(old, { ...old, grantRevision: String(BigInt(old.grantRevision) + 1n), expiresAt: next.expiresAt }, before));
+  }
+  await assert.rejects(r.adapter.renewClient(r.authority, next, { ...before, fence: before.fence - 1 }), /STALE_FLEET_CONTROLLER_FENCE/);
+  const renewed = await r.adapter.renewClient(r.authority, next, before);
+  assert.equal(renewed.controller, r.client); assert.equal(renewed.fence, before.fence + 1); assert.equal(r.rpc.calls.length, calls);
+  now = r.authority.expiresAt + 1;
+  const current = await r.adapter.snapshot(); assert.equal(current.controller, r.client);
+  assert.equal(current.incarnation, before.incarnation); assert.equal(current.threads[0]!.id, before.threads[0]!.id);
+  assert.equal((await r.adapter.execute(r.command(current, 'native.submit'), r.authority)).status, 'REJECTED');
+  assert.equal((await r.adapter.execute(r.command(before, 'native.submit'), next)).code, 'STALE_FLEET_CONTROLLER_FENCE');
+  assert.equal((await r.adapter.execute(r.command(current, 'native.submit'), next)).status, 'SUCCEEDED');
+});
+
+test('expired renewal never resurrects controller and a new viewer cannot inherit it', async () => {
+  let now = 1000000; const r = await setup({ now: () => now }); await r.attach();
+  const before = await r.adapter.snapshot(); now += 300000;
+  const viewer = { ...r.authority, clientInstanceId: randomUUID(), grantId: randomUUID() };
+  assert.equal((await r.adapter.renewClient(viewer, { ...viewer, grantRevision: '2', expiresAt: now + 600000 }, null)).controller, r.client);
+  now = r.authority.expiresAt;
+  await assert.rejects(r.adapter.renewClient(r.authority, { ...r.authority, grantRevision: '2', expiresAt: now + 600000 }, before), /CLIENT_RENEWAL_REJECTED/);
+  assert.equal((await r.adapter.snapshot()).controller, null);
+});
+
+test('400 terminal commands archive durably while active and interrupted residual commands stay retained', async () => {
+  const r = await setup(); await r.attach(); await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
+  const turn = r.rpc.turns[0];
+  turn.items.push({ id: 'unknown-residual', type: 'commandExecution', status: 'unknown' });
+  await r.execute(r.command(await r.adapter.snapshot(), 'native.interrupt'));
+  for (let n = 0; n < 400; n++) r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id, turnId: 'later-turn',
+    item: { id: `many-${n}`, type: 'commandExecution', status: 'completed', command: 'harmless synthetic command' } } });
+  let snapshot = await r.adapter.snapshot(); assert.equal(snapshot.state, 'READY'); assert.equal(snapshot.controller, r.client);
+  assert.equal(snapshot.threads[0]!.residualCommandState, 'MAY_STILL_BE_RUNNING');
+  assert.ok(snapshot.threads[0]!.activity.some(tool => tool.id === 'unknown-residual'), 'archived history must not hide current nonterminal activity');
+  assert.equal(r.activity.unsafe(r.adapter.incarnation, r.rpc.thread.id)[0]!.id, 'unknown-residual');
+  assert.equal(Number(r.journal.db.prepare("SELECT COUNT(*) AS n FROM evidence WHERE kind='NATIVE_COMMAND_EVIDENCE'").get()!.n), 401);
+  // Inspect the actual bounded safety cache as well as the persisted evidence.
+  const tools = (r.adapter as any).threads.get(r.rpc.thread.id).tools as Map<string, any>;
+  assert.ok(tools.has('unknown-residual')); assert.ok(tools.size <= 17); assert.ok(!tools.has('many-0'));
+  assert.ok(r.journal.db.prepare("SELECT 1 FROM native_commands WHERE id='many-0' AND terminal=1").get());
+  const recovered = new NativeActivityJournal(r.journal);
+  assert.equal(recovered.unsafe(r.adapter.incarnation, r.rpc.thread.id)[0]!.status, 'unknown');
+  assert.throws(() => recovered.assertRecovery('replacement-incarnation'), /NATIVE_PREDECESSOR_COMMAND_UNKNOWN_NO_REPLAY/);
+  r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id, turnId: turn.id,
+    item: { id: 'unknown-residual', type: 'commandExecution', status: 'completed' } } });
+  snapshot = await r.adapter.snapshot(); assert.equal(snapshot.threads[0]!.residualCommandState, 'OBSERVED_DRAINED');
+  assert.equal(recovered.unsafe(r.adapter.incarnation, r.rpc.thread.id).length, 0);
+  assert.equal((await r.execute(r.command(snapshot, 'native.submit'))).status, 'SUCCEEDED');
+});
+
+test('journal failure before terminal commit cannot evict an active command or claim residual drain', async () => {
+  const r = await setup(); await r.attach(); await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
+  const turn = r.rpc.turns[0]; turn.items.push({ id: 'not-committed', type: 'commandExecution', status: 'inProgress' });
+  await r.execute(r.command(await r.adapter.snapshot(), 'native.interrupt'));
+  r.journal.db.exec("CREATE TRIGGER deny_terminal BEFORE UPDATE ON native_commands WHEN NEW.terminal=1 BEGIN SELECT RAISE(ABORT,'fixture disk failure'); END");
+  r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id, turnId: turn.id,
+    item: { id: 'not-committed', type: 'commandExecution', status: 'completed' } } });
+  const snapshot = await r.adapter.snapshot(); assert.equal(snapshot.state, 'NATIVE_JOURNAL_UNPROVABLE'); assert.equal(snapshot.controller, null);
+  assert.equal(r.activity.residual(r.adapter.incarnation, r.rpc.thread.id), 'MAY_STILL_BE_RUNNING');
+  assert.equal((r.adapter as any).threads.get(r.rpc.thread.id).tools.get('not-committed').status, 'inProgress');
+  assert.equal(Number(r.journal.db.prepare("SELECT COUNT(*) AS n FROM evidence WHERE kind='NATIVE_COMMAND_EVIDENCE'").get()!.n), 1);
+});
+
+test('HTTP and browser grant renewal spans original expiry; invalid session/client/CSRF/revision fail closed', async () => {
+  let now = Date.now(); const r = await setup({ now: () => now });
+  const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
+  const port = (probe.address() as { port: number }).port; await new Promise<void>(resolve => probe.close(() => resolve()));
+  const origin = `http://127.0.0.1:${port}`; const bootstrapToken = randomUUID();
+  const hub = await startHub({ port, target: target(), root: workspace, sid: 'fixture', principal: 'fixture', sessionId: 1,
+    stateDirectory: mkdtempSync(path.join(tmpdir(), 'fleet-renewal-')), webDirectory: path.resolve('dist/web'), hcpToken: randomUUID(), bootstrapToken }, {
+    snapshot: () => r.adapter.snapshot(), execute: (c, client) => r.adapter.execute(c, client),
+    renewClient: (previous, next, continuity) => r.adapter.renewClient(previous, next, continuity), lookup: async id => r.adapter.lookup(id)
+  }, () => now);
+  try {
+    const boot = await fetch(`${origin}/api/bootstrap`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: bootstrapToken }) });
+    const cookie = boot.headers.get('set-cookie')!.split(';')[0]!;
+    const transport: typeof fetch = (url, init) => fetch(`${origin}${url}`, { ...init, headers: { ...init?.headers, Origin: origin, Cookie: cookie } });
+    const changes: any[] = []; const browser = new BrowserClientSession(c => changes.push(c), () => now, transport);
+    browser.setClient(await browser.request('/api/client', {})); browser.native = true;
+    const original = { ...browser.client! };
+    const snapshot = await browser.request('/api/native/snapshot');
+    assert.equal((await browser.request('/api/native/commands', r.command(snapshot, 'native.attach', { clientInstanceId: original.clientInstanceId }))).status, 'SUCCEEDED');
+    const attached = await browser.request('/api/native/snapshot'); const calls = r.rpc.calls.length;
+    const bad = async (headers: object, body = { grantId: original.grantId, grantRevision: original.grantRevision, continuity: attached }) => {
+      const response = await fetch(`${origin}/api/client/renew`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', Cookie: cookie,
+        'X-Fleet-Client': original.clientInstanceId, 'X-Fleet-Csrf': original.csrf, ...headers }, body: JSON.stringify(body) });
+      assert.equal(response.status, 403);
+    };
+    await bad({ Cookie: `fleetsplice=${'0'.repeat(64)}` }); await bad({ 'X-Fleet-Client': randomUUID() }); await bad({ 'X-Fleet-Csrf': 'wrong' });
+    await bad({}, { grantId: original.grantId, grantRevision: '0', continuity: attached });
+    const viewer = new BrowserClientSession(() => {}, () => now, transport); viewer.setClient(await viewer.request('/api/client', {})); viewer.native = true;
+    assert.notEqual(viewer.client!.clientInstanceId, original.clientInstanceId);
+    now += 25 * 60_000;
+    const continued = await browser.request('/api/native/snapshot');
+    assert.equal(browser.client!.clientInstanceId, original.clientInstanceId); assert.equal(browser.client!.grantRevision, '2');
+    assert.notEqual(browser.client!.csrf, original.csrf); assert.equal(continued.controller, original.clientInstanceId);
+    assert.equal(continued.fence, attached.fence + 1); assert.equal(continued.incarnation, attached.incarnation);
+    assert.ok(r.rpc.calls.slice(calls).every(c => !['turn/start', 'turn/steer', 'turn/interrupt', 'thread/resume'].includes(c.method)));
+    await bad({}); // Old CSRF cannot revive revision 1.
+    assert.equal((await viewer.request('/api/native/snapshot')).controller, original.clientInstanceId);
+    assert.equal((await viewer.request('/api/native/commands', r.command(continued, 'native.submit', { clientInstanceId: viewer.client!.clientInstanceId }))).status, 'REJECTED');
+    now = original.expiresAt + 1;
+    assert.equal((await browser.request('/api/native/snapshot')).state, 'READY'); assert.equal(changes.length, 2);
+    const unrenewed = await transport('/api/client', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); const expired = await unrenewed.json();
+    now = expired.expiresAt;
+    await bad({ 'X-Fleet-Client': expired.clientInstanceId, 'X-Fleet-Csrf': expired.csrf }, { grantId: expired.grantId, grantRevision: expired.grantRevision, continuity: null });
+  } finally { await hub.close(); }
+});
+
+test('browser ambiguous renewal closes all subsequent observation and effects without retry', async () => {
+  let count = 0; const now = 1000000;
+  const browser = new BrowserClientSession(() => {}, () => now, async () => { count++; throw Error('fixture response lost'); });
+  browser.setClient({ actorId: randomUUID(), clientInstanceId: randomUUID(), grantId: randomUUID(), grantRevision: '1', csrf: 'old', expiresAt: now + 1000 });
+  await assert.rejects(browser.request('/api/native/snapshot'), /fixture response lost/);
+  await assert.rejects(browser.request('/api/native/commands', {}), /CLIENT_RENEWAL_FAILED_CLOSED/); assert.equal(count, 1);
+});
+
+test('durable archive and UNKNOWN survive an actual SQLite close/reopen', () => {
+  const file = path.join(mkdtempSync(path.join(tmpdir(), 'fleet-restart-')), 'native.sqlite');
+  let journal = new Journal(file); let activity = new NativeActivityJournal(journal);
+  activity.interrupt('incarnation', 'thread', 'interrupted');
+  activity.observe('incarnation', 'thread', { id: 'unknown', turnId: 'interrupted', status: 'unknown', text: 'unresolved' });
+  for (let n = 0; n < 100; n++) activity.observe('incarnation', 'thread', { id: `done-${n}`, turnId: 'interrupted', status: 'completed', text: 'terminal' });
+  journal.close(); journal = new Journal(file); activity = new NativeActivityJournal(journal);
+  try {
+    assert.equal(activity.unsafe('incarnation', 'thread')[0]!.status, 'unknown');
+    assert.equal(activity.residual('incarnation', 'thread'), 'MAY_STILL_BE_RUNNING');
+    assert.equal(activity.observe('incarnation', 'thread', { id: 'done-0', turnId: 'interrupted', status: 'inProgress', text: 'stale' }).status, 'completed');
+    assert.throws(() => activity.assertRecovery('replacement'), /NATIVE_PREDECESSOR_COMMAND_UNKNOWN_NO_REPLAY/);
+    activity.observe('incarnation', 'thread', { id: 'unknown', turnId: 'interrupted', status: 'completed', text: 'terminal observation' });
+    assert.equal(activity.residual('incarnation', 'thread'), 'OBSERVED_DRAINED');
+  } finally { journal.close(); }
+});
+
+test('more than 64 active commands are never evicted by terminal compaction', async () => {
+  const r = await setup(); await r.attach();
+  for (let n = 0; n < 80; n++) r.rpc.onEvent({ method: 'item/started', params: { threadId: r.rpc.thread.id, turnId: 'active-turn',
+    item: { id: `active-${n}`, type: 'commandExecution', status: 'inProgress' } } });
+  for (let n = 0; n < 160; n++) r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id, turnId: 'other-turn',
+    item: { id: `terminal-${n}`, type: 'commandExecution', status: 'completed' } } });
+  assert.equal(r.activity.unsafe(r.adapter.incarnation, r.rpc.thread.id).length, 80);
+  const tools = (r.adapter as any).threads.get(r.rpc.thread.id).tools as Map<string, any>;
+  assert.equal([...tools.values()].filter(t => t.status === 'inProgress').length, 80);
+  assert.equal((await r.adapter.snapshot()).state, 'READY');
+});
+
+for (const phase of ['initial', 'final'] as const) test(`attach ${phase} terminal journal failure holds before control assignment`, async () => {
+  const r = await setup(); const command = r.command(await r.adapter.snapshot(), 'native.attach');
+  r.journal.db.exec("CREATE TRIGGER deny_command BEFORE INSERT ON native_commands BEGIN SELECT RAISE(ABORT,'fixture journal unavailable'); END");
+  let resumed = false;
+  r.rpc.before = method => {
+    if (method === 'thread/resume') resumed = true;
+    if (method === 'thread/turns/list' && (phase === 'initial' || resumed))
+      r.rpc.turns[0].items.push({ id: 'unjournaled', type: 'commandExecution', status: 'completed' });
+  };
+  const receipt = await r.execute(command); assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_JOURNAL_UNPROVABLE');
+  assert.equal((await r.adapter.snapshot()).controller, null);
+  assert.equal(r.rpc.calls.filter(c => c.method === 'thread/resume' && c.params.threadId === r.rpc.thread.id).length, phase === 'initial' ? 0 : 1);
+});
+
+test('an event journal failure during the final native read blocks dispatch without replay', async () => {
+  const r = await setup(); await r.attach(); const command = r.command(await r.adapter.snapshot(), 'native.submit');
+  r.journal.db.exec("CREATE TRIGGER deny_command BEFORE INSERT ON native_commands BEGIN SELECT RAISE(ABORT,'fixture event journal failure'); END");
+  let reads = 0;
+  r.rpc.before = method => {
+    if (method === 'thread/turns/list' && ++reads === 2) r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id,
+      turnId: r.rpc.turns[0].id, item: { id: 'concurrent-terminal', type: 'commandExecution', status: 'completed' } } });
+  };
+  const receipt = await r.execute(command); assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_JOURNAL_UNPROVABLE');
+  assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start' && c.params.threadId === r.rpc.thread.id).length, 0);
 });

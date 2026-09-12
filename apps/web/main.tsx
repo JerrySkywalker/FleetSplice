@@ -6,6 +6,7 @@ import { stateText, systemText, translate, type MessageKey, type Locale } from '
 import { browserStorage, persistPreference, readPreferences, resolveTheme, type Appearance } from './preferences.ts';
 import { PreferencesControl } from './PreferencesControl.tsx';
 import { NativeAdoption } from './NativeAdoption.tsx';
+import { BrowserClientSession } from './client-session.ts';
 import './style.css';
 
 type Client = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; csrf: string };
@@ -59,9 +60,16 @@ function App() {
   const timeline = useRef<HTMLDivElement>(null);
   const catalogVersion = snapshot?.capabilities ? JSON.stringify(snapshot.capabilities) : '';
   const catalogSeen = useRef('');
-  const headers = () => ({ 'Content-Type': 'application/json', 'X-Fleet-Client': clientRef.current?.clientInstanceId ?? '', 'X-Fleet-Csrf': clientRef.current?.csrf ?? '' });
+  const sessionRef = useRef<BrowserClientSession | null>(null);
+  if (!sessionRef.current) sessionRef.current = new BrowserClientSession(identity => { clientRef.current = identity; setClient(identity); });
   async function request(url: string, body?: unknown) {
-    const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: headers(), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    if (sessionRef.current!.native) {
+      try { return await sessionRef.current!.request(url, body); }
+      catch (error: any) { if (error.status && error.result) throw new RequestError(error.status, error.result); throw error; }
+    }
+    const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: {
+      'Content-Type': 'application/json', 'X-Fleet-Client': clientRef.current?.clientInstanceId ?? '', 'X-Fleet-Csrf': clientRef.current?.csrf ?? ''
+    }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     const result = await response.json(); if (!response.ok) throw new RequestError(response.status, result); return result;
   }
   async function refresh() {
@@ -80,9 +88,9 @@ function App() {
       history.replaceState(null, '', location.pathname);
       if (token) await request('/api/bootstrap', { token });
       const identity: Client = await request('/api/client', {});
-      clientRef.current = identity; setClient(identity);
+      sessionRef.current!.setClient(identity);
       const mode = await request('/api/mode');
-      if (mode.mode === 'NATIVE_ADOPTION') { setNativeMode(true); return; }
+      if (mode.mode === 'NATIVE_ADOPTION') { sessionRef.current!.native = true; setNativeMode(true); return; }
       await refresh();
       events = new EventSource('/api/events'); events.onmessage = () => void refresh();
       events.onerror = () => { setError({ key: 'observationLost', code: 'OBSERVATION_UNKNOWN' }); setSnapshot(old => old ? { ...old, status: 'OBSERVATION_UNKNOWN' } : old); };
@@ -107,9 +115,16 @@ function App() {
   }, [catalogVersion]);
   useEffect(() => {
     if (!client) return;
-    const timer = setTimeout(() => setError({ key: 'grantExpired', code: 'GRANT_EXPIRED' }), Math.max(0, client.expiresAt - Date.now()));
-    return () => clearTimeout(timer);
-  }, [client]);
+    if (!nativeMode) {
+      const timer = setTimeout(() => setError({ key: 'grantExpired', code: 'GRANT_EXPIRED' }), Math.max(0, client.expiresAt - Date.now()));
+      return () => clearTimeout(timer);
+    }
+    const renew = () => { void sessionRef.current!.request().catch(e => setError({ key: 'requestFailed', code: errorCode(e) })); };
+    const timer = setTimeout(renew, Math.max(0, client.expiresAt - Date.now() - 5 * 60_000));
+    const visible = () => { if (document.visibilityState === 'visible') renew(); };
+    document.addEventListener('visibilitychange', visible);
+    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', visible); };
+  }, [client, nativeMode]);
   const lane = snapshot?.lanes.find(item => item.laneId === selected);
   const workspace = snapshot?.workspaces.find(item => selectedWorkspace ? item.registryId === selectedWorkspace : item.target.workspaceId === snapshot.target.workspaceId);
   const controlled = !!lane && lane.fence.controller === client?.clientInstanceId;

@@ -1,5 +1,16 @@
 # Current FleetSplice development status
 
+The bounded [D0 long-session correction](../../goals/FLEETSPLICE-G05C-D0-LONG-SESSION-R2-003.md)
+adds explicit ClientGrant/controller renewal and durable native-command evidence
+with bounded recent activity. Typecheck/build and 134 tests passed. Real local
+smoke retained the same ordinary TUI thread across Web renewal, more than 64
+terminal commands, interrupted residual drain and return to TUI. Browser timers
+were accelerated for renewal; this is not a wall-clock soak. The candidate on
+`fix/g05c-d0-long-session-r2` requires its separate exact-head read-only review;
+that receipt and final Git identity remain in the external Goal directory.
+P3 and G06 remain unstarted; no merge is authorized. See the
+[additive contract](../architecture/amendments/g05c-d0-long-session-continuity.md).
+
 The Owner reports successful personal D0 dogfood and authorizes only the three
 UX corrections in [FLEETSPLICE-G05C-D0-DOGFOOD-UX-R1-002](../../goals/FLEETSPLICE-G05C-D0-DOGFOOD-UX-R1-002.md):
 exact message-source badges, native turn timing/lifecycle, and residual-command

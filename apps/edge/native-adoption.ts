@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { NativeActivityJournal } from '../../packages/native-adoption/activity-journal.ts';
 import { NativeAdoptionAdapter } from '../../packages/native-adoption/adapter.ts';
 import { discoverDaemon, nativeHome } from '../../packages/native-adoption/discovery.ts';
 import { OfficialNativeRpc } from '../../packages/native-adoption/transport.ts';
@@ -21,7 +22,10 @@ export async function nativeAdoptionEdge(workspace: string, stateDirectory: stri
     if (['native.submit', 'native.steer'].includes(command?.family)) provenance.push({ command, receipt: JSON.parse(String(receipt.value)) });
   }
   const identity = discoverDaemon(); const rpc = await OfficialNativeRpc.connect(identity);
-  const adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, discoverDaemon, () => rootProofNow(root.root), journal);
+  let adapter: NativeAdoptionAdapter;
+  try {
+    adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, discoverDaemon, () => rootProofNow(root.root), journal, new NativeActivityJournal(journal));
+  } catch (error) { rpc.close(); journal.close(); throw error; }
   try {
     for (const input of provenance) adapter.restoreInput(input.command, input.receipt);
     const initialized = await rpc.call('initialize', { clientInfo: { name: 'fleetsplice_native_adoption', version: '0.1.0' }, capabilities: { experimentalApi: true } });
@@ -39,7 +43,7 @@ if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.
       if (message.kind === 'stop') { edge.close(); process.exit(0); }
       try {
         const result = message.kind === 'snapshot' ? await edge.adapter.snapshot() : message.kind === 'execute' ?
-          await edge.adapter.execute(message.command, message.clientInstanceId, message.expiresAt) : message.kind === 'lookup' ? edge.adapter.lookup(message.commandId) : null;
+          await edge.adapter.execute(message.command, message.client) : message.kind === 'renewClient' ? await edge.adapter.renewClient(message.previous, message.next, message.continuity) : message.kind === 'lookup' ? edge.adapter.lookup(message.commandId) : null;
         process.send!({ id: message.id, result });
       } catch (error) { process.send!({ id: message.id, error: error instanceof Fault ? error.code : 'NATIVE_EDGE_REQUEST_FAILED' }); }
     });

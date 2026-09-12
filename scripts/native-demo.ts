@@ -27,7 +27,7 @@ export async function startNativeDemo(onReady: (url: string) => void) {
     const id = randomUUID(); const timer = setTimeout(() => { pending.delete(id); reject(new Fault('NATIVE_EDGE_RESPONSE_UNKNOWN_NO_REPLAY')); }, 55000);
     pending.set(id, { resolve, reject, timer }); edge.send({ id, kind, ...fields });
   });
-  const port: AdoptionPort = { snapshot: () => call('snapshot'), execute: (command, clientInstanceId, expiresAt) => call('execute', { command, clientInstanceId, expiresAt }), lookup: commandId => call('lookup', { commandId }) };
+  const port: AdoptionPort = { snapshot: () => call('snapshot'), execute: (command, client) => call('execute', { command, client }), renewClient: (previous, next, continuity) => call('renewClient', { previous, next, continuity }), lookup: commandId => call('lookup', { commandId }) };
   const bootstrapToken = randomBytes(32).toString('hex');
   // A fixed loopback endpoint admits only one D0 Hub before any native attach.
   const hub = await startHub({ port: 4319, target, ...identity, stateDirectory,

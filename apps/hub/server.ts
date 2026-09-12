@@ -1,5 +1,5 @@
 import { createServer, type ServerResponse, type IncomingMessage } from 'node:http';
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,14 +8,14 @@ import { Fault, parseJson, canonical, requireThat, validate, type Target, type H
 import { HubKernel, AdmissionRejected, type ClientGrant } from './kernel.ts';
 import { Journal } from '../../packages/journal/index.ts';
 import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
-import type { AdoptionPort } from '../../packages/native-adoption/types.ts';
+import type { AdoptionPort, AdoptionClient } from '../../packages/native-adoption/types.ts';
 
 export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[] };
 const equalSecret = (a: string, b: string) => {
   const left = Buffer.from(a); const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 };
-export async function startHub(config: HubConfig, adoption?: AdoptionPort) {
+export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: () => number = Date.now) {
   const origin = `http://127.0.0.1:${config.port}`; const host = `127.0.0.1:${config.port}`;
   const actorId = randomUUID();
   const sessions = new Map<string, number>();
@@ -42,12 +42,15 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort) {
   };
   const session = (req: IncomingMessage): string => {
     const cookie = /(?:^|;\s*)fleetsplice=([0-9a-f]{64})(?:;|$)/.exec(req.headers.cookie ?? '')?.[1];
-    requireThat(cookie && (sessions.get(cookie) ?? 0) > Date.now(), 'AUTH_REQUIRED'); return cookie;
+    requireThat(cookie && (sessions.get(cookie) ?? 0) > now(), 'AUTH_REQUIRED'); return cookie;
   };
   const grant = (req: IncomingMessage) => {
     const client = clients.get(String(req.headers['x-fleet-client']));
-    requireThat(client && client.session === session(req) && equalSecret(String(req.headers['x-fleet-csrf']), client.csrf) && client.expiresAt > Date.now(), 'CLIENT_AUTH_REQUIRED'); return client;
+    requireThat(client && client.session === session(req) && equalSecret(String(req.headers['x-fleet-csrf']), client.csrf) && client.expiresAt > now(), 'CLIENT_AUTH_REQUIRED'); return client;
   };
+  const adoptionClient = (client: ClientGrant & { session: string }): AdoptionClient => ({
+    clientInstanceId: client.clientInstanceId, grantId: client.grantId, grantRevision: client.grantRevision,
+    expiresAt: client.expiresAt, sessionBinding: createHash('sha256').update(client.session).digest('hex') });
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -58,21 +61,40 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort) {
       if (req.method === 'POST' && req.url === '/api/bootstrap') {
         const value = await body(req) as any;
         requireThat(value && Object.keys(value).length === 1 && typeof value.token === 'string' && !usedBootstrap && equalSecret(value.token, config.bootstrapToken), 'BOOTSTRAP_REJECTED');
-        usedBootstrap = true; const token = randomBytes(32).toString('hex'); sessions.set(token, Date.now() + 8 * 60 * 60_000);
+        usedBootstrap = true; const token = randomBytes(32).toString('hex'); sessions.set(token, now() + 8 * 60 * 60_000);
         res.setHeader('Set-Cookie', `fleetsplice=${token}; HttpOnly; SameSite=Strict; Path=/`); json(res, 200, { authenticated: true }); return;
       }
       if (req.url?.startsWith('/api/')) {
         const authenticatedSession = session(req);
         if (req.method === 'POST' && req.url === '/api/client') {
           requireThat(canonical(await body(req)) === '{}', 'SCHEMA_INVALID'); requireThat(clients.size < 64, 'CLIENT_LIMIT');
-          const client = { actorId, clientInstanceId: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt: Date.now() + 30 * 60_000, csrf: randomBytes(32).toString('hex'), session: authenticatedSession };
+          const client = { actorId, clientInstanceId: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt: Math.min(now() + 30 * 60_000, sessions.get(authenticatedSession)!), csrf: randomBytes(32).toString('hex'), session: authenticatedSession };
           clients.set(client.clientInstanceId, client); const { session: _, ...projection } = client; json(res, 200, projection); return;
+        }
+        if (req.method === 'POST' && req.url === '/api/client/renew') {
+          // Authenticate again after reading the body; a concurrent rotation cannot
+          // reuse a previously checked grant. Never recreate an expired identity.
+          const value = await body(req) as any;
+          const previous = grant(req);
+          requireThat(value && Object.keys(value).sort().join(',') === 'continuity,grantId,grantRevision' &&
+            value.grantId === previous.grantId && value.grantRevision === previous.grantRevision, 'CLIENT_RENEWAL_REJECTED');
+          const next = { ...previous, grantRevision: String(BigInt(previous.grantRevision) + 1n),
+            expiresAt: Math.min(now() + 30 * 60_000, sessions.get(authenticatedSession)!), csrf: randomBytes(32).toString('hex') };
+          requireThat(next.expiresAt > previous.expiresAt, 'CLIENT_RENEWAL_SESSION_LIMIT');
+          // Retire old credentials before crossing IPC. Any failure or lost response
+          // is closed; neither this route nor the browser retries the renewal.
+          clients.delete(previous.clientInstanceId);
+          if (adoption) await adoption.renewClient(adoptionClient(previous), adoptionClient(next), value.continuity);
+          else requireThat(value.continuity === null, 'CLIENT_RENEWAL_REJECTED');
+          requireThat(session(req) === authenticatedSession && next.expiresAt > now(), 'CLIENT_RENEWAL_EXPIRED');
+          clients.set(next.clientInstanceId, next);
+          const { session: _, ...projection } = next; json(res, 200, projection); return;
         }
         if (req.method === 'GET' && req.url === '/api/events') {
           requireThat(req.headers.origin === origin || req.headers['sec-fetch-site'] === 'same-origin', 'OBSERVATION_ORIGIN_REJECTED');
           requireThat(streams.size < 16, 'OBSERVER_LIMIT');
           res.writeHead(200, { 'Content-Type': 'text/event-stream', Connection: 'keep-alive' }); res.write(`data: ${kernel.snapshot().cursor}\n\n`); streams.add(res);
-          const expiry = setTimeout(() => res.end(), Math.min(30 * 60_000, sessions.get(authenticatedSession)! - Date.now()));
+          const expiry = setTimeout(() => res.end(), Math.min(30 * 60_000, sessions.get(authenticatedSession)! - now()));
           req.on('close', () => { clearTimeout(expiry); streams.delete(res); }); return;
         }
         grant(req);
@@ -80,7 +102,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort) {
         if (adoption) {
           if (req.method === 'GET' && req.url === '/api/native/snapshot') { json(res, 200, await adoption.snapshot()); return; }
           if (req.method === 'POST' && req.url === '/api/native/commands') {
-            const client = grant(req); json(res, 200, await adoption.execute(await body(req), client.clientInstanceId, client.expiresAt)); return;
+            const command = await body(req); const client = grant(req); json(res, 200, await adoption.execute(command, adoptionClient(client))); return;
           }
           if (req.method === 'GET' && /^\/api\/native\/commands\/[a-zA-Z0-9_-]{1,200}$/.test(req.url ?? '')) {
             const receipt = await adoption.lookup(req.url!.slice('/api/native/commands/'.length)); json(res, receipt ? 200 : 404, receipt ?? { error: 'COMMAND_UNKNOWN_NO_REPLAY' }); return;

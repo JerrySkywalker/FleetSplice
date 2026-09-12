@@ -173,6 +173,25 @@ test('activity bound holds without evicting terminal identity or resurrecting dr
   const rejected = await r.execute(r.command(snapshot, 'native.submit'));
   assert.equal(rejected.status, 'REJECTED'); assert.equal(r.rpc.calls.length, callCount);
 });
+
+for (const phase of ['initial', 'final'] as const) test(`attach ${phase} refresh overflow cannot dispatch after hold or restore control`, async () => {
+  const r = await setup();
+  r.rpc.turns[0].items.push(...Array.from({ length: 64 }, (_, index) => ({ id: `command-${index}`, type: 'commandExecution', status: 'completed' })));
+  const command = r.command(await r.adapter.snapshot(), 'native.attach');
+  let resumed = false; let injected = false;
+  r.rpc.before = method => {
+    if (method === 'thread/resume') resumed = true;
+    if (!injected && method === 'thread/turns/list' && (phase === 'initial' || resumed)) {
+      injected = true; r.rpc.turns[0].items.push({ id: 'command-65', type: 'commandExecution', status: 'completed' });
+    }
+  };
+  const receipt = await r.execute(command);
+  assert.equal(injected, true); assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_ACTIVITY_BOUND_EXCEEDED');
+  assert.equal(r.rpc.calls.filter(call => call.method === 'thread/resume' && call.params.threadId === r.rpc.thread.id).length, phase === 'initial' ? 0 : 1);
+  const snapshot = await r.adapter.snapshot(); assert.equal(snapshot.state, 'NATIVE_ACTIVITY_BOUND_EXCEEDED'); assert.equal(snapshot.controller, null);
+  const calls = r.rpc.calls.length;
+  assert.equal((await r.execute(r.command(snapshot, 'native.attach'))).status, 'REJECTED'); assert.equal(r.rpc.calls.length, calls);
+});
 test('capability modes downgrade without requiring optional controls', async () => {
   const r = await setup(); const c = structuredClone(r.adapter.compatibility.capabilities);
   c.steer.available = false; c.interrupt.available = false; assert.equal(classifyCapabilities(c), 'ADOPT_FULL');

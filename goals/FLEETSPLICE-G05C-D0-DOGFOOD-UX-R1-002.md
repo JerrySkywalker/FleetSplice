@@ -24,7 +24,7 @@ history cannot resurrect an observed terminal command. At the 64-command
 evidence bound, observation/control holds instead of evicting terminal facts.
 Interrupt never claims OS process termination.
 
-Corrected candidate validation: typecheck/build and 121 tests passed, preserving all 115
+Corrected candidate validation: typecheck/build and 123 tests passed, preserving all 115
 previous tests. Live evidence outside Git under the matching Goal directory in
 `V:/artifacts/FleetSplice` records the literal ordinary TUI launch, TUI/Web source
 badges on one thread, visible working/completion timing, residual warning and
@@ -50,6 +50,12 @@ landed in the checkout during that review; the Implementer relocated that exact
 owned artifact outside Git after reacquiring the writer lease. All candidate
 source hashes had remained unchanged during review. The new candidate boundary
 must be revalidated.
+
+The first committed review additionally found that overflow inside Attach's
+initial or final refresh could bypass the hold or restore control. Both attach
+boundaries now reject a held observation before dispatch/control assignment;
+two regressions cover those exact timings. `final-correction-live` repeats the
+ordinary same-thread UX sequence with these guards in place.
 
 Final acceptance requires the corrected gates and live evidence, then
 commit/push and a fresh separate strongest read-only review of the exact

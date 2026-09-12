@@ -318,6 +318,7 @@ export class NativeAdoptionAdapter {
         requireThat(this.threads.has(c.threadId) && (await this.loaded()).has(c.threadId), 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
         const baseline = this.nativeStateEvents;
         const binding = await this.readThread(c.threadId);
+        requireThat(this.state === 'READY', this.state);
         requireThat(binding.view.stateToken === c.stateToken && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
         if (c.family === 'native.attach') {
           requireThat(!this.controller || this.controller === authenticatedClient, 'FLEET_CONTROLLER_ALREADY_HELD');
@@ -331,6 +332,7 @@ export class NativeAdoptionAdapter {
           binding.view.permission = typeof resumed.approvalPolicy === 'string' && typeof resumed.sandbox?.type === 'string' ? `${resumed.sandbox.type} · approval=${resumed.approvalPolicy}` : null;
           this.capability('effectiveState', !!binding.view.permission, 'Exact thread/resume response; no configuration overrides');
           await this.readThread(c.threadId, true);
+          requireThat(this.state === 'READY', this.state);
           this.controller = authenticatedClient; this.controllerExpires = expiresAt; this.fence++;
           code = 'NATIVE_SAME_THREAD_ATTACHED_COOPERATIVE';
         } else {

@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { target } from './helpers.ts';
 import { assertFreshIncarnation, candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, edgeAdmissionState, G05B_OWNER_RETIREMENT_RUN, G05C_P1_OWNER_RETIREMENT_RUN, G05C_P1_PROTOCOL_REPAIR_RETIREMENT_RUN, networkPreflight, parseWindowsProxy, proxyConfigurationRequired, readUserProxyConfiguration, resolveProxy, retireOwnerAuthorizedUnknown, retireOwnerAuthorizedUnprovable, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration } from '../packages/local-operation/index.ts';
 import { supervisorProxy } from '../scripts/supervisor.ts';
+import { managedNativeFixture } from './managed-native-fixture.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
 const journalSchema = 'CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL); CREATE TABLE records (id TEXT PRIMARY KEY, digest TEXT NOT NULL, value TEXT NOT NULL); CREATE TABLE aliases (alias TEXT PRIMARY KEY, id TEXT NOT NULL, digest TEXT NOT NULL)';
@@ -72,7 +73,7 @@ test('stale permission rejection closes safely but malformed and ambiguous resul
 
 test('exact Node and native Codex discovery retain the accepted pins', () => {
   const node = discoverNode([process.execPath]); assert.equal(node.version, 'v24.20.0'); assert.equal(node.sqlite, '3.53.4');
-  const codex = discoverCodex(candidateCodexPaths()); assert.match(codex.path, /codex\.exe$/i); assert.equal(codex.version, '0.153.4'); assert.equal(codex.sha256.length, 64);
+  const codex = managedNativeFixture(); assert.match(codex.path, /codex\.exe$/i); assert.equal(codex.version, '0.153.4'); assert.equal(codex.sha256.length, 64);
 });
 test('persistent proxy configuration is private, atomic, fail-closed, and has the required precedence', async () => {
   const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-proxy-config-'));

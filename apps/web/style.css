@@ -38,6 +38,13 @@
   box-sizing:border-box}
 body {
   margin:0}
+.native-demo .native-cooperative { padding:12px 24px; background:var(--panel); border-bottom:1px solid var(--border); }
+.native-demo .native-cooperative p { margin:5px 0 0; color:var(--muted); }
+.native-demo .native-attach { padding:16px 24px; }
+.native-demo .native-controls { display:flex; gap:8px; flex-wrap:wrap; }
+.native-demo .session { display:flex; flex-direction:column; gap:5px; align-items:flex-start; width:100%; }
+.native-demo .session small, .native-demo dd { overflow-wrap:anywhere; }
+.native-demo pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; }
 button,input,textarea,select {
   color:var(--text);
   font:inherit}

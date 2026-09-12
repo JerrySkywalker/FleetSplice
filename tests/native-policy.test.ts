@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { managedNativeFixture } from './managed-native-fixture.ts';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,7 +25,7 @@ test('native policy disables every inherited MCP name and rejects unqualified in
 
 test('pinned native binary suppresses inherited integrations, notify and image tools, with a final effect gate', { timeout: 90000 }, async () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-native-policy-'));
-  const executable = path.join(process.env.APPDATA!, 'npm/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe');
+  const executable = managedNativeFixture().path;
   const worker = fileURLToPath(new URL('./native-policy-worker.js', import.meta.url));
   const results: Record<string, unknown> = {};
   for (const scenario of ['suppressed', 'control']) {

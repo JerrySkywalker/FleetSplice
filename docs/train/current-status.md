@@ -3,6 +3,13 @@
 This file is the current train-status pointer. Historical goal receipts and
 accepted status files remain evidence and are not rewritten by this summary.
 
+The later Owner Goal `FLEETSPLICE-G05C-D0-NATIVE-ADOPTION-HUMAN-DEMO-001`
+authorizes a local native adoption demo from accepted P1/P2A/P2B. Its candidate
+is in progress on `feat/g05c-native-adoption-demo`; human demo and independent
+acceptance remain pending. See [the demo guide](native-adoption-demo.md) and
+[the additive native adoption contract](../architecture/native-adoption-d0.md).
+The new adoption path is capability-driven. P3 and G06 remain unstarted.
+
 The later Owner decision `FLEETSPLICE-G05C-P2B-PATH-A-RESUME-003` selects
 session-scoped permissions and treats native project trust as a separate
 prerequisite. P2B raw proof and real product stages passed in the already-trusted

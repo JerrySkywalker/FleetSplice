@@ -44,7 +44,7 @@ export type Hcp = { v: 1; connectionId: string; target: Target } & (
   { kind: 'event'; event: NativeEvent } |
   { kind: 'closed'; reason: string }
 );
-export type Lane = { sessionId: string; laneId: string; segmentId: string; title: string; target: Target; root: string; fence: Fence; state: string; nativeThreadId: string | null; nativeTurnId: string | null; requestedModel: string | null; requestedReasoningEffort: string | null; effectiveModel: string | null; effectiveReasoningEffort: string | null; requestedPermission?: PermissionPreset; effectivePermission?: NativePermissionEvidence; activity: { text: string; status: string }[]; transcript: { role: 'user' | 'assistant' | 'system'; text: string }[] };
+export type Lane = { origin?: 'FLEETSPLICE_MANAGED'; sessionId: string; laneId: string; segmentId: string; title: string; target: Target; root: string; fence: Fence; state: string; nativeThreadId: string | null; nativeTurnId: string | null; requestedModel: string | null; requestedReasoningEffort: string | null; effectiveModel: string | null; effectiveReasoningEffort: string | null; requestedPermission?: PermissionPreset; effectivePermission?: NativePermissionEvidence; activity: { text: string; status: string }[]; transcript: { role: 'user' | 'assistant' | 'system'; text: string }[] };
 export type CommandRecord = { command: FleetCommand; plan: Plan; status: string; receipt: Receipt | null };
 export type Snapshot = { status: string; target: Target; root: string; registered: boolean; workspaces: (WorkspaceBinding & { registered: boolean })[]; capabilities: NativeCapabilityCatalog | null; lanes: Lane[]; commands: CommandRecord[]; cursor: string };
 

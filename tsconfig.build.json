@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "outDir": "dist", "rootDir": ".", "sourceMap": true },
-  "include": ["apps/hub/**/*.ts", "apps/edge/**/*.ts", "packages/**/*.ts", "scripts/local.ts", "scripts/supervisor.ts", "scripts/fleetsplice.ts"]
+  "include": ["apps/hub/**/*.ts", "apps/edge/**/*.ts", "packages/**/*.ts", "scripts/local.ts", "scripts/supervisor.ts", "scripts/fleetsplice.ts", "scripts/native-demo.ts"]
 }

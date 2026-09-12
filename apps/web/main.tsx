@@ -5,6 +5,7 @@ import type { FleetCommand, Intent, Snapshot, CommandRecord, PermissionPreset } 
 import { stateText, systemText, translate, type MessageKey, type Locale } from './i18n.ts';
 import { browserStorage, persistPreference, readPreferences, resolveTheme, type Appearance } from './preferences.ts';
 import { PreferencesControl } from './PreferencesControl.tsx';
+import { NativeAdoption } from './NativeAdoption.tsx';
 import './style.css';
 
 type Client = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; csrf: string };
@@ -35,6 +36,7 @@ function App() {
   const changeLocale = (value: Locale) => { setLocale(value); const saved = persistPreference(browserStorage(), 'locale', value); setPreferenceSaves(previous => ({ ...previous, locale: saved })); };
   const changeAppearance = (value: Appearance) => { setAppearance(value); const saved = persistPreference(browserStorage(), 'appearance', value); setPreferenceSaves(previous => ({ ...previous, appearance: saved })); };
   const [client, setClient] = useState<Client | null>(null);
+  const [nativeMode, setNativeMode] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
@@ -78,7 +80,10 @@ function App() {
       history.replaceState(null, '', location.pathname);
       if (token) await request('/api/bootstrap', { token });
       const identity: Client = await request('/api/client', {});
-      clientRef.current = identity; setClient(identity); await refresh();
+      clientRef.current = identity; setClient(identity);
+      const mode = await request('/api/mode');
+      if (mode.mode === 'NATIVE_ADOPTION') { setNativeMode(true); return; }
+      await refresh();
       events = new EventSource('/api/events'); events.onmessage = () => void refresh();
       events.onerror = () => { setError({ key: 'observationLost', code: 'OBSERVATION_UNKNOWN' }); setSnapshot(old => old ? { ...old, status: 'OBSERVATION_UNKNOWN' } : old); };
     })().catch(e => setError({ key: 'requestFailed', code: errorCode(e) }));
@@ -167,6 +172,8 @@ function App() {
     const model = models.find(item => item.id === value);
     setSelectedModel(value); setSelectedReasoning(model?.defaultReasoningEffort ?? '');
   }
+  if (nativeMode && client) return <NativeAdoption client={client} request={request} locale={locale}
+    preferences={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}/>;
   return <div className="shell">
     <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('edition')}</span></div><div className="owner"><PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/><span className="owner-name">Jerry</span><span className="avatar">J</span></div></header>
     <aside className="navigation">

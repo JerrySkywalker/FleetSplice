@@ -31,7 +31,7 @@ export class HubKernel {
     this.registeredWorkspaceIds = journal.get<string[]>('registeredWorkspaceIds') ?? (this.registered ? [target.workspaceId] : []);
   }
   snapshot(): Snapshot {
-    return { status: this.status, target: this.target, root: this.root, registered: this.registered, workspaces: structuredClone(this.workspaces.map(w => ({ ...w, registered: this.registeredWorkspaceIds.includes(w.target.workspaceId) }))), capabilities: structuredClone(this.capabilities), lanes: structuredClone(this.lanes), commands: this.commands(), cursor: this.cursor.toString() };
+    return { status: this.status, target: this.target, root: this.root, registered: this.registered, workspaces: structuredClone(this.workspaces.map(w => ({ ...w, registered: this.registeredWorkspaceIds.includes(w.target.workspaceId) }))), capabilities: structuredClone(this.capabilities), lanes: structuredClone(this.lanes.map(lane => ({ ...lane, origin: 'FLEETSPLICE_MANAGED' as const }))), commands: this.commands(), cursor: this.cursor.toString() };
   }
   private commands(): CommandRecord[] { return this.journal.list<StoredCommand>().filter((record): record is CommandRecord => 'plan' in record); }
   private replay(record: StoredCommand, requestedId = record.command.commandId): CommandRecord {

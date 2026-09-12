@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { managedNativeFixture } from './managed-native-fixture.ts';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -59,7 +60,7 @@ test('detached supervisor keeps one local writer, serves a second terminal, and 
   assert.equal(typeof supervisorEntrypoint, 'function');
   const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-supervisor-appdata-'));
   const workspace = mkdtempSync(path.join(tmpdir(), 'fleetsplice-supervisor-workspace-'));
-  const executable = discoverCodex(candidateCodexPaths()).path;
+  const executable = managedNativeFixture().path;
   const supervisor = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'supervisor.js');
   const supervisorLauncher = path.join(process.cwd(), 'scripts', 'start-supervisor.ps1');
   const env = { ...process.env, LOCALAPPDATA: localAppData };

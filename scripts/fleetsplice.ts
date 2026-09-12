@@ -193,6 +193,16 @@ async function configure(args: string[]) {
 }
 export async function fleetspliceEntrypoint() {
   const args = process.argv.slice(2); const command = args[0]; const workspaceIndex = args.indexOf('--workspace'); const workspace = workspaceIndex >= 0 ? args[workspaceIndex + 1] ?? process.cwd() : process.cwd();
+  if (command === 'native-demo') {
+    requireThat(args.length === 1, 'USAGE_FLEETSPLICE_NATIVE_DEMO');
+    const { startNativeDemo } = await import('./native-demo.ts');
+    let demo: Awaited<ReturnType<typeof startNativeDemo>>;
+    try { demo = await startNativeDemo(url => output(`FleetSplice Native Adoption demo\n${url}\nCONTROL_MODE=COOPERATIVE\nLocal Codex TUI remains connected. Type stop here to close only FleetSplice.`)); }
+    catch (reason) { error(`NATIVE_DEMO_START_FAILED\n${reason instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(reason.message) ? reason.message : 'NATIVE_ADOPTION_ADMISSION_UNPROVABLE'}`); return; }
+    const stopDemo = () => { demo.stop().then(() => process.exit(0)); };
+    process.stdin.setEncoding('utf8'); process.stdin.on('data', value => { if (String(value).trim() === 'stop') stopDemo(); });
+    process.on('SIGINT', stopDemo); process.on('SIGTERM', stopDemo); return;
+  }
   if (command === 'permission') {
     const identity = await localIdentity(process.cwd()); const host = { principal: identity.principal, sid: identity.sid };
     if (args[1] === 'show' && args.length === 2) { output(code({ maximum: readCeiling(host), authority: 'LOCAL_HOST' })); return; }

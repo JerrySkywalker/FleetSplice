@@ -8,13 +8,14 @@ import { Fault, parseJson, canonical, requireThat, validate, type Target, type H
 import { HubKernel, AdmissionRejected, type ClientGrant } from './kernel.ts';
 import { Journal } from '../../packages/journal/index.ts';
 import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
+import type { AdoptionPort } from '../../packages/native-adoption/types.ts';
 
 export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[] };
 const equalSecret = (a: string, b: string) => {
   const left = Buffer.from(a); const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 };
-export async function startHub(config: HubConfig) {
+export async function startHub(config: HubConfig, adoption?: AdoptionPort) {
   const origin = `http://127.0.0.1:${config.port}`; const host = `127.0.0.1:${config.port}`;
   const actorId = randomUUID();
   const sessions = new Map<string, number>();
@@ -75,6 +76,17 @@ export async function startHub(config: HubConfig) {
           req.on('close', () => { clearTimeout(expiry); streams.delete(res); }); return;
         }
         grant(req);
+        if (req.method === 'GET' && req.url === '/api/mode') { json(res, 200, { mode: adoption ? 'NATIVE_ADOPTION' : 'FLEETSPLICE_MANAGED' }); return; }
+        if (adoption) {
+          if (req.method === 'GET' && req.url === '/api/native/snapshot') { json(res, 200, await adoption.snapshot()); return; }
+          if (req.method === 'POST' && req.url === '/api/native/commands') {
+            const client = grant(req); json(res, 200, await adoption.execute(await body(req), client.clientInstanceId, client.expiresAt)); return;
+          }
+          if (req.method === 'GET' && /^\/api\/native\/commands\/[a-zA-Z0-9_-]{1,200}$/.test(req.url ?? '')) {
+            const receipt = await adoption.lookup(req.url!.slice('/api/native/commands/'.length)); json(res, receipt ? 200 : 404, receipt ?? { error: 'COMMAND_UNKNOWN_NO_REPLAY' }); return;
+          }
+          throw new Fault('ROUTE_NOT_FOUND');
+        }
         if (req.method === 'GET' && req.url === '/api/snapshot') { json(res, 200, kernel.snapshot()); return; }
         if (req.method === 'GET' && /^\/api\/commands\/[0-9a-f-]{36}$/.test(req.url ?? '')) {
           const record = kernel.lookup(req.url!.slice('/api/commands/'.length)); json(res, record ? 200 : 404, record ?? { error: 'COMMAND_UNKNOWN' }); return;

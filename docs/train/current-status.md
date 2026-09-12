@@ -2,11 +2,14 @@
 
 The bounded [P3 approval slice](../../goals/FLEETSPLICE-G05C-P3-APPROVAL-CONTROL-001.md)
 adds Allow once / Deny for observed native coding approvals on an adopted ordinary
-TUI thread. All 146 tests passed, including the preserved 134. Real headed Web/TUI
+TUI thread. The initial 146-test candidate preserved all 134 existing tests. Real headed Web/TUI
 acceptance exercised late attach, Allow once, Deny, both sequential race
 directions, viewer rejection, same-browser renewal and return to the same TUI.
-Dedicated file-change requests are schema/fixture qualified; turn/session
-permission grants remain unavailable. The candidate requires a fresh separate
+The independent review required complete action context and a delivery deadline;
+the correction passed all 148 tests and complete repeated visible acceptance,
+including a screenshot that visibly shows the return-to-TUI response.
+Dedicated file-change requests and turn/session permission grants remain
+unavailable when a complete one-action approval cannot be presented. The candidate requires a fresh separate
 exact-head read-only review; its final Git identity and review receipt are in the
 external Goal directory. No merge or G06 is authorized.
 

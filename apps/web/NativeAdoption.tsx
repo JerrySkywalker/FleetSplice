@@ -101,7 +101,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         {!snapshot?.compatibility.capabilities.approvalResolve.available && <p>APPROVAL_UNAVAILABLE</p>}
         {snapshot?.approvals?.filter(a => a.threadId === thread.id).slice(-8).map(a => <article key={`${typeof a.requestId}:${a.requestId}`}>
           <strong>{a.status === 'PENDING' ? t('Needs approval', '需要审批') : a.status === 'RESOLVED' ? t('Native request resolved', '原生请求已解决') : a.status === 'STALE' ? 'STALE_NATIVE_REQUEST' : a.status}</strong>
-          <p>{a.summary}</p><small>{a.workspace} · {a.requestType} · {t('Turn', '轮次')} {a.turnId}</small>
+          <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{a.summary}</p><small>{a.workspace} · {a.requestType} · {t('Turn', '轮次')} {a.turnId}</small>
           {!a.supported && <p>APPROVAL_UNAVAILABLE</p>}
           {a.supported && a.status === 'PENDING' && <div>
             {(['ALLOW_ONCE', 'DENY'] as const).map(decision => <button key={decision} disabled={!available || !controlled || !a.authority || !snapshot.compatibility.capabilities.approvalResolve.available}

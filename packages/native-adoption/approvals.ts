@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { canonical, requireThat } from '../contracts/json.ts';
+import { canonical, Fault, requireThat } from '../contracts/json.ts';
 import type { NativeMessage } from './transport.ts';
 
 export type ApprovalIdentity = { requestId: string | number; threadId: string; turnId: string; itemId: string; requestType: string; digest: string };
@@ -12,21 +12,32 @@ const key = (x: string | number) => canonical(x);
 /** Connection-local requests only. Never restore pending authority from a journal. */
 export class NativeApprovals {
   private entries = new Map<string, Entry>();
+  constructor(private readonly deadlineMs = 12000) {}
   observe(message: NativeMessage, workspace: string): boolean {
     if (message.id === undefined) return false;
     const p = message.params;
     requireThat(requestId(message.id) && nativeId(p?.threadId) && nativeId(p?.turnId) && nativeId(p?.itemId), 'NATIVE_REQUEST_IDENTITY_UNPROVABLE');
     let allow: unknown = null, deny: unknown = null;
+    let summary = 'APPROVAL_UNAVAILABLE: complete native action details are not available. Resolve in the native TUI.';
     if (message.method === 'item/commandExecution/requestApproval' && (p.kind === undefined || p.kind === 'command') &&
-      !p.networkApprovalContext && (p.cwd == null || p.cwd.toLowerCase() === workspace.toLowerCase())) {
+      !p.networkApprovalContext && (p.cwd == null || p.cwd.toLowerCase() === workspace.toLowerCase()) &&
+      typeof p.command === 'string' && p.command.trim().length > 0 &&
+      [p.reason, p.environmentId].every(value => value == null || typeof value === 'string')) {
+      const details = [p.command, p.reason ? `Reason: ${p.reason}` : '', p.environmentId ? `Environment: ${p.environmentId}` : '',
+        p.additionalPermissions ? `Requested command permissions: ${canonical(p.additionalPermissions)}` : ''].filter(Boolean).join('\n');
       // A supplied native decision list is authoritative, including absence of decline.
       const decisions = p.availableDecisions ?? ['accept', 'decline', 'cancel'];
-      if (Array.isArray(decisions) && decisions.includes('accept')) allow = { decision: 'accept' };
-      if (Array.isArray(decisions) && decisions.includes('decline')) deny = { decision: 'decline' };
-      else if (Array.isArray(decisions) && decisions.includes('cancel')) deny = { decision: 'cancel' };
-    } else if (message.method === 'item/fileChange/requestApproval' && !p.grantRoot) {
-      allow = { decision: 'accept' }; deny = { decision: 'decline' };
+      // Never authorize a hidden suffix, omitted permission detail or control
+      // sequence. Keep the entire bounded action inspectable, or offer no control.
+      if (details.length <= 4000 && !/[\u0000-\u0008\u000b-\u001f\u007f\u202a-\u202e\u2066-\u2069]/.test(details)) {
+        summary = details;
+        if (Array.isArray(decisions) && decisions.includes('accept')) allow = { decision: 'accept' };
+        if (Array.isArray(decisions) && decisions.includes('decline')) deny = { decision: 'decline' };
+        else if (Array.isArray(decisions) && decisions.includes('cancel')) deny = { decision: 'cancel' };
+      }
     }
+    // File-change request parameters contain no affected paths/diffs. Until
+    // complete exact-item context is projected, a reason is not consent evidence.
     // Permission grants are turn/session scoped, not Allow Once. Unknown request
     // classes, managed-network prompts and persistent grants stay unavailable.
     const digest = createHash('sha256').update(canonical({ id: message.id, method: message.method, params: p })).digest('hex');
@@ -35,7 +46,7 @@ export class NativeApprovals {
     requireThat(this.entries.size < 128, 'NATIVE_APPROVAL_BOUND_EXCEEDED');
     const supported = allow !== null && deny !== null;
     this.entries.set(key(message.id), { view: { requestId: message.id, threadId: p.threadId, turnId: p.turnId, itemId: p.itemId,
-      requestType: message.method!, digest, summary: String(p.command ?? p.reason ?? 'Native request').slice(0, 1000), workspace,
+      requestType: message.method!, digest, summary, workspace,
       status: 'PENDING', supported }, allow, deny });
     return supported;
   }
@@ -65,11 +76,14 @@ export class NativeApprovals {
     requireThat(decision === 'ALLOW_ONCE' || decision === 'DENY', 'NATIVE_APPROVAL_DECISION_INVALID');
     entry.view.status = 'SENDING';
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const settled = new Promise<void>(resolve => { entry.settled = resolve; timer = setTimeout(resolve, 12000); });
+    const settled = new Promise<void>(resolve => { entry.settled = resolve; });
+    const deadline = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Fault('NATIVE_APPROVAL_OUTCOME_UNKNOWN')), this.deadlineMs); });
     try {
-      await send(identity.requestId, decision === 'ALLOW_ONCE' ? entry.allow : entry.deny);
-      await settled;
-      requireThat(entry.view.status as string === 'RESOLVED', 'NATIVE_APPROVAL_OUTCOME_UNKNOWN');
+      await Promise.race([deadline, (async () => {
+        await send(identity.requestId, decision === 'ALLOW_ONCE' ? entry.allow : entry.deny);
+        await settled;
+        requireThat(entry.view.status as string === 'RESOLVED', 'NATIVE_APPROVAL_OUTCOME_UNKNOWN');
+      })()]);
     } catch (error) { entry.view.status = 'UNKNOWN'; throw error; }
     finally { clearTimeout(timer); delete entry.settled; }
   }

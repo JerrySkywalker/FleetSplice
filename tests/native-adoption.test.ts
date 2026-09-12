@@ -124,7 +124,7 @@ test('file approval, unknown requests and turn-scoped permission grants have dis
   for (const method of ['item/fileChange/requestApproval', 'item/permissions/requestApproval', 'item/tool/call', 'unknown/requestApproval']) {
     const store = new NativeApprovals();
     const supported = store.observe({ id: 'request', method, params: { threadId: 'thread', turnId: 'turn', itemId: 'item' } }, workspace);
-    assert.equal(supported, method === 'item/fileChange/requestApproval');
+    assert.equal(supported, false); // File-change params alone contain no inspectable paths/diffs.
     if (!supported) assert.throws(() => store.exact(store.views()[0]!), /APPROVAL_UNAVAILABLE/);
   }
 });
@@ -134,6 +134,37 @@ test('approval ID reuse and persistent file grants remain fail closed', () => {
   const message = { id: 0, method: 'item/fileChange/requestApproval', params: { threadId: 'thread', turnId: 'turn', itemId: 'item', grantRoot: 'V:\\' } };
   assert.equal(store.observe(message, workspace), false);
   assert.throws(() => store.observe({ ...message, params: { ...message.params, itemId: 'another' } }, workspace), /NATIVE_REQUEST_ID_REUSED/);
+});
+
+test('approval preserves complete command details and refuses hidden or unavailable action context', () => {
+  for (const command of ['x'.repeat(1100), 'x'.repeat(4001), '', 'echo safe\u202Ehidden']) {
+    const store = new NativeApprovals();
+    const supported = store.observe({ id: 0, method: 'item/commandExecution/requestApproval', params: {
+      threadId: 'thread', turnId: 'turn', itemId: 'item', command } }, workspace);
+    assert.equal(supported, command.length === 1100);
+    if (supported) assert.equal(store.views()[0]!.summary, command);
+    else assert.throws(() => store.exact(store.views()[0]!), /APPROVAL_UNAVAILABLE/);
+  }
+  const store = new NativeApprovals();
+  store.observe({ id: 0, method: 'item/commandExecution/requestApproval', params: { threadId: 'thread', turnId: 'turn', itemId: 'item',
+    command: 'echo hello', environmentId: 'local', reason: 'test reason', additionalPermissions: { network: true } } }, workspace);
+  assert.match(store.views()[0]!.summary, /echo hello\nReason: test reason\nEnvironment: local\nRequested command permissions:.*network/);
+});
+
+test('approval deadline bounds stalled send and resolution and preserves unknown without replay', { timeout: 2000 }, async () => {
+  for (const stalledSend of [true, false]) {
+    const store = new NativeApprovals(20); let sent = 0;
+    store.observe({ id: 0, method: 'item/commandExecution/requestApproval', params: {
+      threadId: 'thread', turnId: 'turn', itemId: 'item', command: 'echo safe' } }, workspace);
+    const request = store.views()[0]!;
+    await assert.rejects(store.respond(request, 'ALLOW_ONCE', async () => {
+      sent++;
+      if (stalledSend) { store.resolved('thread', 0); await new Promise(() => {}); }
+    }), /NATIVE_APPROVAL_OUTCOME_UNKNOWN/);
+    assert.equal(store.views()[0]!.status, 'UNKNOWN');
+    await assert.rejects(store.respond(request, 'ALLOW_ONCE', async () => { sent++; }), /STALE_NATIVE_REQUEST/);
+    assert.equal(sent, 1);
+  }
 });
 
 const workspace = 'V:\\disposable-native-demo';

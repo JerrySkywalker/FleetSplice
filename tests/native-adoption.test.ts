@@ -17,7 +17,8 @@ import { target } from './helpers.ts';
 const workspace = 'V:\\disposable-native-demo';
 class Rpc implements NativeRpc {
   onEvent: NativeRpc['onEvent'] = () => {}; onClose = () => {};
-  thread: any = { id: 'native-existing-thread', cwd: workspace, status: { type: 'idle' }, model: 'native-model', canAcceptDirectInput: true, threadSource: 'user' };
+  thread: any = { id: 'native-existing-thread', cwd: workspace, status: { type: 'idle' }, model: 'native-model', canAcceptDirectInput: true, threadSource: 'user', ephemeral: false };
+  ephemeralCandidate: any = null;
   turns: any[] = [{ id: 'native-existing-turn', status: 'completed', items: [{ id: 'first-user', type: 'userMessage', content: [{ type: 'text', text: 'Original TUI conversation' }] }, { id: 'first-answer', type: 'agentMessage', text: 'Original native answer' }] }];
   calls: { method: string; params: any }[] = [];
   missing = new Set<string>(); loaded = true; resumeId: string | null = null;
@@ -28,9 +29,14 @@ class Rpc implements NativeRpc {
   async call(method: string, params: any): Promise<any> {
     this.calls.push({ method, params: structuredClone(params) }); this.before(method, params);
     if (this.missing.has(method)) throw new NativeRpcError(-32601, 'Method not found');
+    if (this.ephemeralCandidate && params.threadId === this.ephemeralCandidate.id) {
+      if (method === 'thread/read') return { thread: structuredClone(this.ephemeralCandidate) };
+      if (method === 'thread/turns/list') throw new NativeRpcError(-32600, 'ephemeral threads do not support thread/turns/list');
+      throw Error('Ephemeral thread received unexpected effect');
+    }
     if (params.threadId && params.threadId !== this.thread.id) throw new NativeRpcError(-32600, 'thread not found');
     if (method === 'thread/list') return { data: [structuredClone(this.thread)], nextCursor: null };
-    if (method === 'thread/loaded/list') return { data: this.loaded ? [this.thread.id] : [], nextCursor: null };
+    if (method === 'thread/loaded/list') return { data: this.loaded ? [this.thread.id, ...(this.ephemeralCandidate ? [this.ephemeralCandidate.id] : [])] : [], nextCursor: null };
     if (method === 'thread/read') return { thread: structuredClone(this.thread) };
     if (method === 'thread/turns/list') return { data: structuredClone(this.turns), nextCursor: null };
     if (method === 'thread/resume') return { thread: { ...structuredClone(this.thread), id: this.resumeId ?? this.thread.id }, approvalPolicy: 'never', sandbox: { type: 'dangerFullAccess' } };
@@ -153,6 +159,51 @@ test('stale active turn and stale Fleet fences reject before a native effect; co
   assert.equal((await r.execute(r.command(old, 'native.submit'))).code, 'STALE_FLEET_CONTROLLER_FENCE');
   const value = r.command(await r.adapter.snapshot(), 'native.interrupt'); const first = await r.execute(value); const count = r.rpc.calls.length;
   assert.deepEqual(await r.execute(value), first); assert.deepEqual(r.adapter.lookup(value.commandId), first); assert.equal(r.rpc.calls.length, count);
+});
+
+test('input arriving during the final acknowledgement read remains unreviewed', async () => {
+  const r = await setup(); await r.attach();
+  r.rpc.turns[0].items.push({ id: 'external-before-review', type: 'userMessage', content: [{ type: 'text', text: 'Visible local input' }] });
+  const displayed = await r.adapter.snapshot(); assert.equal(displayed.threads[0]!.externalAdvance, true);
+  let reads = 0;
+  r.rpc.before = method => {
+    if (method === 'thread/turns/list' && ++reads === 2) r.rpc.turns[0].items.push({ id: 'external-during-review', type: 'userMessage', content: [{ type: 'text', text: 'Unseen newer local input' }] });
+  };
+  const receipt = await r.execute(r.command(displayed, 'native.reviewState'));
+  assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
+  const current = await r.adapter.snapshot(); assert.equal(current.fence, displayed.fence); assert.equal(current.threads[0]!.externalAdvance, true);
+  assert.equal((await r.execute(r.command(current, 'native.submit'))).code, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
+  r.rpc.before = () => {};
+  assert.equal((await r.execute(r.command(current, 'native.reviewState'))).status, 'SUCCEEDED');
+});
+
+test('a failed observation retains sanitized phase and identity evidence and never retries or permits effects', async () => {
+  const r = await setup(); await r.attach();
+  r.rpc.before = method => { if (method === 'thread/turns/list') throw new NativeRpcError(-32603, 'resource busy: unrelated private path and payload'); };
+  const held = await r.adapter.snapshot(); const calls = r.rpc.calls.length;
+  assert.equal(held.state, 'NATIVE_OPERATION_UNPROVABLE'); assert.equal(held.controller, null);
+  assert.equal(held.observationFailure?.phase, 'thread/turns/list'); assert.equal(held.observationFailure?.nativeCode, -32603);
+  assert.equal(held.observationFailure?.reason, 'RESOURCE_BUSY'); assert.equal(held.observationFailure?.threadId, r.rpc.thread.id);
+  assert.equal(held.observationFailure?.incarnation, held.incarnation);
+  assert.ok(r.evidence.some(e => e.kind === 'NATIVE_OBSERVATION_FAILURE'));
+  assert.doesNotMatch(JSON.stringify(r.evidence), /unrelated private path|payload/);
+  await r.adapter.snapshot(); assert.equal(r.rpc.calls.length, calls);
+  assert.equal((await r.execute(r.command(held, 'native.submit'))).status, 'REJECTED'); assert.equal(r.rpc.calls.length, calls);
+});
+
+test('native ephemeral background candidates never hydrate history or disable the adopted TUI controller', async () => {
+  const r = await setup(); await r.attach(); const before = await r.adapter.snapshot();
+  r.rpc.ephemeralCandidate = { ...structuredClone(r.rpc.thread), id: 'native-ephemeral-background', ephemeral: true };
+  for (let i = 0; i < 3; i++) {
+    const observed = await r.adapter.snapshot();
+    assert.equal(observed.state, 'READY'); assert.equal(observed.controller, r.client); assert.equal(observed.fence, before.fence);
+    assert.deepEqual(observed.threads.map(t => t.id), [r.rpc.thread.id]);
+  }
+  assert.equal(r.rpc.calls.filter(c => c.params.threadId === r.rpc.ephemeralCandidate.id && c.method !== 'thread/read').length, 0);
+  assert.equal(r.evidence.filter(e => e.kind === 'NATIVE_DISCOVERY_NOT_ATTACHABLE').length, 1);
+  assert.equal((await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'))).status, 'SUCCEEDED');
+  r.rpc.thread.ephemeral = true; const held = await r.adapter.snapshot();
+  assert.equal(held.state, 'NATIVE_THREAD_NOT_ATTACHABLE'); assert.equal(held.controller, null);
 });
 test('ambiguous native response closes admission and cannot be resubmitted under a fresh command ID', async () => {
   const r = await setup(); await r.attach();

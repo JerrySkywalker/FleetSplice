@@ -28,6 +28,10 @@ export class NativeAdoptionAdapter {
   private effectPending = false;
   private ownedTurns = new Set<string>();
   private ownedInputs = new Map<string, { threadId: string; turnId: string | null; text: string }>();
+  private observationPhase = 'identity';
+  private observationThread: string | null = null;
+  private observationFailure: AdoptionSnapshot['observationFailure'] = null;
+  private excludedCandidates = new Set<string>();
   constructor(readonly identity: NativeArtifactIdentity, private readonly rpc: NativeRpc,
     readonly workspace: string, private readonly workspaceIdentity: string,
     private readonly identityNow: () => NativeArtifactIdentity,
@@ -122,18 +126,39 @@ export class NativeAdoptionAdapter {
   }
   private assertThread(thread: any, expectedId: string) {
     requireThat(thread && thread.id === expectedId && typeof thread.cwd === 'string' && thread.cwd.toLowerCase() === this.workspace.toLowerCase(), 'NATIVE_THREAD_IDENTITY_MISMATCH');
-    requireThat(thread.canAcceptDirectInput !== false && thread.threadSource !== 'subAgent', 'NATIVE_THREAD_NOT_ATTACHABLE');
+    requireThat(thread.ephemeral !== true && thread.canAcceptDirectInput !== false && thread.threadSource !== 'subAgent' && !thread.parentThreadId, 'NATIVE_THREAD_NOT_ATTACHABLE');
+  }
+  private eligibleCandidate(thread: any): boolean {
+    if (thread?.cwd?.toLowerCase() !== this.workspace.toLowerCase()) return false;
+    // Native background work can expose ephemeral threads in the same cwd.
+    // They have no persisted history contract and are not adoption candidates.
+    if (thread.ephemeral === true || thread.canAcceptDirectInput === false || thread.threadSource === 'subAgent' || thread.parentThreadId) {
+      if (this.threads.get(thread.id)?.view.attached) return true; // Revalidate and hold the bound thread; never silently drop it.
+      if (!this.excludedCandidates.has(thread.id)) {
+        requireThat(this.excludedCandidates.size < 64, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
+        this.excludedCandidates.add(thread.id);
+        this.evidence.append('NATIVE_DISCOVERY_NOT_ATTACHABLE', thread.id, { threadId: thread.id,
+          reason: thread.ephemeral === true ? 'EPHEMERAL_THREAD' : 'NATIVE_DIRECT_INPUT_UNAVAILABLE', incarnation: this.incarnation });
+      }
+      return false;
+    }
+    return true;
+  }
+  private async observe(method: string, params: { threadId?: string; [key: string]: unknown }): Promise<any> {
+    this.observationPhase = method;
+    this.observationThread = params.threadId && this.threads.has(params.threadId) ? params.threadId : null;
+    return this.rpc.call(method, params);
   }
   private async loaded(): Promise<Set<string>> {
-    const result = await this.rpc.call('thread/loaded/list', { limit: 64 });
+    const result = await this.observe('thread/loaded/list', { limit: 64 });
     requireThat(Array.isArray(result.data) && result.data.length <= 64 && !result.nextCursor && result.data.every(id), 'NATIVE_LOADED_LIST_BOUND_EXCEEDED');
     return new Set<string>(result.data);
   }
-  private async readThread(threadId: string, accept = false): Promise<Binding> {
-    const result = await this.rpc.call('thread/read', { threadId, includeTurns: false });
+  private async readThread(threadId: string, accept = false, admit?: (view: NativeThread) => void): Promise<Binding> {
+    const result = await this.observe('thread/read', { threadId, includeTurns: false });
     this.assertThread(result.thread, threadId);
     const thread = result.thread;
-    const page = await this.rpc.call('thread/turns/list', { threadId, limit: 12, sortDirection: 'desc', itemsView: 'full' });
+    const page = await this.observe('thread/turns/list', { threadId, limit: 12, sortDirection: 'desc', itemsView: 'full' });
     requireThat(Array.isArray(page.data) && page.data.length <= 12, 'NATIVE_HISTORY_UNPROVABLE');
     const turns: any[] = page.data;
     requireThat(turns.every(turn => id(turn.id) && Array.isArray(turn.items) && ['inProgress', 'completed', 'interrupted', 'failed'].includes(turn.status)), 'NATIVE_TURN_STATE_UNPROVABLE');
@@ -178,6 +203,9 @@ export class NativeAdoptionAdapter {
       externalAdvance: accept ? false : externalAdvance, history: history.slice(-48), activity: [...tools.values()].slice(-16),
       historyLimited: !!page.nextCursor || history.length > 48,
       residualCommandState: prior?.view.residualCommandState ?? 'NONE_OBSERVED' };
+    // Acknowledgement commits only the exact reviewed state. No await follows
+    // this final admission check before the accepted baseline is replaced.
+    admit?.(view);
     const binding = { view, tools, userState: accept || !prior ? users : prior.userState };
     this.threads.set(threadId, binding); return binding;
   }
@@ -185,17 +213,18 @@ export class NativeAdoptionAdapter {
     this.expireController();
     if (this.state === 'READY') {
       try {
+        this.observationPhase = 'identity'; this.observationThread = null;
         this.revalidate();
         const loaded = await this.loaded();
         // thread/list is scoped natively. A metadata-only loaded read handles
         // native index lag; foreign cwd payloads are discarded immediately.
-        const listing = await this.rpc.call('thread/list', { cwd: this.workspace, limit: 32 });
+        const listing = await this.observe('thread/list', { cwd: this.workspace, limit: 32 });
         requireThat(Array.isArray(listing.data) && !listing.nextCursor, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
-        const candidates = new Set<string>(listing.data.filter((t: any) => loaded.has(t.id) && t.cwd?.toLowerCase() === this.workspace.toLowerCase()).map((t: any) => t.id));
+        const candidates = new Set<string>(listing.data.filter((t: any) => loaded.has(t.id) && this.eligibleCandidate(t)).map((t: any) => t.id));
         for (const threadId of loaded) {
           if (candidates.has(threadId)) continue;
-          const metadata = await this.rpc.call('thread/read', { threadId, includeTurns: false });
-          if (metadata.thread?.id === threadId && metadata.thread.cwd?.toLowerCase() === this.workspace.toLowerCase()) candidates.add(threadId);
+          const metadata = await this.observe('thread/read', { threadId, includeTurns: false });
+          if (metadata.thread?.id === threadId && this.eligibleCandidate(metadata.thread)) candidates.add(threadId);
         }
         requireThat(candidates.size <= 8, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
         for (const threadId of candidates) {
@@ -204,6 +233,7 @@ export class NativeAdoptionAdapter {
             // A just-opened TUI may not yet have persisted its first turn.
             // Only this known read-only absence is rediscovered later.
             if (error instanceof NativeRpcError && !this.threads.get(threadId)?.view.attached && /no rollout found/i.test(error.message)) continue;
+            if (error instanceof Fault && error.code === 'NATIVE_THREAD_NOT_ATTACHABLE' && !this.threads.get(threadId)?.view.attached) continue;
             throw error;
           }
         }
@@ -211,7 +241,23 @@ export class NativeAdoptionAdapter {
           if (binding.view.attached) { binding.view.status = 'notLoaded'; binding.view.externalAdvance = true; }
           else this.threads.delete(threadId);
         }
-      } catch (error) { this.state = failCode(error); this.controller = null; this.fence++; }
+      } catch (error) {
+        this.state = failCode(error); this.controller = null; this.fence++;
+        const message = error instanceof Error ? error.message : '';
+        const reason = message === 'ephemeral threads do not support thread/turns/list' ? 'EPHEMERAL_HISTORY_UNAVAILABLE' :
+          /thread.*not found|thread.*not loaded|no rollout found/i.test(message) ? 'THREAD_UNAVAILABLE' :
+          /not initialized|not yet initialized/i.test(message) ? 'NOT_INITIALIZED' :
+          /locked|resource busy|sharing violation/i.test(message) ? 'RESOURCE_BUSY' :
+          /method not found|unknown method/i.test(message) ? 'METHOD_UNAVAILABLE' :
+          /invalid params|invalid parameters/i.test(message) ? 'INVALID_PARAMS' : 'UNCLASSIFIED';
+        this.observationFailure = { observedAt: new Date().toISOString(), phase: this.observationPhase, code: this.state,
+          errorClass: error instanceof NativeRpcError ? 'NativeRpcError' : error instanceof Fault ? 'Fault' : error instanceof TypeError ? 'TypeError' : 'Error',
+          nativeCode: error instanceof NativeRpcError && Number.isSafeInteger(error.code) ? error.code : null, reason,
+          errorFingerprint: createHash('sha256').update(message).digest('hex'), incarnation: this.incarnation, threadId: this.observationThread };
+        // Never retain arbitrary/global native error text or retry a held read.
+        try { this.evidence.append('NATIVE_OBSERVATION_FAILURE', this.runtimeId, this.observationFailure); }
+        catch { this.state = 'NATIVE_JOURNAL_UNPROVABLE'; }
+      }
     }
     return this.projection();
   }); }
@@ -219,7 +265,7 @@ export class NativeAdoptionAdapter {
     return JSON.parse(JSON.stringify({ runtimeId: this.runtimeId, state: this.state, incarnation: this.incarnation,
       daemon: this.identity, compatibility: this.compatibility, workspace: this.workspace,
       controller: this.controller, fence: this.fence, threads: [...this.threads.values()].map(b => b.view),
-      receipts: [...this.receipts.values()].slice(-20).map(r => r.receipt), controlMode: 'COOPERATIVE' }));
+      receipts: [...this.receipts.values()].slice(-20).map(r => r.receipt), controlMode: 'COOPERATIVE', observationFailure: this.observationFailure }));
   }
   lookup(commandId: string): AdoptionReceipt | null { return this.receipts.get(commandId)?.receipt ?? null; }
   execute(value: unknown, authenticatedClient: string, expiresAt: number): Promise<AdoptionReceipt> {
@@ -261,7 +307,14 @@ export class NativeAdoptionAdapter {
         } else {
           requireThat(binding.view.attached && this.controller === authenticatedClient && this.controllerExpires > Date.now(), 'FLEET_VIEWER_CANNOT_CONTROL');
           if (c.family === 'native.release') { this.controller = null; this.fence++; code = 'FLEET_CONTROL_RELEASED_NATIVE_UNCHANGED'; }
-          else if (c.family === 'native.reviewState') { await this.readThread(c.threadId, true); this.fence++; code = 'NATIVE_STATE_REVIEWED'; }
+          else if (c.family === 'native.reviewState') {
+            await this.readThread(c.threadId, true, view => {
+              requireThat(view.stateToken === c.stateToken && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
+              this.revalidate();
+              requireThat(expiresAt > Date.now() && this.controllerExpires > Date.now() && this.controller === authenticatedClient && this.fence === c.expectedFence, 'STALE_FLEET_CONTROLLER_FENCE');
+            });
+            this.fence++; code = 'NATIVE_STATE_REVIEWED';
+          }
           else {
             requireThat(!binding.view.externalAdvance, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
             requireThat(binding.view.activeTurnId === c.activeTurnId, 'STALE_NATIVE_ACTIVE_TURN');

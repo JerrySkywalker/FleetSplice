@@ -42,8 +42,19 @@ unchanged throughout the corrected demonstration; 112 tests passed.
 
 A later observation poll failed closed as `NATIVE_OPERATION_UNPROVABLE` after
 the successful local return. The original daemon/TUI remained healthy. This
-unexplained read failure is retained for independent review, not hidden by the
-visible sequence result. Final acceptance is pending that review.
+read failure is retained alongside the visible sequence result.
+
+The first independent review of `de5306d8e72ffd2d406831cd21651fdd7d158bc5`
+required correction of that observation failure and a state-acknowledgement
+race. Instrumented reproduction identified native RPC -32600 with the exact
+error fingerprint for `ephemeral threads do not support thread/turns/list`.
+Native background candidates appeared briefly in the same Workspace. The
+current discovery path excludes non-attachable native metadata before history
+hydration; an already attached thread still fails closed if its contract changes.
+Acknowledgement now commits only after its final read matches the displayed
+token and native event generation. Fresh verification and independent review
+results are retained externally; this document does not assert acceptance on
+behalf of the read-only reviewer or the Owner.
 
 Primary evidence is under
 `V:\artifacts\FleetSplice\FLEETSPLICE-G05C-D0-NATIVE-ADOPTION-HUMAN-DEMO-001`:

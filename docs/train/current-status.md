@@ -5,8 +5,9 @@ accepted status files remain evidence and are not rewritten by this summary.
 
 The later Owner Goal `FLEETSPLICE-G05C-D0-NATIVE-ADOPTION-HUMAN-DEMO-001`
 authorizes a local native adoption demo from accepted P1/P2A/P2B. Its candidate
-is in progress on `feat/g05c-native-adoption-demo`; human demo and independent
-acceptance remain pending. See [the demo guide](native-adoption-demo.md) and
+is on `feat/g05c-native-adoption-demo`. The visible local sequence and subsequent
+review corrections are recorded in its Goal and external acceptance evidence.
+Owner personal dogfood is not claimed. See [the demo guide](native-adoption-demo.md) and
 [the additive native adoption contract](../architecture/native-adoption-d0.md).
 The new adoption path is capability-driven. P3 and G06 remain unstarted.
 

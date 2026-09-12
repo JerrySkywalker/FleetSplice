@@ -41,6 +41,14 @@ must match. No `thread/start` route exists. Recent native history uses at most
 is never hydrated. Origin is `NATIVE_ADOPTED`; managed lane projections remain
 `FLEETSPLICE_MANAGED`. Receipts never claim adopted-thread creation ownership.
 
+Loaded membership alone does not make a thread attachable. Native ephemeral
+background threads can briefly appear in the same cwd and reject persisted
+history reads. Discovery excludes `ephemeral=true`, explicit non-direct-input
+and nested-agent candidates before history hydration. A formerly attached
+thread failing these checks still closes control. Exclusions retain bounded
+metadata evidence; unexpected read errors retain sanitized RPC phase/code,
+identity and an error fingerprint, then hold control without automatic retry.
+
 One authenticated Fleet Web client holds the D0 controller fence. All others
 view the shared projection. Typed Web commands pass through the authenticated
 Hub into a separate Edge process, whose serialized adapter owns native effects
@@ -57,6 +65,9 @@ uses exact `threadId`/`turnId`. Neither is emulated by a continuation or process
 termination. Interrupt response means request accepted; only native interrupted
 turn evidence yields the human `Turn interrupted` label. Residual command state
 remains conservative. Native approvals stay with the TUI in D0.
+Review acknowledgement stages its final native read and compares the exact
+displayed token and native event generation before committing the new baseline.
+Input arriving during that read remains unreviewed.
 
 The native submit API does not expose an atomic idle-state comparison token.
 The final freshness read and event fence detect already-observed advancement;

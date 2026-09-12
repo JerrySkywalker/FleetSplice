@@ -36,6 +36,11 @@ export type AdoptionSnapshot = {
   runtimeId: string; state: string; incarnation: string; daemon: NativeArtifactIdentity;
   compatibility: Compatibility; workspace: string; controller: string | null; fence: number;
   threads: NativeThread[]; receipts: AdoptionReceipt[]; controlMode: 'COOPERATIVE';
+  observationFailure: {
+    observedAt: string; phase: string; code: string; errorClass: string;
+    nativeCode: number | null; reason: string; errorFingerprint: string;
+    incarnation: string; threadId: string | null;
+  } | null;
 };
 export type AdoptionPort = {
   snapshot(): Promise<AdoptionSnapshot>;

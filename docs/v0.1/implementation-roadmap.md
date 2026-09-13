@@ -98,7 +98,7 @@ G05C and G06 remain serial visible increments. After G10/Station B, the later
 
 ## Deferred debts and release gate
 
-The [closeout debt register](../train/receipts/G05C-native-control-closeout.md#known-non-blocking-debts)
+The [closeout debt register](../train/receipts/G05C-native-control-closeout.md#product-boundary-and-remaining-debts)
 retains native Windows command popup / upstream draft, historical managed
 artifact qualification, unavailable dedicated file-change approval, unmapped
 turn/session grants, and unattended soak. None alone reopens G05C. A real 2–4h+

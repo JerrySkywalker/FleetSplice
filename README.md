@@ -51,7 +51,7 @@ Terminal remains the preferred local human terminal. FleetSplice is not an
 IDE/ADE, terminal replacement, Git GUI, worktree manager, embedded editor or
 ChatGPT Mobile clone. A transparent PATH shim is not the primary architecture.
 
-[Known non-blocking debts](docs/train/receipts/G05C-native-control-closeout.md#known-non-blocking-debts)
+[Known non-blocking debts](docs/train/receipts/G05C-native-control-closeout.md#product-boundary-and-remaining-debts)
 remain documented. G06 requires a separate Owner decision and would project the
 proven surface through Tencent Hub + WebUI and authenticated outbound WSS to a
 real phone/browser. No G06 transport, phone UI or deployment is authorized here.

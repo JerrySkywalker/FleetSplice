@@ -160,6 +160,10 @@ $Receipt = [pscustomobject]@{
 }
 $ReceiptPath = Join-Path $RunRoot 'LAUNCH.json'
 $Receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $ReceiptPath -Encoding utf8
+# Keep a stable latest-launch receipt at the path named by the R1 Goal while
+# retaining the immutable per-run copy above for incident/audit history.
+$LatestReceiptPath = Join-Path $LauncherRoot 'LAUNCH.json'
+Copy-Item -LiteralPath $ReceiptPath -Destination $LatestReceiptPath -Force
 
 $OldExecServerUrl = $env:CODEX_EXEC_SERVER_URL
 $OldAuditMode = $env:FLEETSPLICE_AUDITOR_MODE
@@ -180,6 +184,7 @@ try {
     Write-Host "EXEC_SERVER_URL=$ExecServerUrl"
     Write-Host "TARGET_DAEMON_PIDS=$env:FLEETSPLICE_AUDIT_TARGET_DAEMON_PIDS"
     Write-Host "LAUNCH_RECEIPT=$ReceiptPath"
+    Write-Host "LATEST_LAUNCH_RECEIPT=$LatestReceiptPath"
     Write-Host ''
     Write-Host 'This TUI is intentionally NOT using the target official shared daemon.' -ForegroundColor Yellow
     Write-Host 'When Codex opens, enter exactly:' -ForegroundColor Yellow

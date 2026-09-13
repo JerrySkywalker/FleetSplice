@@ -1,7 +1,8 @@
 # FleetSplice Owner Thesis and Product Boundary
 
-Status: Owner-approved product-boundary freeze for planning and maintenance.
-This document does **not** authorize G05C, G06, or any product-code change.
+Status: Reconciled with the Owner-accepted G05C local implementation.
+This document does **not** authorize further product implementation or G06.
+The [current status](../train/current-status.md) controls closeout readiness.
 
 ## Why FleetSplice exists
 
@@ -49,6 +50,24 @@ xterm-based terminal is ever introduced, its interaction acceptance must be
 compatible with the Owner's Windows Terminal habits rather than exposing a raw
 xterm keymap.
 
+## Native-first local workflow
+
+`PRIMARY_NATIVE_PATH=NATIVE_ADOPTED`. The north-star command is ordinary
+`codex --yolo` in the existing Workspace and preferred Windows Terminal.
+FleetSplice requires no wrapper. It discovers and attaches to the already-running
+native TUI thread, continues that same thread through Web controls, and leaves
+the original TUI usable under honest cooperative controller semantics.
+
+Session origins are `NATIVE_ADOPTED` and `FLEETSPLICE_MANAGED`. Native adoption
+compatibility is capability-driven. Codex semantic version and executable SHA
+identify evidence and runtime incarnation; they are not a product compatibility
+allowlist. Historical managed-launch artifact qualification can remain scoped
+to the managed path without restricting adoption of the ordinary native CLI.
+
+FleetSplice owns control authority, not the development environment. The browser
+requests an action; Edge/controller authority admits the exact action. A viewer
+cannot mutate, and Fleet control does not pretend to exclude native TUI input.
+
 ## Design principles
 
 1. **Control plane, not ADE.** New features must improve observation or control
@@ -81,10 +100,12 @@ xterm keymap.
 The following do not block G06 unless later Owner dogfood explicitly changes
 that decision:
 
-- Embedded desktop terminal or terminal-split system.
-- Full file editor or IDE.
+- Terminal replacement or embedded desktop terminal / terminal-split system.
+- IDE/ADE or embedded editor.
 - Full Git/diff/source-control client.
 - Worktree manager.
+- ChatGPT Mobile clone.
+- Transparent PATH shim as the primary architecture.
 - Embedded browser.
 - Multi-agent dashboard or generic agent marketplace.
 - Admin/WSL environments, second Host, provider migration or full release
@@ -92,32 +113,31 @@ that decision:
 
 ## Near-term route
 
-The accepted product implementation currently stops after G05B-R1. The next
-planned step is **G05C Native Agent Control Parity**, not a local coding
-workstation rebuild.
+The Owner accepts G05C Native Local Control at implementation head
+`ba8c6fa84db528b9821be5aa672e8267ae744c70`. Its accepted local train proves:
 
-G05C is intended to close only the control gap that prevents FleetSplice from
-controlling Codex as a real coding agent:
+- safe local operation, persistent proxy and explicit Workspace targeting;
+- live model/reasoning discovery and read-only native coding;
+- session-scoped READ_ONLY / WORKSPACE_AUTO / YOLO and Host permission ceiling;
+- ordinary native TUI late adoption and same-thread Web continuation;
+- cooperative authority, source provenance, Working / Done and native duration;
+- exact-turn Steer and Interrupt with honest residual-command semantics;
+- long-session browser/controller renewal and scalable activity evidence;
+- inspectable command approval Allow Once / Deny, viewer isolation, safe TUI/Web
+  approval races and return to the original native TUI.
 
-- explicit Workspace targeting;
-- live/dynamic model discovery;
-- live/dynamic reasoning capability discovery;
-- permission presets including YOLO, plus verification of effective permission;
-- native Codex file/tool/shell activity instead of the G05 text-only block;
-- native approval projection;
-- interrupt;
-- steer/follow-up control;
-- compact basic activity projection;
-- simple left/right sidebar collapse as a bounded usability correction.
+The post-reboot two-lane closeout smoke passes. Exact-head independent acceptance
+remains a separate evidence gate; consult
+[current status](../train/current-status.md) and the
+[closeout receipt](../train/receipts/G05C-native-control-closeout.md).
+Known debts do not individually reopen G05C. Accelerated renewal testing does
+not prove unattended wall-clock endurance: a real 2–4h+ soak is required before
+final G06/v0.1 release acceptance.
 
-G05C explicitly does not introduce Tencent deployment, phone UI, an embedded
-terminal, editor, Git IDE, browser or worktree manager.
+G06 remains unstarted and requires a separate Owner authorization. It projects
+the already-proven surface through Tencent Hub + WebUI and authenticated
+outbound WSS to a real phone/browser. It should not invent native control
+semantics for the first time. No new capability is authorized by this closeout.
 
-After local control parity is personally dogfooded, **G06 Remote Phone MVP**
-projects that already-proven control surface through the Tencent Hub/WebUI path
-and adds Owner authentication, authenticated outbound WSS, mobile UI, reconnect
-and needs-attention behavior. G06 should not invent new native-agent semantics
-for the first time.
-
-After real phone dogfood, the next feature is selected from observed pain rather
-than from a precommitted workstation feature checklist.
+After real phone dogfood, feature breadth follows observed pain rather than a
+precommitted workstation checklist.

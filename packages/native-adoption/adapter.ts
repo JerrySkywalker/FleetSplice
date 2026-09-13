@@ -37,6 +37,7 @@ export class NativeAdoptionAdapter {
   private observationThread: string | null = null;
   private observationFailure: AdoptionSnapshot['observationFailure'] = null;
   private excludedCandidates = new Set<string>();
+  private unavailableCandidates = new Set<string>();
   private approvals = new NativeApprovals();
   private subscribingThread: string | null = null;
   // Restore attribution only from an exact successful journaled input, never
@@ -189,6 +190,23 @@ export class NativeAdoptionAdapter {
     requireThat(Array.isArray(result.data) && result.data.length <= 64 && !result.nextCursor && result.data.every(id), 'NATIVE_LOADED_LIST_BOUND_EXCEEDED');
     return new Set<string>(result.data);
   }
+  private excludeUnavailable(threadId: string, error: unknown): boolean {
+    // The official bounded inventory can race native idle-thread teardown.
+    // This is absence for this observation, never identity or attach authority.
+    if (this.threads.get(threadId)?.view.attached || this.observationPhase !== 'thread/read' ||
+      !(error instanceof NativeRpcError) || error.code !== -32600 || error.message !== `thread not loaded: ${threadId}`) return false;
+    if (!this.excludedCandidates.has(threadId)) {
+      requireThat(this.excludedCandidates.size < 64, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
+      this.excludedCandidates.add(threadId);
+    }
+    if (!this.unavailableCandidates.has(threadId)) {
+      this.unavailableCandidates.add(threadId);
+      this.evidence.append('NATIVE_DISCOVERY_NOT_ATTACHABLE', threadId, { threadId,
+        reason: 'NATIVE_THREAD_TEMPORARILY_UNAVAILABLE', incarnation: this.incarnation });
+    }
+    this.threads.delete(threadId);
+    return true;
+  }
   private async readThread(threadId: string, accept = false, admit?: (view: NativeThread) => void): Promise<Binding> {
     const result = await this.observe('thread/read', { threadId, includeTurns: false });
     this.assertThread(result.thread, threadId);
@@ -272,13 +290,30 @@ export class NativeAdoptionAdapter {
         const candidates = new Set<string>(listing.data.filter((t: any) => loaded.has(t.id) && this.eligibleCandidate(t)).map((t: any) => t.id));
         for (const threadId of loaded) {
           if (candidates.has(threadId)) continue;
-          const metadata = await this.observe('thread/read', { threadId, includeTurns: false });
-          if (metadata.thread?.id === threadId && this.eligibleCandidate(metadata.thread)) candidates.add(threadId);
+          try {
+            const metadata = await this.observe('thread/read', { threadId, includeTurns: false });
+            if (metadata.thread?.id === threadId && this.eligibleCandidate(metadata.thread)) candidates.add(threadId);
+          } catch (error) { if (!this.excludeUnavailable(threadId, error)) throw error; }
         }
         requireThat(candidates.size <= 8, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
         for (const threadId of candidates) {
           try { await this.readThread(threadId); }
           catch (error) {
+            if (this.excludeUnavailable(threadId, error)) continue;
+            // Only the exact observed native absence on an unattached candidate
+            // is temporary. Never materialize it or discard an attached binding.
+            if (!this.threads.get(threadId)?.view.attached && this.observationPhase === 'thread/turns/list' &&
+              error instanceof NativeRpcError && error.code === -32600 &&
+              error.message === `thread ${threadId} is not materialized yet; thread/turns/list is unavailable before first user message`) {
+              if (!this.excludedCandidates.has(threadId)) {
+                requireThat(this.excludedCandidates.size < 64, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
+                this.excludedCandidates.add(threadId);
+                this.evidence.append('NATIVE_DISCOVERY_NOT_ATTACHABLE', threadId, { threadId,
+                  reason: 'NATIVE_THREAD_AWAITING_FIRST_MESSAGE', incarnation: this.incarnation });
+              }
+              this.threads.delete(threadId); // Retire any stale unattached view until a successful rediscovery.
+              continue;
+            }
             // A just-opened TUI may not yet have persisted its first turn.
             // Only this known read-only absence is rediscovered later.
             if (error instanceof NativeRpcError && !this.threads.get(threadId)?.view.attached && /no rollout found/i.test(error.message)) continue;

@@ -172,6 +172,7 @@ class Rpc implements NativeRpc {
   onEvent: NativeRpc['onEvent'] = () => {}; onClose = () => {};
   thread: any = { id: 'native-existing-thread', cwd: workspace, status: { type: 'idle' }, model: 'native-model', canAcceptDirectInput: true, threadSource: 'user', ephemeral: false };
   ephemeralCandidate: any = null;
+  additionalCandidate: { thread: any; turns: any[] | null } | null = null;
   turns: any[] = [{ id: 'native-existing-turn', status: 'completed', items: [{ id: 'first-user', type: 'userMessage', content: [{ type: 'text', text: 'Original TUI conversation' }] }, { id: 'first-answer', type: 'agentMessage', text: 'Original native answer' }] }];
   calls: { method: string; params: any }[] = [];
   missing = new Set<string>(); loaded = true; resumeId: string | null = null;
@@ -182,14 +183,25 @@ class Rpc implements NativeRpc {
   async call(method: string, params: any): Promise<any> {
     this.calls.push({ method, params: structuredClone(params) }); this.before(method, params);
     if (this.missing.has(method)) throw new NativeRpcError(-32601, 'Method not found');
+    if (this.additionalCandidate && params.threadId === this.additionalCandidate.thread.id) {
+      const candidate = this.additionalCandidate;
+      if (method === 'thread/read') return { thread: structuredClone(candidate.thread) };
+      if (method === 'thread/turns/list') {
+        if (candidate.turns === null) throw new NativeRpcError(-32600,
+          `thread ${candidate.thread.id} is not materialized yet; thread/turns/list is unavailable before first user message`);
+        return { data: structuredClone(candidate.turns), nextCursor: null };
+      }
+      if (method === 'thread/resume') return { thread: structuredClone(candidate.thread), approvalPolicy: 'never', sandbox: { type: 'dangerFullAccess' } };
+      throw Error('Additional candidate received unexpected native input');
+    }
     if (this.ephemeralCandidate && params.threadId === this.ephemeralCandidate.id) {
       if (method === 'thread/read') return { thread: structuredClone(this.ephemeralCandidate) };
       if (method === 'thread/turns/list') throw new NativeRpcError(-32600, 'ephemeral threads do not support thread/turns/list');
       throw Error('Ephemeral thread received unexpected effect');
     }
     if (params.threadId && params.threadId !== this.thread.id) throw new NativeRpcError(-32600, 'thread not found');
-    if (method === 'thread/list') return { data: [structuredClone(this.thread)], nextCursor: null };
-    if (method === 'thread/loaded/list') return { data: this.loaded ? [this.thread.id, ...(this.ephemeralCandidate ? [this.ephemeralCandidate.id] : [])] : [], nextCursor: null };
+    if (method === 'thread/list') return { data: [...(this.additionalCandidate ? [structuredClone(this.additionalCandidate.thread)] : []), structuredClone(this.thread)], nextCursor: null };
+    if (method === 'thread/loaded/list') return { data: this.loaded ? [this.thread.id, ...(this.ephemeralCandidate ? [this.ephemeralCandidate.id] : []), ...(this.additionalCandidate ? [this.additionalCandidate.thread.id] : [])] : [], nextCursor: null };
     if (method === 'thread/read') return { thread: structuredClone(this.thread) };
     if (method === 'thread/turns/list') return { data: structuredClone(this.turns), nextCursor: null };
     if (method === 'thread/resume') return { thread: { ...structuredClone(this.thread), id: this.resumeId ?? this.thread.id }, approvalPolicy: 'never', sandbox: { type: 'dangerFullAccess' } };
@@ -453,6 +465,147 @@ test('a failed observation retains sanitized phase and identity evidence and nev
   assert.doesNotMatch(JSON.stringify(r.evidence), /unrelated private path|payload/);
   await r.adapter.snapshot(); assert.equal(r.rpc.calls.length, calls);
   assert.equal((await r.execute(r.command(held, 'native.submit'))).status, 'REJECTED'); assert.equal(r.rpc.calls.length, calls);
+});
+
+test('an awaiting-first-message candidate cannot poison discovery or attach, and later materialization admits it without native input', async () => {
+  const r = await setup();
+  const threadId = 'ordinary-empty-tui';
+  r.rpc.additionalCandidate = { thread: { ...structuredClone(r.rpc.thread), id: threadId }, turns: null };
+  for (let i = 0; i < 3; i++) {
+    const observed = await r.adapter.snapshot();
+    assert.equal(observed.state, 'READY');
+    assert.deepEqual(observed.threads.map(t => t.id), [r.rpc.thread.id]);
+    const rejected = await r.execute(r.command(observed, 'native.attach', { threadId }));
+    assert.equal(rejected.status, 'REJECTED');
+    assert.equal(rejected.code, 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
+  }
+  const evidence = r.evidence.filter(e => e.kind === 'NATIVE_DISCOVERY_NOT_ATTACHABLE');
+  assert.deepEqual(evidence, [{ kind: 'NATIVE_DISCOVERY_NOT_ATTACHABLE', key: threadId,
+    value: { threadId, reason: 'NATIVE_THREAD_AWAITING_FIRST_MESSAGE', incarnation: r.adapter.incarnation } }]);
+  assert.ok(r.rpc.calls.filter(c => c.params.threadId === threadId).every(c => ['thread/read', 'thread/turns/list'].includes(c.method)));
+  assert.equal(r.evidence.some(e => e.kind === 'NATIVE_ATTACH_ATTEMPT'), false);
+  // This models later native TUI input, not any FleetSplice readiness operation.
+  r.rpc.additionalCandidate.turns = structuredClone(r.rpc.turns);
+  const materialized = await r.adapter.snapshot();
+  assert.equal(materialized.state, 'READY');
+  assert.equal(materialized.threads.length, 2);
+  const candidate = materialized.threads.find(t => t.id === threadId)!;
+  assert.equal(candidate.history[0]!.text, 'Original TUI conversation');
+  const attached = await r.execute(r.command(materialized, 'native.attach', { threadId, stateToken: candidate.stateToken }));
+  assert.equal(attached.status, 'SUCCEEDED');
+  assert.ok((await r.adapter.snapshot()).threads.find(t => t.id === threadId)!.attached);
+  assert.ok(r.rpc.calls.filter(c => c.params.threadId === threadId).every(c => ['thread/read', 'thread/turns/list', 'thread/resume'].includes(c.method)));
+});
+
+test('a stale unattached view is removed on exact unmaterialized evidence while another controller remains valid', async () => {
+  const r = await setup(); await r.attach();
+  const before = await r.adapter.snapshot();
+  const threadId = 'formerly-materialized-unattached';
+  r.rpc.additionalCandidate = { thread: { ...structuredClone(r.rpc.thread), id: threadId }, turns: structuredClone(r.rpc.turns) };
+  const materialized = await r.adapter.snapshot();
+  const stale = materialized.threads.find(t => t.id === threadId)!;
+  assert.ok(stale);
+  r.rpc.additionalCandidate.turns = null;
+  const observed = await r.adapter.snapshot();
+  assert.equal(observed.state, 'READY'); assert.equal(observed.controller, r.client); assert.equal(observed.fence, before.fence);
+  assert.deepEqual(observed.threads.map(t => t.id), [r.rpc.thread.id]);
+  assert.equal((await r.execute(r.command(observed, 'native.attach', { threadId, stateToken: stale.stateToken }))).status, 'REJECTED');
+});
+
+test('an attached thread failing with exact unmaterialized evidence remains visible and fails closed without retry', async () => {
+  const r = await setup(); await r.attach();
+  r.rpc.before = (method, params) => {
+    if (method === 'thread/turns/list') throw new NativeRpcError(-32600,
+      `thread ${params.threadId} is not materialized yet; thread/turns/list is unavailable before first user message`);
+  };
+  const held = await r.adapter.snapshot(); const calls = r.rpc.calls.length;
+  assert.equal(held.state, 'NATIVE_OPERATION_UNPROVABLE'); assert.equal(held.controller, null);
+  assert.equal(held.threads[0]!.id, r.rpc.thread.id); assert.equal(held.threads[0]!.attached, true);
+  assert.equal(held.observationFailure?.threadId, r.rpc.thread.id);
+  assert.equal(r.evidence.some(e => e.kind === 'NATIVE_DISCOVERY_NOT_ATTACHABLE'), false);
+  await r.adapter.snapshot(); assert.equal(r.rpc.calls.length, calls);
+  assert.equal((await r.execute(r.command(held, 'native.submit'))).status, 'REJECTED');
+  assert.equal(r.rpc.calls.length, calls);
+});
+
+test('unmaterialized lookalikes with another code, thread, RPC phase or unknown suffix remain fail-closed', async () => {
+  for (const variant of ['code', 'thread', 'phase', 'suffix', 'type']) {
+    const r = await setup();
+    r.rpc.before = (method, params) => {
+      if (method !== (variant === 'phase' ? 'thread/read' : 'thread/turns/list')) return;
+      const message = `thread ${variant === 'thread' ? 'another-thread' : params.threadId} is not materialized yet; thread/turns/list is unavailable before first user message${variant === 'suffix' ? '; unknown condition' : ''}`;
+      if (variant === 'type') throw new Error(message);
+      throw new NativeRpcError(variant === 'code' ? -32603 : -32600, message);
+    };
+    const held = await r.adapter.snapshot();
+    assert.equal(held.state, 'NATIVE_OPERATION_UNPROVABLE', variant);
+    assert.equal(r.evidence.some(e => e.kind === 'NATIVE_DISCOVERY_NOT_ATTACHABLE'), false, variant);
+    const calls = r.rpc.calls.length; await r.adapter.snapshot(); assert.equal(r.rpc.calls.length, calls, variant);
+  }
+});
+
+test('unattached read-unavailable Workspace candidate is excluded without input, then rediscovered with exact identity', async () => {
+  const r = await setup({ version: 'unknown-future', sha: 'd'.repeat(64) }); await r.attach();
+  const threadId = 'transient-unattached';
+  r.rpc.additionalCandidate = { thread: { ...structuredClone(r.rpc.thread), id: threadId }, turns: structuredClone(r.rpc.turns) };
+  const earlier = await r.adapter.snapshot(); const stale = earlier.threads.find(t => t.id === threadId)!;
+  r.rpc.before = (method, params) => { if (method === 'thread/read' && params.threadId === threadId) throw new NativeRpcError(-32600, `thread not loaded: ${threadId}`); };
+  const observed = await r.adapter.snapshot();
+  assert.equal(observed.state, 'READY'); assert.equal(observed.controller, r.client);
+  assert.deepEqual(observed.threads.map(t => t.id), [r.rpc.thread.id]);
+  const rejected = await r.execute(r.command(observed, 'native.attach', { threadId, stateToken: stale.stateToken }));
+  assert.equal(rejected.status, 'REJECTED');
+  assert.ok(r.rpc.calls.filter(c => c.params.threadId === threadId).every(c => ['thread/read', 'thread/turns/list'].includes(c.method)));
+  assert.ok(r.evidence.some(e => e.key === threadId && e.value.reason === 'NATIVE_THREAD_TEMPORARILY_UNAVAILABLE'));
+  r.rpc.before = () => {};
+  const readable = await r.adapter.snapshot(); const candidate = readable.threads.find(t => t.id === threadId)!;
+  assert.equal(candidate.attached, false); assert.equal(candidate.history[0]!.text, 'Original TUI conversation');
+  assert.equal((await r.execute(r.command(readable, 'native.attach', { threadId, stateToken: candidate.stateToken }))).status, 'SUCCEEDED');
+  assert.ok((await r.adapter.snapshot()).threads.find(t => t.id === threadId)!.attached);
+});
+
+test('bounded loaded metadata inventory teardown does not poison another exact attached thread', async () => {
+  const r = await setup(); await r.attach();
+  const threadId = 'loaded-metadata-race'; r.rpc.ephemeralCandidate = { ...structuredClone(r.rpc.thread), id: threadId, ephemeral: true };
+  await r.adapter.snapshot(); // Earlier non-attachable classification cannot hide a later unavailable reason.
+  r.rpc.before = (method, params) => { if (method === 'thread/read' && params.threadId === threadId) throw new NativeRpcError(-32600, `thread not loaded: ${threadId}`); };
+  for (let n = 0; n < 2; n++) {
+    const observed = await r.adapter.snapshot(); assert.equal(observed.state, 'READY'); assert.equal(observed.controller, r.client);
+    assert.deepEqual(observed.threads.map(t => t.id), [r.rpc.thread.id]);
+    assert.equal((await r.execute(r.command(observed, 'native.attach', { threadId }))).status, 'REJECTED');
+  }
+  assert.equal(r.evidence.filter(e => e.key === threadId && e.value.reason === 'NATIVE_THREAD_TEMPORARILY_UNAVAILABLE').length, 1);
+  assert.ok(r.rpc.calls.filter(c => c.params.threadId === threadId).every(c => c.method === 'thread/read'));
+});
+
+test('attached exact read-unavailable remains fail closed with no effect or wrong-thread failover', async () => {
+  const r = await setup(); await r.attach();
+  r.rpc.additionalCandidate = { thread: { ...structuredClone(r.rpc.thread), id: 'other-valid' }, turns: structuredClone(r.rpc.turns) };
+  r.rpc.before = (method, params) => { if (method === 'thread/read' && params.threadId === r.rpc.thread.id) throw new NativeRpcError(-32600, `thread not loaded: ${params.threadId}`); };
+  const held = await r.adapter.snapshot(); const calls = r.rpc.calls.length;
+  assert.equal(held.state, 'NATIVE_OPERATION_UNPROVABLE'); assert.equal(held.controller, null);
+  assert.equal(held.observationFailure?.threadId, r.rpc.thread.id);
+  assert.equal(held.threads.find(t => t.id === r.rpc.thread.id)!.attached, true);
+  assert.equal((await r.execute(r.command(held, 'native.attach', { threadId: 'other-valid' }))).status, 'REJECTED');
+  await r.adapter.snapshot(); assert.equal(r.rpc.calls.length, calls);
+  assert.equal(r.evidence.some(e => e.value.reason === 'NATIVE_THREAD_TEMPORARILY_UNAVAILABLE'), false);
+});
+
+test('transient read-unavailable lookalikes never weaken unknown-error or exact-identity gates', async () => {
+  for (const variant of ['code', 'id', 'suffix', 'type', 'phase', 'returned-id']) {
+    const r = await setup(); const threadId = 'transient-lookalike';
+    r.rpc.additionalCandidate = { thread: { ...structuredClone(r.rpc.thread), id: threadId }, turns: structuredClone(r.rpc.turns) };
+    r.rpc.before = (method, params) => {
+      if (params.threadId !== threadId || method !== (variant === 'phase' ? 'thread/turns/list' : 'thread/read')) return;
+      if (variant === 'returned-id') { r.rpc.additionalCandidate!.thread.id = 'substituted-id'; return; }
+      const message = `thread not loaded: ${variant === 'id' ? 'wrong-id' : threadId}${variant === 'suffix' ? '; unknown' : ''}`;
+      if (variant === 'type') throw new Error(message);
+      throw new NativeRpcError(variant === 'code' ? -32603 : -32600, message);
+    };
+    const held = await r.adapter.snapshot(); assert.notEqual(held.state, 'READY', variant);
+    assert.equal(r.evidence.some(e => e.value.reason === 'NATIVE_THREAD_TEMPORARILY_UNAVAILABLE'), false, variant);
+    const calls = r.rpc.calls.length; await r.adapter.snapshot(); assert.equal(r.rpc.calls.length, calls);
+  }
 });
 
 test('native ephemeral background candidates never hydrate history or disable the adopted TUI controller', async () => {

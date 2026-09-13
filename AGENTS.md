@@ -1,9 +1,10 @@
 # FleetSplice repository rules
 
 FleetSplice Architecture 0.1 is accepted. `ARCHITECTURE_0_1_READY=true`.
-The accepted implementation train currently reaches G05B-R1 at
-`dabde5d60f211c4a16075443901ab3465ee16b2c`, tree
-`f1242113d28486b64f24f348b04a16456adb09aa`.
+The Owner-accepted local implementation reaches G05C at
+`ba8c6fa84db528b9821be5aa672e8267ae744c70`, tree
+`37cccb8d342d65433330e90f342be9662fa49d28`. The post-reboot closeout has passed both local smoke lanes;
+`docs/train/current-status.md` binds final independent acceptance.
 
 Read these current pointers before changing the repository:
 
@@ -17,16 +18,16 @@ Read these current pointers before changing the repository:
 Current authorization state:
 
 ```text
-G05C_PLANNED=true
-G05C_STARTED=false
+G05C_ACCEPTED=true
+G05C_CLOSEOUT=LOCAL_SMOKE_PASS_EXACT_HEAD_ACCEPTANCE_BOUND
 G06_STARTED=false
 IMPLEMENTATION_AUTHORIZED=NONE
 PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
 ```
 
 This documentation boundary freeze does not authorize product implementation.
-Do not begin G05C or G06 without a later explicit Owner instruction and a
-bounded Goal.
+Do not resume product implementation or begin G06 without a later explicit
+Owner instruction and a bounded Goal.
 
 1. FleetSplice is a **control plane for coding agents in existing development
    environments**, not an AI IDE/ADE. Do not expand a Goal into an editor,

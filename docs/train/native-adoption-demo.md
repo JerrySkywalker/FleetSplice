@@ -32,8 +32,10 @@ read the latest native state before explicitly continuing. If an effect is
 unknown, use receipt lookup and preserve evidence. Never resend to work around it.
 Additional Web clients are viewers until Fleet control is explicitly released.
 
-Acceptance is pending until all visible steps and a separate read-only review
-pass. No P3, G06, phone UI, remote deployment or merge is included.
+This is the operational guide for the accepted native-adoption path.
+[Current status](current-status.md) records the later P3 acceptance and the
+post-reboot closeout and its exact-head acceptance evidence. No G06, phone UI, remote deployment or merge is
+authorized by this guide.
 
 Regression tests retain the older managed-driver qualification. If the installed
 CLI has moved on, set `FLEETSPLICE_MANAGED_TEST_CODEX` to a preserved official

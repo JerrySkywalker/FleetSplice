@@ -1,21 +1,23 @@
 # v0.1 Implementation Roadmap
 
-This is the prospective visible-increment sequence under the accepted
-[G04A amendment](../architecture/amendments/g04a-visible-mvp-simplification.md),
-updated after accepted G05/G05A/G05B/G05B-R1 work and the Owner-approved
-[product boundary](../product/owner-thesis.md). Historical receipts remain
-immutable evidence; this roadmap is the current planning view.
+This is the current visible-increment planning view under the accepted
+[G04A amendment](../architecture/amendments/g04a-visible-mvp-simplification.md)
+and [Owner Thesis](../product/owner-thesis.md). Historical receipts remain
+immutable evidence.
 
-See [current train status](../train/current-status.md). The later Owner night
-train authorization admitted serial local G05C stations only. P1 and P2A are
-accepted. The later `FLEETSPLICE-G05C-P2B-PATH-A-RESUME-003` Owner decision
-resumed P2B with session-scoped permission presets, separate native project
-trust, and no persistent permission-config writes. Its raw and product proof
-passed with unchanged persistent config, clean stop and READ_ONLY Host ceiling.
-Exact candidate review/acceptance is recorded in that external Goal's receipt.
-`G05C_STARTED=true`, `G05C_ACCEPTED=false` and `G06_STARTED=false`.
-P3 is the next planned slice but remains unauthorized and unstarted; G06 remains
-unauthorized. The original Night Train drift remains historically unresolved.
+G05C's local implementation is Owner-accepted at
+`ba8c6fa84db528b9821be5aa672e8267ae744c70`. Its post-reboot closeout passes both local smoke lanes; see [current status](../train/current-status.md) and the
+[closeout receipt](../train/receipts/G05C-native-control-closeout.md).
+`G05C_ACCEPTED=true`, `G06_STARTED=false`, and
+`PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE`. Older intermediate execution states
+are retained in the linked history and confer no current authority.
+
+`PRIMARY_NATIVE_PATH=NATIVE_ADOPTED`: ordinary `codex --yolo`, no wrapper,
+same native TUI thread, cooperative Web control and return to the original TUI.
+Both `NATIVE_ADOPTED` and `FLEETSPLICE_MANAGED` origins remain. Native adoption
+is capability-driven; Codex semantic version and executable SHA are evidence /
+incarnation metadata, not a compatibility allowlist. Historical managed-launch
+artifact qualification remains scoped to the managed path.
 
 `VISIBLE_INCREMENT_RULE=true`.
 
@@ -42,7 +44,7 @@ G05 local real Codex
 | G05A | Accepted G05 and explicit G05A-only authorization | Localized/themed real local Codex browser, compact preferences; same commands and native continuity. | `PASS_M0_1_OWNER_UX_FOUNDATION` |
 | G05B | Accepted G05A and explicit G05B-only authorization | Safe ordinary-user start/stop/status/doctor, predecessor classification, detached supervisor, clean native closure. | `PASS_M0_2_SAFE_LOCAL_OPERATION` |
 | G05B-R1 | Accepted G05B and bounded correction authorization | Persistent per-user proxy configuration; fresh-shell operation without `syncproxy`; real detached-lifecycle dogfood. | `PASS_G05B_R1_PERSISTENT_PROXY` |
-| G05C | Accepted G05B-R1 plus a future explicit G05C authorization | **Native Agent Control Parity only:** Workspace targeting, dynamic model/reasoning discovery, permission presets including YOLO, effective permission, native Codex tool activity, approval, interrupt, steer, basic activity projection, and simple side-panel collapse. No Tencent/mobile/embedded-terminal/IDE scope. | Defined by the future authorized G05C Goal |
+| G05C | Accepted local native-control train; bounded documentation closeout | Workspace and live capability / session permission controls; native TUI adoption, same-thread continuation, source/timing/activity, exact-turn Steer/Interrupt, renewal, inspectable command approvals, viewer isolation, TUI/Web race safety and return to TUI. Post-reboot two-lane smoke passes; exact-head acceptance is bound by the current status. | `PASS_G05C_NATIVE_CONTROL_CLOSEOUT` with matching independent acceptance |
 | G06 | Accepted and personally dogfooded G05C plus separate Owner authorization and Tencent deployment admission | Project the already-proven control surface to a secure real phone/browser session through Tencent Hub + WebUI and authenticated outbound Edge WSS; add mobile UI, Owner auth, reconnect and needs-attention behavior. | `PASS_M1_REMOTE_MOBILE_MVP`; `v0.1-alpha.1` |
 | G07 | G06; ZenBook and O2b/O4b | Real turns on both selected Hosts, exact identity on reconnect, viewer/controller/takeover. | `PASS_M2_MULTI_HOST` |
 | G08 | G07; D1a when recovery/backup first used | Complete durable session/history, journals/cursors/checkpoints and restart/loss reconciliation. | `PASS_M3_DURABLE_SESSION` |
@@ -54,6 +56,9 @@ G05 local real Codex
 FleetSplice is a control plane for agents in an existing development
 environment, not a replacement ADE. The following rules constrain sequencing:
 
+- FleetSplice owns control authority, not the development environment. It is not
+  an IDE/ADE, terminal replacement, embedded editor, Git GUI, worktree manager or
+  ChatGPT Mobile clone. No transparent PATH shim as primary architecture.
 - Native Codex remains responsible for file, shell, test and tool execution.
   G05C should expose and control those upstream capabilities rather than build a
   parallel tool system.
@@ -90,3 +95,12 @@ unavoidable.
 
 G05C and G06 remain serial visible increments. After G10/Station B, the later
 [full train](../roadmap/full-development-train.md) remains separately gated.
+
+## Deferred debts and release gate
+
+The [closeout debt register](../train/receipts/G05C-native-control-closeout.md#known-non-blocking-debts)
+retains native Windows command popup / upstream draft, historical managed
+artifact qualification, unavailable dedicated file-change approval, unmapped
+turn/session grants, and unattended soak. None alone reopens G05C. A real 2–4h+
+unattended soak is required before final G06/v0.1 release acceptance; accelerated
+renewal proves renewal behavior only. Further work requires separate Owner scope.

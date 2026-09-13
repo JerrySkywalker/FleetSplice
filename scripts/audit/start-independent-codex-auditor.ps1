@@ -33,6 +33,7 @@ if (-not $CodexCommand) {
 else {
     $CodexPath = $CodexCommand.Source
 }
+$CodexPath = (Resolve-Path $CodexPath).Path
 
 $Version = (& $CodexPath --version 2>&1 | Out-String).Trim()
 if (-not $Version) {
@@ -48,10 +49,11 @@ $AuditRoot = 'V:\artifacts\FleetSplice\FLEETSPLICE-WINDOWS-NATIVE-DAEMON-CONTAIN
 $LauncherRoot = Join-Path $AuditRoot 'INDEPENDENT-AUDITOR'
 New-Item -ItemType Directory -Force -Path $LauncherRoot | Out-Null
 
+$AllCodexProcesses = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq 'codex.exe' })
+
 $DaemonCandidates = @(
-    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    $AllCodexProcesses |
         Where-Object {
-            $_.Name -ieq 'codex.exe' -and
             $_.CommandLine -match '(?i)\bapp-server\b' -and
             $_.CommandLine -match '(?i)--listen\s+unix://'
         } |
@@ -66,59 +68,75 @@ $DaemonCandidates = @(
         }
 )
 
-$Tmp = Join-Path $env:TEMP ('FleetSplice-independent-auditor-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
-$StdoutPath = Join-Path $Tmp 'exec-server.stdout.log'
-$StderrPath = Join-Path $Tmp 'exec-server.stderr.log'
+# A previous launcher crash can leave the audit-only exec-server alive because the
+# PowerShell host may terminate before its finally block runs. Do not create a second
+# independent executor on top of an unclassified survivor. This is deliberately a
+# fail-closed read-only check; cleanup requires an explicit operator action.
+$StaleAuditExecServers = @(
+    $AllCodexProcesses |
+        Where-Object {
+            $_.CommandLine -match '(?i)\bexec-server\b' -and
+            $_.CommandLine -match '(?i)--listen\s+ws://127\.0\.0\.1:0(?:\s|$)'
+        } |
+        ForEach-Object {
+            [pscustomobject]@{
+                PID = [int]$_.ProcessId
+                ParentPID = [int]$_.ParentProcessId
+                ParentAlive = $null -ne (Get-Process -Id ([int]$_.ParentProcessId) -ErrorAction SilentlyContinue)
+                CreationDate = [string]$_.CreationDate
+                ExecutablePath = [string]$_.ExecutablePath
+                CommandLine = [regex]::Replace([string]$_.CommandLine, '(?i)(--?(?:token|auth(?:-token)?|api[-_]?key|password|secret)(?:=|\s+))([^\s"'']+)', '$1<REDACTED>')
+            }
+        }
+)
 
-$Psi = [System.Diagnostics.ProcessStartInfo]::new()
-$Psi.FileName = $CodexPath
-$Psi.UseShellExecute = $false
-$Psi.CreateNoWindow = $true
-$Psi.RedirectStandardOutput = $true
-$Psi.RedirectStandardError = $true
-$Psi.WorkingDirectory = $WorkingDirectory
-[void]$Psi.ArgumentList.Add('exec-server')
-[void]$Psi.ArgumentList.Add('--listen')
-[void]$Psi.ArgumentList.Add('ws://127.0.0.1:0')
-
-$ExecServer = [System.Diagnostics.Process]::new()
-$ExecServer.StartInfo = $Psi
-if (-not $ExecServer.Start()) {
-    throw 'Failed to start the independent Codex exec-server.'
+if ($StaleAuditExecServers.Count -gt 0) {
+    Write-Host ''
+    Write-Host '===== POSSIBLE ORPHANED INDEPENDENT AUDITOR EXEC-SERVER =====' -ForegroundColor Yellow
+    $StaleAuditExecServers | Format-Table PID,ParentPID,ParentAlive,CreationDate,ExecutablePath,CommandLine -AutoSize
+    throw 'One or more audit-shaped exec-server processes already exist. Classify/clean the prior crashed launcher before starting another independent auditor.'
 }
 
-$StdoutLines = [System.Collections.Generic.List[string]]::new()
-$StderrLines = [System.Collections.Generic.List[string]]::new()
-$ExecServer.add_OutputDataReceived({
-    param($sender, $eventArgs)
-    if ($null -ne $eventArgs.Data) {
-        $StdoutLines.Add($eventArgs.Data)
-        Add-Content -LiteralPath $StdoutPath -Value $eventArgs.Data -Encoding utf8
-    }
-})
-$ExecServer.add_ErrorDataReceived({
-    param($sender, $eventArgs)
-    if ($null -ne $eventArgs.Data) {
-        $StderrLines.Add($eventArgs.Data)
-        Add-Content -LiteralPath $StderrPath -Value $eventArgs.Data -Encoding utf8
-    }
-})
-$ExecServer.BeginOutputReadLine()
-$ExecServer.BeginErrorReadLine()
+$RunId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$RunRoot = Join-Path $LauncherRoot $RunId
+New-Item -ItemType Directory -Force -Path $RunRoot | Out-Null
+$StdoutPath = Join-Path $RunRoot 'exec-server.stdout.log'
+$StderrPath = Join-Path $RunRoot 'exec-server.stderr.log'
+
+# Do not use Process.OutputDataReceived/ErrorDataReceived PowerShell script-block
+# callbacks here. Those callbacks run on ThreadPool threads without a PowerShell
+# runspace and can crash pwsh with PSInvalidOperationException. Redirect to files
+# and poll them from the owning PowerShell runspace instead.
+$ExecServer = Start-Process `
+    -FilePath $CodexPath `
+    -ArgumentList @('exec-server', '--listen', 'ws://127.0.0.1:0') `
+    -WorkingDirectory $WorkingDirectory `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput $StdoutPath `
+    -RedirectStandardError $StderrPath `
+    -PassThru
 
 $ExecServerUrl = $null
 $Deadline = (Get-Date).AddSeconds(20)
 while ((Get-Date) -lt $Deadline) {
+    $ExecServer.Refresh()
     if ($ExecServer.HasExited) {
-        throw "Independent exec-server exited early with code $($ExecServer.ExitCode). See $StderrPath"
+        $Stderr = if (Test-Path -LiteralPath $StderrPath) { Get-Content -LiteralPath $StderrPath -Raw -ErrorAction SilentlyContinue } else { '' }
+        throw "Independent exec-server exited early with code $($ExecServer.ExitCode). STDERR: $Stderr"
     }
-    $ExecServerUrl = $StdoutLines | Where-Object { $_ -match '^ws://127\.0\.0\.1:\d+/?$' } | Select-Object -First 1
+
+    if (Test-Path -LiteralPath $StdoutPath) {
+        $ExecServerUrl = Get-Content -LiteralPath $StdoutPath -ErrorAction SilentlyContinue |
+            Where-Object { $_ -match '^ws://127\.0\.0\.1:\d+/?$' } |
+            Select-Object -First 1
+    }
+
     if ($ExecServerUrl) {
         break
     }
     Start-Sleep -Milliseconds 50
 }
+
 if (-not $ExecServerUrl) {
     throw "Timed out waiting for the independent exec-server listen URL. See $StdoutPath and $StderrPath"
 }
@@ -137,9 +155,10 @@ $Receipt = [pscustomobject]@{
     TargetDaemonCandidates = $DaemonCandidates
     Goal = $Goal
     WorkingDirectory = $WorkingDirectory
+    RunRoot = $RunRoot
     Contract = 'CODEX_EXEC_SERVER_URL is set only for the auditor TUI; upstream documents that this skips implicit shared-daemon attachment.'
 }
-$ReceiptPath = Join-Path $LauncherRoot 'LAUNCH.json'
+$ReceiptPath = Join-Path $RunRoot 'LAUNCH.json'
 $Receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $ReceiptPath -Encoding utf8
 
 $OldExecServerUrl = $env:CODEX_EXEC_SERVER_URL
@@ -181,9 +200,15 @@ finally {
     if ($null -eq $OldAuditPid) { Remove-Item Env:FLEETSPLICE_AUDITOR_EXEC_SERVER_PID -ErrorAction SilentlyContinue } else { $env:FLEETSPLICE_AUDITOR_EXEC_SERVER_PID = $OldAuditPid }
     if ($null -eq $OldTargetPids) { Remove-Item Env:FLEETSPLICE_AUDIT_TARGET_DAEMON_PIDS -ErrorAction SilentlyContinue } else { $env:FLEETSPLICE_AUDIT_TARGET_DAEMON_PIDS = $OldTargetPids }
 
+    $ExecServer.Refresh()
     if (-not $ExecServer.HasExited) {
-        $ExecServer.Kill($true)
-        [void]$ExecServer.WaitForExit(5000)
+        try {
+            $ExecServer.Kill($true)
+            [void]$ExecServer.WaitForExit(5000)
+        }
+        catch {
+            Write-Warning "Failed to reap independent exec-server PID $($ExecServer.Id): $($_.Exception.Message)"
+        }
     }
     $ExecServer.Dispose()
 }

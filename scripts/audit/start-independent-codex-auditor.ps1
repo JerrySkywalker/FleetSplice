@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$WorkingDirectory,
-    [string]$Goal = 'goals/FLEETSPLICE-WINDOWS-NATIVE-DAEMON-CONTAINMENT-AUDIT-001-R2.md'
+    [string]$Goal = 'goals/FLEETSPLICE-WINDOWS-NATIVE-DAEMON-CONTAINMENT-AUDIT-001-R3.md'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -199,7 +199,7 @@ try {
     Write-Host 'R0 proof helper:' -ForegroundColor Yellow
     Write-Host '.\scripts\audit\verify-independent-auditor-context.ps1' -ForegroundColor Green
     Write-Host 'When Codex opens, enter exactly:' -ForegroundColor Yellow
-    Write-Host "Execute `$Goal exactly. Resume after the prior R0 environment-contract stop. Do not broaden scope." -ForegroundColor Green
+    Write-Host "Execute `$Goal exactly. Resume after the prior quiescence stop. Do not broaden scope." -ForegroundColor Green
     Write-Host ''
 
     Push-Location $WorkingDirectory

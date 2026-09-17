@@ -1,6 +1,7 @@
 import Ajv2020 from 'ajv/dist/2020.js';
 import { Fault } from './json.ts';
 export * from './json.ts';
+export * from './realtime-streams.ts';
 
 export type Target = {
   authorityId: string; hubRuntimeId: string; edgeRuntimeId: string; connectionId: string;

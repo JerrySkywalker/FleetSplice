@@ -21,7 +21,10 @@ documentation maintenance does not authorize any further product code. See the
 4. [Accepted Baseline 0.1](baseline-0.1.md) and [six ADRs](../adr/README.md)
    for unchanged clauses. Their bodies are historical G03 evidence; reader
    notices route superseded requirements to the amendment.
-5. [WebUI models](webui-model.md) and [wireframes](webui-wireframes.md) as
+5. [Realtime two-stream contracts](realtime-two-stream.md): provider-neutral
+   Agent Execution vs Fleet Control/Safety streams for the local realtime UX
+   train. Additive; does not authorize product G06.
+6. [WebUI models](webui-model.md) and [wireframes](webui-wireframes.md) as
    supporting identity/control models, not a mandate to grow FleetSplice into
    a full ADE.
 

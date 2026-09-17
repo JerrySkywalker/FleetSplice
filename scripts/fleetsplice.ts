@@ -193,12 +193,15 @@ async function configure(args: string[]) {
 }
 export async function fleetspliceEntrypoint() {
   const args = process.argv.slice(2); const command = args[0]; const workspaceIndex = args.indexOf('--workspace'); const workspace = workspaceIndex >= 0 ? args[workspaceIndex + 1] ?? process.cwd() : process.cwd();
-  if (command === 'native-demo') {
-    requireThat(args.length === 1, 'USAGE_FLEETSPLICE_NATIVE_DEMO');
-    const { startNativeDemo } = await import('./native-demo.ts');
+  if (command === 'native-demo' || command === 'adopt') {
+    const { resolveNativeAdoptionWorkspace, startNativeDemo } = await import('./native-demo.ts');
     let demo: Awaited<ReturnType<typeof startNativeDemo>>;
-    try { demo = await startNativeDemo(url => output(`FleetSplice Native Adoption demo\n${url}\nCONTROL_MODE=COOPERATIVE\nLocal Codex TUI remains connected. Type stop here to close only FleetSplice.`)); }
-    catch (reason) { error(`NATIVE_DEMO_START_FAILED\n${reason instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(reason.message) ? reason.message : 'NATIVE_ADOPTION_ADMISSION_UNPROVABLE'}`); return; }
+    try {
+      const workspace = resolveNativeAdoptionWorkspace(command, args);
+      let readyUrl = '';
+      demo = await startNativeDemo(workspace, url => { readyUrl = url; });
+      output(`FleetSplice Native Adoption\nWorkspace: ${demo.workspace}\n${readyUrl}\nCONTROL_MODE=COOPERATIVE\nLocal Codex TUI remains connected. Type stop here to close only FleetSplice.`);
+    } catch (reason) { error(`NATIVE_ADOPTION_START_FAILED\n${reason instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(reason.message) ? reason.message : 'NATIVE_ADOPTION_ADMISSION_UNPROVABLE'}`); return; }
     const stopDemo = () => { demo.stop().then(() => process.exit(0)); };
     process.stdin.setEncoding('utf8'); process.stdin.on('data', value => { if (String(value).trim() === 'stop') stopDemo(); });
     process.on('SIGINT', stopDemo); process.on('SIGTERM', stopDemo); return;
@@ -229,6 +232,6 @@ export async function fleetspliceEntrypoint() {
   if (command === 'doctor') return await doctor(workspace);
   if (command === 'retire-stale') return retire(args);
   if (command === 'configure') return await configure(args.slice(1));
-  error('USAGE: fleetsplice start|stop|status|doctor|configure [--workspace ABSOLUTE_ROOT]');
+  error('USAGE: fleetsplice start|stop|status|doctor|configure|native-demo|adopt [--workspace ABSOLUTE_ROOT]');
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) fleetspliceEntrypoint().catch(reason => error(`PRECHECK_FAILED\n${reason instanceof Error ? reason.message : 'UNKNOWN'}\nNO_RUNTIME_STATE_MUTATED=true`));

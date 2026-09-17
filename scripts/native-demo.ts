@@ -4,15 +4,41 @@ import { mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startHub } from '../apps/hub/server.ts';
-import { localIdentity } from '../apps/edge/identity.ts';
+import { localIdentity, type LocalIdentity } from '../apps/edge/identity.ts';
 import { requireThat, Fault, type Target } from '../packages/contracts/index.ts';
 import type { AdoptionPort } from '../packages/native-adoption/types.ts';
 import { applyPrivateUserAcl } from '../packages/local-operation/index.ts';
 
+/** Historical disposable demo Workspace. CLI no-argument native-demo only. */
 export const DEMO_WORKSPACE = 'V:\\artifacts\\FleetSplice\\demo-native-adoption\\workspace';
-export async function startNativeDemo(onReady: (url: string) => void) {
+
+export type NativeAdoptionCliCommand = 'native-demo' | 'adopt';
+
+/**
+ * CLI compatibility boundary: historical demo default lives here only.
+ * Runtime never substitutes DEMO_WORKSPACE for an explicit request.
+ */
+export function resolveNativeAdoptionWorkspace(command: NativeAdoptionCliCommand, args: string[]): string {
+  const workspaceIndex = args.indexOf('--workspace');
+  if (command === 'adopt') {
+    requireThat(workspaceIndex === 1 && args.length === 3 && typeof args[2] === 'string' && args[2]!.length > 0, 'USAGE_FLEETSPLICE_ADOPT_WORKSPACE');
+    return args[2]!;
+  }
+  if (args.length === 1) return DEMO_WORKSPACE;
+  requireThat(workspaceIndex === 1 && args.length === 3 && typeof args[2] === 'string' && args[2]!.length > 0, 'USAGE_FLEETSPLICE_NATIVE_DEMO');
+  return args[2]!;
+}
+
+/** Same local identity/root proof used by native adoption; never replaces the requested root. */
+export async function proveNativeAdoptionWorkspace(workspace: string): Promise<LocalIdentity> {
+  requireThat(typeof workspace === 'string' && /^[a-zA-Z]:\\/.test(workspace) && !workspace.includes('\0'), 'LOCAL_ABSOLUTE_ROOT_REQUIRED');
+  requireThat(existsSync(workspace), 'WORKSPACE_ROOT_MISSING');
+  return await localIdentity(workspace);
+}
+
+export async function startNativeDemo(workspace: string, onReady: (url: string) => void) {
   const installation = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const identity = await localIdentity(DEMO_WORKSPACE);
+  const identity = await proveNativeAdoptionWorkspace(workspace);
   const stateDirectory = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'native-adoption-demo');
   mkdirSync(stateDirectory, { recursive: true });
   applyPrivateUserAcl(stateDirectory, identity.sid, true);
@@ -47,6 +73,6 @@ export async function startNativeDemo(onReady: (url: string) => void) {
     });
     onReady(`http://127.0.0.1:4319/#bootstrap=${bootstrapToken}`);
     const stop = async () => { if (edge?.connected) edge.send({ kind: 'stop' }); await hub.close(); };
-    return { stop, stateDirectory, port };
+    return { stop, stateDirectory, port, workspace: identity.root, rootIdentity: identity.rootIdentity };
   } catch (error) { if (edge?.connected) edge.disconnect(); await hub.close(); throw error; }
 }

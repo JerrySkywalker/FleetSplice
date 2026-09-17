@@ -12,6 +12,12 @@ import { applyPrivateUserAcl } from '../packages/local-operation/index.ts';
 /** Historical disposable demo Workspace. CLI no-argument native-demo only. */
 export const DEMO_WORKSPACE = 'V:\\artifacts\\FleetSplice\\demo-native-adoption\\workspace';
 
+/** Legacy single-demo journal namespace. Historical no-argument native-demo only. */
+export const LEGACY_NATIVE_ADOPTION_DEMO_STATE = 'native-adoption-demo';
+
+/** Explicit Workspace journal parent namespace under %LOCALAPPDATA%\\FleetSplice. */
+export const NATIVE_ADOPTION_STATE_NAMESPACE = 'native-adoption';
+
 export type NativeAdoptionCliCommand = 'native-demo' | 'adopt';
 
 /**
@@ -29,6 +35,31 @@ export function resolveNativeAdoptionWorkspace(command: NativeAdoptionCliCommand
   return args[2]!;
 }
 
+/** True only for `fleetsplice native-demo` with no further arguments. */
+export function isHistoricalNativeDemoRoute(command: NativeAdoptionCliCommand, args: string[]): boolean {
+  return command === 'native-demo' && args.length === 1;
+}
+
+/**
+ * State isolation for native adoption journals.
+ * Historical no-argument demo keeps the legacy directory; explicit Workspace
+ * routes use rootIdentity so separate Workspaces never share one sqlite journal.
+ * Isolation is by stateDirectory construction; restoreInput is not filtered by path.
+ */
+export function resolveNativeAdoptionStateDirectory(input: {
+  historicalCompatibilityRoute: boolean;
+  rootIdentity: string;
+  localAppData?: string;
+}): string {
+  const localAppData = input.localAppData ?? process.env.LOCALAPPDATA;
+  requireThat(typeof localAppData === 'string' && localAppData.length > 0, 'LOCALAPPDATA_REQUIRED');
+  if (input.historicalCompatibilityRoute) {
+    return path.join(localAppData, 'FleetSplice', LEGACY_NATIVE_ADOPTION_DEMO_STATE);
+  }
+  requireThat(/^[0-9a-f]{64}$/.test(input.rootIdentity), 'ROOT_IDENTITY_INVALID');
+  return path.join(localAppData, 'FleetSplice', NATIVE_ADOPTION_STATE_NAMESPACE, input.rootIdentity);
+}
+
 /** Same local identity/root proof used by native adoption; never replaces the requested root. */
 export async function proveNativeAdoptionWorkspace(workspace: string): Promise<LocalIdentity> {
   requireThat(typeof workspace === 'string' && /^[a-zA-Z]:\\/.test(workspace) && !workspace.includes('\0'), 'LOCAL_ABSOLUTE_ROOT_REQUIRED');
@@ -36,10 +67,17 @@ export async function proveNativeAdoptionWorkspace(workspace: string): Promise<L
   return await localIdentity(workspace);
 }
 
-export async function startNativeDemo(workspace: string, onReady: (url: string) => void) {
+export async function startNativeDemo(
+  workspace: string,
+  onReady: (url: string) => void,
+  options: { historicalCompatibilityRoute?: boolean } = {},
+) {
   const installation = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const identity = await proveNativeAdoptionWorkspace(workspace);
-  const stateDirectory = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'native-adoption-demo');
+  const stateDirectory = resolveNativeAdoptionStateDirectory({
+    historicalCompatibilityRoute: options.historicalCompatibilityRoute === true,
+    rootIdentity: identity.rootIdentity,
+  });
   mkdirSync(stateDirectory, { recursive: true });
   applyPrivateUserAcl(stateDirectory, identity.sid, true);
   requireThat(existsSync(path.join(installation, 'web', 'index.html')), 'FLEETSPLICE_BUILD_UNAVAILABLE');

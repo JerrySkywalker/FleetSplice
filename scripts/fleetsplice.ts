@@ -194,12 +194,13 @@ async function configure(args: string[]) {
 export async function fleetspliceEntrypoint() {
   const args = process.argv.slice(2); const command = args[0]; const workspaceIndex = args.indexOf('--workspace'); const workspace = workspaceIndex >= 0 ? args[workspaceIndex + 1] ?? process.cwd() : process.cwd();
   if (command === 'native-demo' || command === 'adopt') {
-    const { resolveNativeAdoptionWorkspace, startNativeDemo } = await import('./native-demo.ts');
+    const { isHistoricalNativeDemoRoute, resolveNativeAdoptionWorkspace, startNativeDemo } = await import('./native-demo.ts');
     let demo: Awaited<ReturnType<typeof startNativeDemo>>;
     try {
+      const historicalCompatibilityRoute = isHistoricalNativeDemoRoute(command, args);
       const workspace = resolveNativeAdoptionWorkspace(command, args);
       let readyUrl = '';
-      demo = await startNativeDemo(workspace, url => { readyUrl = url; });
+      demo = await startNativeDemo(workspace, url => { readyUrl = url; }, { historicalCompatibilityRoute });
       output(`FleetSplice Native Adoption\nWorkspace: ${demo.workspace}\n${readyUrl}\nCONTROL_MODE=COOPERATIVE\nLocal Codex TUI remains connected. Type stop here to close only FleetSplice.`);
     } catch (reason) { error(`NATIVE_ADOPTION_START_FAILED\n${reason instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(reason.message) ? reason.message : 'NATIVE_ADOPTION_ADMISSION_UNPROVABLE'}`); return; }
     const stopDemo = () => { demo.stop().then(() => process.exit(0)); };

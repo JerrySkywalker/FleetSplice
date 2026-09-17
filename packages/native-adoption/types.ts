@@ -62,4 +62,6 @@ export type AdoptionPort = {
   execute(command: unknown, client: AdoptionClient): Promise<AdoptionReceipt>;
   renewClient(previous: AdoptionClient, next: AdoptionClient, continuity: AdoptionContinuity | null): Promise<{ controller: string | null; fence: number }>;
   lookup(commandId: string): Promise<AdoptionReceipt | null>;
+  /** Optional realtime poll for sanitized invalidation envelopes since a revision. */
+  pollRealtime?(sinceRevision: string): Promise<{ revision: string; events: import('../contracts/realtime-bus.ts').RealtimeInvalidateEnvelope[] }>;
 };

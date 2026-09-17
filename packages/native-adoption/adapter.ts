@@ -1,5 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { canonical, Fault, requireThat } from '../contracts/json.ts';
+import { RealtimeEventBus } from '../contracts/realtime-bus.ts';
 import type { AgentExecutionEvent } from '../contracts/realtime-streams.ts';
 import { assertSameIncarnation, classifyCapabilities, incarnationOf } from './compatibility.ts';
 import { mapCodexNotification } from './codex-execution-mapper.ts';
@@ -42,7 +43,8 @@ export class NativeAdoptionAdapter {
   private unavailableCandidates = new Set<string>();
   private approvals = new NativeApprovals();
   private subscribingThread: string | null = null;
-  private executionRevision = 0;
+  private readonly realtime = new RealtimeEventBus();
+  private lastControlSignature = '';
   private executionEvents: AgentExecutionEvent[] = [];
   // Restore attribution only from an exact successful journaled input, never
   // from matching text or an interrupted/unknown delivery attempt.
@@ -122,15 +124,31 @@ export class NativeAdoptionAdapter {
   }
   /** Non-authoritative Agent Execution projection for later SSE/timeline. Never admits effects. */
   recentExecutionEvents(): readonly AgentExecutionEvent[] { return this.executionEvents; }
+  pollRealtime(sinceRevision: string) { this.publishControlObservation(); return this.realtime.since(sinceRevision); }
+  private publishControlObservation() {
+    const signature = `${this.state}|${this.controller}|${this.fence}|${this.incarnation}|${[...this.threads.values()].map(b => `${b.view.id}:${b.view.externalAdvance}:${b.view.stateToken}`).join(',')}`;
+    if (signature === this.lastControlSignature) return;
+    this.lastControlSignature = signature;
+    this.realtime.publishFleet({
+      eventId: randomUUID(),
+      observedAt: new Date().toISOString(),
+      sessionKey: this.runtimeId,
+      threadId: null,
+      turnId: null,
+      kind: this.state === 'READY' ? 'fence.advanced' : 'recovery.required',
+      payload: { state: this.state, fence: this.fence, controller: this.controller },
+    });
+  }
   private event(message: NativeMessage) {
     this.observedEvents = true;
     const p = message.params;
     const threadId = p?.threadId ?? p?.thread?.id;
     const binding = this.threads.get(threadId);
     if (!binding || (!binding.view.attached && this.subscribingThread !== threadId)) return; // Never retain foreign thread payloads.
-    const mapped = mapCodexNotification(message, { sessionKey: this.runtimeId, revision: String(++this.executionRevision) });
+    const mapped = mapCodexNotification(message, { sessionKey: this.runtimeId, revision: '0' });
     if (mapped) {
-      this.executionEvents.push(mapped);
+      const published = this.realtime.publish(mapped);
+      this.executionEvents.push({ ...mapped, revision: published.revision, eventId: published.eventId });
       if (this.executionEvents.length > 64) this.executionEvents.splice(0, this.executionEvents.length - 64);
     }
     const turnId = p.turnId ?? p.turn?.id;

@@ -34,7 +34,21 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     catch (e) { setError(e instanceof Error ? e.message : 'NATIVE_OBSERVATION_LOST'); setSnapshot(old => old ? { ...old, state: 'NATIVE_OBSERVATION_LOST' } : old); }
     finally { refreshing.current = false; }
   }
-  useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 3000); return () => clearInterval(timer); }, []);
+  useEffect(() => {
+    void refresh();
+    let events: EventSource | undefined;
+    const connect = () => {
+      events?.close();
+      events = new EventSource('/api/native/events');
+      events.onmessage = () => void refresh();
+      events.onerror = () => { /* Browser reconnects EventSource; retain slow fallback refresh. */ };
+    };
+    connect();
+    const fallback = setInterval(() => void refresh(), 20_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') { connect(); void refresh(); } };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { events?.close(); clearInterval(fallback); document.removeEventListener('visibilitychange', onVisible); };
+  }, []);
   const thread = snapshot?.threads.find(item => item.id === selected) ?? snapshot?.threads[0];
   const controlled = snapshot?.controller === client.clientInstanceId;
   const available = snapshot?.state === 'READY' && snapshot.compatibility.profile === 'ADOPT_FULL' && !busy && !pending && client.expiresAt > Date.now();

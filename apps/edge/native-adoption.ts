@@ -43,7 +43,7 @@ if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.
       if (message.kind === 'stop') { edge.close(); process.exit(0); }
       try {
         const result = message.kind === 'snapshot' ? await edge.adapter.snapshot() : message.kind === 'execute' ?
-          await edge.adapter.execute(message.command, message.client) : message.kind === 'renewClient' ? await edge.adapter.renewClient(message.previous, message.next, message.continuity) : message.kind === 'lookup' ? edge.adapter.lookup(message.commandId) : null;
+          await edge.adapter.execute(message.command, message.client) : message.kind === 'renewClient' ? await edge.adapter.renewClient(message.previous, message.next, message.continuity) : message.kind === 'lookup' ? edge.adapter.lookup(message.commandId) : message.kind === 'pollRealtime' ? edge.adapter.pollRealtime(String(message.sinceRevision ?? '0')) : null;
         process.send!({ id: message.id, result });
       } catch (error) { process.send!({ id: message.id, error: error instanceof Fault ? error.code : 'NATIVE_EDGE_REQUEST_FAILED' }); }
     });

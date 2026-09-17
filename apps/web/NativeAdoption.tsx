@@ -1,6 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { AdoptionCommand, AdoptionReceipt, AdoptionSnapshot, NativeTurn } from '../../packages/native-adoption/types.ts';
 import type { Locale } from './i18n.ts';
+import {
+  advancePresentation,
+  correlateProvisional,
+  createProvisional,
+  markOutcomeUnknown,
+  shouldClearComposer,
+  type PresentationCommandState,
+  type ProvisionalMessage,
+} from './optimistic-command.ts';
 
 function TurnStatus({ turn, locale, live }: { turn: NativeTurn; locale: Locale; live: boolean }) {
   const [now, setNow] = useState(Date.now());
@@ -15,6 +24,15 @@ function TurnStatus({ turn, locale, live }: { turn: NativeTurn; locale: Locale; 
   return <span className="native-turn-status" data-turn-id={turn.id} data-turn-state={turn.state}><span>{label}</span>{formatted ? ` · ${turn.state === 'RUNNING' ? '' : zh ? '工作用时 ' : 'Worked for '}${formatted}` : ` · ${zh ? '计时不可用' : 'Timing unavailable'}`}</span>;
 }
 
+const presentationLabel = (state: PresentationCommandState, zh: boolean) => ({
+  LOCAL_PENDING: zh ? '本地待发送' : 'Local pending',
+  NATIVE_ACCEPTED: zh ? '已接受（权威待观察）' : 'Accepted (awaiting observation)',
+  OBSERVED: zh ? '已观察' : 'Observed',
+  OUTCOME_UNKNOWN: zh ? '结果未知' : 'Outcome unknown',
+  REJECTED: zh ? '已拒绝' : 'Rejected',
+  AMBIGUOUS_EFFECT: zh ? '效果不明' : 'Ambiguous effect',
+}[state]);
+
 export function NativeAdoption({ client, request, locale, preferences }: {
   client: { clientInstanceId: string; expiresAt: number }; request: (url: string, body?: unknown) => Promise<any>;
   locale: Locale; preferences: React.ReactNode;
@@ -26,11 +44,29 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<AdoptionCommand | null>(() => { try { return JSON.parse(sessionStorage.getItem('fleetsplice.native.pending') ?? 'null'); } catch { return null; } });
+  const [provisional, setProvisional] = useState<ProvisionalMessage | null>(() => {
+    try { return JSON.parse(sessionStorage.getItem('fleetsplice.native.provisional') ?? 'null'); } catch { return null; }
+  });
   const refreshing = useRef(false);
   async function refresh(discover = false) {
     if (refreshing.current) return;
     refreshing.current = true;
-    try { setSnapshot(await request(discover ? '/api/native/snapshot?discover=1' : '/api/native/snapshot')); }
+    try {
+      const next = await request(discover ? '/api/native/snapshot?discover=1' : '/api/native/snapshot');
+      setSnapshot(next);
+      setProvisional(current => {
+        if (!current || !['native.submit', 'native.steer'].includes(current.family)) return current;
+        const observed = (next.threads ?? []).some((item: any) => correlateProvisional(current, item.history ?? [], client.clientInstanceId));
+        if (!observed) return current;
+        const advanced = { ...current, state: advancePresentation(current.state, { status: 'SUCCEEDED' }, true) as PresentationCommandState };
+        if (advanced.state === 'OBSERVED') {
+          sessionStorage.removeItem('fleetsplice.native.provisional');
+          return null;
+        }
+        sessionStorage.setItem('fleetsplice.native.provisional', JSON.stringify(advanced));
+        return advanced;
+      });
+    }
     catch (e) { setError(e instanceof Error ? e.message : 'NATIVE_OBSERVATION_LOST'); setSnapshot(old => old ? { ...old, state: 'NATIVE_OBSERVATION_LOST' } : old); }
     finally { refreshing.current = false; }
   }
@@ -55,10 +91,24 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const canControl = available && controlled && thread?.attached && !thread.externalAdvance;
   const interrupt = snapshot?.compatibility.capabilities.interrupt.available;
   const steer = snapshot?.compatibility.capabilities.steer.available;
+  function persistProvisional(value: ProvisionalMessage | null) {
+    setProvisional(value);
+    if (value) sessionStorage.setItem('fleetsplice.native.provisional', JSON.stringify(value));
+    else sessionStorage.removeItem('fleetsplice.native.provisional');
+  }
   function receiptObserved(receipt: AdoptionReceipt) {
     sessionStorage.removeItem('fleetsplice.native.pending'); setPending(null);
     setError(receipt.status === 'SUCCEEDED' ? '' : `${receipt.status}: ${receipt.code}`);
-    if (receipt.status === 'SUCCEEDED' && ['native.submit', 'native.steer'].includes(receipt.family)) setText('');
+    setProvisional(current => {
+      if (!current || current.commandId !== receipt.commandId) return current;
+      const observed = correlateProvisional(current, thread?.history ?? [], client.clientInstanceId);
+      const state = advancePresentation(current.state, receipt, observed);
+      if (shouldClearComposer(state)) setText('');
+      if (state === 'OBSERVED') { sessionStorage.removeItem('fleetsplice.native.provisional'); return null; }
+      const next = { ...current, state };
+      sessionStorage.setItem('fleetsplice.native.provisional', JSON.stringify(next));
+      return next;
+    });
   }
   async function command(family: AdoptionCommand['family'], approval?: AdoptionCommand['approval']) {
     if (!available || !snapshot || !thread) return;
@@ -67,10 +117,21 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       threadId: thread.id, stateToken: thread.stateToken, activeTurnId: thread.activeTurnId, family, text: ['native.submit', 'native.steer'].includes(family) ? text : '' };
     if (approval) value.approval = approval;
     setBusy(true); setError('');
+    if (family === 'native.submit' || family === 'native.steer') {
+      persistProvisional(createProvisional(value.commandId, family, value.text));
+    }
     try {
       sessionStorage.setItem('fleetsplice.native.pending', JSON.stringify(value)); setPending(value);
       receiptObserved(await request('/api/native/commands', value)); await refresh();
-    } catch (e) { setError(`${t('Outcome unknown. Check the receipt; do not resend.', '结果未知。请查询回执，不要重发。')} ${e instanceof Error ? e.message : ''}`); }
+    } catch (e) {
+      setProvisional(current => {
+        if (!current || current.commandId !== value.commandId) return current;
+        const next = { ...current, state: markOutcomeUnknown(current.state) };
+        sessionStorage.setItem('fleetsplice.native.provisional', JSON.stringify(next));
+        return next;
+      });
+      setError(`${t('Outcome unknown. Check the receipt; do not resend.', '结果未知。请查询回执，不要重发。')} ${e instanceof Error ? e.message : ''}`);
+    }
     finally { setBusy(false); }
   }
   async function lookup() {
@@ -79,6 +140,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     catch (e) { setError(e instanceof Error ? e.message : 'COMMAND_UNKNOWN_NO_REPLAY'); }
     finally { setBusy(false); }
   }
+  const showProvisional = provisional && provisional.state !== 'OBSERVED'
+    && !correlateProvisional(provisional, thread?.history ?? [], client.clientInstanceId);
   return <div className="shell native-demo">
     <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('NATIVE ADOPTION · LOCAL DEMO', '原生会话接入 · 本地演示')}</span></div>{preferences}</header>
     <aside className="navigation"><div className="eyebrow">{t('Running Native Agents', '正在运行的原生代理')}</div>
@@ -109,6 +172,10 @@ export function NativeAdoption({ client, request, locale, preferences }: {
           </div><div className="message-text">{message.text}</div></article>)}
           <div className="native-turn-marker"><TurnStatus turn={turn} locale={locale} live={snapshot?.state === 'READY'}/></div>
         </React.Fragment>)}
+        {showProvisional && <article className="message user provisional" data-presentation-state={provisional.state} data-command-id={provisional.commandId}>
+          <div className="message-label">{t('Web (provisional)', '网页（临时）')}<small data-testid="presentation-state">{presentationLabel(provisional.state, locale === 'zh-CN')}</small></div>
+          <div className="message-text">{provisional.text}</div>
+        </article>}
         {thread?.historyLimited && <p className="muted">{t('Showing bounded recent history.', '仅显示最近的有限历史。')}</p>}
       </div>
       {thread?.attached && <section className="native-approvals" aria-label={t('Approvals', '审批')}>

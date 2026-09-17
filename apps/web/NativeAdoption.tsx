@@ -8,7 +8,6 @@ import {
   correlateProvisional,
   createProvisional,
   markOutcomeUnknown,
-  shouldClearComposer,
   type PresentationCommandState,
   type ProvisionalMessage,
 } from './optimistic-command.ts';
@@ -20,6 +19,7 @@ import {
   permissionPresentation,
   residualSeverity,
 } from './control-safety-ux.ts';
+import { LocalLoopTimer } from '../../packages/contracts/local-loop-timing.ts';
 
 function TurnStatus({ turn, locale, live }: { turn: NativeTurn; locale: Locale; live: boolean }) {
   const [now, setNow] = useState(Date.now());
@@ -60,6 +60,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const [liveTimeline, setLiveTimeline] = useState<TimelinePresentationItem[]>([]);
   const timelineRef = useRef<HTMLDivElement>(null);
   const followTail = useRef(true);
+  const timerRef = useRef(new LocalLoopTimer());
   const refreshing = useRef(false);
   async function refresh(discover = false) {
     if (refreshing.current) return;
@@ -103,6 +104,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
               role: envelope.semantic?.role, text: envelope.semantic?.text, toolId: envelope.semantic?.toolId, status: envelope.semantic?.status,
             };
             setLiveTimeline(current => foldTimeline(current, item));
+            timerRef.current.record('browser_receive_render', performance.now());
           }
         } catch { /* Invalidation-only payloads still trigger refresh below. */ }
         void refresh();
@@ -148,11 +150,15 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     if (approval) value.approval = approval;
     setBusy(true); setError('');
     if (family === 'native.submit' || family === 'native.steer') {
-      persistProvisional(createProvisional(value.commandId, family, value.text));
+      timerRef.current.measure('local_echo', () => persistProvisional(createProvisional(value.commandId, family, value.text)));
     }
     try {
       sessionStorage.setItem('fleetsplice.native.pending', JSON.stringify(value)); setPending(value);
-      receiptObserved(await request('/api/native/commands', value)); await refresh();
+      const sendStarted = performance.now();
+      const receipt = await timerRef.current.measureAsync('command_send', () => request('/api/native/commands', value));
+      timerRef.current.record('receipt', sendStarted, performance.now());
+      receiptObserved(receipt);
+      await timerRef.current.measureAsync('final_reconciliation', () => refresh());
     } catch (e) {
       setProvisional(current => {
         if (!current || current.commandId !== value.commandId) return current;

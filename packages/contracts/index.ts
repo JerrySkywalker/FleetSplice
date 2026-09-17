@@ -4,6 +4,7 @@ export * from './json.ts';
 export * from './realtime-streams.ts';
 export * from './realtime-bus.ts';
 export * from './realtime-timeline.ts';
+export * from './local-loop-timing.ts';
 
 export type Target = {
   authorityId: string; hubRuntimeId: string; edgeRuntimeId: string; connectionId: string;

@@ -1,4 +1,5 @@
 import type { FleetControlEvent, RealtimeStreamEvent } from './realtime-streams.ts';
+import { projectExecutionToTimeline } from './realtime-timeline.ts';
 
 /** Sanitized SSE/bus envelope. Never carries credentials, raw daemon payloads, or global diagnostics. */
 export type RealtimeInvalidateEnvelope = {
@@ -8,10 +9,17 @@ export type RealtimeInvalidateEnvelope = {
   kind: string;
   threadId: string | null;
   turnId: string | null;
+  /** Optional provider-neutral semantic fields for live timeline presentation. */
+  semantic?: {
+    role?: 'user' | 'assistant' | 'tool' | 'system';
+    text?: string;
+    toolId?: string;
+    status?: string;
+  };
 };
 
 export function sanitizeRealtimeEvent(event: RealtimeStreamEvent): RealtimeInvalidateEnvelope {
-  return {
+  const envelope: RealtimeInvalidateEnvelope = {
     revision: event.revision,
     eventId: event.eventId,
     stream: event.stream,
@@ -19,6 +27,18 @@ export function sanitizeRealtimeEvent(event: RealtimeStreamEvent): RealtimeInval
     threadId: event.threadId,
     turnId: event.turnId,
   };
+  if (event.stream === 'agent.execution') {
+    const projected = projectExecutionToTimeline(event);
+    if (projected && (projected.text || projected.toolId || projected.status || projected.role)) {
+      envelope.semantic = {
+        ...(projected.role ? { role: projected.role } : {}),
+        ...(projected.text !== undefined ? { text: projected.text } : {}),
+        ...(projected.toolId ? { toolId: projected.toolId } : {}),
+        ...(projected.status ? { status: projected.status } : {}),
+      };
+    }
+  }
+  return envelope;
 }
 
 export type RealtimeBusListener = (envelope: RealtimeInvalidateEnvelope) => void;

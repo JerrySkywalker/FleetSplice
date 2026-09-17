@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { AdoptionCommand, AdoptionReceipt, AdoptionSnapshot, NativeTurn } from '../../packages/native-adoption/types.ts';
+import type { TimelinePresentationItem } from '../../packages/contracts/realtime-timeline.ts';
+import { foldTimeline } from '../../packages/contracts/realtime-timeline.ts';
 import type { Locale } from './i18n.ts';
 import {
   advancePresentation,
@@ -47,6 +49,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const [provisional, setProvisional] = useState<ProvisionalMessage | null>(() => {
     try { return JSON.parse(sessionStorage.getItem('fleetsplice.native.provisional') ?? 'null'); } catch { return null; }
   });
+  const [liveTimeline, setLiveTimeline] = useState<TimelinePresentationItem[]>([]);
   const refreshing = useRef(false);
   async function refresh(discover = false) {
     if (refreshing.current) return;
@@ -76,7 +79,24 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     const connect = () => {
       events?.close();
       events = new EventSource('/api/native/events');
-      events.onmessage = () => void refresh();
+      events.onmessage = (message) => {
+        try {
+          const envelope = JSON.parse(message.data) as {
+            eventId: string; revision: string; stream: string; kind: string;
+            threadId: string | null; turnId: string | null;
+            semantic?: { role?: TimelinePresentationItem['role']; text?: string; toolId?: string; status?: string };
+          };
+          if (envelope.stream === 'agent.execution' && envelope.kind !== 'unsupported') {
+            const item: TimelinePresentationItem = {
+              eventId: envelope.eventId, revision: envelope.revision, kind: envelope.kind as TimelinePresentationItem['kind'],
+              threadId: envelope.threadId, turnId: envelope.turnId, ephemeral: true,
+              role: envelope.semantic?.role, text: envelope.semantic?.text, toolId: envelope.semantic?.toolId, status: envelope.semantic?.status,
+            };
+            setLiveTimeline(current => foldTimeline(current, item));
+          }
+        } catch { /* Invalidation-only payloads still trigger refresh below. */ }
+        void refresh();
+      };
       events.onerror = () => { /* Browser reconnects EventSource; retain slow fallback refresh. */ };
     };
     connect();
@@ -176,6 +196,12 @@ export function NativeAdoption({ client, request, locale, preferences }: {
           <div className="message-label">{t('Web (provisional)', '网页（临时）')}<small data-testid="presentation-state">{presentationLabel(provisional.state, locale === 'zh-CN')}</small></div>
           <div className="message-text">{provisional.text}</div>
         </article>}
+        {liveTimeline.filter(item => item.kind === 'message.delta' || item.kind.startsWith('tool.') || item.kind.startsWith('turn.')).map(item => (
+          <article className={`message ${item.role === 'assistant' ? 'assistant' : item.role === 'tool' ? 'system' : 'system'} live`} data-live-kind={item.kind} data-ephemeral="true" key={item.eventId}>
+            <div className="message-label">{item.kind.startsWith('tool.') ? t('Tool activity', '工具活动') : item.kind.startsWith('turn.') ? t('Turn', '轮次') : 'Codex'}<small>{item.status ?? item.kind}</small></div>
+            {item.text ? <div className="message-text">{item.text}</div> : null}
+          </article>
+        ))}
         {thread?.historyLimited && <p className="muted">{t('Showing bounded recent history.', '仅显示最近的有限历史。')}</p>}
       </div>
       {thread?.attached && <section className="native-approvals" aria-label={t('Approvals', '审批')}>

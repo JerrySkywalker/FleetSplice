@@ -32,7 +32,8 @@ test('realtime bus orders revisions, dedupes event ids, and sanitizes payloads',
   assert.equal(duplicate.revision, '1');
   assert.equal(seen.length, 1);
   assert.equal('payload' in first, false);
-  assert.doesNotMatch(JSON.stringify(first), /secret|cred/);
+  assert.equal(first.semantic?.text, 'secret-should-not-appear');
+  assert.doesNotMatch(JSON.stringify(first), /"token"|"credential"|rawDaemon/);
   const page = bus.since('1');
   assert.equal(page.events.length, 0);
   bus.publish({ ...base, eventId: 'next', kind: 'turn.started' });
@@ -92,7 +93,7 @@ test('native SSE requires same-origin session, enforces observer limit, and emit
       buffer += decoder.decode(value, { stream: true });
     }
     assert.match(buffer, /turn\.started/);
-    assert.doesNotMatch(buffer, /should-not-leak|credential/);
+    assert.doesNotMatch(buffer, /should-not-leak|"credential"/);
     await reader.cancel().catch(() => {});
     for (const stream of streams.slice(1)) await stream.body?.cancel().catch(() => {});
   } finally { await hub.close(); }

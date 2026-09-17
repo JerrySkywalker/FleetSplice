@@ -1,6 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { canonical, Fault, requireThat } from '../contracts/json.ts';
+import type { AgentExecutionEvent } from '../contracts/realtime-streams.ts';
 import { assertSameIncarnation, classifyCapabilities, incarnationOf } from './compatibility.ts';
+import { mapCodexNotification } from './codex-execution-mapper.ts';
 import { NativeRpcError, type NativeRpc, type NativeMessage } from './transport.ts';
 import { NativeActivityJournal } from './activity-journal.ts';
 import { commandTerminal, projectTurn } from './projection.ts';
@@ -40,6 +42,8 @@ export class NativeAdoptionAdapter {
   private unavailableCandidates = new Set<string>();
   private approvals = new NativeApprovals();
   private subscribingThread: string | null = null;
+  private executionRevision = 0;
+  private executionEvents: AgentExecutionEvent[] = [];
   // Restore attribution only from an exact successful journaled input, never
   // from matching text or an interrupted/unknown delivery attempt.
   restoreInput(command: AdoptionCommand, receipt: AdoptionReceipt) {
@@ -116,12 +120,19 @@ export class NativeAdoptionAdapter {
   private expireController() {
     if (this.controller && this.controllerExpires <= this.now()) { this.controller = null; this.fence++; }
   }
+  /** Non-authoritative Agent Execution projection for later SSE/timeline. Never admits effects. */
+  recentExecutionEvents(): readonly AgentExecutionEvent[] { return this.executionEvents; }
   private event(message: NativeMessage) {
     this.observedEvents = true;
     const p = message.params;
     const threadId = p?.threadId ?? p?.thread?.id;
     const binding = this.threads.get(threadId);
     if (!binding || (!binding.view.attached && this.subscribingThread !== threadId)) return; // Never retain foreign thread payloads.
+    const mapped = mapCodexNotification(message, { sessionKey: this.runtimeId, revision: String(++this.executionRevision) });
+    if (mapped) {
+      this.executionEvents.push(mapped);
+      if (this.executionEvents.length > 64) this.executionEvents.splice(0, this.executionEvents.length - 64);
+    }
     const turnId = p.turnId ?? p.turn?.id;
     if (['turn/started', 'turn/completed', 'thread/status/changed', 'thread/settings/updated', 'serverRequest/resolved'].includes(message.method ?? '') || p.item?.type === 'userMessage') this.nativeStateEvents++;
     if (message.method === 'thread/settings/updated') { binding.view.permission = null; binding.view.externalAdvance = true; }

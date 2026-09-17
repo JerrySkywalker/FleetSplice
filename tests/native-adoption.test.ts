@@ -676,7 +676,8 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
     await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
     await expect(page.locator('[data-source="NATIVE_EXTERNAL"]')).toBeVisible();
     await expect(page.getByText('Done · Worked for 2m 13s', { exact: true })).toBeVisible();
-    await expect(page.getByText('CONTROL_MODE=COOPERATIVE', { exact: true })).toBeVisible();
+    await expect(page.getByText('Cooperative control', { exact: true })).toBeVisible();
+    await expect(page.getByText('CONTROL_MODE=COOPERATIVE', { exact: true })).toHaveCount(0);
     await expect(page.getByTestId('adopted-thread-id')).toHaveText(r.rpc.thread.id);
     await page.locator('#native-prompt').fill('Browser continuation'); await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
     await expect(page.getByTestId('adopted-turn-id')).not.toHaveText('—');
@@ -684,7 +685,7 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
     await expect(page.locator('[data-source="FLEETSPLICE_WEB"]')).toBeVisible();
     const active = await page.getByTestId('adopted-turn-id').innerText();
     await page.locator('#native-prompt').fill('Guide this turn'); await page.getByRole('button', { name: 'Steer', exact: true }).click();
-    await expect(page.getByText('Guide this turn', { exact: true })).toBeVisible();
+    await expect(page.getByRole('log', { name: 'Native conversation' }).getByText('Guide this turn', { exact: true })).toBeVisible();
     await expect(page.getByTestId('adopted-turn-id')).toHaveText(active);
     r.rpc.turns[0].items.push({ id: 'browser-residual', type: 'commandExecution', command: 'harmless sleep', status: 'inProgress' });
     await page.getByRole('button', { name: 'Interrupt turn', exact: true }).click();

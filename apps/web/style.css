@@ -443,6 +443,50 @@ footer {
   font-size:12px;
   padding:13px 28px;
   overflow-wrap:anywhere}
+.notice {
+  font-size:12px;
+  padding:13px 28px;
+  border-bottom:1px solid var(--border);
+  overflow-wrap:anywhere}
+.severity-info {
+  background:var(--panel);
+  color:var(--text);
+  border-bottom-color:var(--border)}
+.severity-attention {
+  background:var(--warning-bg);
+  color:var(--warning-text);
+  border-bottom-color:var(--warning-border)}
+.severity-danger {
+  background:var(--warning-bg);
+  color:var(--warning-text);
+  border-bottom-color:var(--warning-border)}
+.native-status-summary {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 14px;
+  margin-top:8px;
+  color:var(--muted);
+  font-size:12px}
+.native-main {
+  display:flex;
+  flex-direction:column;
+  min-height:0}
+.native-main .timeline {
+  flex:1;
+  min-height:0}
+.sticky-composer {
+  position:sticky;
+  bottom:0;
+  z-index:2;
+  background:var(--surface)}
+.inspector {
+  margin-top:12px}
+@media (prefers-reduced-motion: reduce) {
+  .message, .notice, .alert, .pending, .provisional, .live {
+    transition:none !important;
+    animation:none !important;
+  }
+}
 .pending {
   display:flex;
   align-items:center;

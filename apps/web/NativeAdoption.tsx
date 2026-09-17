@@ -12,6 +12,14 @@ import {
   type PresentationCommandState,
   type ProvisionalMessage,
 } from './optimistic-command.ts';
+import {
+  approvalResolveUnavailableLabel,
+  controlSurfaceMode,
+  externalAdvanceSeverity,
+  observationSeverity,
+  permissionPresentation,
+  residualSeverity,
+} from './control-safety-ux.ts';
 
 function TurnStatus({ turn, locale, live }: { turn: NativeTurn; locale: Locale; live: boolean }) {
   const [now, setNow] = useState(Date.now());
@@ -50,6 +58,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     try { return JSON.parse(sessionStorage.getItem('fleetsplice.native.provisional') ?? 'null'); } catch { return null; }
   });
   const [liveTimeline, setLiveTimeline] = useState<TimelinePresentationItem[]>([]);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const followTail = useRef(true);
   const refreshing = useRef(false);
   async function refresh(discover = false) {
     if (refreshing.current) return;
@@ -123,12 +133,12 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       if (!current || current.commandId !== receipt.commandId) return current;
       const observed = correlateProvisional(current, thread?.history ?? [], client.clientInstanceId);
       const state = advancePresentation(current.state, receipt, observed);
-      if (shouldClearComposer(state)) setText('');
       if (state === 'OBSERVED') { sessionStorage.removeItem('fleetsplice.native.provisional'); return null; }
       const next = { ...current, state };
       sessionStorage.setItem('fleetsplice.native.provisional', JSON.stringify(next));
       return next;
     });
+    if (receipt.status === 'SUCCEEDED' && ['native.submit', 'native.steer'].includes(receipt.family)) setText('');
   }
   async function command(family: AdoptionCommand['family'], approval?: AdoptionCommand['approval']) {
     if (!available || !snapshot || !thread) return;
@@ -162,30 +172,56 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   }
   const showProvisional = provisional && provisional.state !== 'OBSERVED'
     && !correlateProvisional(provisional, thread?.history ?? [], client.clientInstanceId);
+  const outcomeUnknown = provisional?.state === 'OUTCOME_UNKNOWN' || provisional?.state === 'AMBIGUOUS_EFFECT' || (!!pending && !!error && /Outcome unknown|结果未知/.test(error));
+  const mode = controlSurfaceMode({
+    attached: !!thread?.attached,
+    controlled,
+    externalAdvance: !!thread?.externalAdvance,
+    activeTurn: !!thread?.activeTurnId,
+    outcomeUnknown,
+    viewer: !controlled,
+  });
+  const permission = permissionPresentation(thread?.permission, locale === 'zh-CN');
+  useEffect(() => {
+    const node = timelineRef.current;
+    if (!node || !followTail.current) return;
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    node.scrollTo({ top: node.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
+  }, [thread?.history.length, liveTimeline.length, showProvisional, provisional?.state]);
   return <div className="shell native-demo">
-    <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('NATIVE ADOPTION · LOCAL DEMO', '原生会话接入 · 本地演示')}</span></div>{preferences}</header>
+    <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('NATIVE ADOPTION · LOCAL', '原生会话接入 · 本地')}</span></div>{preferences}</header>
     <aside className="navigation"><div className="eyebrow">{t('Running Native Agents', '正在运行的原生代理')}</div>
-      <p className="muted">{t('Start Codex in Windows Terminal, then attach here.', '在 Windows Terminal 中启动 Codex，然后在此接入。')}</p>
-      <code>codex --sandbox read-only --ask-for-approval on-request</code>
+      <p className="muted">{t('Attach an existing native Codex session in this Workspace.', '接入此工作区中已有的原生 Codex 会话。')}</p>
       {!snapshot?.threads.length && <p>{t('Waiting for an existing native thread.', '等待已有原生会话。')}</p>}
       {snapshot?.threads.map(item => <button className={`session ${thread?.id === item.id ? 'selected' : ''}`} onClick={() => setSelected(item.id)} key={item.id}>
-        <strong>Codex</strong><span>{t('Native adopted', '原生接入')}</span><small>{item.workspace}</small><small>{item.status}{item.activeTurnId ? ` · ${t('active turn', '活动轮次')}` : ''}</small><small>{item.permission ?? t('Permission not yet observed', '权限尚未观察')}</small>
+        <strong>Codex</strong><span>{t('Native adopted', '原生接入')}</span><small>{item.workspace}</small><small>{item.status}{item.activeTurnId ? ` · ${t('active turn', '活动轮次')}` : ''}</small><small>{permissionPresentation(item.permission, locale === 'zh-CN').label}</small>
       </button>)}
       <button disabled={busy} onClick={() => void refresh(true)}>{t('Refresh discovery', '刷新发现')}</button>
       <div className="local-note">{t('Local browser only', '仅限本地浏览器')}<br/>{snapshot?.compatibility.profile ?? 'PROBING'}</div>
     </aside>
-    <main>
+    <main className="native-main">
       <div className="session-heading"><div><div className="eyebrow">{t('Existing native conversation', '已有的原生对话')}</div><h1>{thread ? 'Codex · Native adopted' : t('Running Native Agents', '正在运行的原生代理')}</h1>
-        <div className="subtitle">{thread?.workspace}</div></div><span className="status">{thread?.activeTurnId && thread.turns.find(turn => turn.id === thread.activeTurnId) ? <TurnStatus turn={thread.turns.find(turn => turn.id === thread.activeTurnId)!} locale={locale} live={snapshot?.state === 'READY'}/> : thread?.status ?? 'WAITING'}</span></div>
-      <div className="native-cooperative"><strong>CONTROL_MODE=COOPERATIVE</strong><p>{t('Local Codex TUI remains connected and may still issue native input.', '本地 Codex TUI 仍保持连接，也可以继续输入。')}</p></div>
-      {(error || (snapshot && snapshot.state !== 'READY')) && <div role="alert" className="alert">{error || snapshot?.state}</div>}
-      {pending && <div className="pending">{t('Pending command receipt', '等待命令回执')} <code>{pending.commandId}</code><button disabled={busy} onClick={lookup}>{t('Check receipt', '查询回执')}</button></div>}
-      {thread?.externalAdvance && <div className="alert">NATIVE_STATE_ADVANCED_EXTERNALLY<p>{t('Native state changed outside this Web controller. Read the updated conversation, then acknowledge it before controlling.', '原生状态已由此网页控制器之外的输入改变。请阅读更新后的对话，再确认当前状态以继续控制。')}</p>
-        <button disabled={!available || !controlled} onClick={() => void command('native.reviewState')}>{t('I reviewed the current native state', '我已查看当前原生状态')}</button></div>}
-      {thread?.residualCommandState === 'MAY_STILL_BE_RUNNING' && <div className="alert">{t('A native command may still be finishing in the background. Interrupt does not terminate the daemon, TUI or command process.', '原生命令可能仍在后台收尾。中断轮次不代表守护进程、TUI 或命令进程已终止。')}</div>}
+        <div className="subtitle">{thread?.workspace}</div>
+        <div className="native-status-summary" data-testid="native-status-summary">
+          <span>{thread?.model ?? 'UNOBSERVED'}</span>
+          <span>{permission.label}</span>
+          <span>{controlled ? t('Controller', '控制器') : t('Viewer', '查看者')}</span>
+          <span>{snapshot?.state ?? 'CONNECTING'}</span>
+        </div>
+      </div><span className="status">{thread?.activeTurnId && thread.turns.find(turn => turn.id === thread.activeTurnId) ? <TurnStatus turn={thread.turns.find(turn => turn.id === thread.activeTurnId)!} locale={locale} live={snapshot?.state === 'READY'}/> : thread?.status ?? 'WAITING'}</span></div>
+      <div className="native-cooperative severity-info" data-severity="info"><strong>{t('Cooperative control', '协作控制')}</strong><p>{t('Local Codex TUI remains connected and may still issue native input.', '本地 Codex TUI 仍保持连接，也可以继续输入。')}</p></div>
+      {(error || (snapshot && snapshot.state !== 'READY')) && <div role="alert" className={`alert severity-${observationSeverity(snapshot?.state)}`} data-severity={observationSeverity(snapshot?.state)}>{error || snapshot?.state}</div>}
+      {(pending || mode === 'receipt_lookup') && <div className="pending severity-attention" data-severity="attention">{t('Pending command receipt', '等待命令回执')} <code>{pending?.commandId ?? provisional?.commandId}</code><button disabled={busy || !pending} onClick={lookup}>{t('Check receipt', '查询回执')}</button></div>}
+      {thread?.externalAdvance && <div className={`notice severity-${externalAdvanceSeverity()}`} data-severity={externalAdvanceSeverity()} data-testid="external-advance-notice">
+        <strong>{t('Native state advanced outside this Web controller', '原生状态已在此网页控制器之外更新')}</strong>
+        <p>{t('New conversation activity is shown below. Review it, then acknowledge before controlling.', '下方已显示新的对话活动。请先阅读，再确认后继续控制。')}</p>
+        <button disabled={!available || !controlled} onClick={() => void command('native.reviewState')}>{t('I reviewed the current native state', '我已查看当前原生状态')}</button>
+      </div>}
+      {thread?.residualCommandState === 'MAY_STILL_BE_RUNNING' && <div className={`notice severity-${residualSeverity(thread.residualCommandState)}`} data-severity={residualSeverity(thread.residualCommandState)}>{t('A native command may still be finishing in the background. Interrupt does not terminate the daemon, TUI or command process.', '原生命令可能仍在后台收尾。中断轮次不代表守护进程、TUI 或命令进程已终止。')}</div>}
       {thread?.residualCommandState === 'OBSERVED_DRAINED' && <p className="muted" data-residual-state="OBSERVED_DRAINED">{t('Observed interrupted-turn commands have finished. The turn remains interrupted.', '已观察到的中断轮次命令已结束。轮次仍为已中断。')}</p>}
       {!thread?.attached && <div className="native-attach"><button className="primary" disabled={!available || !thread || (!!snapshot?.controller && !controlled)} onClick={() => void command('native.attach')}>{t('Attach', '接入')}</button></div>}
-      <div className="timeline" role="log" aria-label={t('Native conversation', '原生对话')}>
+      <div className="timeline" role="log" aria-label={t('Native conversation', '原生对话')} ref={timelineRef}
+        onScroll={event => { const node = event.currentTarget; followTail.current = node.scrollTop + node.clientHeight >= node.scrollHeight - 48; }}>
         {thread?.attached && thread.turns.map(turn => <React.Fragment key={turn.id}>
           {thread.history.filter(message => message.turnId === turn.id).map((message, index) => <article className={`message ${message.role}`} key={`${message.turnId}-${index}`}><div className="message-label">{message.role === 'user' ? t('Native user input', '原生用户输入') : 'Codex'}
             {message.role === 'user' && <small className="native-source-badge" data-source={message.source?.kind ?? 'NATIVE_EXTERNAL'} title={message.source?.kind === 'FLEETSPLICE_WEB' ? message.source.clientInstanceId : undefined}>{message.source?.kind === 'FLEETSPLICE_WEB' ? `Web${message.source.deviceLabel || message.source.clientDisplayLabel ? ` · ${message.source.deviceLabel || message.source.clientDisplayLabel}` : ''}` : t('Native external client', '原生外部客户端')}</small>}
@@ -205,11 +241,11 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         {thread?.historyLimited && <p className="muted">{t('Showing bounded recent history.', '仅显示最近的有限历史。')}</p>}
       </div>
       {thread?.attached && <section className="native-approvals" aria-label={t('Approvals', '审批')}>
-        {!snapshot?.compatibility.capabilities.approvalResolve.available && <p>APPROVAL_UNAVAILABLE</p>}
+        {!snapshot?.compatibility.capabilities.approvalResolve.available && <p className="muted" data-testid="approval-capability-note">{approvalResolveUnavailableLabel(thread.permission, locale === 'zh-CN')}</p>}
         {snapshot?.approvals?.filter(a => a.threadId === thread.id).slice(-8).map(a => <article key={`${typeof a.requestId}:${a.requestId}`}>
           <strong>{a.status === 'PENDING' ? t('Needs approval', '需要审批') : a.status === 'RESOLVED' ? t('Native request resolved', '原生请求已解决') : a.status === 'STALE' ? 'STALE_NATIVE_REQUEST' : a.status}</strong>
           <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{a.summary}</p><small>{a.workspace} · {a.requestType} · {t('Turn', '轮次')} {a.turnId}</small>
-          {!a.supported && <p>APPROVAL_UNAVAILABLE</p>}
+          {!a.supported && <p className="muted">{approvalResolveUnavailableLabel(thread.permission, locale === 'zh-CN')}</p>}
           {a.supported && a.status === 'PENDING' && <div>
             {(['ALLOW_ONCE', 'DENY'] as const).map(decision => <button key={decision} disabled={!available || !controlled || !a.authority || !snapshot.compatibility.capabilities.approvalResolve.available}
               onClick={() => void command('native.approval', { requestId: a.requestId, threadId: a.threadId, turnId: a.turnId,
@@ -217,22 +253,42 @@ export function NativeAdoption({ client, request, locale, preferences }: {
           </div>}
         </article>)}
       </section>}
-      <form className="composer" onSubmit={event => { event.preventDefault(); void command('native.submit'); }}>
-        <label htmlFor="native-prompt">{t('Continue this native conversation', '继续此原生对话')}</label><textarea id="native-prompt" maxLength={16000} value={text} onChange={event => setText(event.target.value)} disabled={!canControl}/>
-        <div className="native-controls"><button type="submit" className="primary" disabled={!canControl || thread?.status !== 'idle' || !text.trim()}>{t('Send continuation', '发送后续对话')}</button>
-          <button type="button" disabled={!canControl || !steer || !thread?.activeTurnId || !text.trim()} onClick={() => void command('native.steer')}>{steer ? t('Steer', '引导当前轮次') : t('Steer unavailable', '引导不可用')}</button>
-          <button type="button" disabled={!canControl || !interrupt || !thread?.activeTurnId} onClick={() => void command('native.interrupt')}>{interrupt ? t('Interrupt turn', '中断轮次') : t('Interrupt unavailable', '中断不可用')}</button></div>
+      <form className="composer sticky-composer" data-control-mode={mode} onSubmit={event => { event.preventDefault(); void command('native.submit'); }}>
+        <label htmlFor="native-prompt">{t('Continue this native conversation', '继续此原生对话')}</label><textarea id="native-prompt" maxLength={16000} value={text} onChange={event => setText(event.target.value)} disabled={!canControl || mode === 'review' || mode === 'receipt_lookup'}/>
+        <div className="native-controls">
+          {mode === 'send' || mode === 'steer_interrupt' || mode === 'viewer' ? <button type="submit" className="primary" disabled={!canControl || thread?.status !== 'idle' || !text.trim() || mode === 'viewer'}>{t('Send continuation', '发送后续对话')}</button> : null}
+          {mode === 'steer_interrupt' || (mode === 'viewer' && !!thread?.activeTurnId) ? <>
+            <button type="button" disabled={!canControl || !steer || !thread?.activeTurnId || !text.trim() || mode === 'viewer'} onClick={() => void command('native.steer')}>{steer ? t('Steer', '引导当前轮次') : t('Steer unavailable', '引导不可用')}</button>
+            <button type="button" disabled={!canControl || !interrupt || !thread?.activeTurnId || mode === 'viewer'} onClick={() => void command('native.interrupt')}>{interrupt ? t('Interrupt turn', '中断轮次') : t('Interrupt unavailable', '中断不可用')}</button>
+          </> : null}
+          {mode === 'review' ? <button type="button" disabled={!available || !controlled} onClick={() => void command('native.reviewState')}>{t('Review / continue', '确认并继续')}</button> : null}
+          {mode === 'receipt_lookup' ? <button type="button" disabled={busy || !pending} onClick={lookup}>{t('Check receipt', '查询回执')}</button> : null}
+        </div>
       </form>
     </main>
-    <aside className="context"><div className="eyebrow">{t('Native identity', '原生身份')}</div>
+    <aside className="context"><div className="eyebrow">{t('Session', '会话')}</div>
       <p>{controlled ? t('This Web client is the FleetSplice controller.', '此网页客户端是 FleetSplice 控制器。') : t('Viewer', '查看者')}</p>
       {thread?.attached && <button disabled={!available || !!snapshot?.controller} onClick={() => void command('native.attach')}>{t('Acquire FleetSplice control', '获取 FleetSplice 控制权')}</button>}
       <button disabled={!available || !controlled || !thread?.attached} onClick={() => void command('native.release')}>{t('Release FleetSplice control', '释放 FleetSplice 控制权')}</button>
-      <dl><dt>Agent origin</dt><dd>NATIVE_ADOPTED</dd><dt>Native thread ID</dt><dd className="id" data-testid="adopted-thread-id">{thread?.id ?? '—'}</dd><dt>Active turn ID</dt><dd className="id" data-testid="adopted-turn-id">{thread?.activeTurnId ?? '—'}</dd>
-        <dt>Workspace</dt><dd>{thread?.workspace ?? snapshot?.workspace}</dd><dt>{t('Observed model', '观察到的模型')}</dt><dd>{thread?.model ?? 'UNOBSERVED'}</dd><dt>{t('Observed permission', '观察到的权限')}</dt><dd>{thread?.permission ?? 'UNOBSERVED'}</dd><dt>Daemon PID</dt><dd>{snapshot?.daemon.processId}</dd><dt>{t('Fleet controller fence', 'Fleet 控制栅栏')}</dt><dd>{snapshot?.fence}</dd></dl>
+      <dl>
+        <dt>{t('Model', '模型')}</dt><dd>{thread?.model ?? 'UNOBSERVED'}</dd>
+        <dt>{t('Permission', '权限')}</dt><dd>{permission.label}</dd>
+        <dt>{t('Connectivity', '连接')}</dt><dd>{snapshot?.state ?? 'CONNECTING'}</dd>
+        <dt>Native thread ID</dt><dd className="id" data-testid="adopted-thread-id">{thread?.id ?? '—'}</dd>
+        <dt>Active turn ID</dt><dd className="id" data-testid="adopted-turn-id">{thread?.activeTurnId ?? '—'}</dd>
+      </dl>
       <h3>{t('Native activity', '原生活动')}</h3><p className="muted">{t('Recent activity only. Older command evidence is retained locally; omitted activity does not imply completion.', '仅显示最近活动。较早的命令证据保留在本机；未显示的活动不代表已完成。')}</p><ul className="activity">{thread?.activity.slice(-8).map(item => <li key={item.id}>{item.status} · {item.text}</li>)}</ul>
-      <details><summary>{t('Daemon and capabilities', '守护进程与能力')}</summary><pre>{JSON.stringify({ daemon: snapshot?.daemon, compatibility: snapshot?.compatibility, incarnation: snapshot?.incarnation, observationFailure: snapshot?.observationFailure, createdNativeThread: false }, null, 2)}</pre></details>
-      <details><summary>{t('Latest receipt', '最新回执')}</summary><pre>{JSON.stringify(snapshot?.receipts.at(-1) ?? null, null, 2)}</pre></details>
+      <details className="inspector"><summary>{t('Inspector / developer details', '检查器 / 开发者详情')}</summary>
+        <dl>
+          <dt>Agent origin</dt><dd>NATIVE_ADOPTED</dd>
+          <dt>Workspace</dt><dd>{thread?.workspace ?? snapshot?.workspace}</dd>
+          <dt>Daemon PID</dt><dd>{snapshot?.daemon.processId}</dd>
+          <dt>{t('Fleet controller fence', 'Fleet 控制栅栏')}</dt><dd>{snapshot?.fence}</dd>
+          <dt>Incarnation</dt><dd className="id">{snapshot?.incarnation ?? '—'}</dd>
+        </dl>
+        <pre>{JSON.stringify({ daemon: snapshot?.daemon, compatibility: snapshot?.compatibility, observationFailure: snapshot?.observationFailure, createdNativeThread: false }, null, 2)}</pre>
+        <pre>{JSON.stringify(snapshot?.receipts.at(-1) ?? null, null, 2)}</pre>
+      </details>
     </aside>
     <footer><span>{snapshot?.state ?? 'CONNECTING'} · {snapshot?.compatibility.profile ?? 'PROBING'}</span><span className="footer-right">{t('The native TUI remains usable', '原生 TUI 仍可继续使用')}</span></footer>
   </div>;

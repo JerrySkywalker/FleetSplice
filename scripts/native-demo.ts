@@ -92,7 +92,7 @@ export async function startNativeDemo(
     pending.set(id, { resolve, reject, timer }); edge.send({ id, kind, ...fields });
   });
   const port: AdoptionPort = {
-    snapshot: () => call('snapshot'),
+    snapshot: (options) => call('snapshot', { options: options ?? {} }),
     execute: (command, client) => call('execute', { command, client }),
     renewClient: (previous, next, continuity) => call('renewClient', { previous, next, continuity }),
     lookup: commandId => call('lookup', { commandId }),

@@ -138,7 +138,10 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         grant(req);
         if (req.method === 'GET' && req.url === '/api/mode') { json(res, 200, { mode: adoption ? 'NATIVE_ADOPTION' : 'FLEETSPLICE_MANAGED' }); return; }
         if (adoption) {
-          if (req.method === 'GET' && req.url === '/api/native/snapshot') { json(res, 200, await adoption.snapshot()); return; }
+          if (req.method === 'GET' && (req.url === '/api/native/snapshot' || req.url?.startsWith('/api/native/snapshot?'))) {
+            const discover = new URL(req.url!, origin).searchParams.get('discover') === '1';
+            json(res, 200, await adoption.snapshot(discover ? { discover: true } : {})); return;
+          }
           if (req.method === 'POST' && req.url === '/api/native/commands') {
             const command = await body(req); const client = grant(req); json(res, 200, await adoption.execute(command, adoptionClient(client))); void pollNativeRealtime(); return;
           }

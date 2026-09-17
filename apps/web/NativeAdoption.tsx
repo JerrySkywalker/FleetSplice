@@ -27,10 +27,10 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<AdoptionCommand | null>(() => { try { return JSON.parse(sessionStorage.getItem('fleetsplice.native.pending') ?? 'null'); } catch { return null; } });
   const refreshing = useRef(false);
-  async function refresh() {
+  async function refresh(discover = false) {
     if (refreshing.current) return;
     refreshing.current = true;
-    try { setSnapshot(await request('/api/native/snapshot')); }
+    try { setSnapshot(await request(discover ? '/api/native/snapshot?discover=1' : '/api/native/snapshot')); }
     catch (e) { setError(e instanceof Error ? e.message : 'NATIVE_OBSERVATION_LOST'); setSnapshot(old => old ? { ...old, state: 'NATIVE_OBSERVATION_LOST' } : old); }
     finally { refreshing.current = false; }
   }
@@ -88,7 +88,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       {snapshot?.threads.map(item => <button className={`session ${thread?.id === item.id ? 'selected' : ''}`} onClick={() => setSelected(item.id)} key={item.id}>
         <strong>Codex</strong><span>{t('Native adopted', '原生接入')}</span><small>{item.workspace}</small><small>{item.status}{item.activeTurnId ? ` · ${t('active turn', '活动轮次')}` : ''}</small><small>{item.permission ?? t('Permission not yet observed', '权限尚未观察')}</small>
       </button>)}
-      <button disabled={busy} onClick={() => void refresh()}>{t('Refresh discovery', '刷新发现')}</button>
+      <button disabled={busy} onClick={() => void refresh(true)}>{t('Refresh discovery', '刷新发现')}</button>
       <div className="local-note">{t('Local browser only', '仅限本地浏览器')}<br/>{snapshot?.compatibility.profile ?? 'PROBING'}</div>
     </aside>
     <main>

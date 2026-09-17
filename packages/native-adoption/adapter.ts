@@ -46,6 +46,9 @@ export class NativeAdoptionAdapter {
   private readonly realtime = new RealtimeEventBus();
   private lastControlSignature = '';
   private executionEvents: AgentExecutionEvent[] = [];
+  private needsFullDiscovery = true;
+  private lastFullDiscoveryAt = 0;
+  private dirtyThreads = new Set<string>();
   // Restore attribution only from an exact successful journaled input, never
   // from matching text or an interrupted/unknown delivery attempt.
   restoreInput(command: AdoptionCommand, receipt: AdoptionReceipt) {
@@ -60,7 +63,8 @@ export class NativeAdoptionAdapter {
     private readonly identityNow: () => NativeArtifactIdentity,
     private readonly rootNow: () => { root: string; rootIdentity: string },
     private readonly evidence: AdoptionEvidence, private readonly activityJournal: NativeActivityJournal,
-    private readonly now: () => number = Date.now) {
+    private readonly now: () => number = Date.now,
+    private readonly discoveryIntervalMs = 20_000) {
     this.incarnation = incarnationOf(identity);
     activityJournal.assertRecovery(this.incarnation);
     this.compatibility = { profile: 'UNSUPPORTED', observedAt: new Date().toISOString(),
@@ -150,6 +154,7 @@ export class NativeAdoptionAdapter {
       const published = this.realtime.publish(mapped);
       this.executionEvents.push({ ...mapped, revision: published.revision, eventId: published.eventId });
       if (this.executionEvents.length > 64) this.executionEvents.splice(0, this.executionEvents.length - 64);
+      if (typeof threadId === 'string') this.dirtyThreads.add(threadId);
     }
     const turnId = p.turnId ?? p.turn?.id;
     if (['turn/started', 'turn/completed', 'thread/status/changed', 'thread/settings/updated', 'serverRequest/resolved'].includes(message.method ?? '') || p.item?.type === 'userMessage') this.nativeStateEvents++;
@@ -305,54 +310,21 @@ export class NativeAdoptionAdapter {
     const binding = { view, tools, interrupted, userState: accept || !prior ? users : prior.userState };
     this.threads.set(threadId, binding); return binding;
   }
-  snapshot(): Promise<AdoptionSnapshot> { return this.serial(async () => {
+  snapshot(options: { discover?: boolean } = {}): Promise<AdoptionSnapshot> { return this.serial(async () => {
     this.expireController();
     if (this.state === 'READY') {
       try {
         this.observationPhase = 'identity'; this.observationThread = null;
         this.revalidate();
-        const loaded = await this.loaded();
-        // thread/list is scoped natively. A metadata-only loaded read handles
-        // native index lag; foreign cwd payloads are discarded immediately.
-        const listing = await this.observe('thread/list', { cwd: this.workspace, limit: 32 });
-        requireThat(Array.isArray(listing.data) && !listing.nextCursor, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
-        const candidates = new Set<string>(listing.data.filter((t: any) => loaded.has(t.id) && this.eligibleCandidate(t)).map((t: any) => t.id));
-        for (const threadId of loaded) {
-          if (candidates.has(threadId)) continue;
-          try {
-            const metadata = await this.observe('thread/read', { threadId, includeTurns: false });
-            if (metadata.thread?.id === threadId && this.eligibleCandidate(metadata.thread)) candidates.add(threadId);
-          } catch (error) { if (!this.excludeUnavailable(threadId, error)) throw error; }
-        }
-        requireThat(candidates.size <= 8, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
-        for (const threadId of candidates) {
-          try { await this.readThread(threadId); }
-          catch (error) {
-            if (this.excludeUnavailable(threadId, error)) continue;
-            // Only the exact observed native absence on an unattached candidate
-            // is temporary. Never materialize it or discard an attached binding.
-            if (!this.threads.get(threadId)?.view.attached && this.observationPhase === 'thread/turns/list' &&
-              error instanceof NativeRpcError && error.code === -32600 &&
-              error.message === `thread ${threadId} is not materialized yet; thread/turns/list is unavailable before first user message`) {
-              if (!this.excludedCandidates.has(threadId)) {
-                requireThat(this.excludedCandidates.size < 64, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
-                this.excludedCandidates.add(threadId);
-                this.evidence.append('NATIVE_DISCOVERY_NOT_ATTACHABLE', threadId, { threadId,
-                  reason: 'NATIVE_THREAD_AWAITING_FIRST_MESSAGE', incarnation: this.incarnation });
-              }
-              this.threads.delete(threadId); // Retire any stale unattached view until a successful rediscovery.
-              continue;
-            }
-            // A just-opened TUI may not yet have persisted its first turn.
-            // Only this known read-only absence is rediscovered later.
-            if (error instanceof NativeRpcError && !this.threads.get(threadId)?.view.attached && /no rollout found/i.test(error.message)) continue;
-            if (error instanceof Fault && error.code === 'NATIVE_THREAD_NOT_ATTACHABLE' && !this.threads.get(threadId)?.view.attached) continue;
-            throw error;
-          }
-        }
-        for (const [threadId, binding] of this.threads) if (!candidates.has(threadId)) {
-          if (binding.view.attached) { binding.view.status = 'notLoaded'; binding.view.externalAdvance = true; this.approvals.invalidate(threadId); }
-          else this.threads.delete(threadId);
+        const now = this.now();
+        const discover = options.discover === true || this.needsFullDiscovery || (now - this.lastFullDiscoveryAt) >= this.discoveryIntervalMs;
+        if (discover) {
+          await this.discoverSessions();
+          this.lastFullDiscoveryAt = now;
+          this.needsFullDiscovery = false;
+          this.dirtyThreads.clear();
+        } else if (this.dirtyThreads.size) {
+          await this.reconcileDirtyThreads();
         }
       } catch (error) {
         this.state = failCode(error); this.controller = null; this.fence++;
@@ -374,6 +346,64 @@ export class NativeAdoptionAdapter {
     }
     return this.projection();
   }); }
+  private async reconcileDirtyThreads() {
+    const targets = [...this.dirtyThreads];
+    this.dirtyThreads.clear();
+    for (const threadId of targets) {
+      const binding = this.threads.get(threadId);
+      if (!binding?.view.attached) { this.needsFullDiscovery = true; continue; }
+      try { await this.readThread(threadId); }
+      catch (error) {
+        if (this.excludeUnavailable(threadId, error)) continue;
+        throw error;
+      }
+    }
+  }
+  private async discoverSessions() {
+    const loaded = await this.loaded();
+    // thread/list is scoped natively. A metadata-only loaded read handles
+    // native index lag; foreign cwd payloads are discarded immediately.
+    const listing = await this.observe('thread/list', { cwd: this.workspace, limit: 32 });
+    requireThat(Array.isArray(listing.data) && !listing.nextCursor, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
+    const candidates = new Set<string>(listing.data.filter((t: any) => loaded.has(t.id) && this.eligibleCandidate(t)).map((t: any) => t.id));
+    for (const threadId of loaded) {
+      if (candidates.has(threadId)) continue;
+      try {
+        const metadata = await this.observe('thread/read', { threadId, includeTurns: false });
+        if (metadata.thread?.id === threadId && this.eligibleCandidate(metadata.thread)) candidates.add(threadId);
+      } catch (error) { if (!this.excludeUnavailable(threadId, error)) throw error; }
+    }
+    requireThat(candidates.size <= 8, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
+    for (const threadId of candidates) {
+      try { await this.readThread(threadId); }
+      catch (error) {
+        if (this.excludeUnavailable(threadId, error)) continue;
+        // Only the exact observed native absence on an unattached candidate
+        // is temporary. Never materialize it or discard an attached binding.
+        if (!this.threads.get(threadId)?.view.attached && this.observationPhase === 'thread/turns/list' &&
+          error instanceof NativeRpcError && error.code === -32600 &&
+          error.message === `thread ${threadId} is not materialized yet; thread/turns/list is unavailable before first user message`) {
+          if (!this.excludedCandidates.has(threadId)) {
+            requireThat(this.excludedCandidates.size < 64, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
+            this.excludedCandidates.add(threadId);
+            this.evidence.append('NATIVE_DISCOVERY_NOT_ATTACHABLE', threadId, { threadId,
+              reason: 'NATIVE_THREAD_AWAITING_FIRST_MESSAGE', incarnation: this.incarnation });
+          }
+          this.threads.delete(threadId); // Retire any stale unattached view until a successful rediscovery.
+          continue;
+        }
+        // A just-opened TUI may not yet have persisted its first turn.
+        // Only this known read-only absence is rediscovered later.
+        if (error instanceof NativeRpcError && !this.threads.get(threadId)?.view.attached && /no rollout found/i.test(error.message)) continue;
+        if (error instanceof Fault && error.code === 'NATIVE_THREAD_NOT_ATTACHABLE' && !this.threads.get(threadId)?.view.attached) continue;
+        throw error;
+      }
+    }
+    for (const [threadId, binding] of this.threads) if (!candidates.has(threadId)) {
+      if (binding.view.attached) { binding.view.status = 'notLoaded'; binding.view.externalAdvance = true; this.approvals.invalidate(threadId); }
+      else this.threads.delete(threadId);
+    }
+  }
   private projection(): AdoptionSnapshot {
     return JSON.parse(JSON.stringify({ runtimeId: this.runtimeId, state: this.state, incarnation: this.incarnation,
       daemon: this.identity, compatibility: this.compatibility, workspace: this.workspace,

@@ -58,7 +58,7 @@ export type AdoptionSnapshot = {
 export type AdoptionClient = { clientInstanceId: string; sessionBinding: string; grantId: string; grantRevision: string; expiresAt: number };
 export type AdoptionContinuity = Pick<AdoptionSnapshot, 'runtimeId' | 'incarnation' | 'controller' | 'fence'>;
 export type AdoptionPort = {
-  snapshot(): Promise<AdoptionSnapshot>;
+  snapshot(options?: { discover?: boolean }): Promise<AdoptionSnapshot>;
   execute(command: unknown, client: AdoptionClient): Promise<AdoptionReceipt>;
   renewClient(previous: AdoptionClient, next: AdoptionClient, continuity: AdoptionContinuity | null): Promise<{ controller: string | null; fence: number }>;
   lookup(commandId: string): Promise<AdoptionReceipt | null>;

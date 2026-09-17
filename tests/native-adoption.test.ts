@@ -233,7 +233,7 @@ async function setup(options: { version?: string; sha?: string; missing?: string
   const journal = new Journal(path.join(mkdtempSync(path.join(tmpdir(), 'fleet-activity-')), 'native.sqlite'));
   const activity = new NativeActivityJournal(journal);
   const adapter = new NativeAdoptionAdapter(structuredClone(identity), rpc, workspace, 'workspace-identity', () => identity,
-    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) }, activity, options.now);
+    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) }, activity, options.now, 0);
   await adapter.qualify();
   const client = randomUUID(); const expiresAt = (options.now ?? Date.now)() + 600000;
   const authority = { clientInstanceId: client, sessionBinding: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt };
@@ -663,7 +663,11 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
   const bootstrapToken = randomUUID();
   const hub = await startHub({ port, target: target(), root: workspace, sid: 'fixture', principal: 'fixture', sessionId: 1,
     stateDirectory: mkdtempSync(path.join(tmpdir(), 'fleet-native-browser-')), webDirectory: path.resolve('dist/web'), hcpToken: randomUUID(), bootstrapToken }, {
-    snapshot: () => r.adapter.snapshot(), execute: (command, client) => r.adapter.execute(command, client), renewClient: (previous, next, continuity) => r.adapter.renewClient(previous, next, continuity), lookup: async commandId => r.adapter.lookup(commandId) });
+    snapshot: (options) => r.adapter.snapshot(options), execute: (command, client) => r.adapter.execute(command, client),
+    renewClient: (previous, next, continuity) => r.adapter.renewClient(previous, next, continuity),
+    lookup: async commandId => r.adapter.lookup(commandId),
+    pollRealtime: since => Promise.resolve(r.adapter.pollRealtime(since)),
+  });
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   try {
     const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1480, height: 1000 } });
@@ -687,6 +691,8 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
     await expect(page.getByText('Turn interrupted', { exact: true })).toBeVisible();
     await expect(page.getByText(/A native command may still be finishing/)).toBeVisible();
     r.rpc.turns[0].items.find((item: any) => item.id === 'browser-residual').status = 'completed';
+    r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id, turnId: r.rpc.turns[0].id,
+      item: { id: 'browser-residual', type: 'commandExecution', command: 'harmless sleep', status: 'completed' } } });
     await expect(page.locator('[data-residual-state="OBSERVED_DRAINED"]')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/A native command may still be finishing/)).toHaveCount(0);
     await expect(page.getByText('Turn interrupted', { exact: true })).toBeVisible();

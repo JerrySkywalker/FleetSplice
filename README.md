@@ -1,57 +1,68 @@
 # FleetSplice
 
-FleetSplice is an open-source, self-hosted control plane for coding-agent
-sessions running in existing development environments.
+FleetSplice is a self-hosted control plane for coding-agent sessions in existing
+development environments. It is intentionally **not** an IDE/ADE.
 
-It is intentionally **not** an AI IDE/ADE. FleetSplice is meant to let an Owner
-observe, authorize, interrupt, steer and resume coding agents across devices
-without replacing the local terminal, editor, Git workflow or native agent
-runtime. See the [Owner Thesis and Product Boundary](docs/product/owner-thesis.md).
+## 1. CURRENT PRODUCT IDENTITY
 
-Architecture 0.1 is accepted: `ARCHITECTURE_0_1_READY=true`. Read the
-[current architecture](docs/architecture/README.md),
-[visible implementation roadmap](docs/v0.1/implementation-roadmap.md), and
-[current train status](docs/train/current-status.md).
+FleetSplice is a self-hosted control plane for coding-agent sessions in existing
+development environments. FleetSplice does not replace the local terminal,
+editor, Git workflow, worktree flow, or native runtime semantics.
 
-## Current state
+## 2. CURRENT AUTHORITATIVE STATE
 
-The Owner-accepted local G05C implementation is
-`ba8c6fa84db528b9821be5aa672e8267ae744c70`. The post-reboot closeout passes both fresh local smoke lanes; see the
-[current status](docs/train/current-status.md) for the controlling state.
-`G05C_ACCEPTED=true`, `G06_STARTED=false`, and
-`PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE`.
+```text
+ARCHITECTURE_0_1_READY=true
+G05C_ACCEPTED=true
+G06_STARTED=false
+PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
+PRIMARY_NATIVE_PATH=NATIVE_ADOPTED
+```
 
-The primary native path is `NATIVE_ADOPTED`: start ordinary Codex in the existing
-Workspace and Windows Terminal, then attach FleetSplice to that same thread.
-The north-star local command is:
+The accepted G05C implementation head remains
+`ba8c6fa84db528b9821be5aa672e8267ae744c70`.
+
+Authoritative references:
+
+- [Current status](docs/train/current-status.md)
+- [Owner thesis and product boundary](docs/product/owner-thesis.md)
+- [Implementation roadmap](docs/v0.1/implementation-roadmap.md)
+- [G05C closeout receipt](docs/train/receipts/G05C-native-control-closeout.md)
+
+## 3. PROVEN G05C LOCAL PATH
+
+The proven local path is ordinary native Codex in the existing Workspace:
 
 ```powershell
 codex --yolo
 ```
 
-FleetSplice requires no wrapper or transparent PATH shim. The native permission
-choice remains explicit; bounded approval testing can use native read-only,
-on-request settings. Both `NATIVE_ADOPTED` and `FLEETSPLICE_MANAGED` session
-origins remain supported. Compatibility is capability-driven: Codex semantic
-version and executable SHA are evidence / incarnation metadata, not a native
-adoption compatibility allowlist. The managed path retains its historical
-artifact qualification fixture.
+The accepted local operating path includes:
 
-The proven local train includes safe operation and persistent proxy, live
-model/reasoning discovery, read-only native coding, explicit Workspace targeting,
-session-scoped READ_ONLY / WORKSPACE_AUTO / YOLO with a Host ceiling, late TUI
-adoption, same-thread Web continuation and cooperative controller semantics.
-Source provenance, Working / Done and native duration, exact-turn Steer and
-Interrupt with honest residual-command state, browser/controller renewal,
-scalable activity evidence, command approval Allow Once / Deny, viewer isolation,
-TUI/Web approval races and return to the original TUI are part of that train.
+- `NATIVE_ADOPTED` and `FLEETSPLICE_MANAGED` session origins
+- no wrapper or PATH shim requirement
+- same native thread and cooperative controller semantics
+- native runtime owns execution truth and effect semantics
+- FleetSplice owns control authority (observe, approve/deny, steer, interrupt, resume)
+- return to and continued usability of the original native TUI
 
-FleetSplice owns control authority, not the development environment. Windows
-Terminal remains the preferred local human terminal. FleetSplice is not an
-IDE/ADE, terminal replacement, Git GUI, worktree manager, embedded editor or
-ChatGPT Mobile clone. A transparent PATH shim is not the primary architecture.
+## 4. LONG-TERM / POST-v0.1 PRODUCT PRINCIPLES
 
-[Known non-blocking debts](docs/train/receipts/G05C-native-control-closeout.md#product-boundary-and-remaining-debts)
-remain documented. G06 requires a separate Owner decision and would project the
-proven surface through Tencent Hub + WebUI and authenticated outbound WSS to a
-real phone/browser. No G06 transport, phone UI or deployment is authorized here.
+- Capability @ Environment (capabilities are meaningful in the concrete environment that owns them)
+- brownfield-first operation over real existing environments
+- split authority with a thin Edge and explicit local execution truth
+- independent orchestration, execution, inference, and tool placement
+- inference fabric as a Fleet resource, not assumed agent-local
+- typed tool placement bound to concrete environments
+- failure-honest receipts and explicit `AMBIGUOUS_EFFECT` handling
+- Architecture 0.1 remains accepted and authoritative (`ARCHITECTURE_0_1_READY=true`)
+
+## 5. SCOPE BOUNDARY
+
+Issues [#2](https://github.com/JerrySkywalker/FleetSplice/issues/2) through
+[#8](https://github.com/JerrySkywalker/FleetSplice/issues/8) are post-v0.1 and
+non-blocking for the accepted G05-G10 implementation line.
+
+G06 remains separately authorized and currently unstarted (`G06_STARTED=false`).
+These long-term principles clarify direction, but they do not expand or reopen
+G06 scope by themselves.

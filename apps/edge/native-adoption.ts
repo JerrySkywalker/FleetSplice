@@ -38,15 +38,29 @@ export async function nativeAdoptionEdge(workspace: string, stateDirectory: stri
 if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.once('message', async (config: { workspace: string; stateDirectory: string }) => {
   try {
     const edge = await nativeAdoptionEdge(config.workspace, config.stateDirectory);
+    let pushUnsubscribe: (() => void) | null = null;
     process.send!({ kind: 'nativeReady' });
     process.on('message', async (message: any) => {
-      if (message.kind === 'stop') { edge.close(); process.exit(0); }
+      if (message.kind === 'stop') { pushUnsubscribe?.(); edge.close(); process.exit(0); }
       try {
+        if (message.kind === 'subscribeRealtimePush') {
+          pushUnsubscribe?.();
+          pushUnsubscribe = edge.adapter.subscribeRealtime(envelope => {
+            try { process.send!({ kind: 'realtimePush', envelope }); } catch { /* Parent may have disconnected. */ }
+          });
+          process.send!({ id: message.id, result: { subscribed: true } });
+          return;
+        }
+        if (message.kind === 'unsubscribeRealtimePush') {
+          pushUnsubscribe?.(); pushUnsubscribe = null;
+          process.send!({ id: message.id, result: { subscribed: false } });
+          return;
+        }
         const result = message.kind === 'snapshot' ? await edge.adapter.snapshot(message.options ?? {}) : message.kind === 'execute' ?
           await edge.adapter.execute(message.command, message.client) : message.kind === 'renewClient' ? await edge.adapter.renewClient(message.previous, message.next, message.continuity) : message.kind === 'lookup' ? edge.adapter.lookup(message.commandId) : message.kind === 'pollRealtime' ? edge.adapter.pollRealtime(String(message.sinceRevision ?? '0')) : null;
         process.send!({ id: message.id, result });
       } catch (error) { process.send!({ id: message.id, error: error instanceof Fault ? error.code : 'NATIVE_EDGE_REQUEST_FAILED' }); }
     });
-    process.on('disconnect', () => { edge.close(); process.exit(0); });
+    process.on('disconnect', () => { pushUnsubscribe?.(); edge.close(); process.exit(0); });
   } catch (error) { process.send!({ kind: 'error', code: error instanceof Error ? error.message : 'NATIVE_ADOPTION_START_FAILED' }); process.exitCode = 1; }
 });

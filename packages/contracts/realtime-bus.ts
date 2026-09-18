@@ -15,6 +15,8 @@ export type RealtimeInvalidateEnvelope = {
     text?: string;
     toolId?: string;
     status?: string;
+    /** Exact execution-item identity when the runtime provided one. Never fabricated. */
+    itemId?: string | null;
   };
 };
 
@@ -29,12 +31,13 @@ export function sanitizeRealtimeEvent(event: RealtimeStreamEvent): RealtimeInval
   };
   if (event.stream === 'agent.execution') {
     const projected = projectExecutionToTimeline(event);
-    if (projected && (projected.text || projected.toolId || projected.status || projected.role)) {
+    if (projected && (projected.text || projected.toolId || projected.status || projected.role || projected.itemId)) {
       envelope.semantic = {
         ...(projected.role ? { role: projected.role } : {}),
         ...(projected.text !== undefined ? { text: projected.text } : {}),
         ...(projected.toolId ? { toolId: projected.toolId } : {}),
         ...(projected.status ? { status: projected.status } : {}),
+        ...(projected.itemId !== undefined ? { itemId: projected.itemId } : {}),
       };
     }
   }

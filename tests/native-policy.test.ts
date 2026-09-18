@@ -35,6 +35,10 @@ test('pinned native binary suppresses inherited integrations, notify and image t
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => ['SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'PATH', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'HOMEDRIVE', 'HOMEPATH'].includes(key.toUpperCase())));
     env.CODEX_HOME = fixtureHome; env.FLEETSPLICE_NATIVE_POLICY_FIXTURE = root;
     env.CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED = '0';
+    // Loopback inert provider must not be forced through a host HTTP proxy.
+    // This does not weaken turn assertions; it only restores fixture reachability.
+    env.NO_PROXY = '127.0.0.1,localhost';
+    env.no_proxy = '127.0.0.1,localhost';
     await new Promise<void>((resolve, reject) => {
       const child = spawn(process.execPath, [worker, executable, root, scenario], { env, cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
       let output = ''; child.stdout.on('data', bytes => { output += String(bytes); });

@@ -67,6 +67,33 @@ Presentation may be optimistic. Authority may not be optimistic.
 Provider-specific transports (Codex app-server RPC, future hooks/plugins,
 structured artifacts) stay inside adapter implementations.
 
+## Exact message-item identity (R1)
+
+When a runtime supplies an exact execution-item identity, adapters carry it as
+provider-neutral `itemId` on Agent Execution `message.*` / tool payloads.
+Timeline folding correlates by `threadId + turnId + itemId` when present and
+must not merge distinct assistant items merely because they share a turn and
+role. Providers without identity may use a documented degraded turn/role
+fallback and must not fabricate identity.
+
+Live `message.final` remains visible until authoritative history retains the
+same exact item identity; text equality is never the retirement authority.
+
+## Native SSE primary path (R1)
+
+```text
+native structured event
+  -> AgentRuntimeAdapter mapping
+  -> RealtimeEventBus publish
+  -> Hub subscribeRealtime callback
+  -> /api/native/events SSE
+  -> browser live projection
+```
+
+The subscription is observation-only and never authorizes effects. A 20 s
+browser refresh plus visibility refresh remain recovery fallbacks. Hub must not
+use a 250 ms poll as the primary delivery path.
+
 ## Non-goals for this freeze
 
 - No Claude Code / Gemini CLI / OpenCode adapters in this train

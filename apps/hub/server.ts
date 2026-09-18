@@ -23,7 +23,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   const streams = new Set<ServerResponse>();
   const nativeStreams = new Set<ServerResponse>();
   let nativeRevision = '0';
-  let nativePoller: NodeJS.Timeout | null = null;
+  let nativeUnsubscribe: (() => void) | null = null;
   let edge: WebSocket | null = null; let usedBootstrap = false; let hcpAccepted = false;
   const pending = new Map<string, { resolve: (receipt: Receipt) => void; reject: () => void; timer: NodeJS.Timeout }>();
   const send = (message: Hcp) => {
@@ -41,7 +41,8 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
     const data = `data: ${JSON.stringify(payload)}\n\n`;
     for (const stream of nativeStreams) if (!stream.write(data)) { stream.end(); nativeStreams.delete(stream); }
   };
-  const pollNativeRealtime = async () => {
+  /** Catch-up only (reconnect / missed buffer). Not the primary delivery path. */
+  const catchUpNativeRealtime = async () => {
     if (!adoption?.pollRealtime || nativeStreams.size === 0) return;
     try {
       const page = await adoption.pollRealtime(nativeRevision);
@@ -52,15 +53,18 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         nativeRevision = page.revision;
         writeNative({ revision: nativeRevision, eventId: `rev-${nativeRevision}`, stream: 'fleet.control', kind: 'fence.advanced', threadId: null, turnId: null });
       }
-    } catch { /* Observation poll failures do not invent events; clients retain fallback refresh. */ }
+    } catch { /* Observation catch-up failures do not invent events; clients retain fallback refresh. */ }
   };
-  const ensureNativePoller = () => {
-    if (nativePoller || !adoption?.pollRealtime) return;
-    nativePoller = setInterval(() => { void pollNativeRealtime(); }, 250);
+  const ensureNativeSubscription = () => {
+    if (nativeUnsubscribe || !adoption?.subscribeRealtime) return;
+    nativeUnsubscribe = adoption.subscribeRealtime(envelope => {
+      nativeRevision = envelope.revision;
+      writeNative(envelope);
+    });
   };
-  const stopNativePoller = () => {
-    if (nativeStreams.size || !nativePoller) return;
-    clearInterval(nativePoller); nativePoller = null;
+  const stopNativeSubscription = () => {
+    if (nativeStreams.size || !nativeUnsubscribe) return;
+    nativeUnsubscribe(); nativeUnsubscribe = null;
   };
   const json = (res: ServerResponse, status: number, value: unknown) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)); };
   const body = async (req: IncomingMessage) => {
@@ -131,9 +135,9 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
           requireThat(nativeStreams.size < 16, 'OBSERVER_LIMIT');
           res.writeHead(200, { 'Content-Type': 'text/event-stream', Connection: 'keep-alive' });
           res.write(`data: ${JSON.stringify({ revision: nativeRevision, eventId: `hello-${nativeRevision}`, stream: 'fleet.control', kind: 'reconnect', threadId: null, turnId: null })}\n\n`);
-          nativeStreams.add(res); ensureNativePoller(); void pollNativeRealtime();
+          nativeStreams.add(res); ensureNativeSubscription(); void catchUpNativeRealtime();
           const expiry = setTimeout(() => res.end(), Math.min(30 * 60_000, sessions.get(authenticatedSession)! - now()));
-          req.on('close', () => { clearTimeout(expiry); nativeStreams.delete(res); stopNativePoller(); }); return;
+          req.on('close', () => { clearTimeout(expiry); nativeStreams.delete(res); stopNativeSubscription(); }); return;
         }
         grant(req);
         if (req.method === 'GET' && req.url === '/api/mode') { json(res, 200, { mode: adoption ? 'NATIVE_ADOPTION' : 'FLEETSPLICE_MANAGED' }); return; }
@@ -143,7 +147,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
             json(res, 200, await adoption.snapshot(discover ? { discover: true } : {})); return;
           }
           if (req.method === 'POST' && req.url === '/api/native/commands') {
-            const command = await body(req); const client = grant(req); json(res, 200, await adoption.execute(command, adoptionClient(client))); void pollNativeRealtime(); return;
+            const command = await body(req); const client = grant(req); json(res, 200, await adoption.execute(command, adoptionClient(client))); void catchUpNativeRealtime(); return;
           }
           if (req.method === 'GET' && /^\/api\/native\/commands\/[a-zA-Z0-9_-]{1,200}$/.test(req.url ?? '')) {
             const receipt = await adoption.lookup(req.url!.slice('/api/native/commands/'.length)); json(res, receipt ? 200 : 404, receipt ?? { error: 'COMMAND_UNKNOWN_NO_REPLAY' }); return;
@@ -199,7 +203,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   });
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(config.port, '127.0.0.1', resolve); });
   return { kernel, close: async () => {
-    if (nativePoller) clearInterval(nativePoller);
+    if (nativeUnsubscribe) { nativeUnsubscribe(); nativeUnsubscribe = null; }
     for (const stream of streams) stream.end();
     for (const stream of nativeStreams) stream.end();
     edge?.close(); wss.close(); await new Promise<void>(resolve => server.close(() => resolve())); journal.close();

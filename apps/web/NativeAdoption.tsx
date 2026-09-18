@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { AdoptionCommand, AdoptionReceipt, AdoptionSnapshot, NativeTurn } from '../../packages/native-adoption/types.ts';
 import type { TimelinePresentationItem } from '../../packages/contracts/realtime-timeline.ts';
-import { foldTimeline } from '../../packages/contracts/realtime-timeline.ts';
+import { foldTimeline, retireLiveWhenAuthoritative } from '../../packages/contracts/realtime-timeline.ts';
 import type { Locale } from './i18n.ts';
 import {
   advancePresentation,
@@ -68,6 +68,9 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     try {
       const next = await request(discover ? '/api/native/snapshot?discover=1' : '/api/native/snapshot');
       setSnapshot(next);
+      const history = (next.threads ?? []).flatMap((item: any) => item.history ?? []);
+      const activity = (next.threads ?? []).flatMap((item: any) => item.activity ?? []);
+      setLiveTimeline(current => retireLiveWhenAuthoritative(current, history, activity));
       setProvisional(current => {
         if (!current || !['native.submit', 'native.steer'].includes(current.family)) return current;
         const observed = (next.threads ?? []).some((item: any) => correlateProvisional(current, item.history ?? [], client.clientInstanceId));
@@ -92,19 +95,23 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       events = new EventSource('/api/native/events');
       events.onmessage = (message) => {
         try {
+          const receiveAt = performance.now();
           const envelope = JSON.parse(message.data) as {
             eventId: string; revision: string; stream: string; kind: string;
             threadId: string | null; turnId: string | null;
-            semantic?: { role?: TimelinePresentationItem['role']; text?: string; toolId?: string; status?: string };
+            semantic?: { role?: TimelinePresentationItem['role']; text?: string; toolId?: string; status?: string; itemId?: string | null };
           };
           if (envelope.stream === 'agent.execution' && envelope.kind !== 'unsupported') {
             const item: TimelinePresentationItem = {
               eventId: envelope.eventId, revision: envelope.revision, kind: envelope.kind as TimelinePresentationItem['kind'],
               threadId: envelope.threadId, turnId: envelope.turnId, ephemeral: true,
+              itemId: envelope.semantic?.itemId ?? envelope.semantic?.toolId ?? null,
               role: envelope.semantic?.role, text: envelope.semantic?.text, toolId: envelope.semantic?.toolId, status: envelope.semantic?.status,
             };
+            // Queue-stage only: a single performance.now() is not event-to-render latency.
+            timerRef.current.record('browser_receive_queue', receiveAt, performance.now());
+            timerRef.current.markUnmeasured('browser_receive_render');
             setLiveTimeline(current => foldTimeline(current, item));
-            timerRef.current.record('browser_receive_render', performance.now());
           }
         } catch { /* Invalidation-only payloads still trigger refresh below. */ }
         void refresh();
@@ -229,7 +236,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       <div className="timeline" role="log" aria-label={t('Native conversation', '原生对话')} ref={timelineRef}
         onScroll={event => { const node = event.currentTarget; followTail.current = node.scrollTop + node.clientHeight >= node.scrollHeight - 48; }}>
         {thread?.attached && thread.turns.map(turn => <React.Fragment key={turn.id}>
-          {thread.history.filter(message => message.turnId === turn.id).map((message, index) => <article className={`message ${message.role}`} key={`${message.turnId}-${index}`}><div className="message-label">{message.role === 'user' ? t('Native user input', '原生用户输入') : 'Codex'}
+          {thread.history.filter(message => message.turnId === turn.id).map((message, index) => <article className={`message ${message.role}`} key={message.itemId ? `${message.turnId}-${message.itemId}` : `${message.turnId}-${index}`} data-item-id={message.itemId ?? undefined}><div className="message-label">{message.role === 'user' ? t('Native user input', '原生用户输入') : 'Codex'}
             {message.role === 'user' && <small className="native-source-badge" data-source={message.source?.kind ?? 'NATIVE_EXTERNAL'} title={message.source?.kind === 'FLEETSPLICE_WEB' ? message.source.clientInstanceId : undefined}>{message.source?.kind === 'FLEETSPLICE_WEB' ? `Web${message.source.deviceLabel || message.source.clientDisplayLabel ? ` · ${message.source.deviceLabel || message.source.clientDisplayLabel}` : ''}` : t('Native external client', '原生外部客户端')}</small>}
           </div><div className="message-text">{message.text}</div></article>)}
           <div className="native-turn-marker"><TurnStatus turn={turn} locale={locale} live={snapshot?.state === 'READY'}/></div>
@@ -238,8 +245,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
           <div className="message-label">{t('Web (provisional)', '网页（临时）')}<small data-testid="presentation-state">{presentationLabel(provisional.state, locale === 'zh-CN')}</small></div>
           <div className="message-text">{provisional.text}</div>
         </article>}
-        {liveTimeline.filter(item => item.kind === 'message.delta' || item.kind.startsWith('tool.') || item.kind.startsWith('turn.')).map(item => (
-          <article className={`message ${item.role === 'assistant' ? 'assistant' : item.role === 'tool' ? 'system' : 'system'} live`} data-live-kind={item.kind} data-ephemeral="true" key={item.eventId}>
+        {liveTimeline.filter(item => item.kind === 'message.delta' || item.kind === 'message.final' || item.kind.startsWith('tool.') || item.kind.startsWith('turn.')).map(item => (
+          <article className={`message ${item.role === 'assistant' ? 'assistant' : item.role === 'tool' ? 'system' : 'system'} live`} data-live-kind={item.kind} data-ephemeral="true" data-item-id={item.itemId ?? undefined} key={item.eventId}>
             <div className="message-label">{item.kind.startsWith('tool.') ? t('Tool activity', '工具活动') : item.kind.startsWith('turn.') ? t('Turn', '轮次') : 'Codex'}<small>{item.status ?? item.kind}</small></div>
             {item.text ? <div className="message-text">{item.text}</div> : null}
           </article>

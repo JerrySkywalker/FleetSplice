@@ -667,6 +667,7 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
     renewClient: (previous, next, continuity) => r.adapter.renewClient(previous, next, continuity),
     lookup: async commandId => r.adapter.lookup(commandId),
     pollRealtime: since => Promise.resolve(r.adapter.pollRealtime(since)),
+    subscribeRealtime: listener => r.adapter.subscribeRealtime(listener),
   });
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   try {

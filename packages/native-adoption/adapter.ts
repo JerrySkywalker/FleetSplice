@@ -128,6 +128,10 @@ export class NativeAdoptionAdapter {
   }
   /** Non-authoritative Agent Execution projection for later SSE/timeline. Never admits effects. */
   recentExecutionEvents(): readonly AgentExecutionEvent[] { return this.executionEvents; }
+  /** Observation-only. Never authorizes effects. */
+  subscribeRealtime(listener: (envelope: import('../contracts/realtime-bus.ts').RealtimeInvalidateEnvelope) => void): () => void {
+    return this.realtime.subscribe(listener);
+  }
   pollRealtime(sinceRevision: string) { this.publishControlObservation(); return this.realtime.since(sinceRevision); }
   private publishControlObservation() {
     const signature = `${this.state}|${this.controller}|${this.fence}|${this.incarnation}|${[...this.threads.values()].map(b => `${b.view.id}:${b.view.externalAdvance}:${b.view.stateToken}`).join(',')}`;
@@ -277,6 +281,7 @@ export class NativeAdoptionAdapter {
             ...(owned.clientDisplayLabel !== undefined ? { clientDisplayLabel: owned.clientDisplayLabel } : {}),
             ...(owned.deviceLabel !== undefined ? { deviceLabel: owned.deviceLabel } : {}) } : { kind: 'NATIVE_EXTERNAL' as const };
           if (typeof text === 'string') history.push({ role: item.type === 'userMessage' ? 'user' : 'assistant', text: text.slice(0,24000), turnId: turn.id,
+            ...(typeof item.id === 'string' ? { itemId: item.id } : {}),
             ...(item.type === 'userMessage' ? { source } : {}) });
         } else if (item.type === 'commandExecution' && id(item.id)) this.observeTool(tools, item, turn.id, threadId);
       }

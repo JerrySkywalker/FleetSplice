@@ -22,12 +22,27 @@ test('maps message deltas and finals from structured items', () => {
   const delta = mapCodexNotification({ method: 'item/agentMessage/delta', params: { threadId: 't1', turnId: 'u1', itemId: 'm1', delta: 'Hel' } }, ctx);
   assert.equal(delta?.kind, 'message.delta');
   assert.equal(delta?.payload.text, 'Hel');
+  assert.equal(delta?.payload.itemId, 'm1');
 
   const finals = mapCodexNotification({ method: 'item/completed', params: { threadId: 't1', turnId: 'u1',
     item: { id: 'm1', type: 'agentMessage', text: 'Hello' } } }, ctx);
   assert.equal(finals?.kind, 'message.final');
   assert.equal(finals?.payload.text, 'Hello');
   assert.equal(finals?.payload.role, 'assistant');
+  assert.equal(finals?.payload.itemId, 'm1');
+});
+
+test('preserves distinct assistant item identities across tool activity in one turn', () => {
+  const first = mapCodexNotification({ method: 'item/completed', params: { threadId: 't1', turnId: 'u1',
+    item: { id: 'msg-a', type: 'agentMessage', text: 'First' } } }, ctx);
+  const tool = mapCodexNotification({ method: 'item/started', params: { threadId: 't1', turnId: 'u1',
+    item: { id: 'tool-1', type: 'commandExecution', command: 'npm test', status: 'inProgress' } } }, ctx);
+  const second = mapCodexNotification({ method: 'item/completed', params: { threadId: 't1', turnId: 'u1',
+    item: { id: 'msg-b', type: 'agentMessage', text: 'Second' } } }, ctx);
+  assert.equal(first?.payload.itemId, 'msg-a');
+  assert.equal(tool?.payload.toolId, 'tool-1');
+  assert.equal(second?.payload.itemId, 'msg-b');
+  assert.notEqual(first?.payload.itemId, second?.payload.itemId);
 });
 
 test('maps tool lifecycle started/completed/failed', () => {

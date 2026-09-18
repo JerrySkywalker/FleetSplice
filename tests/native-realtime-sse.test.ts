@@ -36,14 +36,19 @@ test('realtime bus orders revisions, dedupes event ids, and sanitizes payloads',
   assert.doesNotMatch(JSON.stringify(first), /"token"|"credential"|rawDaemon/);
   const page = bus.since('1');
   assert.equal(page.events.length, 0);
+  const withId = bus.publish({
+    ...base, eventId: 'with-id', kind: 'message.final',
+    payload: { role: 'assistant', text: 'ok', itemId: 'native-item-9' },
+  });
+  assert.equal(withId.semantic?.itemId, 'native-item-9');
   bus.publish({ ...base, eventId: 'next', kind: 'turn.started' });
-  assert.deepEqual(bus.since('1').events.map(item => item.eventId), ['next']);
+  assert.deepEqual(bus.since('1').events.map(item => item.eventId), ['with-id', 'next']);
   const sanitized = sanitizeRealtimeEvent(base satisfies AgentExecutionEvent);
   assert.equal(sanitized.kind, 'message.delta');
   assert.equal('payload' in sanitized, false);
 });
 
-test('native SSE requires same-origin session, enforces observer limit, and emits sanitized envelopes', async () => {
+test('native SSE requires same-origin session, enforces observer limit, and emits sanitized envelopes via direct subscription', async () => {
   const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
   const port = (probe.address() as { port: number }).port; await new Promise<void>(resolve => probe.close(() => resolve()));
   const origin = `http://127.0.0.1:${port}`;
@@ -58,6 +63,7 @@ test('native SSE requires same-origin session, enforces observer limit, and emit
     execute: async () => ({ status: 'SUCCEEDED' } as any),
     renewClient: async () => ({ controller: null, fence: 0 }),
     lookup: async () => null,
+    subscribeRealtime: listener => bus.subscribe(listener),
     pollRealtime: async since => bus.since(since),
   });
   try {
@@ -82,7 +88,6 @@ test('native SSE requires same-origin session, enforces observer limit, and emit
       threadId: 'thread-1', turnId: 'turn-1', stream: 'agent.execution', kind: 'turn.started',
       payload: { rawDaemon: 'should-not-leak', credential: 'x' }, trustLevel: 'NATIVE_STRUCTURED_API',
     });
-    await new Promise(resolve => setTimeout(resolve, 400));
     const reader = streams[0]!.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -96,5 +101,50 @@ test('native SSE requires same-origin session, enforces observer limit, and emit
     assert.doesNotMatch(buffer, /should-not-leak|"credential"/);
     await reader.cancel().catch(() => {});
     for (const stream of streams.slice(1)) await stream.body?.cancel().catch(() => {});
+  } finally { await hub.close(); }
+});
+
+test('direct subscription delivers agent message itemId without 250ms poll', async () => {
+  const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
+  const port = (probe.address() as { port: number }).port; await new Promise<void>(resolve => probe.close(() => resolve()));
+  const origin = `http://127.0.0.1:${port}`;
+  const bootstrapToken = randomUUID();
+  const bus = new RealtimeEventBus();
+  let subscribed = false;
+  const hub = await startHub({
+    port, target: target(), root: 'V:\\test', sid: 'fixture', principal: 'fixture', sessionId: 1,
+    stateDirectory: mkdtempSync(path.join(tmpdir(), 'fleet-native-sse-sub-')), webDirectory: path.resolve('dist/web'),
+    hcpToken: randomUUID(), bootstrapToken,
+  }, {
+    snapshot: async () => ({ state: 'READY' } as any),
+    execute: async () => ({ status: 'SUCCEEDED' } as any),
+    renewClient: async () => ({ controller: null, fence: 0 }),
+    lookup: async () => null,
+    subscribeRealtime: listener => { subscribed = true; return bus.subscribe(listener); },
+    pollRealtime: async since => bus.since(since),
+  });
+  try {
+    const boot = await fetch(`${origin}/api/bootstrap`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: bootstrapToken }) });
+    const cookie = boot.headers.get('set-cookie')!.split(';')[0]!;
+    const response = await fetch(`${origin}/api/native/events`, { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'same-origin' } });
+    assert.equal(subscribed, true);
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    bus.publish({
+      eventId: randomUUID(), revision: '0', observedAt: '2026-09-17T00:00:00.000Z', sessionKey: 's',
+      threadId: 'thread-1', turnId: 'turn-1', stream: 'agent.execution', kind: 'message.final',
+      payload: { role: 'assistant', text: 'push', itemId: 'item-42' }, trustLevel: 'NATIVE_STRUCTURED_API',
+    });
+    const started = Date.now();
+    while (Date.now() - started < 500 && !buffer.includes('item-42')) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+    }
+    assert.ok(Date.now() - started < 250, 'push subscription must not wait for the old 250ms poll');
+    assert.match(buffer, /"itemId":"item-42"/);
+    assert.match(buffer, /message\.final/);
+    await reader.cancel().catch(() => {});
   } finally { await hub.close(); }
 });

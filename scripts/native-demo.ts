@@ -96,6 +96,14 @@ export async function startNativeDemo(
     execute: (command, client) => call('execute', { command, client }),
     renewClient: (previous, next, continuity) => call('renewClient', { previous, next, continuity }),
     lookup: commandId => call('lookup', { commandId }),
+    subscribeRealtime: (listener) => {
+      const handler = (message: any) => {
+        if (message?.kind === 'realtimePush' && message.envelope) listener(message.envelope);
+      };
+      edge?.on('message', handler);
+      void call('subscribeRealtimePush', {}).catch(() => {});
+      return () => { edge?.off('message', handler); void call('unsubscribeRealtimePush', {}).catch(() => {}); };
+    },
     pollRealtime: sinceRevision => call('pollRealtime', { sinceRevision }),
   };
   const bootstrapToken = randomBytes(32).toString('hex');

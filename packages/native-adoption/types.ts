@@ -26,7 +26,7 @@ export type NativeThread = {
   id: string; workspace: string; workspaceIdentity: string; origin: 'NATIVE_ADOPTED';
   status: string; activeTurnId: string | null; lastTurnStatus: string | null; model: string | null; permission: string | null;
   attached: boolean; stateToken: string; externalAdvance: boolean;
-  history: { role: 'user' | 'assistant'; text: string; turnId: string; source?: MessageSource }[];
+  history: { role: 'user' | 'assistant'; text: string; turnId: string; itemId?: string | null; source?: MessageSource }[];
   turns: NativeTurn[];
   activity: { id: string; turnId: string; text: string; status: string }[];
   historyLimited: boolean; residualCommandState: 'NONE_OBSERVED' | 'MAY_STILL_BE_RUNNING' | 'OBSERVED_DRAINED';
@@ -62,6 +62,11 @@ export type AdoptionPort = {
   execute(command: unknown, client: AdoptionClient): Promise<AdoptionReceipt>;
   renewClient(previous: AdoptionClient, next: AdoptionClient, continuity: AdoptionContinuity | null): Promise<{ controller: string | null; fence: number }>;
   lookup(commandId: string): Promise<AdoptionReceipt | null>;
-  /** Optional realtime poll for sanitized invalidation envelopes since a revision. */
+  /**
+   * Observation-only realtime subscription. Must never authorize or dispatch effects.
+   * Preferred primary delivery path for Native SSE.
+   */
+  subscribeRealtime?(listener: (envelope: import('../contracts/realtime-bus.ts').RealtimeInvalidateEnvelope) => void): () => void;
+  /** Optional catch-up / since-revision read for reconnect buffering. Not the primary SSE path. */
   pollRealtime?(sinceRevision: string): Promise<{ revision: string; events: import('../contracts/realtime-bus.ts').RealtimeInvalidateEnvelope[] }>;
 };

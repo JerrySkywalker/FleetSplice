@@ -66,19 +66,19 @@ export function SessionConfigBar({
     }
   }, [sheetOpen]);
 
-  const shortModel = tablet ? abbreviateModel(model) : undefined;
-  const shortReasoning = tablet ? abbreviateReasoning(reasoning) : undefined;
-  const shortPermission = tablet ? abbreviatePermission(permission) : undefined;
+  const displayModel = mutationSupported ? model : abbreviateModel(effectiveModel ?? model);
+  const displayReasoning = mutationSupported ? reasoning : abbreviateReasoning(effectiveReasoning ?? reasoning);
+  const displayPermission = mutationSupported ? permission : abbreviatePermission(effectivePermission ?? permission);
 
   const selects = <>
     <label className="config-chip">
-      <span>{tablet ? abbreviateModel(modelLabel) || modelLabel.slice(0, 1) : modelLabel}</span>
+      <span>{tablet ? 'M' : modelLabel}</span>
       <select data-testid="config-model" aria-label={modelLabel} title={modelTitle ?? model}
         value={model} disabled={modelDisabled || !mutationSupported || !models.length}
         onChange={event => onModel?.(event.target.value)}>
-        {!models.length && <option value={model || ''}>{shortModel || model || '—'}</option>}
+        {!models.length && <option value={model || ''}>{displayModel || '—'}</option>}
         {models.map(item => <option key={item.id} value={item.id} disabled={item.disabled}>
-          {tablet ? abbreviateModel(item.label) : item.label}
+          {mutationSupported ? (tablet ? abbreviateModel(item.label) : item.label) : abbreviateModel(item.label)}
         </option>)}
       </select>
     </label>
@@ -87,9 +87,9 @@ export function SessionConfigBar({
       <select data-testid="config-reasoning" aria-label={reasoningLabel} title={reasoningTitle ?? reasoning}
         value={reasoning} disabled={reasoningDisabled || !mutationSupported || !reasonings.length}
         onChange={event => onReasoning?.(event.target.value)}>
-        {!reasonings.length && <option value={reasoning || ''}>{shortReasoning || reasoning || '—'}</option>}
+        {!reasonings.length && <option value={reasoning || ''}>{displayReasoning || '—'}</option>}
         {reasonings.map(item => <option key={item.id} value={item.id} disabled={item.disabled}>
-          {tablet ? abbreviateReasoning(item.label) : item.label}
+          {mutationSupported ? (tablet ? abbreviateReasoning(item.label) : item.label) : abbreviateReasoning(item.label)}
         </option>)}
       </select>
     </label>
@@ -98,9 +98,9 @@ export function SessionConfigBar({
       <select data-testid="config-permission" aria-label={permissionLabel} title={permissionTitle ?? permission}
         value={permission} disabled={permissionDisabled || !mutationSupported || !permissions.length}
         onChange={event => onPermission?.(event.target.value)}>
-        {!permissions.length && <option value={permission || ''}>{shortPermission || permission || '—'}</option>}
+        {!permissions.length && <option value={permission || ''}>{displayPermission || '—'}</option>}
         {permissions.map(item => <option key={item.id} value={item.id} disabled={item.disabled}>
-          {tablet ? abbreviatePermission(item.label) : item.label}
+          {mutationSupported ? (tablet ? abbreviatePermission(item.label) : item.label) : abbreviatePermission(item.label)}
         </option>)}
       </select>
     </label>

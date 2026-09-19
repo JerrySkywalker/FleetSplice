@@ -267,8 +267,8 @@ async function run(): Promise<number> {
       await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled({ timeout: 8000 });
       await page.getByRole('button', { name: 'Send', exact: true }).click();
       await expect(page.getByTestId('adopted-turn-id')).not.toHaveText('—', { timeout: 8000 });
-      await expect(page.getByRole('button', { name: 'Interrupt turn', exact: true })).toBeEnabled({ timeout: 8000 });
-      await page.getByRole('button', { name: 'Interrupt turn', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Interrupt', exact: true })).toBeEnabled({ timeout: 8000 });
+      await page.getByRole('button', { name: 'Interrupt', exact: true }).click();
       await expect(page.getByText('Turn interrupted', { exact: true })).toBeVisible({ timeout: 8000 });
       await expect(page.getByText(/A native command may still be finishing/)).toBeVisible({ timeout: 8000 });
       const residualItem = fixture.rpc.turns[0].items.find((item: any) => item.id === 'browser-residual');

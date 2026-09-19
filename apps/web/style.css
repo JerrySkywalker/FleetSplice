@@ -398,10 +398,11 @@ h3 { font-size: 12px; font-weight: 650; margin: 20px 0 8px; }
 }
 .composer textarea:focus, .composer-surface textarea:focus { outline: none; }
 .session-config-bar {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  display: flex; flex-wrap: nowrap; gap: 6px; align-items: center;
   margin-bottom: 4px;
+  overflow-x: auto;
 }
-.session-config-bar.density-mobile { flex-wrap: nowrap; gap: 8px; }
+.session-config-bar.density-mobile { flex-wrap: nowrap; gap: 8px; overflow: visible; }
 .config-capsule {
   display: inline-flex; align-items: center; gap: 6px;
   min-height: var(--touch-h); padding: 6px 10px;
@@ -417,7 +418,7 @@ h3 { font-size: 12px; font-weight: 650; margin: 20px 0 8px; }
 }
 .config-chip span { color: var(--muted); white-space: nowrap; }
 .config-chip select {
-  border: 0; background: transparent; max-width: min(220px, 42vw); padding: 0;
+  border: 0; background: transparent; max-width: min(160px, 28vw); padding: 0;
   color: var(--text); min-height: 28px;
 }
 .controller-chip { gap: 8px; padding-inline: 10px; }
@@ -543,12 +544,28 @@ dialog p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-bottom
 .product-shell.breakpoint-mobile .controller-label-full { display: none; }
 .product-shell.breakpoint-mobile .controller-label-short { display: inline; }
 .product-shell.breakpoint-mobile .composer-surface {
-  margin: 0 8px 8px; padding: 8px 10px;
+  margin: 0 8px 6px; padding: 6px 8px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "config config"
+    "prompt actions";
+  gap: 4px 8px;
+  align-items: end;
 }
+.product-shell.breakpoint-mobile .composer-surface .session-config-bar { grid-area: config; margin-bottom: 0; }
 .product-shell.breakpoint-mobile .composer-surface textarea {
-  min-height: 40px; max-height: 88px; margin: 4px 0;
+  grid-area: prompt;
+  min-height: 36px; max-height: 64px; margin: 0;
 }
-.product-shell.breakpoint-mobile .composer-actions button { min-height: var(--touch-h); }
+.product-shell.breakpoint-mobile .composer-actions {
+  grid-area: actions;
+  flex-direction: column;
+  gap: 4px;
+}
+.product-shell.breakpoint-mobile .composer-actions button { min-height: 36px; padding: 4px 8px; }
+.product-shell.breakpoint-mobile .config-capsule { min-height: 32px; padding: 4px 8px; }
+.product-shell.breakpoint-mobile .controller-chip { min-height: 32px; padding: 2px 8px; }
 
 @keyframes caret-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
 @keyframes spin { to { transform: rotate(360deg); } }

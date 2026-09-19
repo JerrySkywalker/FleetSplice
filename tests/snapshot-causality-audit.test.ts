@@ -1,6 +1,7 @@
 /**
- * A0 causality: full Web-owned command lifecycle through Hub + catch-up + SSE
- * classification must attribute each authoritative snapshot (not synthetic-policy-only).
+ * A0/A2 causality: full Web-owned command lifecycle through Hub + SSE.
+ * Pre-fix ingredients were command + turn.final + post-command catch-up fence.
+ * Post-fix healthy subscription must not re-introduce catch-up double delivery.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,7 +24,7 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-test('A0 full lifecycle reproduces multi-snapshot fanout with exact trigger attribution', async () => {
+test('A2 healthy subscription Web-owned turn keeps authoritative fanout <= 2 with command+turn.final', async () => {
   const fixture = await createDisposableAdoptionFixture();
   fixture.rpc.afterTurnStart = (turnId) => fixture.rpc.emitOwnedTurnLifecycle(turnId);
   const port = await freePort();
@@ -35,26 +36,17 @@ test('A0 full lifecycle reproduces multi-snapshot fanout with exact trigger attr
     sid: 'fixture',
     principal: 'fixture',
     sessionId: 1,
-    stateDirectory: mkdtempSync(path.join(tmpdir(), 'fleet-a0-causality-')),
+    stateDirectory: mkdtempSync(path.join(tmpdir(), 'fleet-a2-causality-')),
     webDirectory: path.resolve('dist/web'),
     hcpToken: randomUUID(),
     bootstrapToken,
   }, fixture.adoptionPort);
 
   const origin = `http://127.0.0.1:${port}`;
-    const rows: Array<Record<string, unknown>> = [];
   let snapshots = 0;
-  const scheduler = new AuthoritativeReconcileScheduler(async (reasons) => {
+  const scheduler = new AuthoritativeReconcileScheduler(async () => {
     snapshots += 1;
-    rows.push({
-      SNAPSHOT_SEQ: snapshots,
-      RECONCILE_REASON: reasons.join('+'),
-      TRIGGER_EVENT: reasons[0] ?? null,
-      COALESCED_OR_EXECUTED: 'executed',
-      NOTES: `scheduler_audit_seq=${snapshots}`,
-    });
-    // Simulate browser applySnapshot HTTP latency so late catch-up cannot always coalesce.
-    await new Promise(resolve => setTimeout(resolve, 40));
+    await new Promise(resolve => setTimeout(resolve, 20));
   }, { debounceMs: 10 });
 
   try {
@@ -85,6 +77,7 @@ test('A0 full lifecycle reproduces multi-snapshot fanout with exact trigger attr
     const decoder = new TextDecoder();
     let buffer = '';
     const seenKinds: string[] = [];
+    const seenEventIds: string[] = [];
 
     const pump = (async () => {
       while (true) {
@@ -96,15 +89,15 @@ test('A0 full lifecycle reproduces multi-snapshot fanout with exact trigger attr
         for (const chunk of chunks) {
           const line = chunk.split('\n').find(item => item.startsWith('data: '));
           if (!line) continue;
-          const envelope = JSON.parse(line.slice(6)) as { stream: string; kind: string; revision: string; turnId: string | null };
+          const envelope = JSON.parse(line.slice(6)) as { stream: string; kind: string; revision: string; eventId: string; turnId: string | null };
           seenKinds.push(`${envelope.stream}:${envelope.kind}`);
+          seenEventIds.push(envelope.eventId);
           const decision = classifyRealtimeRefresh(envelope);
           if (decision.mode === 'schedule_reconcile') scheduler.schedule(decision.reason);
         }
       }
     })();
 
-    // Attach
     let snapshot = await (await fetch(`${origin}/api/native/snapshot`, { headers })).json();
     const attach = {
       commandId: randomUUID(),
@@ -119,11 +112,11 @@ test('A0 full lifecycle reproduces multi-snapshot fanout with exact trigger attr
       text: '',
     };
     assert.equal((await (await fetch(`${origin}/api/native/commands`, { method: 'POST', headers, body: JSON.stringify(attach) })).json()).status, 'SUCCEEDED');
+    scheduler.schedule('command');
     await new Promise(resolve => setTimeout(resolve, 80));
     await scheduler.whenIdle();
     const afterAttach = snapshots;
 
-    // Web submit with full turn lifecycle (fixture completes during turn/start)
     snapshot = await (await fetch(`${origin}/api/native/snapshot`, { headers })).json();
     const submit = {
       commandId: randomUUID(),
@@ -139,33 +132,20 @@ test('A0 full lifecycle reproduces multi-snapshot fanout with exact trigger attr
     };
     const receipt = await (await fetch(`${origin}/api/native/commands`, { method: 'POST', headers, body: JSON.stringify(submit) })).json();
     assert.equal(receipt.status, 'SUCCEEDED');
-    // Mirror NativeAdoption: schedule command on receipt, then wait for idle.
-    // Catch-up fence.advanced may still arrive after this window under real Hub timing.
     scheduler.schedule('command');
     await scheduler.whenIdle();
-    // Allow Hub catch-up + SSE delivery after receipt handling.
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 150));
     await scheduler.whenIdle();
 
     const turnWindow = snapshots - afterAttach;
     const audit = scheduler.audit();
     assert.ok(seenKinds.some(item => item.includes('turn.completed')), `expected turn.completed in SSE, saw ${seenKinds.join(',')}`);
-    assert.ok(seenKinds.some(item => item.includes('fence.advanced')), `expected catch-up fence.advanced, saw ${seenKinds.join(',')}`);
-    assert.ok(
-      audit.schedules.some(item => item.reason === 'command')
-      && audit.schedules.some(item => item.reason === 'turn.final')
-      && audit.schedules.some(item => item.reason === 'fleet.control'),
-      `missing causal reasons in ${JSON.stringify(audit.schedules)}`,
-    );
-    // Fanout may coalesce under lucky timing; require either >=3 executions OR
-    // proof that all three distinct trigger classes fired (Owner-path ingredients).
-    const distinctReasons = new Set(audit.schedules.map(item => item.reason));
-    assert.ok(
-      turnWindow >= 3 || (distinctReasons.has('command') && distinctReasons.has('turn.final') && distinctReasons.has('fleet.control')),
-      `expected >=3 refreshes or full three-trigger attribution; turnWindow=${turnWindow} rows=${JSON.stringify(rows.slice(afterAttach))} schedules=${JSON.stringify(audit.schedules)}`,
-    );
-    // Record observed fanout for evidence consumers.
-    assert.ok(turnWindow >= 1, 'turn window must perform at least one authoritative refresh');
+    assert.ok(audit.schedules.some(item => item.reason === 'command'), 'command reconcile required');
+    assert.ok(audit.schedules.some(item => item.reason === 'turn.final'), 'turn.final reconcile required');
+    assert.ok(turnWindow >= 1 && turnWindow <= 2, `post-fix turn fanout must be 1..2, got ${turnWindow}`);
+    // No duplicate SSE event ids from subscribe+catchUp double write.
+    const duplicates = seenEventIds.filter((id, index) => seenEventIds.indexOf(id) !== index);
+    assert.equal(duplicates.length, 0, `SSE double-delivered event ids: ${duplicates.join(',')}`);
 
     await reader.cancel().catch(() => {});
     await pump.catch(() => {});

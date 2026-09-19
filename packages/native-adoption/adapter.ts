@@ -626,7 +626,15 @@ export class NativeAdoptionAdapter {
         threadId: c.threadId, turnId, origin: 'NATIVE_ADOPTED', createdNativeThread: false, processTerminationClaim: false };
       try { this.evidence.append('NATIVE_ADOPTION_RECEIPT', c.commandId, receipt); }
       catch { this.state = 'NATIVE_JOURNAL_UNPROVABLE'; this.controller = null; this.fence++; throw new Fault(this.state); }
-      this.receipts.set(c.commandId, { digest, receipt }); return receipt;
+      this.receipts.set(c.commandId, { digest, receipt });
+      // Publish controller/fence/review authority changes on the Fleet Control stream so
+      // live subscribers (including non-commanding viewers) converge without relying on
+      // Hub post-command catch-up. Submit/steer/interrupt rely on turn.final + command
+      // reconcile for the common Web-owned path.
+      if (status === 'SUCCEEDED' && ['native.attach', 'native.release', 'native.reviewState', 'native.approval'].includes(c.family)) {
+        this.publishControlObservation();
+      }
+      return receipt;
     });
   }
   close() { this.controller = null; this.fence++; this.state = 'FLEET_CLIENT_CLOSED'; this.rpc.close(); }

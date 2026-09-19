@@ -45,15 +45,34 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   const catchUpNativeRealtime = async () => {
     if (!adoption?.pollRealtime || nativeStreams.size === 0) return;
     try {
-      const page = await adoption.pollRealtime(nativeRevision);
+      const since = nativeRevision;
+      const page = await adoption.pollRealtime(since);
+      // pollRealtime may publish a new control observation that live subscribeRealtime
+      // already wrote and advanced nativeRevision. Never double-write those envelopes.
       if (page.events.length) {
-        nativeRevision = page.revision;
-        for (const envelope of page.events) writeNative(envelope);
+        for (const envelope of page.events) {
+          let revision: bigint;
+          try { revision = BigInt(envelope.revision); } catch { continue; }
+          let cursor: bigint;
+          try { cursor = BigInt(nativeRevision || '0'); } catch { cursor = 0n; }
+          if (revision > cursor) {
+            nativeRevision = envelope.revision;
+            writeNative(envelope);
+          }
+        }
+        try {
+          if (BigInt(page.revision) > BigInt(nativeRevision || '0')) nativeRevision = page.revision;
+        } catch { /* keep live cursor */ }
       } else if (page.revision !== nativeRevision) {
         nativeRevision = page.revision;
         writeNative({ revision: nativeRevision, eventId: `rev-${nativeRevision}`, stream: 'fleet.control', kind: 'fence.advanced', threadId: null, turnId: null });
       }
     } catch { /* Observation catch-up failures do not invent events; clients retain fallback refresh. */ }
+  };
+  /** Post-command catch-up is redundant while a direct subscribeRealtime push is healthy. */
+  const catchUpAfterCommandIfNeeded = () => {
+    if (nativeUnsubscribe) return;
+    void catchUpNativeRealtime();
   };
   const ensureNativeSubscription = () => {
     if (nativeUnsubscribe || !adoption?.subscribeRealtime) return;
@@ -147,7 +166,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
             json(res, 200, await adoption.snapshot(discover ? { discover: true } : {})); return;
           }
           if (req.method === 'POST' && req.url === '/api/native/commands') {
-            const command = await body(req); const client = grant(req); json(res, 200, await adoption.execute(command, adoptionClient(client))); void catchUpNativeRealtime(); return;
+            const command = await body(req); const client = grant(req); json(res, 200, await adoption.execute(command, adoptionClient(client))); catchUpAfterCommandIfNeeded(); return;
           }
           if (req.method === 'GET' && /^\/api\/native\/commands\/[a-zA-Z0-9_-]{1,200}$/.test(req.url ?? '')) {
             const receipt = await adoption.lookup(req.url!.slice('/api/native/commands/'.length)); json(res, receipt ? 200 : 404, receipt ?? { error: 'COMMAND_UNKNOWN_NO_REPLAY' }); return;

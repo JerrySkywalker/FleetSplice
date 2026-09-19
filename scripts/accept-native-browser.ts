@@ -221,16 +221,16 @@ async function run(): Promise<number> {
 
     // --- Steer ---
     if (scenarios.has('steer')) {
-      fixture.rpc.afterTurnStart = (turnId) => {
-        // Leave turn running for steer.
-        fixture.rpc.emitOwnedTurnLifecycle(turnId, { complete: false, assistantB: 'STEER_TURN_LIVE' });
-      };
+      // Leave the turn running; do not auto-complete inside turn/start.
+      fixture.rpc.afterTurnStart = null;
       await page.locator('#native-prompt').fill('Start turn for steer');
+      await expect(page.getByRole('button', { name: 'Send continuation', exact: true })).toBeEnabled({ timeout: 8000 });
       await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
       await expect(page.getByTestId('adopted-turn-id')).not.toHaveText('—', { timeout: 8000 });
       const active = await page.getByTestId('adopted-turn-id').innerText();
       const steerCallsBefore = fixture.rpc.calls.filter(item => item.method === 'turn/steer').length;
       await page.locator('#native-prompt').fill('Guide this turn');
+      await expect(page.getByRole('button', { name: 'Steer', exact: true })).toBeEnabled({ timeout: 8000 });
       await page.getByRole('button', { name: 'Steer', exact: true }).click();
       await expect(page.getByRole('log', { name: 'Native conversation' }).getByText('Guide this turn', { exact: true })).toBeVisible({ timeout: 8000 });
       await expect(page.getByTestId('adopted-turn-id')).toHaveText(active);
@@ -241,6 +241,8 @@ async function run(): Promise<number> {
       // Complete the turn so later scenarios see idle controls.
       const turn = fixture.rpc.turns.find((item: any) => item.id === active) ?? fixture.rpc.turns[0];
       turn.status = 'completed';
+      turn.completedAt = Math.floor(Date.now() / 1000);
+      turn.durationMs = 500;
       fixture.rpc.thread.status.type = 'idle';
       fixture.rpc.onEvent({ method: 'turn/completed', params: { threadId: fixture.rpc.thread.id, turn: structuredClone(turn) } });
       await waitSchedulerIdle(page);
@@ -262,8 +264,10 @@ async function run(): Promise<number> {
         });
       };
       await page.locator('#native-prompt').fill('Turn with residual command');
+      await expect(page.getByRole('button', { name: 'Send continuation', exact: true })).toBeEnabled({ timeout: 8000 });
       await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
       await expect(page.getByTestId('adopted-turn-id')).not.toHaveText('—', { timeout: 8000 });
+      await expect(page.getByRole('button', { name: 'Interrupt turn', exact: true })).toBeEnabled({ timeout: 8000 });
       await page.getByRole('button', { name: 'Interrupt turn', exact: true }).click();
       await expect(page.getByText('Turn interrupted', { exact: true })).toBeVisible({ timeout: 8000 });
       await expect(page.getByText(/A native command may still be finishing/)).toBeVisible({ timeout: 8000 });

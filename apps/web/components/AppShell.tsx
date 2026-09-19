@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
 import {
   LEFT_MAX, LEFT_MIN, RIGHT_MAX, RIGHT_MIN,
   persistShellLayout, readShellLayout, type ShellLayout,
@@ -92,6 +93,10 @@ export function AppShell({
   const [layout, updateLayout] = useShellLayout();
   const [navOpen, setNavOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
+  const navTriggerRef = useRef<HTMLButtonElement>(null);
+  const contextTriggerRef = useRef<HTMLButtonElement>(null);
+  const navCloseRef = useRef<HTMLButtonElement>(null);
+  const contextCloseRef = useRef<HTMLButtonElement>(null);
   const desktop = breakpoint === 'desktop';
   const showDrawers = !desktop;
 
@@ -102,11 +107,21 @@ export function AppShell({
   useEffect(() => {
     if (!navOpen && !contextOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setNavOpen(false); setContextOpen(false); }
+      if (event.key === 'Escape') {
+        if (navOpen) { setNavOpen(false); navTriggerRef.current?.focus(); }
+        if (contextOpen) { setContextOpen(false); contextTriggerRef.current?.focus(); }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [navOpen, contextOpen]);
+
+  useEffect(() => {
+    if (navOpen) navCloseRef.current?.focus();
+  }, [navOpen]);
+  useEffect(() => {
+    if (contextOpen) contextCloseRef.current?.focus();
+  }, [contextOpen]);
 
   return <div
     className={`shell product-shell breakpoint-${breakpoint}`}
@@ -121,24 +136,32 @@ export function AppShell({
   >
     <header className="product-header">
       <div className="header-leading">
-        {showDrawers && <button type="button" className="icon-button" data-testid="nav-menu" aria-label={navTitle}
-          aria-expanded={navOpen} onClick={() => { setNavOpen(true); setContextOpen(false); }}>☰</button>}
+        {showDrawers && <button type="button" ref={navTriggerRef} className="icon-button" data-testid="nav-menu" aria-label={navTitle}
+          aria-expanded={navOpen} onClick={() => { setNavOpen(true); setContextOpen(false); }}>
+          <Menu size={20} aria-hidden="true" />
+        </button>}
         {brand}
       </div>
       <div className="header-trailing">
         {headerActions}
-        {showDrawers && <button type="button" className="icon-button" data-testid="context-menu" aria-label={contextTitle}
-          aria-expanded={contextOpen} onClick={() => { setContextOpen(true); setNavOpen(false); }}>⋯</button>}
+        {showDrawers && <button type="button" ref={contextTriggerRef} className="icon-button" data-testid="context-menu" aria-label={contextTitle}
+          aria-expanded={contextOpen} onClick={() => { setContextOpen(true); setNavOpen(false); }}>
+          <MoreHorizontal size={20} aria-hidden="true" />
+        </button>}
         {desktop && <>
-          <button type="button" className="ghost-button" data-testid="toggle-left"
+          <button type="button" className="ghost-button icon-text-button" data-testid="toggle-left"
+            aria-label={layout.leftCollapsed ? 'Expand navigation' : 'Collapse navigation'}
             aria-pressed={layout.leftCollapsed}
             onClick={() => updateLayout({ leftCollapsed: !layout.leftCollapsed })}>
-            {layout.leftCollapsed ? '▸ Nav' : '◂ Nav'}
+            {layout.leftCollapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}
+            <span>Nav</span>
           </button>
-          <button type="button" className="ghost-button" data-testid="toggle-right"
+          <button type="button" className="ghost-button icon-text-button" data-testid="toggle-right"
+            aria-label={layout.rightCollapsed ? 'Expand context' : 'Collapse context'}
             aria-pressed={layout.rightCollapsed}
             onClick={() => updateLayout({ rightCollapsed: !layout.rightCollapsed })}>
-            {layout.rightCollapsed ? 'Ctx ◂' : 'Ctx ▸'}
+            <span>Ctx</span>
+            {layout.rightCollapsed ? <PanelRightOpen size={16} aria-hidden="true" /> : <PanelRightClose size={16} aria-hidden="true" />}
           </button>
         </>}
       </div>
@@ -161,18 +184,22 @@ export function AppShell({
     </aside>
 
     {showDrawers && navOpen && <>
-      <div className="drawer-backdrop" data-testid="nav-backdrop" onClick={() => setNavOpen(false)} />
+      <div className="drawer-backdrop" data-testid="nav-backdrop" onClick={() => { setNavOpen(false); navTriggerRef.current?.focus(); }} />
       <div className="drawer drawer-nav" role="dialog" aria-modal="true" aria-label={navTitle} data-testid="nav-drawer">
         <div className="drawer-toolbar"><strong>{navTitle}</strong>
-          <button type="button" onClick={() => setNavOpen(false)}>Close</button></div>
+          <button type="button" ref={navCloseRef} aria-label="Close sessions" onClick={() => { setNavOpen(false); navTriggerRef.current?.focus(); }}>
+            <X size={16} aria-hidden="true" /> Close
+          </button></div>
         <div className="drawer-body">{navigation}</div>
       </div>
     </>}
     {showDrawers && contextOpen && <>
-      <div className="drawer-backdrop" data-testid="context-backdrop" onClick={() => setContextOpen(false)} />
+      <div className="drawer-backdrop" data-testid="context-backdrop" onClick={() => { setContextOpen(false); contextTriggerRef.current?.focus(); }} />
       <div className="drawer drawer-context" role="dialog" aria-modal="true" aria-label={contextTitle} data-testid="context-drawer">
         <div className="drawer-toolbar"><strong>{contextTitle}</strong>
-          <button type="button" onClick={() => setContextOpen(false)}>Close</button></div>
+          <button type="button" ref={contextCloseRef} aria-label="Close context" onClick={() => { setContextOpen(false); contextTriggerRef.current?.focus(); }}>
+            <X size={16} aria-hidden="true" /> Close
+          </button></div>
         <div className="drawer-body">{context}</div>
       </div>
     </>}

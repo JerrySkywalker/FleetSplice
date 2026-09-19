@@ -16,7 +16,7 @@ import { setPresentation } from '../tests/ui-preferences.ts';
 
 const evidenceRoot = path.resolve(
   process.env.FLEETSPLICE_UX_BASELINE
-    ?? 'V:\\artifacts\\FleetSplice\\FLEETSPLICE-G05C-UX-HARDENING-24H-001\\BASELINE',
+    ?? 'V:\\artifacts\\FleetSplice\\FLEETSPLICE-G05C-UX-R2-DENSITY-SEMANTICS-001\\BASELINE-R2',
 );
 
 const viewports = [
@@ -61,8 +61,8 @@ async function run(): Promise<number> {
     const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     await page.goto(`http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`);
-    await expect(page.getByRole('button', { name: 'Attach', exact: true })).toBeVisible({ timeout: 15000 });
-    await page.getByRole('button', { name: 'Attach', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Connect session', exact: true })).toBeVisible({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Connect session', exact: true }).click();
     await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
 
     for (const viewport of viewports) {

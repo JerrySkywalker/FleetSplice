@@ -673,14 +673,14 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
   try {
     const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1480, height: 1000 } });
     const page = await context.newPage(); await page.goto(`http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`);
-    await page.getByRole('button', { name: 'Attach', exact: true }).click();
+    await page.getByRole('button', { name: 'Connect session', exact: true }).click();
     await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
     await expect(page.locator('[data-source="NATIVE_EXTERNAL"]')).toBeVisible();
     await expect(page.getByText('Done · Worked for 2m 13s', { exact: true })).toBeVisible();
     await expect(page.getByText('Cooperative control', { exact: true })).toBeVisible();
     await expect(page.getByText('CONTROL_MODE=COOPERATIVE', { exact: true })).toHaveCount(0);
     await expect(page.getByTestId('adopted-thread-id')).toHaveText(r.rpc.thread.id);
-    await page.locator('#native-prompt').fill('Browser continuation'); await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
+    await page.locator('#native-prompt').fill('Browser continuation'); await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByTestId('adopted-turn-id')).not.toHaveText('—');
     await expect(page.locator('.session-heading [data-turn-state="RUNNING"]')).toContainText(/Working · \d+m \d+s/);
     await expect(page.locator('[data-source="FLEETSPLICE_WEB"]')).toBeVisible();
@@ -700,7 +700,7 @@ test('SYNTHETIC_BROWSER_ADOPTION: existing history, cooperative controls, same-t
     await expect(page.getByText('Turn interrupted', { exact: true })).toBeVisible();
     const viewer = await context.newPage(); await viewer.goto(`http://127.0.0.1:${port}/`);
     await expect(viewer.getByTestId('adopted-thread-id')).toHaveText(r.rpc.thread.id);
-    await expect(viewer.getByRole('button', { name: 'Send continuation', exact: true })).toBeDisabled();
+    await expect(viewer.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
   } finally { await browser.close(); await hub.close(); }
 });
 

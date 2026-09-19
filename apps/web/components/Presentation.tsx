@@ -1,5 +1,17 @@
 import React from 'react';
+import { AlertTriangle, CheckCircle2, Circle, Loader2, ShieldAlert, XCircle } from 'lucide-react';
 import type { TimelinePresentationItem } from '../../../packages/contracts/realtime-timeline.ts';
+
+export function StatusChip({ kind, label, testId }: {
+  kind: 'controller' | 'viewer' | 'working' | 'attention' | 'connected';
+  label: string;
+  testId?: string;
+}) {
+  return <span className={`status-chip status-chip-${kind}`} data-testid={testId ?? `status-chip-${kind}`} data-kind={kind}>
+    <span className={`status-dot ${kind === 'viewer' ? 'is-outline' : kind === 'attention' ? 'is-attention' : kind === 'working' ? 'is-working' : 'is-filled'}`} aria-hidden="true" />
+    <span>{label}</span>
+  </span>;
+}
 
 export function StreamingMessage({ item, streamingLabel }: {
   item: TimelinePresentationItem;
@@ -49,7 +61,12 @@ export function ToolActivityCard({ item, runningLabel, completedLabel, failedLab
   >
     <div className="tool-card-head">
       <strong>{title}</strong>
-      <span className={`tool-state ${running ? 'pulse' : ''}`}>{running ? <span className="tool-spinner" aria-hidden="true" /> : null}{stateLabel}</span>
+      <span className={`tool-state ${running ? 'pulse' : ''}`}>
+        {running ? <Loader2 size={14} className="tool-icon spin" aria-hidden="true" />
+          : failed ? <XCircle size={14} className="tool-icon" aria-hidden="true" />
+            : <CheckCircle2 size={14} className="tool-icon" aria-hidden="true" />}
+        {stateLabel}
+      </span>
     </div>
     {detail ? <div className="tool-summary">{detail}</div> : null}
     {item.text && item.text.trim() !== detail ? <details><summary>{detailsLabel}</summary><pre>{item.text}</pre></details> : null}
@@ -69,7 +86,7 @@ export function OwnershipSurface({ controlled, controllerLabel, viewerLabel, rel
 }) {
   return <div className="ownership-surface" data-testid="ownership-surface" data-controlled={controlled}>
     <div className="ownership-status">
-      <span className={`ownership-dot ${controlled ? 'is-controller' : 'is-viewer'}`} aria-hidden="true" />
+      <span className={`status-dot ${controlled ? 'is-filled' : 'is-outline'}`} aria-hidden="true" />
       <span>{controlled ? controllerLabel : viewerLabel}</span>
     </div>
     {controlled
@@ -81,9 +98,104 @@ export function OwnershipSurface({ controlled, controllerLabel, viewerLabel, rel
 export function ReviewCard({ title, body, actionLabel, disabled, onReview }: {
   title: string; body: string; actionLabel: string; disabled: boolean; onReview: () => void;
 }) {
-  return <div className="review-card severity-info" data-testid="external-advance-notice" data-severity="info">
-    <strong>{title}</strong>
+  return <div className="review-card notice-card severity-info" data-testid="external-advance-notice" data-severity="info">
+    <div className="notice-card-head">
+      <AlertTriangle size={16} aria-hidden="true" />
+      <strong>{title}</strong>
+    </div>
     <p>{body}</p>
     <button type="button" className="primary" data-testid="external-review-action" disabled={disabled} onClick={onReview}>{actionLabel}</button>
+  </div>;
+}
+
+export function ApprovalCard({
+  statusLabel, summary, meta, unsupportedHint, canAllow, canDeny, onAllow, onDeny, allowLabel, denyLabel,
+}: {
+  statusLabel: string;
+  summary: string;
+  meta: string;
+  unsupportedHint?: string;
+  canAllow: boolean;
+  canDeny: boolean;
+  onAllow: () => void;
+  onDeny: () => void;
+  allowLabel: string;
+  denyLabel: string;
+}) {
+  return <article className="approval-card" data-testid="approval-card">
+    <div className="notice-card-head">
+      <ShieldAlert size={16} aria-hidden="true" />
+      <strong>{statusLabel}</strong>
+    </div>
+    <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{summary}</p>
+    <small>{meta}</small>
+    {unsupportedHint ? <p className="muted">{unsupportedHint}</p> : null}
+    {(canAllow || canDeny) && <div className="approval-actions">
+      <button type="button" className="primary" disabled={!canAllow} onClick={onAllow}>{allowLabel}</button>
+      <button type="button" disabled={!canDeny} onClick={onDeny}>{denyLabel}</button>
+    </div>}
+  </article>;
+}
+
+export function SessionItem({
+  selected, title, subtitle, workspace, status, connected, onSelect, testId,
+}: {
+  selected: boolean;
+  title: string;
+  subtitle: string;
+  workspace: string;
+  status: string;
+  connected: boolean;
+  onSelect: () => void;
+  testId?: string;
+}) {
+  return <button
+    type="button"
+    className={`session session-item ${selected ? 'selected' : ''}`}
+    data-testid={testId ?? 'session-item'}
+    data-connected={connected}
+    onClick={onSelect}
+  >
+    <strong>{title}</strong>
+    <span>{subtitle}</span>
+    <small>{workspace}</small>
+    <small className="session-item-status">
+      {connected ? <CheckCircle2 size={12} aria-hidden="true" /> : <Circle size={12} aria-hidden="true" />}
+      {status}
+    </small>
+  </button>;
+}
+
+export function SessionConnectPreview({
+  title, workspaceLabel, modelLabel, stateLabel, threadLabel,
+  workspace, model, state, threadShort, body, actionLabel, disabled, onConnect,
+}: {
+  title: string;
+  workspaceLabel: string;
+  modelLabel: string;
+  stateLabel: string;
+  threadLabel: string;
+  workspace: string;
+  model: string;
+  state: string;
+  threadShort: string;
+  body: string;
+  actionLabel: string;
+  disabled: boolean;
+  onConnect: () => void;
+}) {
+  return <div className="session-connect-preview" data-testid="session-connect-preview">
+    <div className="eyebrow">Codex</div>
+    <h2>{title}</h2>
+    <dl className="connect-facts">
+      <dt>{workspaceLabel}</dt><dd>{workspace}</dd>
+      <dt>{modelLabel}</dt><dd>{model}</dd>
+      <dt>{stateLabel}</dt><dd>{state}</dd>
+      <dt>{threadLabel}</dt><dd className="id">{threadShort}</dd>
+    </dl>
+    <p className="muted connect-body">{body}</p>
+    <button type="button" className="primary" data-testid="connect-session" disabled={disabled} onClick={onConnect}>
+      {actionLabel}
+    </button>
   </div>;
 }

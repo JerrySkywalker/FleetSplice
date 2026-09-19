@@ -18,7 +18,7 @@ export class DisposableNativeRpc implements NativeRpc {
     id: 'native-existing-thread',
     cwd: DISPOSABLE_NATIVE_WORKSPACE,
     status: { type: 'idle' },
-    model: 'native-model',
+    model: 'gpt-5.6-terra',
     canAcceptDirectInput: true,
     threadSource: 'user',
     ephemeral: false,

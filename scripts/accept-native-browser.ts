@@ -143,8 +143,8 @@ async function run(): Promise<number> {
     });
 
     await page.goto(`http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`);
-    await expect(page.getByRole('button', { name: 'Attach', exact: true })).toBeVisible({ timeout: 15000 });
-    await page.getByRole('button', { name: 'Attach', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Connect session', exact: true })).toBeVisible({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Connect session', exact: true }).click();
     await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
     await expect(page.getByTestId('adopted-thread-id')).toHaveText(fixture.rpc.thread.id);
     await waitSchedulerIdle(page);
@@ -157,7 +157,7 @@ async function run(): Promise<number> {
     if (scenarios.has('continuation')) {
       await page.locator('#native-prompt').fill('Browser continuation for causality');
       const provisionalVisible = page.locator('[data-presentation-state]');
-      await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
+      await page.getByRole('button', { name: 'Send', exact: true }).click();
       await expect(provisionalVisible.first()).toBeVisible({ timeout: 5000 }).catch(() => {});
       await expect(page.getByText('LIVE_ASSISTANT_A')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('git rev-parse --short HEAD')).toBeVisible({ timeout: 10000 });
@@ -224,8 +224,8 @@ async function run(): Promise<number> {
       // Leave the turn running; do not auto-complete inside turn/start.
       fixture.rpc.afterTurnStart = null;
       await page.locator('#native-prompt').fill('Start turn for steer');
-      await expect(page.getByRole('button', { name: 'Send continuation', exact: true })).toBeEnabled({ timeout: 8000 });
-      await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled({ timeout: 8000 });
+      await page.getByRole('button', { name: 'Send', exact: true }).click();
       await expect(page.getByTestId('adopted-turn-id')).not.toHaveText('—', { timeout: 8000 });
       const active = await page.getByTestId('adopted-turn-id').innerText();
       const steerCallsBefore = fixture.rpc.calls.filter(item => item.method === 'turn/steer').length;
@@ -264,8 +264,8 @@ async function run(): Promise<number> {
         });
       };
       await page.locator('#native-prompt').fill('Turn with residual command');
-      await expect(page.getByRole('button', { name: 'Send continuation', exact: true })).toBeEnabled({ timeout: 8000 });
-      await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled({ timeout: 8000 });
+      await page.getByRole('button', { name: 'Send', exact: true }).click();
       await expect(page.getByTestId('adopted-turn-id')).not.toHaveText('—', { timeout: 8000 });
       await expect(page.getByRole('button', { name: 'Interrupt turn', exact: true })).toBeEnabled({ timeout: 8000 });
       await page.getByRole('button', { name: 'Interrupt turn', exact: true }).click();

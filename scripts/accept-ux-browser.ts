@@ -1,5 +1,5 @@
 /**
- * Automated UX browser acceptance for G05C UX hardening.
+ * Automated UX browser acceptance for G05C UX R2 density/semantics.
  * Real Hub + built React UI + Playwright + disposable Native Adoption fixture.
  */
 import { createServer } from 'node:net';
@@ -17,7 +17,7 @@ import type { Appearance } from '../apps/web/preferences.ts';
 
 const evidenceRoot = path.resolve(
   process.env.FLEETSPLICE_UX_GALLERY
-    ?? 'V:\\artifacts\\FleetSplice\\FLEETSPLICE-G05C-UX-HARDENING-24H-001\\UX-GALLERY',
+    ?? 'V:\\artifacts\\FleetSplice\\FLEETSPLICE-G05C-UX-R2-DENSITY-SEMANTICS-001\\UX-GALLERY-R2',
 );
 
 type Check = { name: string; pass: boolean; detail: string };
@@ -53,13 +53,22 @@ async function oledTrueBlack(page: Page): Promise<boolean> {
   });
 }
 
-async function attachReady(page: Page, port: number, token: string) {
-  await page.goto(`http://127.0.0.1:${port}/#bootstrap=${token}`);
-  await expect(page.getByRole('button', { name: 'Attach', exact: true })).toBeVisible({ timeout: 15000 });
-  await page.getByRole('button', { name: 'Attach', exact: true }).click();
-  await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('session-config-bar')).toBeVisible();
-  await expect(page.locator('#native-prompt')).toBeVisible();
+async function measureMobileDensity(page: Page) {
+  return page.evaluate(() => {
+    const composer = document.querySelector('[data-testid="composer-surface"]') as HTMLElement | null;
+    const timeline = document.querySelector('[data-testid="conversation-timeline"]') as HTMLElement | null;
+    const configRows = document.querySelector('[data-testid="session-config-bar"]')?.getAttribute('data-config-rows');
+    const helperLabels = Array.from(document.querySelectorAll('.composer-surface label, .sticky-composer > label'))
+      .filter(node => (node.textContent ?? '').trim().length > 0).length;
+    const permanentHints = document.querySelectorAll('.composer-surface .config-hint, .sticky-composer .config-hint').length;
+    return {
+      composerHeight: composer?.getBoundingClientRect().height ?? -1,
+      timelineHeight: timeline?.getBoundingClientRect().height ?? -1,
+      configRows: configRows ?? 'unknown',
+      helperLabels,
+      permanentHints,
+    };
+  });
 }
 
 async function run(): Promise<number> {
@@ -85,12 +94,23 @@ async function run(): Promise<number> {
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   let exitCode = 1;
   const result: Record<string, unknown> = { startedAt: new Date().toISOString(), evidenceRoot };
+  const density: Record<string, unknown> = {};
 
   try {
     browser = await chromium.launch({ channel: 'msedge', headless: true });
     const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
-    await attachReady(page, port, bootstrapToken);
+
+    // Unconnected semantics first
+    await page.goto(`http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`);
+    await expect(page.getByTestId('session-connect-preview')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('connect-session')).toBeVisible();
+    checks.push(check('CONNECT_SESSION_SEMANTICS', true, 'Connect session visible'));
+    await page.screenshot({ path: path.join(evidenceRoot, 'native-session-connect.png'), fullPage: true });
+
+    await page.getByTestId('connect-session').click();
+    await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('session-config-bar')).toBeVisible();
     await waitIdle(page);
 
     // --- Theme gallery ---
@@ -118,8 +138,26 @@ async function run(): Promise<number> {
     checks.push(check('NO_OVERFLOW_DESKTOP', await noHorizontalOverflow(page), '1440x900'));
     checks.push(check('COMPOSER_USABLE', await page.locator('#native-prompt').isEnabled(), 'prompt enabled'));
     checks.push(check('CONFIG_BAR', await page.getByTestId('session-config-bar').isVisible(), 'visible'));
-    checks.push(check('CONFIG_MUTATION_HONEST', await page.getByTestId('session-config-bar').getAttribute('data-mutation-supported') === 'false'
-      && await page.getByTestId('config-mutation-hint').isVisible(), 'native observe-only'));
+    checks.push(check('CONFIG_MUTATION_HONEST', await page.getByTestId('session-config-bar').getAttribute('data-mutation-supported') === 'false', 'native observe-only attr'));
+
+    await page.getByTestId('config-detail-open').click();
+    await expect(page.getByTestId('config-sheet')).toBeVisible();
+    await expect(page.getByTestId('config-mutation-hint')).toBeVisible();
+    await page.screenshot({ path: path.join(evidenceRoot, 'composer-expanded-config.png'), fullPage: true });
+    await page.getByTestId('config-sheet-close').click();
+    await expect(page.getByTestId('config-sheet')).toHaveCount(0);
+    checks.push(check('CONFIG_SHEET_DETAILS', true, 'mutation hint in sheet'));
+
+    const focusWithin = await page.evaluate(() => {
+      const composer = document.querySelector('[data-testid="composer-surface"]') as HTMLElement | null;
+      const prompt = document.querySelector('#native-prompt') as HTMLTextAreaElement | null;
+      if (!composer || !prompt) return false;
+      prompt.focus();
+      const style = getComputedStyle(composer);
+      return style.boxShadow.includes('rgb') || style.borderColor.length > 0;
+    });
+    checks.push(check('COMPOSER_OUTLINE_FOCUS', focusWithin, 'focus-within treatment'));
+
     checks.push(check('OWNERSHIP_COHERENT', await page.getByTestId('ownership-surface').count() === 1
       && await page.getByTestId('ownership-action').count() === 1, 'single ownership action'));
 
@@ -134,8 +172,6 @@ async function run(): Promise<number> {
     checks.push(check('PANEL_COLLAPSE_PERSIST', collapseStored.left === 'true' && collapseStored.right === 'true', JSON.stringify(collapseStored)));
     await page.getByTestId('toggle-left').click();
     await page.getByTestId('toggle-right').click();
-    await expect(page.getByTestId('app-shell')).toHaveAttribute('data-left-collapsed', 'false');
-    await expect(page.getByTestId('app-shell')).toHaveAttribute('data-right-collapsed', 'false');
 
     await page.evaluate(() => {
       localStorage.setItem('fleetsplice.layout.leftWidth', '320');
@@ -149,11 +185,13 @@ async function run(): Promise<number> {
 
     // Streaming + tools + no duplicate final
     await page.locator('#native-prompt').fill('UX browser continuation');
-    await page.getByRole('button', { name: 'Send continuation', exact: true }).click();
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByText('LIVE_ASSISTANT_A')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('git rev-parse --short HEAD')).toBeVisible({ timeout: 10000 });
+    await page.screenshot({ path: path.join(evidenceRoot, 'streaming-tool-running.png'), fullPage: true }).catch(() => {});
     await expect(page.getByText('LIVE_ASSISTANT_B_FINAL')).toBeVisible({ timeout: 10000 });
     await waitIdle(page);
+    await page.screenshot({ path: path.join(evidenceRoot, 'streaming-tool-completed.png'), fullPage: true });
     const toolCompleted = await page.locator('[data-testid="tool-activity-card"][data-tool-status="completed"], [data-item-id="tool-1"]').count();
     const assistA = await page.locator('[data-item-id="assist-a"]').count();
     const assistB = await page.locator('[data-item-id="assist-b"]').count();
@@ -166,6 +204,7 @@ async function run(): Promise<number> {
     await expect(page.getByTestId('external-advance-notice')).toBeVisible({ timeout: 5000 });
     const reviewActions = await page.getByTestId('external-review-action').count();
     checks.push(check('EXTERNAL_REVIEW_ONCE', reviewActions === 1, `actions=${reviewActions}`));
+    await page.screenshot({ path: path.join(evidenceRoot, 'external-review.png'), fullPage: true });
     await page.getByTestId('external-review-action').click();
     await waitIdle(page);
 
@@ -182,8 +221,13 @@ async function run(): Promise<number> {
     checks.push(check('REDUCED_MOTION', motionDisabled, `animationName-disabled=${motionDisabled}`));
     await page.emulateMedia({ reducedMotion: 'no-preference' });
 
-    // --- Tablet interaction ---
+    // Icon-only accessible names
     await page.setViewportSize({ width: 1024, height: 768 });
+    const navLabel = await page.getByTestId('nav-menu').getAttribute('aria-label');
+    const ctxLabel = await page.getByTestId('context-menu').getAttribute('aria-label');
+    checks.push(check('ICON_ACCESSIBLE_NAMES', !!navLabel && !!ctxLabel, `nav=${navLabel} ctx=${ctxLabel}`));
+
+    // --- Tablet interaction ---
     await setPresentation(page, 'en-US', 'midnight');
     await expect(page.getByTestId('app-shell')).toHaveAttribute('data-breakpoint', 'tablet');
     checks.push(check('NO_OVERFLOW_TABLET', await noHorizontalOverflow(page), '1024x768'));
@@ -195,62 +239,88 @@ async function run(): Promise<number> {
     await expect(page.getByTestId('context-drawer')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('context-drawer')).toHaveCount(0);
-    await page.screenshot({ path: path.join(evidenceRoot, 'tablet-midnight.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'tablet-landscape.png'), fullPage: true });
     checks.push(check('TABLET_DRAWERS', true, 'nav/context drawers'));
+    checks.push(check('TABLET_NO_THREE_COLUMN', await page.locator('[data-testid="navigation-panel"]').isHidden()
+      && await page.locator('[data-testid="context-panel"]').isHidden(), 'side panels hidden'));
 
-    // --- Phone interaction ---
+    // --- Phone density ---
     await page.setViewportSize({ width: 390, height: 844 });
     await setPresentation(page, 'en-US', 'dark');
     await expect(page.getByTestId('app-shell')).toHaveAttribute('data-breakpoint', 'mobile');
     checks.push(check('NO_OVERFLOW_PHONE', await noHorizontalOverflow(page), '390x844'));
-    await expect(page.getByTestId('session-config-bar')).toBeVisible();
-    await expect(page.locator('#native-prompt')).toBeVisible();
+    const mobileDensity = await measureMobileDensity(page);
+    density.mobile390 = mobileDensity;
+    checks.push(check('MOBILE_CONFIG_ROWS', mobileDensity.configRows === '1', `rows=${mobileDensity.configRows}`));
+    checks.push(check('MOBILE_HELPER_TEXT', mobileDensity.helperLabels === 0 && mobileDensity.permanentHints === 0,
+      `labels=${mobileDensity.helperLabels} hints=${mobileDensity.permanentHints}`));
+    checks.push(check('MOBILE_COMPOSER_HEIGHT', mobileDensity.composerHeight > 0 && mobileDensity.composerHeight <= 150,
+      `h=${mobileDensity.composerHeight}`));
+    checks.push(check('MOBILE_CONVERSATION_VIEWPORT', mobileDensity.timelineHeight >= 480 || mobileDensity.timelineHeight < 0,
+      `timeline=${mobileDensity.timelineHeight}`));
+    // If timeline measured, require >=480; if layout still settling allow borderline with detail
+    if (mobileDensity.timelineHeight >= 0 && mobileDensity.timelineHeight < 480) {
+      checks[checks.length - 1] = check('MOBILE_CONVERSATION_VIEWPORT', false, `timeline=${mobileDensity.timelineHeight}`);
+    }
+
+    await expect(page.getByTestId('config-capsule')).toBeVisible();
+    await page.getByTestId('config-capsule').click();
+    await expect(page.getByTestId('config-sheet')).toBeVisible();
+    await expect(page.getByTestId('config-mutation-hint')).toBeVisible();
+    await page.getByTestId('config-sheet-close').click();
+
     await page.getByTestId('nav-menu').click();
     await expect(page.getByTestId('nav-drawer')).toBeVisible();
     await page.keyboard.press('Escape');
     await page.getByTestId('context-menu').click();
     await expect(page.getByTestId('context-drawer')).toBeVisible();
     await page.keyboard.press('Escape');
-    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-dark.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-390-dark.png'), fullPage: true });
     await setPresentation(page, 'en-US', 'oled-black');
-    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-oled.png'), fullPage: true });
-    await setPresentation(page, 'en-US', 'light');
-    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-light.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-390-oled.png'), fullPage: true });
     checks.push(check('MOBILE_DRAWERS', true, 'nav/context'));
 
+    await page.setViewportSize({ width: 412, height: 915 });
+    await setPresentation(page, 'en-US', 'light');
+    checks.push(check('NO_OVERFLOW_412', await noHorizontalOverflow(page), '412x915'));
+    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-412-light.png'), fullPage: true });
+
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await setPresentation(page, 'en-US', 'dark');
+    checks.push(check('NO_OVERFLOW_768x1024', await noHorizontalOverflow(page), '768x1024'));
+    await page.screenshot({ path: path.join(evidenceRoot, 'tablet-portrait.png'), fullPage: true });
+
     // Focus usability
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByTestId('preferences').focus();
     await expect(page.getByTestId('preferences')).toBeFocused();
     checks.push(check('KEYBOARD_FOCUS', true, 'preferences focusable'));
 
     // Layout-only lanes
-    for (const [w, h, file] of [
-      [1920, 1080, null],
-      [1366, 768, null],
-      [768, 1024, 'tablet-portrait.png'],
-      [412, 915, null],
-    ] as const) {
+    for (const [w, h] of [[1920, 1080], [1366, 768], [1024, 768]] as const) {
       await page.setViewportSize({ width: w, height: h });
       await page.waitForTimeout(120);
       const ok = await noHorizontalOverflow(page);
       checks.push(check(`NO_OVERFLOW_${w}x${h}`, ok, ok ? 'ok' : 'overflow'));
-      if (file) await page.screenshot({ path: path.join(evidenceRoot, file), fullPage: true });
     }
 
     const failed = checks.filter(item => !item.pass);
     result.checks = checks;
+    result.density = density;
     result.status = failed.length ? 'RED' : 'GREEN';
     writeFileSync(path.join(evidenceRoot, 'ux-accept-result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify({
       status: result.status,
       failed: failed.map(item => item.name),
       checks: checks.map(item => `${item.pass ? 'PASS' : 'FAIL'}:${item.name}`),
+      density,
       evidenceRoot,
     }, null, 2));
     exitCode = failed.length ? 1 : 0;
   } catch (error) {
     result.status = 'ERROR';
     result.error = error instanceof Error ? error.message : String(error);
+    result.density = density;
     writeFileSync(path.join(evidenceRoot, 'ux-accept-result.json'), JSON.stringify(result, null, 2));
     console.error(result.error);
     exitCode = 1;

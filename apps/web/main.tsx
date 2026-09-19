@@ -7,6 +7,8 @@ import { browserStorage, persistPreference, readPreferences, resolveTheme, type 
 import { PreferencesControl } from './PreferencesControl.tsx';
 import { NativeAdoption } from './NativeAdoption.tsx';
 import { BrowserClientSession } from './client-session.ts';
+import { SessionConfigBar } from './components/SessionConfigBar.tsx';
+import { OwnershipSurface } from './components/Presentation.tsx';
 import './style.css';
 
 type Client = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; csrf: string };
@@ -210,24 +212,37 @@ function App() {
         {!lane?.transcript.length && <div className="empty"><div className="empty-symbol">↗</div><h2>{t('emptyHeading')}</h2><p>{t(lane ? 'emptySession' : 'emptyNoSession')}</p><div className="path">{t('browser')} <span>→</span> Hub <span>→</span> SKYFORGE Edge <span>→</span> Codex</div></div>}
         {lane?.transcript.map((item, index) => <article className={`message ${item.role}`} key={index}><div className="message-label">{t(item.role === 'user' ? 'you' : item.role === 'assistant' ? 'codex' : 'session')}</div><div className="message-text" data-testid={item.role === 'assistant' ? 'assistant-text' : undefined}>{(item.role === 'system' ? systemText(locale, item.text) : item.text) || (lane.state === 'RUNNING' ? '…' : '')}</div></article>)}
       </div>
-      <form className="composer" onSubmit={e => { e.preventDefault(); void command('turn.submit', { text: prompt }); }}><label htmlFor="prompt">{t('messageCodex')}</label><textarea id="prompt" placeholder={t('promptPlaceholder')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'}/><div><span>{t('readOnlyHint')}</span><button className="primary" disabled={!available || !controlled || lane?.state !== 'IDLE' || !prompt.trim()}>{t('sendMessage')} <span aria-hidden="true">↑</span></button></div></form>
+      <form className="composer" onSubmit={e => { e.preventDefault(); void command('turn.submit', { text: prompt }); }}>
+        <SessionConfigBar
+          modelLabel={t('model')} reasoningLabel={t('reasoning')} permissionLabel={t('permission')}
+          controllerLabel={controlled ? t('haveControl') : t('viewer')}
+          model={selectedModel} reasoning={selectedReasoning} permission={selectedPermission}
+          models={models.map(model => ({ id: model.id, label: `${model.displayName}${model.isDefault ? ' · default' : ''}` }))}
+          reasonings={(chosenModel?.supportedReasoningEfforts ?? []).map(choice => ({ id: choice.reasoningEffort, label: choice.reasoningEffort }))}
+          permissions={permissions.map(item => ({ id: item.preset, label: `${t(item.preset)}${item.allowed ? '' : ` · ${t('permissionUnavailable')}`}`, disabled: !item.allowed }))}
+          modelDisabled={!models.length || !available} reasoningDisabled={!chosenModel || !available} permissionDisabled={!permissions.length || !available}
+          onModel={chooseModel} onReasoning={setSelectedReasoning} onPermission={value => setSelectedPermission(value as PermissionPreset)}
+          mutationSupported={true}
+        />
+        <label htmlFor="prompt">{t('messageCodex')}</label><textarea id="prompt" placeholder={t('promptPlaceholder')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'}/><div><span>{t('readOnlyHint')}</span><button className="primary" disabled={!available || !controlled || lane?.state !== 'IDLE' || !prompt.trim()}>{t('sendMessage')} <span aria-hidden="true">↑</span></button></div></form>
     </main>
     <aside className="context"><div className="eyebrow">{t('controlContext')}</div><h3>{t('nativeCapabilities')}</h3><p className="muted">{t('liveCatalogHint')}</p><p className="muted">{t('newSessionConfigurationHint')}</p>
       <button disabled={!available || !workspace?.registered || !workspace.valid} onClick={() => command('native.capabilities.read')}>{t('refreshCapabilities')}</button>
-      <label className="capability-label" htmlFor="model">{t('model')}</label><select id="model" aria-label={t('model')} value={selectedModel} disabled={!models.length || !available} onChange={event => chooseModel(event.target.value)}>
-        {!models.length && <option value="">{t('selectModel')}</option>}{models.map(model => <option key={model.id} value={model.id}>{model.displayName}{model.isDefault ? ' · default' : ''}</option>)}
-      </select>
-      <label className="capability-label" htmlFor="reasoning">{t('reasoning')}</label><select id="reasoning" aria-label={t('reasoning')} value={selectedReasoning} disabled={!chosenModel || !available} onChange={event => setSelectedReasoning(event.target.value)}>
-        {!chosenModel && <option value="">{t('selectReasoning')}</option>}{chosenModel?.supportedReasoningEfforts.map(choice => <option key={choice.reasoningEffort} value={choice.reasoningEffort}>{choice.reasoningEffort}</option>)}
-      </select>
-      <label className="capability-label" htmlFor="permission">{t('permission')}</label><select id="permission" aria-label={t('permission')} value={selectedPermission} disabled={!permissions.length || !available} onChange={event => setSelectedPermission(event.target.value as PermissionPreset)}>
-        {permissions.map(item => <option key={item.preset} value={item.preset} disabled={!item.allowed}>{t(item.preset)}{item.allowed ? '' : ` · ${t('permissionUnavailable')}`}</option>)}
-      </select><p className="muted">{t('permissionHint')}</p>
+      <p className="muted">{t('permissionHint')}</p>
       <h3>{t('sessionControl')}</h3><p className="muted">{t(controlled ? 'controllerHint' : 'viewerHint')}</p>
       {available && lane && ['EMPTY', 'IDLE'].includes(lane.state) && (controlled || lane.fence.controller === null) && <p className="control-next" role="status">{t(!controlled ? 'nextAcquire' : !lane.nativeThreadId ? 'nextContinue' : 'nextPrompt')}</p>}
-      <button disabled={!available || !lane || lane.fence.controller !== null} onClick={() => command('sessionLane.acquireControl')}>{t('acquireControl')}</button>
+      <OwnershipSurface
+        controlled={controlled}
+        controllerLabel={t('haveControl')}
+        viewerLabel={t('viewer')}
+        releaseLabel={t('releaseControl')}
+        acquireLabel={t('acquireControl')}
+        canRelease={!!available && controlled}
+        canAcquire={!!available && !!lane && lane.fence.controller === null}
+        onRelease={() => void command('sessionLane.releaseControl')}
+        onAcquire={() => void command('sessionLane.acquireControl')}
+      />
       <button ref={continueButton} disabled={!available || !controlled || (!lane?.nativeThreadId && !configurationSelected) || !['EMPTY', 'IDLE'].includes(lane?.state ?? '')} onClick={() => command('sessionLane.continue', { model: lane?.nativeThreadId ? lane.requestedModel : selectedModel, reasoningEffort: lane?.nativeThreadId ? lane.requestedReasoningEffort : selectedReasoning, permission: lane?.nativeThreadId ? lane.requestedPermission ?? 'READ_ONLY' : selectedPermission })}>{t('continueSession')}</button>
-      <button disabled={!available || !controlled} onClick={() => command('sessionLane.releaseControl')}>{t('releaseControl')}</button>
       <h3>{t('execution')}</h3><dl><dt>{t('host')}</dt><dd>SKYFORGE-01</dd><dt>{t('environment')}</dt><dd>windows-user</dd><dt>{t('agent')}</dt><dd>{t('nativeAgent')}</dd><dt>{t('continuity')}</dt><dd>{lane?.nativeThreadId ? t(snapshot?.status === 'READY' ? 'sameNative' : 'nativeUnavailable') : t('nativeNotStarted')}</dd><dt>{t('controlRevision')}</dt><dd data-testid="control-fence">{lane ? `${lane.fence.epoch} / ${lane.fence.revision}` : '—'}</dd><dt>{t('requestedConfiguration')}</dt><dd>{lane?.requestedModel ? `${lane.requestedModel} / ${lane.requestedReasoningEffort}` : '—'}</dd><dt>{t('effectiveConfiguration')}</dt><dd>{lane?.effectiveModel ? `${lane.effectiveModel} / ${lane.effectiveReasoningEffort}` : '—'}</dd><dt>{t('nativeThread')}</dt><dd className="id" data-testid="native-thread">{lane?.nativeThreadId ?? '—'}</dd><dt>{t('nativeTurn')}</dt><dd className="id" data-testid="native-turn">{lane?.nativeTurnId ?? '—'}</dd></dl>
       <dl><dt>{t('requestedPermission')}</dt><dd data-testid="requested-permission">{lane?.requestedPermission ? t(lane.requestedPermission) : '—'}</dd><dt>{t('effectivePermission')}</dt><dd data-testid="effective-permission">{lane?.effectivePermission ? `${t(lane.effectivePermission.preset)} · ${lane.effectivePermission.sandbox} · approval=${lane.effectivePermission.approvalPolicy} · network=${lane.effectivePermission.network}` : '—'}</dd></dl>
       <h3>{t('activity')}</h3><ul className="activity" aria-label={t('activity')}>{lane?.activity.length ? lane.activity.slice(-8).map((item, index) => <li key={`${item.text}-${index}`}>{item.text}</li>) : <li>{t('noActivity')}</li>}</ul>

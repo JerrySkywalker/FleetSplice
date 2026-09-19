@@ -12,6 +12,7 @@
     "start": "node dist/scripts/local.js",
     "accept:live": "tsc -p tsconfig.test.json && node test-results/compiled/scripts/accept-live.js",
     "accept:native-browser": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/accept-native-browser.js",
+    "accept:ux-browser": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/accept-ux-browser.js",
     "accept:native-live": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/accept-native-live.js"
   },
   "dependencies": {

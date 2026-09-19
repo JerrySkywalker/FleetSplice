@@ -1,5 +1,5 @@
 import { locales, type Locale } from './i18n.ts';
-export const appearances = ['system', 'light', 'dark', 'oled-black'] as const;
+export const appearances = ['system', 'light', 'dark', 'oled-black', 'midnight', 'graphite', 'warm'] as const;
 export type Appearance = typeof appearances[number];
 export type ResolvedTheme = Exclude<Appearance, 'system'>;
 export type Preferences = { locale: Locale; appearance: Appearance };

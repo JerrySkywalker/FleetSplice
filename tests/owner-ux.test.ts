@@ -32,7 +32,7 @@ test('normal PENDING status has explicit human labels in both languages', () => 
   assert.equal(stateText('en-US', 'PENDING'), 'Pending');
   assert.equal(stateText('zh-CN', 'PENDING'), '处理中');
 });
-test('locale and all four appearances persist independently and survive a new read', () => {
+test('locale and all appearances persist independently and survive a new read', () => {
   const values = new Map<string, string>();
   const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
   assert.deepEqual(readPreferences(storage, ['zh-CN']), { locale: 'zh-CN', appearance: 'system' });
@@ -48,12 +48,12 @@ test('locale and all four appearances persist independently and survive a new re
   assert.equal(persistPreference(denied, 'appearance', 'light'), false);
   assert.equal(persistPreference(undefined, 'locale', 'en-US'), false);
 });
-test('exactly four appearances resolve system changes and respect explicit overrides', () => {
-  assert.deepEqual([...appearances], ['system', 'light', 'dark', 'oled-black']);
+test('exactly seven appearances resolve system changes and respect explicit overrides', () => {
+  assert.deepEqual([...appearances], ['system', 'light', 'dark', 'oled-black', 'midnight', 'graphite', 'warm']);
   assert.equal(resolveAppearance('unknown'), 'system');
   for (const dark of [true, false]) {
     assert.equal(resolveTheme('system', dark), dark ? 'dark' : 'light');
-    for (const explicit of ['light', 'dark', 'oled-black'] as const) assert.equal(resolveTheme(explicit, dark), explicit);
+    for (const explicit of ['light', 'dark', 'oled-black', 'midnight', 'graphite', 'warm'] as const) assert.equal(resolveTheme(explicit, dark), explicit);
   }
 });
 test('blocking prepaint bootstrap matches typed preferences, including denied storage', () => {

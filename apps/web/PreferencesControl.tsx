@@ -31,8 +31,13 @@ export function PreferencesControl({ locale, appearance, saved, onLocale, onAppe
       </select>
       <label htmlFor="appearance">{t('appearance')}</label>
       <select id="appearance" data-testid="appearance-select" value={appearance} onChange={e => onAppearance(e.target.value as Appearance)}>
-        <option value="system">{t('system')}</option><option value="light">{t('light')}</option>
-        <option value="dark">{t('dark')}</option><option value="oled-black">{t('oledBlack')}</option>
+        <option value="system">{t('system')}</option>
+        <option value="light">{t('light')}</option>
+        <option value="dark">{t('dark')}</option>
+        <option value="oled-black">{t('oledBlack')}</option>
+        <option value="midnight">{t('midnight')}</option>
+        <option value="graphite">{t('graphite')}</option>
+        <option value="warm">{t('warm')}</option>
       </select>
       <p role="status">{t(saved ? 'preferencesLocal' : 'preferencesUnavailable')}</p>
     </dialog>

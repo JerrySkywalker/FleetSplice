@@ -211,7 +211,7 @@ async function run(): Promise<number> {
       checks.push(check('EXTERNAL_ADVANCE_PROMPT', elapsed < 15_000 && externalSnapshots >= 1,
         `elapsedMs=${elapsed} snapshots=${externalSnapshots}`));
       checks.push(check('EXTERNAL_CONTROLS_GATED', composerDisabled, `composerDisabled=${composerDisabled}`));
-      await page.getByRole('button', { name: 'I reviewed the current native state', exact: true }).click();
+      await page.getByTestId('external-review-action').click();
       await waitSchedulerIdle(page);
       await expect(page.getByTestId('external-advance-notice')).toHaveCount(0, { timeout: 8000 });
       const composerEnabled = await page.locator('#native-prompt').isEnabled();

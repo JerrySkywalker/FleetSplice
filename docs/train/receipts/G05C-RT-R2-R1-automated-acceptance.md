@@ -22,7 +22,8 @@ MERGED=false
 OWNER_FINAL_UX_SMOKE_REQUIRED=true
 ```
 
-Exact FINAL_HEAD / IMPLEMENTATION_HEAD are recorded after the closeout commit/push.
+FINAL_HEAD=da5e842ea75a487aa1624615c03e3e03c8e71a1d
+IMPLEMENTATION_HEAD=f9b9d75bfc554d21e704dbff6caef471c7ecaa0f
 
 ## Fix summary
 

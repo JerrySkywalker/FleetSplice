@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "outDir": "test-results/compiled", "rootDir": "." },
-  "include": ["tests/**/*.ts", "scripts/accept-live.ts", "scripts/accept-native-browser.ts", "scripts/accept-native-live.ts"]
+  "include": ["tests/**/*.ts", "scripts/accept-live.ts", "scripts/accept-native-browser.ts", "scripts/accept-native-live.ts", "scripts/accept-native-live-preflight.ts"]
 }

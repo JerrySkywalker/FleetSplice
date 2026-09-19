@@ -9,8 +9,9 @@ npm run accept:native-browser
   fully automated and required for Native realtime/control changes
 
 npm run accept:native-live
-  local real Codex daemon + real browser integration when available
-  currently may defer with REAL_DAEMON_AUTOMATION_DEFERRED_WITH_REASON=...
+  product-equivalent discoverDaemon() preflight for local real Codex daemon
+  may DEFER with REAL_DAEMON_PRECHECK=<exact discovery error>
+  or REAL_DAEMON_PRECHECK=PASS and REAL_DAEMON_HARNESS=DEFERRED_WITH_REASON=...
 
 Owner UX smoke
   subjective feel + ordinary Windows Terminal / codex --yolo return-to-TUI

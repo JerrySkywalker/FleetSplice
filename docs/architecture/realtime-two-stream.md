@@ -52,6 +52,7 @@ resolution. Capability evidence reports which features are available.
 - ambiguity / residual-effect honesty
 - identity / incarnation changes
 - reconnect / recovery requirements
+- external native advancement (`external-state-advanced`)
 
 Presentation may be optimistic. Authority may not be optimistic.
 
@@ -93,6 +94,22 @@ native structured event
 The subscription is observation-only and never authorizes effects. A 20 s
 browser refresh plus visibility refresh remain recovery fallbacks. Hub must not
 use a 250 ms poll as the primary delivery path.
+
+## Stream-driven reconciliation (R2)
+
+Agent Execution events update live presentation directly. Message/tool events
+and ordinary `turn.started` must not each request an authoritative snapshot.
+
+Fleet Control & Safety events schedule bounded authoritative reconciliation when
+they can change controller/fence, review gate, recovery, identity/incarnation,
+residual honesty, or other control authority. `external-state-advanced` is
+published on a real `externalAdvance=false→true` transition and never
+auto-reviews or clears the safety gate. Residual command-state transitions
+publish `residual` so drain honesty is not delayed until the 20 s fallback.
+
+Terminal turn events (`turn.completed` / `turn.interrupted` / `turn.failed`)
+schedule one coalesced final reconciliation. A small reconcile scheduler keeps
+at most one active refresh, coalesces bursts, and retains one dirty follow-up.
 
 ## Non-goals for this freeze
 

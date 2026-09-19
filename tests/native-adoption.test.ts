@@ -881,3 +881,51 @@ test('an event journal failure during the final native read blocks dispatch with
   const receipt = await r.execute(command); assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_JOURNAL_UNPROVABLE');
   assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start' && c.params.threadId === r.rpc.thread.id).length, 0);
 });
+
+test('residual command-state transitions publish Fleet Control residual events', async () => {
+  const r = await setup(); await r.attach();
+  const residuals: string[] = [];
+  r.adapter.subscribeRealtime(envelope => {
+    if (envelope.kind === 'residual') residuals.push(envelope.kind);
+  });
+  await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
+  r.rpc.turns[0].items.push({ id: 'residual-tool', type: 'commandExecution', command: 'sleep', status: 'inProgress' });
+  r.rpc.onEvent({ method: 'item/started', params: { threadId: r.rpc.thread.id, turnId: r.rpc.turns[0].id,
+    item: { id: 'residual-tool', type: 'commandExecution', command: 'sleep', status: 'inProgress' } } });
+  await r.execute(r.command(await r.adapter.snapshot(), 'native.interrupt'));
+  assert.equal((await r.adapter.snapshot()).threads[0]!.residualCommandState, 'MAY_STILL_BE_RUNNING');
+  const beforeDrain = residuals.length;
+  r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id, turnId: r.rpc.turns[0].id,
+    item: { id: 'residual-tool', type: 'commandExecution', command: 'sleep', status: 'completed' } } });
+  assert.equal((await r.adapter.snapshot()).threads[0]!.residualCommandState, 'OBSERVED_DRAINED');
+  assert.ok(residuals.length > beforeDrain);
+});
+
+test('externalAdvance transition publishes external-state-advanced once without clearing the gate', async () => {
+  const r = await setup(); await r.attach();
+  const seen: string[] = [];
+  r.adapter.subscribeRealtime(envelope => {
+    if (envelope.kind === 'external-state-advanced') seen.push(envelope.eventId);
+  });
+  r.rpc.onEvent({
+    method: 'turn/started',
+    params: {
+      threadId: r.rpc.thread.id,
+      turnId: 'native-external-turn',
+      turn: { id: 'native-external-turn', status: 'inProgress', items: [] },
+    },
+  });
+  assert.equal((await r.adapter.snapshot()).threads[0]!.externalAdvance, true);
+  assert.equal(seen.length, 1);
+  // Unchanged safety state must not republish.
+  r.rpc.onEvent({
+    method: 'turn/started',
+    params: {
+      threadId: r.rpc.thread.id,
+      turnId: 'native-external-turn-2',
+      turn: { id: 'native-external-turn-2', status: 'inProgress', items: [] },
+    },
+  });
+  assert.equal(seen.length, 1);
+  assert.equal((await r.adapter.snapshot()).threads[0]!.externalAdvance, true);
+});

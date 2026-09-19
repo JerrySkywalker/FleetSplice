@@ -73,6 +73,18 @@ test('terminal scraping cannot authorize effects', () => {
   assert.equal(observationMayAuthorizeEffect('TERMINAL_SCRAPING'), false);
 });
 
+test('FleetControlEvent includes provider-neutral external-state-advanced', () => {
+  const control: FleetControlEvent = {
+    ...envelope,
+    stream: 'fleet.control',
+    kind: 'external-state-advanced',
+    payload: { reason: 'external_turn_started', externalAdvance: true },
+  };
+  assert.equal(isFleetControlEvent(control), true);
+  assert.equal(control.kind, 'external-state-advanced');
+  assert.equal('raw' in control.payload, false);
+});
+
 test('unsupported provider observations degrade without fabricating deltas', () => {
   const event: AgentExecutionEvent = {
     ...envelope,

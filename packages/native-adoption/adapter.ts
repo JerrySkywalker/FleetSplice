@@ -133,8 +133,11 @@ export class NativeAdoptionAdapter {
     return this.realtime.subscribe(listener);
   }
   pollRealtime(sinceRevision: string) { this.publishControlObservation(); return this.realtime.since(sinceRevision); }
+  private controlSignature(): string {
+    return `${this.state}|${this.controller}|${this.fence}|${this.incarnation}|${[...this.threads.values()].map(b => `${b.view.id}:${b.view.externalAdvance}:${b.view.stateToken}`).join(',')}`;
+  }
   private publishControlObservation() {
-    const signature = `${this.state}|${this.controller}|${this.fence}|${this.incarnation}|${[...this.threads.values()].map(b => `${b.view.id}:${b.view.externalAdvance}:${b.view.stateToken}`).join(',')}`;
+    const signature = this.controlSignature();
     if (signature === this.lastControlSignature) return;
     this.lastControlSignature = signature;
     this.realtime.publishFleet({
@@ -146,6 +149,25 @@ export class NativeAdoptionAdapter {
       kind: this.state === 'READY' ? 'fence.advanced' : 'recovery.required',
       payload: { state: this.state, fence: this.fence, controller: this.controller },
     });
+  }
+  /** Publish once when an attached thread transitions into externalAdvance=true. Never clears the gate. */
+  private publishExternalStateAdvanced(threadId: string, turnId: string | null, reason: string) {
+    this.realtime.publishFleet({
+      eventId: randomUUID(),
+      observedAt: new Date().toISOString(),
+      sessionKey: this.runtimeId,
+      threadId,
+      turnId,
+      kind: 'external-state-advanced',
+      payload: { reason, externalAdvance: true },
+    });
+    this.lastControlSignature = this.controlSignature();
+  }
+  /** Set externalAdvance on a real false→true transition and notify Fleet Control/Safety. */
+  private markExternalAdvance(binding: Binding, threadId: string, turnId: string | null, reason: string) {
+    if (binding.view.externalAdvance) return;
+    binding.view.externalAdvance = true;
+    this.publishExternalStateAdvanced(threadId, turnId, reason);
   }
   private event(message: NativeMessage) {
     this.observedEvents = true;
@@ -162,8 +184,13 @@ export class NativeAdoptionAdapter {
     }
     const turnId = p.turnId ?? p.turn?.id;
     if (['turn/started', 'turn/completed', 'thread/status/changed', 'thread/settings/updated', 'serverRequest/resolved'].includes(message.method ?? '') || p.item?.type === 'userMessage') this.nativeStateEvents++;
-    if (message.method === 'thread/settings/updated') { binding.view.permission = null; binding.view.externalAdvance = true; }
-    if (message.method === 'turn/started' && !this.effectPending && !binding.userState.has(turnId) && !this.ownedTurns.has(turnId)) binding.view.externalAdvance = true;
+    if (message.method === 'thread/settings/updated') {
+      binding.view.permission = null;
+      this.markExternalAdvance(binding, threadId, typeof turnId === 'string' ? turnId : null, 'thread_settings_updated');
+    }
+    if (message.method === 'turn/started' && !this.effectPending && !binding.userState.has(turnId) && !this.ownedTurns.has(turnId)) {
+      this.markExternalAdvance(binding, threadId, typeof turnId === 'string' ? turnId : null, 'external_turn_started');
+    }
     if (message.id !== undefined) {
       const supported = this.approvals.observe(message, this.workspace);
       if (supported) {
@@ -180,7 +207,20 @@ export class NativeAdoptionAdapter {
       binding.interrupted.add(turnId);
       this.activityJournal.interrupt(this.incarnation, threadId, turnId);
     }
+    const priorResidual = binding.view.residualCommandState;
     binding.view.residualCommandState = this.activityJournal.residual(this.incarnation, threadId);
+    if (binding.view.residualCommandState !== priorResidual) {
+      this.realtime.publishFleet({
+        eventId: randomUUID(),
+        observedAt: new Date().toISOString(),
+        sessionKey: this.runtimeId,
+        threadId: typeof threadId === 'string' ? threadId : null,
+        turnId: typeof turnId === 'string' ? turnId : null,
+        kind: 'residual',
+        payload: { residualCommandState: binding.view.residualCommandState },
+      });
+      this.lastControlSignature = this.controlSignature();
+    }
     // Keep compact native lifecycle evidence, never raw/global native payloads.
     if (/^(turn\/|item\/(started|completed)|serverRequest\/)/.test(message.method ?? '')) this.evidence.append('NATIVE_ADOPTED_EVENT', threadId,
       { method: message.method, threadId, turnId: turnId ?? null, itemId: p.item?.id ?? null, type: p.item?.type ?? null, status: p.turn?.status ?? p.item?.status ?? null });
@@ -286,7 +326,8 @@ export class NativeAdoptionAdapter {
         } else if (item.type === 'commandExecution' && id(item.id)) this.observeTool(tools, item, turn.id, threadId);
       }
     }
-    let externalAdvance = prior?.view.externalAdvance ?? false;
+    const priorAdvance = prior?.view.externalAdvance ?? false;
+    let externalAdvance = priorAdvance;
     if (prior?.view.attached && !accept) for (const [turnId, userHash] of users) {
       // Native acknowledgments can precede persisted userMessage observations.
       // Correlate our exact client message ID/turn/text, never merely equal text.
@@ -313,7 +354,11 @@ export class NativeAdoptionAdapter {
     // this final admission check before the accepted baseline is replaced.
     admit?.(view);
     const binding = { view, tools, interrupted, userState: accept || !prior ? users : prior.userState };
-    this.threads.set(threadId, binding); return binding;
+    this.threads.set(threadId, binding);
+    if (!accept && view.externalAdvance && !priorAdvance && view.attached) {
+      this.publishExternalStateAdvanced(threadId, view.activeTurnId, 'native_history_diverged');
+    }
+    return binding;
   }
   snapshot(options: { discover?: boolean } = {}): Promise<AdoptionSnapshot> { return this.serial(async () => {
     this.expireController();
@@ -405,7 +450,11 @@ export class NativeAdoptionAdapter {
       }
     }
     for (const [threadId, binding] of this.threads) if (!candidates.has(threadId)) {
-      if (binding.view.attached) { binding.view.status = 'notLoaded'; binding.view.externalAdvance = true; this.approvals.invalidate(threadId); }
+      if (binding.view.attached) {
+        binding.view.status = 'notLoaded';
+        this.markExternalAdvance(binding, threadId, binding.view.activeTurnId, 'attached_thread_missing_from_discovery');
+        this.approvals.invalidate(threadId);
+      }
       else this.threads.delete(threadId);
     }
   }
@@ -567,7 +616,10 @@ export class NativeAdoptionAdapter {
         }
       } catch (error) {
         code = failCode(error); status = effectSent ? 'AMBIGUOUS_EFFECT' : 'REJECTED';
-        if (code === 'NATIVE_STATE_ADVANCED_EXTERNALLY') { const b = this.threads.get(c.threadId); if (b) b.view.externalAdvance = true; }
+        if (code === 'NATIVE_STATE_ADVANCED_EXTERNALLY') {
+          const b = this.threads.get(c.threadId);
+          if (b) this.markExternalAdvance(b, c.threadId, c.activeTurnId ?? null, 'native_state_advanced_externally');
+        }
         if (effectSent) { this.state = 'NATIVE_EFFECT_UNKNOWN_NO_REPLAY'; this.controller = null; this.fence++; }
       } finally { this.effectPending = false; this.subscribingThread = null; }
       const receipt: AdoptionReceipt = { commandId: c.commandId, family: c.family, status, code, daemon: this.identity,

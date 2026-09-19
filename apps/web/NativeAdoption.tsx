@@ -20,6 +20,8 @@ import {
   residualSeverity,
 } from './control-safety-ux.ts';
 import { LocalLoopTimer } from '../../packages/contracts/local-loop-timing.ts';
+import { AuthoritativeReconcileScheduler } from './reconcile-scheduler.ts';
+import { classifyRealtimeRefresh, shouldUpdateLiveTimeline } from './realtime-refresh-policy.ts';
 
 function TurnStatus({ turn, locale, live }: { turn: NativeTurn; locale: Locale; live: boolean }) {
   const [now, setNow] = useState(Date.now());
@@ -61,10 +63,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const timelineRef = useRef<HTMLDivElement>(null);
   const followTail = useRef(true);
   const timerRef = useRef(new LocalLoopTimer());
-  const refreshing = useRef(false);
-  async function refresh(discover = false) {
-    if (refreshing.current) return;
-    refreshing.current = true;
+  const schedulerRef = useRef<AuthoritativeReconcileScheduler | null>(null);
+  async function applySnapshot(discover = false) {
     try {
       const next = await request(discover ? '/api/native/snapshot?discover=1' : '/api/native/snapshot');
       setSnapshot(next);
@@ -85,10 +85,21 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       });
     }
     catch (e) { setError(e instanceof Error ? e.message : 'NATIVE_OBSERVATION_LOST'); setSnapshot(old => old ? { ...old, state: 'NATIVE_OBSERVATION_LOST' } : old); }
-    finally { refreshing.current = false; }
+  }
+  function refresh(discover = false) {
+    const scheduler = schedulerRef.current;
+    if (!scheduler) { void applySnapshot(discover); return; }
+    if (discover) {
+      // Manual discovery bypasses coalesce so Owner refresh is prompt and exact.
+      void applySnapshot(true);
+      return;
+    }
+    scheduler.schedule('manual');
   }
   useEffect(() => {
-    void refresh();
+    const scheduler = new AuthoritativeReconcileScheduler(() => applySnapshot(false), { debounceMs: 48 });
+    schedulerRef.current = scheduler;
+    scheduler.schedule('initial');
     let events: EventSource | undefined;
     const connect = () => {
       events?.close();
@@ -101,7 +112,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
             threadId: string | null; turnId: string | null;
             semantic?: { role?: TimelinePresentationItem['role']; text?: string; toolId?: string; status?: string; itemId?: string | null };
           };
-          if (envelope.stream === 'agent.execution' && envelope.kind !== 'unsupported') {
+          const decision = classifyRealtimeRefresh(envelope);
+          if (shouldUpdateLiveTimeline(envelope)) {
             const item: TimelinePresentationItem = {
               eventId: envelope.eventId, revision: envelope.revision, kind: envelope.kind as TimelinePresentationItem['kind'],
               threadId: envelope.threadId, turnId: envelope.turnId, ephemeral: true,
@@ -113,16 +125,27 @@ export function NativeAdoption({ client, request, locale, preferences }: {
             timerRef.current.markUnmeasured('browser_receive_render');
             setLiveTimeline(current => foldTimeline(current, item));
           }
-        } catch { /* Invalidation-only payloads still trigger refresh below. */ }
-        void refresh();
+          if (decision.mode === 'schedule_reconcile') scheduler.schedule(decision.reason);
+        } catch { /* Malformed SSE payloads are ignored; recovery remains via fallback/visibility. */ }
       };
       events.onerror = () => { /* Browser reconnects EventSource; retain slow fallback refresh. */ };
     };
     connect();
-    const fallback = setInterval(() => void refresh(), 20_000);
-    const onVisible = () => { if (document.visibilityState === 'visible') { connect(); void refresh(); } };
+    const fallback = setInterval(() => scheduler.schedule('fallback'), 20_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        connect();
+        scheduler.schedule('visibility');
+      }
+    };
     document.addEventListener('visibilitychange', onVisible);
-    return () => { events?.close(); clearInterval(fallback); document.removeEventListener('visibilitychange', onVisible); };
+    return () => {
+      events?.close();
+      clearInterval(fallback);
+      document.removeEventListener('visibilitychange', onVisible);
+      scheduler.dispose();
+      schedulerRef.current = null;
+    };
   }, []);
   const thread = snapshot?.threads.find(item => item.id === selected) ?? snapshot?.threads[0];
   const controlled = snapshot?.controller === client.clientInstanceId;
@@ -165,7 +188,15 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       const receipt = await timerRef.current.measureAsync('command_send', () => request('/api/native/commands', value));
       timerRef.current.record('receipt', sendStarted, performance.now());
       receiptObserved(receipt);
-      await timerRef.current.measureAsync('final_reconciliation', () => refresh());
+      await timerRef.current.measureAsync('final_reconciliation', async () => {
+        const scheduler = schedulerRef.current;
+        if (scheduler) {
+          scheduler.schedule('command');
+          await scheduler.whenIdle();
+        } else {
+          await applySnapshot(false);
+        }
+      });
     } catch (e) {
       setProvisional(current => {
         if (!current || current.commandId !== value.commandId) return current;
@@ -179,7 +210,12 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   }
   async function lookup() {
     if (!pending) return; setBusy(true);
-    try { receiptObserved(await request(`/api/native/commands/${pending.commandId}`)); await refresh(); }
+    try {
+      receiptObserved(await request(`/api/native/commands/${pending.commandId}`));
+      const scheduler = schedulerRef.current;
+      if (scheduler) { scheduler.schedule('command'); await scheduler.whenIdle(); }
+      else await applySnapshot(false);
+    }
     catch (e) { setError(e instanceof Error ? e.message : 'COMMAND_UNKNOWN_NO_REPLAY'); }
     finally { setBusy(false); }
   }

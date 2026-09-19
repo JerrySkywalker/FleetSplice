@@ -99,7 +99,9 @@ export type FleetControlKind =
   | 'identity.changed'
   | 'incarnation.changed'
   | 'reconnect'
-  | 'recovery.required';
+  | 'recovery.required'
+  /** Native state advanced outside the current Web controller; does not clear the review gate. */
+  | 'external-state-advanced';
 
 export type FleetControlEvent = StreamEnvelope & {
   stream: 'fleet.control';

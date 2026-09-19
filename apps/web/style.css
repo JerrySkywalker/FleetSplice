@@ -5,7 +5,7 @@
   --panel: #eef2f5;
   --raised: #ffffff;
   --text: #1a2430;
-  --muted: #5a6b78;
+  --muted: #4a5c68;
   --border: #c5d0d8;
   --hover: #e5eef2;
   --accent: #1f5663;
@@ -30,7 +30,6 @@
   --shadow: 0 8px 28px var(--shadow-color);
   --radius: 10px;
   --motion: 160ms ease;
-  --theme-fade: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
   --left-panel: 260px;
   --right-panel: 300px;
 }
@@ -190,10 +189,9 @@
   background: var(--canvas);
   font-synthesis: none;
   font-size: 14px;
-  transition: var(--theme-fade);
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--canvas); color: var(--text); transition: var(--theme-fade); }
+body { margin: 0; background: var(--canvas); color: var(--text); }
 body.is-resizing { cursor: col-resize; user-select: none; }
 button, input, textarea, select { color: var(--text); font: inherit; }
 button {
@@ -204,7 +202,6 @@ button {
   color: var(--text);
   padding: 9px 12px;
   min-height: 40px;
-  transition: background-color var(--motion), border-color var(--motion), opacity var(--motion);
 }
 button:hover:not(:disabled) { background: var(--hover); }
 button:disabled { opacity: .45; cursor: not-allowed; }
@@ -231,7 +228,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   max-width: 100vw;
   overflow: hidden;
   background: var(--canvas);
-  transition: var(--theme-fade);
 }
 .product-header, .product-footer { grid-column: 1 / -1; }
 .product-header {
@@ -242,12 +238,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   padding: 0 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
-  transition: var(--theme-fade);
 }
 .header-leading, .header-trailing { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .brand {
   display: flex; align-items: center; gap: 10px;
   font-weight: 650; font-size: 18px; letter-spacing: -.4px; min-width: 0;
+  color: var(--text);
 }
 .mark {
   display: inline-grid; place-items: center;
@@ -265,7 +261,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: var(--panel);
   overflow: auto;
   min-width: 0;
-  transition: width var(--motion), background-color var(--motion), border-color var(--motion);
 }
 .navigation { border-right: 1px solid var(--border); padding: 18px 16px; }
 .context { border-left: 1px solid var(--border); padding: 18px 16px; }
@@ -414,6 +409,7 @@ h3 { font-size: 12px; font-weight: 650; margin: 20px 0 8px; }
 }
 .session.selected { background: var(--selected); border-color: var(--border); color: var(--selected-text); }
 .session small { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.session.selected small { color: var(--selected-text); }
 .local-note { margin-top: 24px; font-size: 11px; color: var(--muted); line-height: 1.7; }
 .activity { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
 .activity li { padding: 7px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
@@ -485,7 +481,7 @@ dialog p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-bottom
 @keyframes sheet-in { from { transform: translateY(18px); opacity: .6; } to { transform: none; opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion: 0ms; --theme-fade: none; }
+  :root { --motion: 0ms; }
   *, *::before, *::after {
     animation: none !important;
     transition: none !important;
@@ -499,6 +495,8 @@ dialog p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-bottom
   grid-template-columns: 254px minmax(380px, 1fr) 270px;
   grid-template-rows: 68px calc(100dvh - 101px) 33px;
   min-height: 650px;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 .shell:not(.product-shell) header {
   grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between;
@@ -542,4 +540,9 @@ dialog p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-bottom
     grid-template-rows: 64px auto minmax(520px, 70dvh) auto auto;
     min-height: 100dvh;
   }
+  .session-config-bar { gap: 6px; }
+  .config-chip { max-width: 100%; }
+  .config-chip select { max-width: min(180px, 55vw); }
+  .ownership-surface { flex-wrap: wrap; }
+  .composer, .sticky-composer { margin-inline: 10px; }
 }

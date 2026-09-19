@@ -20,8 +20,33 @@ import {
   residualSeverity,
 } from './control-safety-ux.ts';
 import { LocalLoopTimer } from '../../packages/contracts/local-loop-timing.ts';
-import { AuthoritativeReconcileScheduler } from './reconcile-scheduler.ts';
+import { AuthoritativeReconcileScheduler, type ReconcileReason } from './reconcile-scheduler.ts';
 import { classifyRealtimeRefresh, shouldUpdateLiveTimeline } from './realtime-refresh-policy.ts';
+
+type SnapshotCausalityRow = {
+  snapshotSeq: number;
+  reconcileReason: string;
+  triggerEvent: string;
+  commandId: string | null;
+  turnId: string | null;
+  controlRevision: string | null;
+  coalescedOrExecuted: 'executed';
+  notes: string;
+  at: number;
+  url: string;
+};
+
+type SnapshotAuditSurface = {
+  networkSnapshots: SnapshotCausalityRow[];
+  sseTriggers: Array<{ at: number; stream: string; kind: string; eventId: string; revision: string; turnId: string | null; decision: string }>;
+  scheduler: () => ReturnType<AuthoritativeReconcileScheduler['audit']> | null;
+};
+
+declare global {
+  interface Window {
+    __FLEETSPLICE_SNAPSHOT_AUDIT__?: SnapshotAuditSurface;
+  }
+}
 
 function TurnStatus({ turn, locale, live }: { turn: NativeTurn; locale: Locale; live: boolean }) {
   const [now, setNow] = useState(Date.now());
@@ -64,9 +89,38 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const followTail = useRef(true);
   const timerRef = useRef(new LocalLoopTimer());
   const schedulerRef = useRef<AuthoritativeReconcileScheduler | null>(null);
-  async function applySnapshot(discover = false) {
+  const auditRef = useRef<SnapshotAuditSurface>({
+    networkSnapshots: [],
+    sseTriggers: [],
+    scheduler: () => schedulerRef.current?.audit() ?? null,
+  });
+  const lastTriggerRef = useRef<{ event: string; revision: string | null; turnId: string | null }>({
+    event: 'bootstrap', revision: null, turnId: null,
+  });
+  async function applySnapshot(discover = false, reasons: readonly ReconcileReason[] = ['manual']) {
+    const reason = reasons[0] ?? (discover ? 'manual' : 'manual');
+    const trigger = lastTriggerRef.current;
+    const params = new URLSearchParams();
+    if (discover) params.set('discover', '1');
+    params.set('reconcileReason', reason);
+    params.set('reconcileReasons', reasons.join(','));
+    if (trigger.event) params.set('triggerEvent', trigger.event);
+    const url = `/api/native/snapshot?${params.toString()}`;
     try {
-      const next = await request(discover ? '/api/native/snapshot?discover=1' : '/api/native/snapshot');
+      const next = await request(url);
+      const row: SnapshotCausalityRow = {
+        snapshotSeq: auditRef.current.networkSnapshots.length + 1,
+        reconcileReason: reasons.join('+') || reason,
+        triggerEvent: trigger.event,
+        commandId: null,
+        turnId: trigger.turnId,
+        controlRevision: trigger.revision,
+        coalescedOrExecuted: 'executed',
+        notes: discover ? 'discover=1 bypass' : `scheduler_reasons=${reasons.join(',')}`,
+        at: Date.now(),
+        url,
+      };
+      auditRef.current.networkSnapshots.push(row);
       setSnapshot(next);
       const history = (next.threads ?? []).flatMap((item: any) => item.history ?? []);
       const activity = (next.threads ?? []).flatMap((item: any) => item.activity ?? []);
@@ -88,17 +142,21 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   }
   function refresh(discover = false) {
     const scheduler = schedulerRef.current;
-    if (!scheduler) { void applySnapshot(discover); return; }
+    if (!scheduler) { void applySnapshot(discover, discover ? ['manual'] : ['manual']); return; }
     if (discover) {
       // Manual discovery bypasses coalesce so Owner refresh is prompt and exact.
-      void applySnapshot(true);
+      lastTriggerRef.current = { event: 'manual.discovery', revision: null, turnId: null };
+      void applySnapshot(true, ['manual']);
       return;
     }
+    lastTriggerRef.current = { event: 'manual.refresh', revision: null, turnId: null };
     scheduler.schedule('manual');
   }
   useEffect(() => {
-    const scheduler = new AuthoritativeReconcileScheduler(() => applySnapshot(false), { debounceMs: 48 });
+    const scheduler = new AuthoritativeReconcileScheduler(reasons => applySnapshot(false, reasons), { debounceMs: 48 });
     schedulerRef.current = scheduler;
+    window.__FLEETSPLICE_SNAPSHOT_AUDIT__ = auditRef.current;
+    lastTriggerRef.current = { event: 'scheduler.initial', revision: null, turnId: null };
     scheduler.schedule('initial');
     let events: EventSource | undefined;
     const connect = () => {
@@ -113,6 +171,11 @@ export function NativeAdoption({ client, request, locale, preferences }: {
             semantic?: { role?: TimelinePresentationItem['role']; text?: string; toolId?: string; status?: string; itemId?: string | null };
           };
           const decision = classifyRealtimeRefresh(envelope);
+          auditRef.current.sseTriggers.push({
+            at: Date.now(), stream: envelope.stream, kind: envelope.kind, eventId: envelope.eventId,
+            revision: envelope.revision, turnId: envelope.turnId,
+            decision: decision.mode === 'schedule_reconcile' ? decision.reason : decision.mode,
+          });
           if (shouldUpdateLiveTimeline(envelope)) {
             const item: TimelinePresentationItem = {
               eventId: envelope.eventId, revision: envelope.revision, kind: envelope.kind as TimelinePresentationItem['kind'],
@@ -125,16 +188,27 @@ export function NativeAdoption({ client, request, locale, preferences }: {
             timerRef.current.markUnmeasured('browser_receive_render');
             setLiveTimeline(current => foldTimeline(current, item));
           }
-          if (decision.mode === 'schedule_reconcile') scheduler.schedule(decision.reason);
+          if (decision.mode === 'schedule_reconcile') {
+            lastTriggerRef.current = {
+              event: `${envelope.stream}:${envelope.kind}`,
+              revision: envelope.revision,
+              turnId: envelope.turnId,
+            };
+            scheduler.schedule(decision.reason);
+          }
         } catch { /* Malformed SSE payloads are ignored; recovery remains via fallback/visibility. */ }
       };
       events.onerror = () => { /* Browser reconnects EventSource; retain slow fallback refresh. */ };
     };
     connect();
-    const fallback = setInterval(() => scheduler.schedule('fallback'), 20_000);
+    const fallback = setInterval(() => {
+      lastTriggerRef.current = { event: 'fallback.20s', revision: null, turnId: null };
+      scheduler.schedule('fallback');
+    }, 20_000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         connect();
+        lastTriggerRef.current = { event: 'visibilitychange', revision: null, turnId: null };
         scheduler.schedule('visibility');
       }
     };
@@ -145,6 +219,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       document.removeEventListener('visibilitychange', onVisible);
       scheduler.dispose();
       schedulerRef.current = null;
+      if (window.__FLEETSPLICE_SNAPSHOT_AUDIT__ === auditRef.current) delete window.__FLEETSPLICE_SNAPSHOT_AUDIT__;
     };
   }, []);
   const thread = snapshot?.threads.find(item => item.id === selected) ?? snapshot?.threads[0];
@@ -185,16 +260,25 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     try {
       sessionStorage.setItem('fleetsplice.native.pending', JSON.stringify(value)); setPending(value);
       const sendStarted = performance.now();
+      const commandWindowStart = Date.now();
       const receipt = await timerRef.current.measureAsync('command_send', () => request('/api/native/commands', value));
       timerRef.current.record('receipt', sendStarted, performance.now());
       receiptObserved(receipt);
       await timerRef.current.measureAsync('final_reconciliation', async () => {
         const scheduler = schedulerRef.current;
         if (scheduler) {
+          lastTriggerRef.current = {
+            event: 'command.receipt',
+            revision: null,
+            turnId: thread?.activeTurnId ?? null,
+          };
           scheduler.schedule('command');
           await scheduler.whenIdle();
+          for (const row of auditRef.current.networkSnapshots) {
+            if (row.at >= commandWindowStart && row.commandId === null) row.commandId = receipt.commandId;
+          }
         } else {
-          await applySnapshot(false);
+          await applySnapshot(false, ['command']);
         }
       });
     } catch (e) {
@@ -213,8 +297,11 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     try {
       receiptObserved(await request(`/api/native/commands/${pending.commandId}`));
       const scheduler = schedulerRef.current;
-      if (scheduler) { scheduler.schedule('command'); await scheduler.whenIdle(); }
-      else await applySnapshot(false);
+      if (scheduler) {
+        lastTriggerRef.current = { event: 'command.lookup', revision: null, turnId: thread?.activeTurnId ?? null };
+        scheduler.schedule('command');
+        await scheduler.whenIdle();
+      } else await applySnapshot(false, ['command']);
     }
     catch (e) { setError(e instanceof Error ? e.message : 'COMMAND_UNKNOWN_NO_REPLAY'); }
     finally { setBusy(false); }

@@ -415,9 +415,21 @@ export class NativeAdoptionAdapter {
     // native index lag; foreign cwd payloads are discarded immediately.
     const listing = await this.observe('thread/list', { cwd: this.workspace, limit: 32 });
     requireThat(Array.isArray(listing.data) && !listing.nextCursor, 'NATIVE_DISCOVERY_BOUND_EXCEEDED');
-    const candidates = new Set<string>(listing.data.filter((t: any) => loaded.has(t.id) && this.eligibleCandidate(t)).map((t: any) => t.id));
+    // Discovery-only same-pass classification: IDs already proven not-attachable
+    // by this listing must not trigger a redundant metadata thread/read. This
+    // set never authorizes loaded membership, stateToken, activeTurn, controller,
+    // fence, or effect dispatch. IDs absent from listing still require a live
+    // metadata probe so unavailable transitions cannot be hidden.
+    const listingNotAttachable = new Set<string>();
+    const candidates = new Set<string>();
+    for (const thread of listing.data) {
+      if (!loaded.has(thread.id)) continue;
+      if (this.eligibleCandidate(thread)) candidates.add(thread.id);
+      else listingNotAttachable.add(thread.id);
+    }
     for (const threadId of loaded) {
       if (candidates.has(threadId)) continue;
+      if (listingNotAttachable.has(threadId)) continue;
       try {
         const metadata = await this.observe('thread/read', { threadId, includeTurns: false });
         if (metadata.thread?.id === threadId && this.eligibleCandidate(metadata.thread)) candidates.add(threadId);

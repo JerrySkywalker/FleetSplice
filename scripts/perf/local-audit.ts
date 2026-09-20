@@ -175,7 +175,7 @@ async function runAdapterBenchmarks(): Promise<ScenarioResult> {
     fx.journal.close();
   }
 
-  // DISCOVERY_FANOUT
+  // DISCOVERY_FANOUT (+ unchanged second discovery for T01)
   {
     const fx = await createPerfAdoptionFixture({ discoveryIntervalMs: 60_000 });
     fx.rpc.configureDiscoveryFanout({ loaded: 64, eligible: 8 });
@@ -183,13 +183,43 @@ async function runAdapterBenchmarks(): Promise<ScenarioResult> {
     const t0 = process.hrtime.bigint();
     const snap = await fx.adapter.snapshot({ discover: true });
     const wallMs = hrMs(t0);
+    const firstCounts = fx.rpc.methodCounts();
+    const firstTotal = fx.rpc.calls.length;
+    const firstThreadRead = firstCounts['thread/read'] ?? 0;
+    const firstTurnsList = firstCounts['thread/turns/list'] ?? 0;
+    const firstMetadataReads = Math.max(0, firstThreadRead - firstTurnsList);
+    const firstCandidateIds = snap.threads.map(t => t.id).sort();
+
+    fx.rpc.resetCalls();
+    const t1 = process.hrtime.bigint();
+    const snap2 = await fx.adapter.snapshot({ discover: true });
+    const secondWallMs = hrMs(t1);
+    const secondCounts = fx.rpc.methodCounts();
+    const secondTotal = fx.rpc.calls.length;
+    const secondThreadRead = secondCounts['thread/read'] ?? 0;
+    const secondTurnsList = secondCounts['thread/turns/list'] ?? 0;
+    const secondMetadataReads = Math.max(0, secondThreadRead - secondTurnsList);
+    const auditBaselineMetadataReads = 56; // frozen from G05C PERFORMANCE-METRICS DISCOVERY_FANOUT (64 read - 8 turns)
+    const metadataReduction = (auditBaselineMetadataReads - secondMetadataReads) / auditBaselineMetadataReads;
+
     results.DISCOVERY_FANOUT = {
       wallMs,
       threadCount: snap.threads.length,
       candidatesBoundOk: snap.threads.length <= 8,
-      rpcCounts: fx.rpc.methodCounts(),
-      rpcTotal: fx.rpc.calls.length,
+      rpcCounts: firstCounts,
+      rpcTotal: firstTotal,
       snapshotBytes: Buffer.byteLength(JSON.stringify(snap), 'utf8'),
+      metadataReads: firstMetadataReads,
+      unchangedSecond: {
+        wallMs: secondWallMs,
+        rpcCounts: secondCounts,
+        rpcTotal: secondTotal,
+        metadataReads: secondMetadataReads,
+        threadIdsEqual: JSON.stringify(snap2.threads.map(t => t.id).sort()) === JSON.stringify(firstCandidateIds),
+        auditBaselineMetadataReads,
+        metadataReadReduction: metadataReduction,
+        metadataReadReductionPct: Math.round(metadataReduction * 1000) / 10,
+      },
     };
   }
 
@@ -509,6 +539,8 @@ async function main() {
     status: 'PERF_LOCAL_AUDIT_COMPLETE',
     browserScenarioCount: browser.length,
     discoveryRpcTotal: (adapter.DISCOVERY_FANOUT as any)?.rpcTotal,
+    discoverySecondMetadataReads: (adapter.DISCOVERY_FANOUT as any)?.unchangedSecond?.metadataReads,
+    discoveryMetadataReductionPct: (adapter.DISCOVERY_FANOUT as any)?.unchangedSecond?.metadataReadReductionPct,
     boundedHistoryOk: (adapter.CURRENT_BOUNDED_MAX_ADAPTER as any)?.bounds?.historyOk,
     liveOnlyPolicy: (adapter.COMMON_TURN_SNAPSHOT_FANOUT_POLICY as any)?.allLiveOnly,
     artifactRoot: ARTIFACT_ROOT,

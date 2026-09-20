@@ -544,87 +544,92 @@ export class NativeAdoptionAdapter {
         }
         requireThat(this.compatibility.profile === 'ADOPT_FULL', 'NATIVE_ADOPT_FULL_REQUIRED');
         requireThat(this.threads.has(c.threadId) && (await this.loaded()).has(c.threadId), 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
-        const baseline = this.nativeStateEvents;
-        const binding = await this.readThread(c.threadId);
-        requireThat(this.state === 'READY', this.state);
-        if (c.family === 'native.approval') this.approvals.exact(c.approval!);
-        requireThat(binding.view.stateToken === c.stateToken && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
-        if (c.family === 'native.attach') {
-          requireThat(!this.controller || this.controller === authenticatedClient, 'FLEET_CONTROLLER_ALREADY_HELD');
-          requireThat(!binding.view.attached || this.controller !== authenticatedClient, 'NATIVE_ALREADY_ATTACHED_USE_REVIEW_STATE');
-          // Exact loaded ID only; no path, history, model or permission overrides.
-          this.evidence.append('NATIVE_ATTACH_ATTEMPT', c.commandId, { command: c, daemon: this.identity, createdNativeThread: false });
-          this.subscribingThread = c.threadId;
-          const resumed = await this.rpc.call('thread/resume', { threadId: c.threadId, excludeTurns: true });
-          this.assertThread(resumed.thread, c.threadId);
-          this.revalidate(); requireThat((await this.loaded()).has(c.threadId), 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
-          binding.view.attached = true;
-          binding.view.permission = typeof resumed.approvalPolicy === 'string' && typeof resumed.sandbox?.type === 'string' ? `${resumed.sandbox.type} · approval=${resumed.approvalPolicy}` : null;
-          this.capability('effectiveState', !!binding.view.permission, 'Exact thread/resume response; no configuration overrides');
-          await this.readThread(c.threadId, true);
+        const isEffectFamily = c.family === 'native.submit' || c.family === 'native.steer' || c.family === 'native.interrupt';
+        if (!isEffectFamily) {
+          const baseline = this.nativeStateEvents;
+          const binding = await this.readThread(c.threadId);
           requireThat(this.state === 'READY', this.state);
-          requireThat(expiresAt > this.now(), 'STALE_FLEET_CONTROLLER_FENCE');
-          this.controller = authenticatedClient; this.controllerGrant = structuredClone(client); this.controllerExpires = expiresAt; this.fence++;
-          code = 'NATIVE_SAME_THREAD_ATTACHED_COOPERATIVE';
-        } else {
-          requireThat(binding.view.attached && this.controller === authenticatedClient && this.controllerExpires > this.now(), 'FLEET_VIEWER_CANNOT_CONTROL');
-          requireThat(this.sameGrant(client, this.controllerGrant), 'STALE_FLEET_GRANT');
-          if (c.family === 'native.release') { this.controller = null; this.fence++; code = 'FLEET_CONTROL_RELEASED_NATIVE_UNCHANGED'; }
-          else if (c.family === 'native.approval') {
-            requireThat(c.approval && this.rpc.respond && this.compatibility.capabilities.approvalResolve.available, 'APPROVAL_UNAVAILABLE');
-            requireThat(binding.view.activeTurnId === c.approval.turnId && binding.view.status === 'active', 'STALE_NATIVE_REQUEST');
-            this.revalidate();
-            requireThat(this.controllerExpires > this.now() && c.expectedFence === this.fence &&
-              c.approval.authority === this.approvalAuthority(c.approval.digest), 'STALE_FLEET_CONTROLLER_FENCE');
-            this.approvals.exact(c.approval);
-            this.evidence.append('NATIVE_EFFECT_ATTEMPT', c.commandId, { command: c, daemon: this.identity, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
-            effectSent = true; this.fence++;
-            await this.approvals.respond(c.approval, c.approval.decision, (id, result) => this.rpc.respond!(id, result));
-            this.revalidate();
-            code = 'NATIVE_APPROVAL_RESOLVED';
-          }
-          else if (c.family === 'native.reviewState') {
-            await this.readThread(c.threadId, true, view => {
-              requireThat(view.stateToken === c.stateToken && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
-              this.revalidate();
-              requireThat(expiresAt > this.now() && this.controllerExpires > this.now() && this.controller === authenticatedClient && this.fence === c.expectedFence, 'STALE_FLEET_CONTROLLER_FENCE');
-            });
-            this.fence++; code = 'NATIVE_STATE_REVIEWED';
-          }
-          else {
-            requireThat(!binding.view.externalAdvance, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
-            requireThat(binding.view.activeTurnId === c.activeTurnId, 'STALE_NATIVE_ACTIVE_TURN');
-            const isSubmit = c.family === 'native.submit';
-            requireThat(isSubmit ? binding.view.status === 'idle' && c.activeTurnId === null : binding.view.status === 'active' && !!c.activeTurnId, 'NATIVE_TURN_STATE_INCOMPATIBLE');
-            requireThat(c.family === 'native.interrupt' || c.text.trim().length > 0, 'NATIVE_INPUT_REQUIRED');
-            if (c.family === 'native.interrupt') requireThat(this.compatibility.capabilities.interrupt.available, 'NATIVE_INTERRUPT_UNAVAILABLE');
-            if (c.family === 'native.steer') requireThat(this.compatibility.capabilities.steer.available, 'NATIVE_STEER_UNAVAILABLE');
-            // Refresh the OS identity first, then obtain the final native state.
-            // No awaited work follows that response before the dispatch decision.
-            this.revalidate();
-            const finalBinding = await this.readThread(c.threadId);
+          if (c.family === 'native.approval') this.approvals.exact(c.approval!);
+          requireThat(binding.view.stateToken === c.stateToken && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
+          if (c.family === 'native.attach') {
+            requireThat(!this.controller || this.controller === authenticatedClient, 'FLEET_CONTROLLER_ALREADY_HELD');
+            requireThat(!binding.view.attached || this.controller !== authenticatedClient, 'NATIVE_ALREADY_ATTACHED_USE_REVIEW_STATE');
+            // Exact loaded ID only; no path, history, model or permission overrides.
+            this.evidence.append('NATIVE_ATTACH_ATTEMPT', c.commandId, { command: c, daemon: this.identity, createdNativeThread: false });
+            this.subscribingThread = c.threadId;
+            const resumed = await this.rpc.call('thread/resume', { threadId: c.threadId, excludeTurns: true });
+            this.assertThread(resumed.thread, c.threadId);
+            this.revalidate(); requireThat((await this.loaded()).has(c.threadId), 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
+            binding.view.attached = true;
+            binding.view.permission = typeof resumed.approvalPolicy === 'string' && typeof resumed.sandbox?.type === 'string' ? `${resumed.sandbox.type} · approval=${resumed.approvalPolicy}` : null;
+            this.capability('effectiveState', !!binding.view.permission, 'Exact thread/resume response; no configuration overrides');
+            await this.readThread(c.threadId, true);
             requireThat(this.state === 'READY', this.state);
-            requireThat(finalBinding.view.stateToken === c.stateToken && !finalBinding.view.externalAdvance && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
-            requireThat(expiresAt > this.now() && this.controllerExpires > this.now() && this.controller === authenticatedClient && this.fence === c.expectedFence, 'STALE_FLEET_CONTROLLER_FENCE');
-            this.evidence.append('NATIVE_EFFECT_ATTEMPT', c.commandId, { command: c, daemon: this.identity, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
-            effectSent = true; this.effectPending = true; this.fence++;
-            if (c.family !== 'native.interrupt') this.ownedInputs.set(c.commandId, { threadId: c.threadId, turnId: c.activeTurnId, text: c.text,
-              clientInstanceId: authenticatedClient, clientDisplayLabel: c.clientDisplayLabel, deviceLabel: c.deviceLabel });
-            const input = [{ type: 'text', text: c.text, text_elements: [] }];
-            const result = await this.rpc.call(isSubmit ? 'turn/start' : c.family === 'native.steer' ? 'turn/steer' : 'turn/interrupt', isSubmit ?
-              { threadId: c.threadId, clientUserMessageId: c.commandId, input } : c.family === 'native.steer' ? { threadId: c.threadId, expectedTurnId: c.activeTurnId, clientUserMessageId: c.commandId, input } : { threadId: c.threadId, turnId: c.activeTurnId });
-            if (isSubmit) {
-              requireThat(id(result.turn?.id) && !binding.userState.has(result.turn.id), 'NATIVE_SUBMIT_TARGET_UNPROVABLE'); turnId = result.turn.id;
-              this.ownedTurns.add(turnId!); this.ownedInputs.get(c.commandId)!.turnId = turnId;
+            requireThat(expiresAt > this.now(), 'STALE_FLEET_CONTROLLER_FENCE');
+            this.controller = authenticatedClient; this.controllerGrant = structuredClone(client); this.controllerExpires = expiresAt; this.fence++;
+            code = 'NATIVE_SAME_THREAD_ATTACHED_COOPERATIVE';
+          } else {
+            requireThat(binding.view.attached && this.controller === authenticatedClient && this.controllerExpires > this.now(), 'FLEET_VIEWER_CANNOT_CONTROL');
+            requireThat(this.sameGrant(client, this.controllerGrant), 'STALE_FLEET_GRANT');
+            if (c.family === 'native.release') { this.controller = null; this.fence++; code = 'FLEET_CONTROL_RELEASED_NATIVE_UNCHANGED'; }
+            else if (c.family === 'native.approval') {
+              requireThat(c.approval && this.rpc.respond && this.compatibility.capabilities.approvalResolve.available, 'APPROVAL_UNAVAILABLE');
+              requireThat(binding.view.activeTurnId === c.approval.turnId && binding.view.status === 'active', 'STALE_NATIVE_REQUEST');
+              this.revalidate();
+              requireThat(this.controllerExpires > this.now() && c.expectedFence === this.fence &&
+                c.approval.authority === this.approvalAuthority(c.approval.digest), 'STALE_FLEET_CONTROLLER_FENCE');
+              this.approvals.exact(c.approval);
+              this.evidence.append('NATIVE_EFFECT_ATTEMPT', c.commandId, { command: c, daemon: this.identity, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
+              effectSent = true; this.fence++;
+              await this.approvals.respond(c.approval, c.approval.decision, (id, result) => this.rpc.respond!(id, result));
+              this.revalidate();
+              code = 'NATIVE_APPROVAL_RESOLVED';
             }
-            if (c.family === 'native.steer') requireThat(result.turnId === c.activeTurnId, 'STALE_NATIVE_ACTIVE_TURN');
-            this.revalidate();
-            const afterEffect = await this.readThread(c.threadId);
-            requireThat(!afterEffect.view.externalAdvance, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
-            if (c.family === 'native.interrupt') {
-              code = 'NATIVE_INTERRUPT_REQUEST_ACCEPTED';
-            } else code = isSubmit ? 'NATIVE_CONTINUATION_ACCEPTED' : 'NATIVE_STEER_SAME_TURN_ACCEPTED';
+            else if (c.family === 'native.reviewState') {
+              await this.readThread(c.threadId, true, view => {
+                requireThat(view.stateToken === c.stateToken && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
+                this.revalidate();
+                requireThat(expiresAt > this.now() && this.controllerExpires > this.now() && this.controller === authenticatedClient && this.fence === c.expectedFence, 'STALE_FLEET_CONTROLLER_FENCE');
+              });
+              this.fence++; code = 'NATIVE_STATE_REVIEWED';
+            }
           }
+        } else {
+          // submit/steer/interrupt: one final pre-effect readThread, then post-effect observation.
+          // No TTL/time freshness. No effecting await between the final read and dispatch.
+          requireThat(this.threads.get(c.threadId)?.view.attached && this.controller === authenticatedClient && this.controllerExpires > this.now(), 'FLEET_VIEWER_CANNOT_CONTROL');
+          requireThat(this.sameGrant(client, this.controllerGrant), 'STALE_FLEET_GRANT');
+          requireThat(c.family === 'native.interrupt' || c.text.trim().length > 0, 'NATIVE_INPUT_REQUIRED');
+          if (c.family === 'native.interrupt') requireThat(this.compatibility.capabilities.interrupt.available, 'NATIVE_INTERRUPT_UNAVAILABLE');
+          if (c.family === 'native.steer') requireThat(this.compatibility.capabilities.steer.available, 'NATIVE_STEER_UNAVAILABLE');
+          this.revalidate();
+          const baseline = this.nativeStateEvents;
+          const binding = await this.readThread(c.threadId);
+          requireThat(this.state === 'READY', this.state);
+          requireThat(binding.view.attached && this.controller === authenticatedClient && this.controllerExpires > this.now(), 'FLEET_VIEWER_CANNOT_CONTROL');
+          requireThat(binding.view.stateToken === c.stateToken && !binding.view.externalAdvance && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
+          requireThat(binding.view.activeTurnId === c.activeTurnId, 'STALE_NATIVE_ACTIVE_TURN');
+          const isSubmit = c.family === 'native.submit';
+          requireThat(isSubmit ? binding.view.status === 'idle' && c.activeTurnId === null : binding.view.status === 'active' && !!c.activeTurnId, 'NATIVE_TURN_STATE_INCOMPATIBLE');
+          requireThat(expiresAt > this.now() && this.controllerExpires > this.now() && this.controller === authenticatedClient && this.fence === c.expectedFence, 'STALE_FLEET_CONTROLLER_FENCE');
+          this.evidence.append('NATIVE_EFFECT_ATTEMPT', c.commandId, { command: c, daemon: this.identity, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
+          effectSent = true; this.effectPending = true; this.fence++;
+          if (c.family !== 'native.interrupt') this.ownedInputs.set(c.commandId, { threadId: c.threadId, turnId: c.activeTurnId, text: c.text,
+            clientInstanceId: authenticatedClient, clientDisplayLabel: c.clientDisplayLabel, deviceLabel: c.deviceLabel });
+          const input = [{ type: 'text', text: c.text, text_elements: [] }];
+          const result = await this.rpc.call(isSubmit ? 'turn/start' : c.family === 'native.steer' ? 'turn/steer' : 'turn/interrupt', isSubmit ?
+            { threadId: c.threadId, clientUserMessageId: c.commandId, input } : c.family === 'native.steer' ? { threadId: c.threadId, expectedTurnId: c.activeTurnId, clientUserMessageId: c.commandId, input } : { threadId: c.threadId, turnId: c.activeTurnId });
+          if (isSubmit) {
+            requireThat(id(result.turn?.id) && !binding.userState.has(result.turn.id), 'NATIVE_SUBMIT_TARGET_UNPROVABLE'); turnId = result.turn.id;
+            this.ownedTurns.add(turnId!); this.ownedInputs.get(c.commandId)!.turnId = turnId;
+          }
+          if (c.family === 'native.steer') requireThat(result.turnId === c.activeTurnId, 'STALE_NATIVE_ACTIVE_TURN');
+          this.revalidate();
+          const afterEffect = await this.readThread(c.threadId);
+          requireThat(!afterEffect.view.externalAdvance, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
+          if (c.family === 'native.interrupt') {
+            code = 'NATIVE_INTERRUPT_REQUEST_ACCEPTED';
+          } else code = isSubmit ? 'NATIVE_CONTINUATION_ACCEPTED' : 'NATIVE_STEER_SAME_TURN_ACCEPTED';
         }
       } catch (error) {
         code = failCode(error); status = effectSent ? 'AMBIGUOUS_EFFECT' : 'REJECTED';

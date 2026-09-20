@@ -271,16 +271,24 @@ async function runAdapterBenchmarks(): Promise<ScenarioResult> {
     const wallMs = hrMs(t0);
     const methods = fx.rpc.calls.map(c => c.method);
     const startIdx = methods.indexOf('turn/start');
+    const preEffect = startIdx >= 0 ? methods.slice(0, startIdx) : methods;
+    const postEffect = startIdx >= 0 ? methods.slice(startIdx + 1) : [];
+    const preEffectReadThread = preEffect.filter(m => m === 'thread/read').length;
+    const postEffectReadThread = postEffect.filter(m => m === 'thread/read').length;
     results.WEB_SUBMIT_OBSERVATION_SEQUENCE = {
       wallMs,
       receiptStatus: receipt.status,
       receiptCode: receipt.code,
       methods,
-      preEffect: startIdx >= 0 ? methods.slice(0, startIdx) : methods,
+      preEffect,
       effect: startIdx >= 0 ? methods[startIdx] : null,
-      postEffect: startIdx >= 0 ? methods.slice(startIdx + 1) : [],
+      postEffect,
+      preEffectReadThread,
+      postEffectReadThread,
       methodCounts: fx.rpc.methodCounts(),
-      note: 'Safety revalidation reads retained; redundancy is documentation-only in this Goal.',
+      note: 'T02: single final pre-effect readThread; post-effect observation retained; no TTL freshness.',
+      auditBaselinePreEffectReadThread: 2,
+      consolidated: preEffectReadThread === 1 && postEffectReadThread === 1,
     };
   }
 

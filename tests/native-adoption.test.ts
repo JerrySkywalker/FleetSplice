@@ -641,7 +641,8 @@ test('delayed own submit and steer observations correlate exact client IDs witho
 test('a client expiring during the final native read is rejected before effect dispatch', async () => {
   let now = 1000000; const r = await setup({ now: () => now }); await r.attach(); const c = r.command(await r.adapter.snapshot(), 'native.submit');
   let reads = 0;
-  r.rpc.before = method => { if (method === 'thread/read' && ++reads === 2) now = r.expiresAt; };
+  // T02: the sole pre-effect readThread is the final freshness observation.
+  r.rpc.before = method => { if (method === 'thread/read' && ++reads === 1) now = r.expiresAt; };
   const receipt = await r.adapter.execute(c, r.authority);
   assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'STALE_FLEET_CONTROLLER_FENCE');
   assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start' && c.params.threadId === r.rpc.thread.id).length, 0);
@@ -874,8 +875,9 @@ test('an event journal failure during the final native read blocks dispatch with
   const r = await setup(); await r.attach(); const command = r.command(await r.adapter.snapshot(), 'native.submit');
   r.journal.db.exec("CREATE TRIGGER deny_command BEFORE INSERT ON native_commands BEGIN SELECT RAISE(ABORT,'fixture event journal failure'); END");
   let reads = 0;
+  // T02: the sole pre-effect turns/list is the final freshness observation.
   r.rpc.before = method => {
-    if (method === 'thread/turns/list' && ++reads === 2) r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id,
+    if (method === 'thread/turns/list' && ++reads === 1) r.rpc.onEvent({ method: 'item/completed', params: { threadId: r.rpc.thread.id,
       turnId: r.rpc.turns[0].id, item: { id: 'concurrent-terminal', type: 'commandExecution', status: 'completed' } } });
   };
   const receipt = await r.execute(command); assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_JOURNAL_UNPROVABLE');

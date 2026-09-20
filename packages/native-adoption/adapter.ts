@@ -606,7 +606,7 @@ export class NativeAdoptionAdapter {
           const baseline = this.nativeStateEvents;
           const binding = await this.readThread(c.threadId);
           requireThat(this.state === 'READY', this.state);
-          requireThat(binding.view.attached && this.controller === authenticatedClient && this.controllerExpires > this.now(), 'FLEET_VIEWER_CANNOT_CONTROL');
+          requireThat(binding.view.attached && this.controller === authenticatedClient, 'FLEET_VIEWER_CANNOT_CONTROL');
           requireThat(binding.view.stateToken === c.stateToken && !binding.view.externalAdvance && this.nativeStateEvents === baseline, 'NATIVE_STATE_ADVANCED_EXTERNALLY');
           requireThat(binding.view.activeTurnId === c.activeTurnId, 'STALE_NATIVE_ACTIVE_TURN');
           const isSubmit = c.family === 'native.submit';

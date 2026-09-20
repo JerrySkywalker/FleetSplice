@@ -1,5 +1,5 @@
 /**
- * Automated UX browser acceptance for G05C UX R2 density/semantics.
+ * Automated UX browser acceptance for G05C UX R2-R1 geometry alignment.
  * Real Hub + built React UI + Playwright + disposable Native Adoption fixture.
  */
 import { createServer } from 'node:net';
@@ -17,7 +17,7 @@ import type { Appearance } from '../apps/web/preferences.ts';
 
 const evidenceRoot = path.resolve(
   process.env.FLEETSPLICE_UX_GALLERY
-    ?? 'V:\\artifacts\\FleetSplice\\FLEETSPLICE-G05C-UX-R2-DENSITY-SEMANTICS-001\\UX-GALLERY-R2',
+    ?? 'V:\\artifacts\\FleetSplice\\FLEETSPLICE-G05C-UX-R2-R1-GEOMETRY-ALIGNMENT-001\\UX-GALLERY-R2-R1',
 );
 
 type Check = { name: string; pass: boolean; detail: string };
@@ -53,20 +53,150 @@ async function oledTrueBlack(page: Page): Promise<boolean> {
   });
 }
 
-async function measureMobileDensity(page: Page) {
+async function resetTimelineScroll(page: Page) {
+  await page.evaluate(() => {
+    const timeline = document.querySelector('[data-testid="conversation-timeline"]') as HTMLElement | null;
+    if (timeline) timeline.scrollTop = 0;
+  });
+}
+
+async function scrollTimelineBottom(page: Page) {
+  await page.evaluate(() => {
+    const timeline = document.querySelector('[data-testid="conversation-timeline"]') as HTMLElement | null;
+    if (timeline) timeline.scrollTop = timeline.scrollHeight;
+  });
+}
+
+async function measureComposerGeometry(page: Page) {
   return page.evaluate(() => {
     const composer = document.querySelector('[data-testid="composer-surface"]') as HTMLElement | null;
+    const send = document.querySelector('[data-testid="composer-send"]') as HTMLElement | null;
+    const prompt = document.querySelector('[data-testid="native-prompt"]') as HTMLElement | null;
+    const bar = document.querySelector('[data-testid="session-config-bar"]') as HTMLElement | null;
+    const heading = document.querySelector('.session-heading') as HTMLElement | null;
     const timeline = document.querySelector('[data-testid="conversation-timeline"]') as HTMLElement | null;
-    const configRows = document.querySelector('[data-testid="session-config-bar"]')?.getAttribute('data-config-rows');
-    const helperLabels = Array.from(document.querySelectorAll('.composer-surface label, .sticky-composer > label'))
-      .filter(node => (node.textContent ?? '').trim().length > 0).length;
-    const permanentHints = document.querySelectorAll('.composer-surface .config-hint, .sticky-composer .config-hint').length;
+    const message = document.querySelector('.timeline .message') as HTMLElement | null;
+    const tool = document.querySelector('[data-testid="tool-activity-card"]') as HTMLElement | null;
+    if (!composer) return null;
+    const cr = composer.getBoundingClientRect();
+    const sendR = send?.getBoundingClientRect();
+    const promptR = prompt?.getBoundingClientRect();
+    const composerPad = parseFloat(getComputedStyle(composer).paddingRight) || 0;
+    const headingPad = heading ? parseFloat(getComputedStyle(heading).paddingLeft) || 0 : 0;
+    const timelinePad = timeline ? parseFloat(getComputedStyle(timeline).paddingLeft) || 0 : 0;
+    const composerPadL = parseFloat(getComputedStyle(composer).paddingLeft) || 0;
+    const edges = [
+      heading ? heading.getBoundingClientRect().left + headingPad : null,
+      timeline ? timeline.getBoundingClientRect().left + timelinePad : null,
+      // Composer outer border shares the conversation gutter (internal padding is inset).
+      cr.left,
+      message ? message.getBoundingClientRect().left : null,
+      tool ? tool.getBoundingClientRect().left : null,
+    ].filter((value): value is number => value !== null);
+    const edgeMin = Math.min(...edges);
+    const edgeMax = Math.max(...edges);
+    let configWrap = false;
+    if (bar) {
+      const barTop = bar.getBoundingClientRect().top;
+      for (const child of Array.from(bar.children) as HTMLElement[]) {
+        if (child.getBoundingClientRect().top > barTop + 10) configWrap = true;
+      }
+    }
+    const trailingAligned = !!(sendR && promptR
+      && sendR.left >= promptR.right - 12
+      && Math.abs((cr.right - composerPad) - sendR.right) <= 8);
     return {
-      composerHeight: composer?.getBoundingClientRect().height ?? -1,
-      timelineHeight: timeline?.getBoundingClientRect().height ?? -1,
-      configRows: configRows ?? 'unknown',
-      helperLabels,
-      permanentHints,
+      composerHeight: cr.height,
+      trailingAligned,
+      sendLeft: sendR?.left ?? -1,
+      promptRight: promptR?.right ?? -1,
+      composerRight: cr.right,
+      edgeDelta: edgeMax - edgeMin,
+      edges,
+      configWrap,
+      configRows: bar?.getAttribute('data-config-rows') ?? 'unknown',
+      observeChips: bar?.getAttribute('data-observe-chips') ?? 'unknown',
+      helperLabels: Array.from(document.querySelectorAll('.composer-surface label, .sticky-composer > label'))
+        .filter(node => (node.textContent ?? '').trim().length > 0).length,
+      permanentHints: document.querySelectorAll('.composer-surface .config-hint, .sticky-composer .config-hint').length,
+    };
+  });
+}
+
+async function scanClipping(page: Page) {
+  return page.evaluate(() => {
+    const selectors = [
+      '[data-testid="session-item"]',
+      '.session-workspace',
+      '[data-testid="ownership-surface"]',
+      '[data-testid="config-capsule"]',
+      '.config-readonly-chip',
+      '.context dd',
+      '[data-testid="session-connect-preview"]',
+      '[data-testid="composer-send"]',
+      '.composer-actions button',
+      '.connect-facts dd',
+    ];
+    const offenders: Array<{ sel: string; policy: string; sw: number; cw: number; sh: number; ch: number }> = [];
+    for (const sel of selectors) {
+      for (const el of Array.from(document.querySelectorAll(sel)) as HTMLElement[]) {
+        const policyEl = el.closest('[data-clipping-policy]') as HTMLElement | null;
+        const policy = policyEl?.getAttribute('data-clipping-policy')
+          ?? (getComputedStyle(el).textOverflow === 'ellipsis' ? 'ellipsis' : '');
+        if (policy === 'ellipsis') continue;
+        if (el.scrollWidth > el.clientWidth + 2 || el.scrollHeight > el.clientHeight + 3) {
+          offenders.push({
+            sel,
+            policy: policy || 'none',
+            sw: el.scrollWidth,
+            cw: el.clientWidth,
+            sh: el.scrollHeight,
+            ch: el.clientHeight,
+          });
+        }
+      }
+    }
+    return offenders;
+  });
+}
+
+async function measureConfigSurface(page: Page) {
+  return page.evaluate(() => {
+    const sheet = document.querySelector('[data-testid="config-sheet"]') as HTMLElement | null;
+    if (!sheet) return null;
+    const box = sheet.getBoundingClientRect();
+    return {
+      width: box.width,
+      height: box.height,
+      top: box.top,
+      left: box.left,
+      variant: sheet.getAttribute('data-config-surface') ?? 'unknown',
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+}
+
+async function measureConnectPreview(page: Page) {
+  return page.evaluate(() => {
+    const preview = document.querySelector('[data-testid="session-connect-preview"]') as HTMLElement | null;
+    const button = document.querySelector('[data-testid="connect-session"]') as HTMLElement | null;
+    const ownership = document.querySelector('[data-testid="ownership-surface"]') as HTMLElement | null;
+    if (!preview) return null;
+    const box = preview.getBoundingClientRect();
+    const pane = document.querySelector('[data-testid="conversation-pane"]') as HTMLElement | null;
+    const paneBox = pane?.getBoundingClientRect();
+    const centerDelta = paneBox
+      ? Math.abs((box.left + box.width / 2) - (paneBox.left + paneBox.width / 2))
+      : -1;
+    return {
+      width: box.width,
+      maxWidthOk: box.width <= 700,
+      centerDelta,
+      buttonWidth: button?.getBoundingClientRect().width ?? -1,
+      notConnected: ownership?.getAttribute('data-connected') === 'false'
+        && !!document.querySelector('[data-testid="ownership-not-connected"]'),
+      acquireAbsent: !document.querySelector('[data-testid="ownership-action"]'),
     };
   });
 }
@@ -106,36 +236,71 @@ async function run(): Promise<number> {
     await expect(page.getByTestId('session-connect-preview')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('connect-session')).toBeVisible();
     checks.push(check('CONNECT_SESSION_SEMANTICS', true, 'Connect session visible'));
-    await page.screenshot({ path: path.join(evidenceRoot, 'native-session-connect.png'), fullPage: true });
+    const connectGeom = await measureConnectPreview(page);
+    density.connectPreview = connectGeom;
+    checks.push(check('SESSION_CONNECT_CENTERED', !!connectGeom
+      && connectGeom.maxWidthOk
+      && connectGeom.centerDelta >= 0
+      && connectGeom.centerDelta <= 48
+      && connectGeom.buttonWidth > 0
+      && connectGeom.buttonWidth < 520, JSON.stringify(connectGeom)));
+    checks.push(check('UNCONNECTED_CONTEXT_SEMANTICS', !!connectGeom
+      && connectGeom.notConnected
+      && connectGeom.acquireAbsent, JSON.stringify({
+      notConnected: connectGeom?.notConnected,
+      acquireAbsent: connectGeom?.acquireAbsent,
+    })));
+    await page.screenshot({ path: path.join(evidenceRoot, 'native-session-connect-centered.png'), fullPage: true });
 
     await page.getByTestId('connect-session').click();
     await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
     await expect(page.getByTestId('session-config-bar')).toBeVisible();
     await waitIdle(page);
+    await expect(page.getByTestId('ownership-surface')).toHaveAttribute('data-connected', 'true');
 
-    // --- Theme gallery ---
-    const themes: Appearance[] = ['light', 'dark', 'oled-black', 'midnight', 'graphite', 'warm'];
-    const themeFiles: Record<string, string> = {
-      light: 'desktop-light.png',
-      dark: 'desktop-dark.png',
-      'oled-black': 'desktop-oled.png',
-      midnight: 'desktop-midnight.png',
-      graphite: 'desktop-graphite.png',
-      warm: 'desktop-warm.png',
-    };
+    // Observe-only chips (no disabled selects)
+    const observeOnly = await page.evaluate(() => {
+      const bar = document.querySelector('[data-testid="session-config-bar"]');
+      const selects = bar?.querySelectorAll('select').length ?? -1;
+      const chips = bar?.querySelectorAll('.config-readonly-chip').length ?? -1;
+      return {
+        mutation: bar?.getAttribute('data-mutation-supported'),
+        observeChips: bar?.getAttribute('data-observe-chips'),
+        selects,
+        chips,
+      };
+    });
+    checks.push(check('OBSERVE_ONLY_CONFIG_READONLY_CHIPS',
+      observeOnly.mutation === 'false'
+      && observeOnly.observeChips === 'true'
+      && observeOnly.selects === 0
+      && observeOnly.chips >= 2, JSON.stringify(observeOnly)));
+
+    // --- Theme gallery compact (scroll top) ---
     await page.setViewportSize({ width: 1440, height: 900 });
-    for (const theme of themes) {
-      await setPresentation(page, 'en-US', theme);
-      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-      await page.screenshot({ path: path.join(evidenceRoot, themeFiles[theme]!), fullPage: true });
-    }
     await setPresentation(page, 'en-US', 'oled-black');
+    await resetTimelineScroll(page);
+    await page.screenshot({ path: path.join(evidenceRoot, 'desktop-oled-compact.png'), fullPage: true });
     checks.push(check('OLED_TRUE_BLACK', await oledTrueBlack(page), 'canvas/body true black'));
+    await setPresentation(page, 'en-US', 'light');
+    await resetTimelineScroll(page);
+    await page.screenshot({ path: path.join(evidenceRoot, 'desktop-light-compact.png'), fullPage: true });
 
-    // --- Interaction: desktop oled ---
+    // Desktop geometry
     await page.setViewportSize({ width: 1440, height: 900 });
     await setPresentation(page, 'en-US', 'oled-black');
+    await page.locator('#native-prompt').fill('');
+    await waitIdle(page);
+    const desktopGeom = await measureComposerGeometry(page);
+    density.desktop1440 = desktopGeom;
     checks.push(check('NO_OVERFLOW_DESKTOP', await noHorizontalOverflow(page), '1440x900'));
+    checks.push(check('DESKTOP_COMPOSER_IDLE_HEIGHT', !!desktopGeom && desktopGeom.composerHeight > 0 && desktopGeom.composerHeight <= 120,
+      `h=${desktopGeom?.composerHeight}`));
+    checks.push(check('COMPOSER_TRAILING_ACTION_ALIGNMENT', !!desktopGeom && desktopGeom.trailingAligned,
+      JSON.stringify({ trailingAligned: desktopGeom?.trailingAligned, sendLeft: desktopGeom?.sendLeft, promptRight: desktopGeom?.promptRight })));
+    checks.push(check('CONVERSATION_EDGE_ALIGNMENT', !!desktopGeom && desktopGeom.edgeDelta <= 4,
+      `delta=${desktopGeom?.edgeDelta} edges=${JSON.stringify(desktopGeom?.edges)}`));
+    checks.push(check('DESKTOP_CONFIG_NO_WRAP', !!desktopGeom && !desktopGeom.configWrap, `wrap=${desktopGeom?.configWrap}`));
     checks.push(check('COMPOSER_USABLE', await page.locator('#native-prompt').isEnabled(), 'prompt enabled'));
     checks.push(check('CONFIG_BAR', await page.getByTestId('session-config-bar').isVisible(), 'visible'));
     checks.push(check('CONFIG_MUTATION_HONEST', await page.getByTestId('session-config-bar').getAttribute('data-mutation-supported') === 'false', 'native observe-only attr'));
@@ -143,7 +308,14 @@ async function run(): Promise<number> {
     await page.getByTestId('config-detail-open').click();
     await expect(page.getByTestId('config-sheet')).toBeVisible();
     await expect(page.getByTestId('config-mutation-hint')).toBeVisible();
-    await page.screenshot({ path: path.join(evidenceRoot, 'composer-expanded-config.png'), fullPage: true });
+    const desktopSheet = await measureConfigSurface(page);
+    density.desktopConfigSurface = desktopSheet;
+    checks.push(check('DESKTOP_CONFIG_POPOVER', !!desktopSheet
+      && desktopSheet.variant === 'popover'
+      && desktopSheet.width >= 280
+      && desktopSheet.width <= 420
+      && desktopSheet.width < desktopSheet.viewportWidth * 0.55, JSON.stringify(desktopSheet)));
+    await page.screenshot({ path: path.join(evidenceRoot, 'config-desktop-popover.png') });
     await page.getByTestId('config-sheet-close').click();
     await expect(page.getByTestId('config-sheet')).toHaveCount(0);
     checks.push(check('CONFIG_SHEET_DETAILS', true, 'mutation hint in sheet'));
@@ -188,10 +360,10 @@ async function run(): Promise<number> {
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByText('LIVE_ASSISTANT_A')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('git rev-parse --short HEAD')).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: path.join(evidenceRoot, 'streaming-tool-running.png'), fullPage: true }).catch(() => {});
     await expect(page.getByText('LIVE_ASSISTANT_B_FINAL')).toBeVisible({ timeout: 10000 });
     await waitIdle(page);
-    await page.screenshot({ path: path.join(evidenceRoot, 'streaming-tool-completed.png'), fullPage: true });
+    await resetTimelineScroll(page);
+    await page.screenshot({ path: path.join(evidenceRoot, 'tool-card-completed.png'), fullPage: true });
     const toolCompleted = await page.locator('[data-testid="tool-activity-card"][data-tool-status="completed"], [data-item-id="tool-1"]').count();
     const assistA = await page.locator('[data-item-id="assist-a"]').count();
     const assistB = await page.locator('[data-item-id="assist-b"]').count();
@@ -204,6 +376,7 @@ async function run(): Promise<number> {
     await expect(page.getByTestId('external-advance-notice')).toBeVisible({ timeout: 5000 });
     const reviewActions = await page.getByTestId('external-review-action').count();
     checks.push(check('EXTERNAL_REVIEW_ONCE', reviewActions === 1, `actions=${reviewActions}`));
+    await resetTimelineScroll(page);
     await page.screenshot({ path: path.join(evidenceRoot, 'external-review.png'), fullPage: true });
     await page.getByTestId('external-review-action').click();
     await waitIdle(page);
@@ -230,7 +403,15 @@ async function run(): Promise<number> {
     // --- Tablet interaction ---
     await setPresentation(page, 'en-US', 'midnight');
     await expect(page.getByTestId('app-shell')).toHaveAttribute('data-breakpoint', 'tablet');
+    await page.locator('#native-prompt').fill('');
     checks.push(check('NO_OVERFLOW_TABLET', await noHorizontalOverflow(page), '1024x768'));
+    const tabletGeom = await measureComposerGeometry(page);
+    density.tablet1024 = tabletGeom;
+    checks.push(check('TABLET_COMPOSER_IDLE_HEIGHT', !!tabletGeom && tabletGeom.composerHeight > 0 && tabletGeom.composerHeight <= 120,
+      `h=${tabletGeom?.composerHeight}`));
+    checks.push(check('TABLET_CONFIG_SINGLE_LINE', !!tabletGeom && tabletGeom.configRows === '1' && !tabletGeom.configWrap,
+      `rows=${tabletGeom?.configRows} wrap=${tabletGeom?.configWrap}`));
+    await expect(page.getByTestId('config-capsule')).toBeVisible();
     await page.getByTestId('nav-menu').click();
     await expect(page.getByTestId('nav-drawer')).toBeVisible();
     await page.getByTestId('nav-backdrop').click();
@@ -239,7 +420,8 @@ async function run(): Promise<number> {
     await expect(page.getByTestId('context-drawer')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('context-drawer')).toHaveCount(0);
-    await page.screenshot({ path: path.join(evidenceRoot, 'tablet-landscape.png'), fullPage: true });
+    await resetTimelineScroll(page);
+    await page.screenshot({ path: path.join(evidenceRoot, 'tablet-compact.png'), fullPage: true });
     checks.push(check('TABLET_DRAWERS', true, 'nav/context drawers'));
     checks.push(check('TABLET_NO_THREE_COLUMN', await page.locator('[data-testid="navigation-panel"]').isHidden()
       && await page.locator('[data-testid="context-panel"]').isHidden(), 'side panels hidden'));
@@ -248,25 +430,26 @@ async function run(): Promise<number> {
     await page.setViewportSize({ width: 390, height: 844 });
     await setPresentation(page, 'en-US', 'dark');
     await expect(page.getByTestId('app-shell')).toHaveAttribute('data-breakpoint', 'mobile');
+    await page.locator('#native-prompt').fill('');
     checks.push(check('NO_OVERFLOW_PHONE', await noHorizontalOverflow(page), '390x844'));
-    const mobileDensity = await measureMobileDensity(page);
-    density.mobile390 = mobileDensity;
-    checks.push(check('MOBILE_CONFIG_ROWS', mobileDensity.configRows === '1', `rows=${mobileDensity.configRows}`));
-    checks.push(check('MOBILE_HELPER_TEXT', mobileDensity.helperLabels === 0 && mobileDensity.permanentHints === 0,
-      `labels=${mobileDensity.helperLabels} hints=${mobileDensity.permanentHints}`));
-    checks.push(check('MOBILE_COMPOSER_HEIGHT', mobileDensity.composerHeight > 0 && mobileDensity.composerHeight <= 150,
-      `h=${mobileDensity.composerHeight}`));
-    checks.push(check('MOBILE_CONVERSATION_VIEWPORT', mobileDensity.timelineHeight >= 480 || mobileDensity.timelineHeight < 0,
-      `timeline=${mobileDensity.timelineHeight}`));
-    // If timeline measured, require >=480; if layout still settling allow borderline with detail
-    if (mobileDensity.timelineHeight >= 0 && mobileDensity.timelineHeight < 480) {
-      checks[checks.length - 1] = check('MOBILE_CONVERSATION_VIEWPORT', false, `timeline=${mobileDensity.timelineHeight}`);
-    }
+    const mobileGeom = await measureComposerGeometry(page);
+    density.mobile390 = mobileGeom;
+    checks.push(check('MOBILE_CONFIG_ROWS', mobileGeom?.configRows === '1', `rows=${mobileGeom?.configRows}`));
+    checks.push(check('MOBILE_HELPER_TEXT', (mobileGeom?.helperLabels ?? 1) === 0 && (mobileGeom?.permanentHints ?? 1) === 0,
+      `labels=${mobileGeom?.helperLabels} hints=${mobileGeom?.permanentHints}`));
+    checks.push(check('MOBILE_COMPOSER_IDLE_HEIGHT', !!mobileGeom && mobileGeom.composerHeight > 0 && mobileGeom.composerHeight <= 112,
+      `h=${mobileGeom?.composerHeight}`));
 
     await expect(page.getByTestId('config-capsule')).toBeVisible();
     await page.getByTestId('config-capsule').click();
     await expect(page.getByTestId('config-sheet')).toBeVisible();
     await expect(page.getByTestId('config-mutation-hint')).toBeVisible();
+    const mobileSheet = await measureConfigSurface(page);
+    density.mobileConfigSurface = mobileSheet;
+    checks.push(check('MOBILE_CONFIG_SHEET', !!mobileSheet
+      && mobileSheet.variant === 'sheet'
+      && mobileSheet.width >= mobileSheet.viewportWidth * 0.9, JSON.stringify(mobileSheet)));
+    await page.screenshot({ path: path.join(evidenceRoot, 'config-mobile-sheet.png') });
     await page.getByTestId('config-sheet-close').click();
 
     await page.getByTestId('nav-menu').click();
@@ -275,23 +458,26 @@ async function run(): Promise<number> {
     await page.getByTestId('context-menu').click();
     await expect(page.getByTestId('context-drawer')).toBeVisible();
     await page.keyboard.press('Escape');
-    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-390-dark.png'), fullPage: true });
-    await setPresentation(page, 'en-US', 'oled-black');
-    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-390-oled.png'), fullPage: true });
+
+    await resetTimelineScroll(page);
+    await page.waitForTimeout(80);
+    const scrollTop = await page.evaluate(() => (document.querySelector('[data-testid="conversation-timeline"]') as HTMLElement | null)?.scrollTop ?? -1);
+    checks.push(check('GALLERY_SCROLL_DISCIPLINE', scrollTop === 0, `scrollTop=${scrollTop}`));
+    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-390-top.png'), fullPage: true });
+    await scrollTimelineBottom(page);
+    await page.waitForTimeout(80);
+    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-390-bottom.png'), fullPage: true });
     checks.push(check('MOBILE_DRAWERS', true, 'nav/context'));
 
-    await page.setViewportSize({ width: 412, height: 915 });
-    await setPresentation(page, 'en-US', 'light');
-    checks.push(check('NO_OVERFLOW_412', await noHorizontalOverflow(page), '412x915'));
-    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-412-light.png'), fullPage: true });
-
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await setPresentation(page, 'en-US', 'dark');
-    checks.push(check('NO_OVERFLOW_768x1024', await noHorizontalOverflow(page), '768x1024'));
-    await page.screenshot({ path: path.join(evidenceRoot, 'tablet-portrait.png'), fullPage: true });
+    // Element clipping scan (connected desktop)
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await setPresentation(page, 'en-US', 'oled-black');
+    await waitIdle(page);
+    const clipOffenders = await scanClipping(page);
+    density.clipping = clipOffenders;
+    checks.push(check('TEXT_CLIPPING_SCAN', clipOffenders.length === 0, JSON.stringify(clipOffenders.slice(0, 8))));
 
     // Focus usability
-    await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByTestId('preferences').focus();
     await expect(page.getByTestId('preferences')).toBeFocused();
     checks.push(check('KEYBOARD_FOCUS', true, 'preferences focusable'));

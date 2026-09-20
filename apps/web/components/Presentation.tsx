@@ -73,7 +73,11 @@ export function ToolActivityCard({ item, runningLabel, completedLabel, failedLab
   </article>;
 }
 
-export function OwnershipSurface({ controlled, controllerLabel, viewerLabel, releaseLabel, acquireLabel, canRelease, canAcquire, onRelease, onAcquire }: {
+export function OwnershipSurface({
+  controlled, controllerLabel, viewerLabel, releaseLabel, acquireLabel,
+  canRelease, canAcquire, onRelease, onAcquire,
+  connected = true, notConnectedLabel = 'Not connected',
+}: {
   controlled: boolean;
   controllerLabel: string;
   viewerLabel: string;
@@ -83,8 +87,18 @@ export function OwnershipSurface({ controlled, controllerLabel, viewerLabel, rel
   canAcquire: boolean;
   onRelease: () => void;
   onAcquire: () => void;
+  connected?: boolean;
+  notConnectedLabel?: string;
 }) {
-  return <div className="ownership-surface" data-testid="ownership-surface" data-controlled={controlled}>
+  if (!connected) {
+    return <div className="ownership-surface" data-testid="ownership-surface" data-controlled="false" data-connected="false">
+      <div className="ownership-status">
+        <span className="status-dot is-outline" aria-hidden="true" />
+        <span data-testid="ownership-not-connected">{notConnectedLabel}</span>
+      </div>
+    </div>;
+  }
+  return <div className="ownership-surface" data-testid="ownership-surface" data-controlled={controlled} data-connected="true">
     <div className="ownership-status">
       <span className={`status-dot ${controlled ? 'is-filled' : 'is-outline'}`} aria-hidden="true" />
       <span>{controlled ? controllerLabel : viewerLabel}</span>
@@ -156,10 +170,10 @@ export function SessionItem({
     data-connected={connected}
     onClick={onSelect}
   >
-    <strong>{title}</strong>
-    <span>{subtitle}</span>
-    <small>{workspace}</small>
-    <small className="session-item-status">
+    <strong className="text-ellipsis" title={title}>{title}</strong>
+    <span className="text-ellipsis" title={subtitle}>{subtitle}</span>
+    <small className="session-workspace text-ellipsis" data-clipping-policy="ellipsis" title={workspace}>{workspace}</small>
+    <small className="session-item-status text-ellipsis" title={status}>
       {connected ? <CheckCircle2 size={12} aria-hidden="true" /> : <Circle size={12} aria-hidden="true" />}
       {status}
     </small>
@@ -188,13 +202,13 @@ export function SessionConnectPreview({
     <div className="eyebrow">Codex</div>
     <h2>{title}</h2>
     <dl className="connect-facts">
-      <dt>{workspaceLabel}</dt><dd>{workspace}</dd>
-      <dt>{modelLabel}</dt><dd>{model}</dd>
+      <dt>{workspaceLabel}</dt><dd className="text-ellipsis" data-clipping-policy="ellipsis" title={workspace}>{workspace}</dd>
+      <dt>{modelLabel}</dt><dd className="text-ellipsis" data-clipping-policy="ellipsis" title={model}>{model}</dd>
       <dt>{stateLabel}</dt><dd>{state}</dd>
-      <dt>{threadLabel}</dt><dd className="id">{threadShort}</dd>
+      <dt>{threadLabel}</dt><dd className="id text-wrap-safe">{threadShort}</dd>
     </dl>
-    <p className="muted connect-body">{body}</p>
-    <button type="button" className="primary" data-testid="connect-session" disabled={disabled} onClick={onConnect}>
+    <p className="muted connect-body text-wrap-safe">{body}</p>
+    <button type="button" className="primary connect-session-action" data-testid="connect-session" disabled={disabled} onClick={onConnect}>
       {actionLabel}
     </button>
   </div>;

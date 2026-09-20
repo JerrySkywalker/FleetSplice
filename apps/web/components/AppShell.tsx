@@ -149,18 +149,18 @@ export function AppShell({
           <MoreHorizontal size={20} aria-hidden="true" />
         </button>}
         {desktop && <>
-          <button type="button" className="ghost-button icon-text-button" data-testid="toggle-left"
+          <button type="button" className="ghost-button icon-button" data-testid="toggle-left"
             aria-label={layout.leftCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            title={layout.leftCollapsed ? 'Expand navigation' : 'Collapse navigation'}
             aria-pressed={layout.leftCollapsed}
             onClick={() => updateLayout({ leftCollapsed: !layout.leftCollapsed })}>
             {layout.leftCollapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}
-            <span>Nav</span>
           </button>
-          <button type="button" className="ghost-button icon-text-button" data-testid="toggle-right"
+          <button type="button" className="ghost-button icon-button" data-testid="toggle-right"
             aria-label={layout.rightCollapsed ? 'Expand context' : 'Collapse context'}
+            title={layout.rightCollapsed ? 'Expand context' : 'Collapse context'}
             aria-pressed={layout.rightCollapsed}
             onClick={() => updateLayout({ rightCollapsed: !layout.rightCollapsed })}>
-            <span>Ctx</span>
             {layout.rightCollapsed ? <PanelRightOpen size={16} aria-hidden="true" /> : <PanelRightClose size={16} aria-hidden="true" />}
           </button>
         </>}

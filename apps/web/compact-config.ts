@@ -44,9 +44,9 @@ export function compactConfigSummary(input: {
   reasoning?: string | null;
   permission?: string | null;
 }): string {
-  return [
-    abbreviateModel(input.model),
-    abbreviateReasoning(input.reasoning),
-    abbreviatePermission(input.permission),
-  ].join(' · ');
+  const parts = [abbreviateModel(input.model)];
+  const reasoning = (input.reasoning ?? '').trim();
+  if (reasoning) parts.push(abbreviateReasoning(reasoning));
+  parts.push(abbreviatePermission(input.permission));
+  return parts.join(' · ');
 }

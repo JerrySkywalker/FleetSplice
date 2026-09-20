@@ -10,4 +10,5 @@ test('compact config notation abbreviates observed labels', () => {
   assert.equal(abbreviatePermission('dangerFullAccess approval=never'), 'YOLO');
   assert.equal(abbreviatePermission('read-only'), 'RO');
   assert.equal(compactConfigSummary({ model: 'gpt-5.6-terra', reasoning: 'medium', permission: 'YOLO' }), '5.6T · MED · YOLO');
+  assert.equal(compactConfigSummary({ model: 'gpt-5.6-terra', reasoning: '', permission: 'YOLO' }), '5.6T · YOLO');
 });

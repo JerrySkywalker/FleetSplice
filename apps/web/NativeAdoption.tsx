@@ -357,7 +357,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         onSelect={() => setSelected(item.id)}
       />)}
       <button type="button" disabled={busy} onClick={() => void refresh(true)}>{t('Refresh discovery', '刷新发现')}</button>
-      <div className="local-note">{t('Local browser only', '仅限本地浏览器')}<br/>{snapshot?.compatibility.profile ?? 'PROBING'}</div>
+      <div className="local-note">{t('Local browser only', '仅限本地浏览器')}</div>
     </>}
     conversation={<>
       <div className="session-heading"><div><div className="eyebrow">{t('Native session', '原生会话')}</div>
@@ -460,6 +460,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     context={<>
       <div className="eyebrow">{t('Session', '会话')}</div>
       <OwnershipSurface
+        connected={!!thread?.attached}
+        notConnectedLabel={t('Not connected', '未连接')}
         controlled={controlled}
         controllerLabel={t('You control this session', '你控制此会话')}
         viewerLabel={t('Read-only viewer', '只读查看者')}
@@ -492,6 +494,6 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         <pre>{JSON.stringify(snapshot?.receipts.at(-1) ?? null, null, 2)}</pre>
       </details>
     </>}
-    footer={<><span>{snapshot?.state ?? 'CONNECTING'} · {snapshot?.compatibility.profile ?? 'PROBING'}</span><span className="footer-right">{t('Native TUI remains usable', '原生 TUI 仍可继续使用')}</span></>}
+    footer={<><span>{snapshot?.state ?? 'CONNECTING'}</span><span className="footer-right">{t('Native TUI remains usable', '原生 TUI 仍可继续使用')}</span></>}
   />;
 }

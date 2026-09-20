@@ -23,16 +23,19 @@ G05C_FINAL_PRODUCT_BASELINE_READY=true
 PRIMARY_NATIVE_PATH=NATIVE_ADOPTED
 NEAR_TERM_UI_UX_DEVELOPMENT=FROZEN
 NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK
-G06_STARTED=false
-TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY
+G06_STARTED=true
+G06_PHASE=PREDEPLOY_LOCAL
+TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY
 TENCENT_TARGET=tencent-pek-01
+TENCENT_DEPLOYED=false
 REMOTE_TENCENT_WORK=false
-IMPLEMENTATION_AUTHORIZED=NONE
-PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
+G06_LIVE_ACCEPTANCE=false
+IMPLEMENTATION_AUTHORIZED=PERF_G06_PREDEPLOY_NIGHT_TRAIN_ONLY
+PRODUCT_IMPLEMENTATION_AUTHORIZED=PERF_G06_PREDEPLOY_NIGHT_TRAIN_ONLY
 ```
 
-This documentation boundary freeze does not authorize product implementation.
-Do not resume product implementation or begin G06 without a later explicit
+This train authorizes only the bounded PERF/G06-predeploy night Goals.
+Do not begin product G07, contact Tencent, or merge main without a later explicit
 Owner instruction and a bounded Goal.
 
 1. FleetSplice is a **control plane for coding agents in existing development

@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Circle, Loader2, ShieldAlert, XCircle } from 'lucide-react';
+import { Circle } from 'lucide-react';
+import { SemanticIcon, toolFailedIcon as ToolFailedIcon } from '../icons/semantic-icons.tsx';
 import type { TimelinePresentationItem } from '../../../packages/contracts/realtime-timeline.ts';
 
 export function StatusChip({ kind, label, testId }: {
@@ -62,9 +63,9 @@ export function ToolActivityCard({ item, runningLabel, completedLabel, failedLab
     <div className="tool-card-head">
       <strong>{title}</strong>
       <span className={`tool-state ${running ? 'pulse' : ''}`}>
-        {running ? <Loader2 size={14} className="tool-icon spin" aria-hidden="true" />
-          : failed ? <XCircle size={14} className="tool-icon" aria-hidden="true" />
-            : <CheckCircle2 size={14} className="tool-icon" aria-hidden="true" />}
+        {running ? <SemanticIcon intent="toolRunning" size={14} className="tool-icon" spin />
+          : failed ? <ToolFailedIcon size={14} className="tool-icon" aria-hidden="true" />
+            : <SemanticIcon intent="toolCompleted" size={14} className="tool-icon" />}
         {stateLabel}
       </span>
     </div>
@@ -114,7 +115,7 @@ export function ReviewCard({ title, body, actionLabel, disabled, onReview }: {
 }) {
   return <div className="review-card notice-card review-card-compact severity-info" data-testid="external-advance-notice" data-severity="info">
     <div className="review-card-body">
-      <AlertTriangle size={16} className="review-card-icon" aria-hidden="true" />
+      <SemanticIcon intent="review" size={16} className="review-card-icon" />
       <div className="review-card-copy">
         <strong>{title}</strong>
         <p>{body}</p>
@@ -140,7 +141,7 @@ export function ApprovalCard({
 }) {
   return <article className="approval-card" data-testid="approval-card">
     <div className="notice-card-head">
-      <ShieldAlert size={16} aria-hidden="true" />
+      <SemanticIcon intent="warning" size={16} />
       <strong>{statusLabel}</strong>
     </div>
     <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{summary}</p>
@@ -176,7 +177,7 @@ export function SessionItem({
     <span className="text-ellipsis" title={subtitle}>{subtitle}</span>
     <small className="session-workspace text-ellipsis" data-clipping-policy="ellipsis" title={workspace}>{workspace}</small>
     <small className="session-item-status text-ellipsis" title={status}>
-      {connected ? <CheckCircle2 size={12} aria-hidden="true" /> : <Circle size={12} aria-hidden="true" />}
+      {connected ? <SemanticIcon intent="connected" size={12} /> : <Circle size={12} aria-hidden="true" />}
       {status}
     </small>
   </button>;

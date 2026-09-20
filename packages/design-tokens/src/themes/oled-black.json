@@ -1,0 +1,33 @@
+{
+  "$description": "FleetSplice OLED black theme. canvas/surface/footer remain true black.",
+  "colorScheme": { "$type": "string", "$value": "dark" },
+  "color": {
+    "canvas": { "$type": "color", "$value": "#000000" },
+    "surface": { "$type": "color", "$value": "#000000" },
+    "panel": { "$type": "color", "$value": "#050607" },
+    "raised": { "$type": "color", "$value": "#101418" },
+    "text": { "$type": "color", "$value": "#f1f6f8" },
+    "textMuted": { "$type": "color", "$value": "#bac8d0" },
+    "border": { "$type": "color", "$value": "#3d4d57" },
+    "hover": { "$type": "color", "$value": "#161d22" },
+    "accent": { "$type": "color", "$value": "#a2dde6" },
+    "onAccent": { "$type": "color", "$value": "#082a33" },
+    "accentHover": { "$type": "color", "$value": "#cef0f4" },
+    "selected": { "$type": "color", "$value": "#122028" },
+    "selectedText": { "$type": "color", "$value": "#c4edf2" },
+    "focus": { "$type": "color", "$value": "#b1eefa" },
+    "online": { "$type": "color", "$value": "#86dfb8" },
+    "offline": { "$type": "color", "$value": "#f0c881" },
+    "success": { "$type": "color", "$value": "#86dfb8" },
+    "attention": { "$type": "color", "$value": "#f0c881" },
+    "warning": { "$type": "color", "$value": "#f0c881" },
+    "danger": { "$type": "color", "$value": "#ff9b9b" },
+    "streaming": { "$type": "color", "$value": "#b1eefa" },
+    "tool": { "$type": "color", "$value": "#a8c2cf" },
+    "warningBg": { "$type": "color", "$value": "#1a1408" },
+    "warningText": { "$type": "color", "$value": "#ffe4b5" },
+    "warningBorder": { "$type": "color", "$value": "#a98b5a" },
+    "footer": { "$type": "color", "$value": "#000000" },
+    "shadowColor": { "$type": "color", "$value": "#00000088" }
+  }
+}

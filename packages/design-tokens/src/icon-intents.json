@@ -1,0 +1,18 @@
+{
+  "$description": "Semantic icon intents. Platforms map independently (Web→Lucide, Flutter→own glyphs).",
+  "intents": [
+    "settings",
+    "sessions",
+    "context",
+    "send",
+    "interrupt",
+    "steer",
+    "review",
+    "connected",
+    "controller",
+    "viewer",
+    "toolRunning",
+    "toolCompleted",
+    "warning"
+  ]
+}

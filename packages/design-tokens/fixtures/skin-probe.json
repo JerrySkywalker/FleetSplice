@@ -1,0 +1,22 @@
+{
+  "$description": "DEV/TEST ONLY skin probe. Not a user-facing theme. Proves token swap without product code changes.",
+  "id": "skin-probe",
+  "userFacing": false,
+  "overrides": {
+    "color": {
+      "accent": { "$type": "color", "$value": "#7a2f6b" },
+      "onAccent": { "$type": "color", "$value": "#fff5fb" },
+      "accentHover": { "$type": "color", "$value": "#934086" },
+      "surface": { "$type": "color", "$value": "#f7f0f5" },
+      "panel": { "$type": "color", "$value": "#efe3eb" },
+      "selected": { "$type": "color", "$value": "#ead5e3" },
+      "selectedText": { "$type": "color", "$value": "#5c214f" },
+      "focus": { "$type": "color", "$value": "#934086" }
+    },
+    "radii": {
+      "sm": { "$type": "dimension", "$value": "2px" },
+      "md": { "$type": "dimension", "$value": "4px" },
+      "lg": { "$type": "dimension", "$value": "8px" }
+    }
+  }
+}

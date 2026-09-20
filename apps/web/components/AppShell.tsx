@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
+import { SemanticIcon } from '../icons/semantic-icons.tsx';
+import {
+  layoutIntentFromWebBreakpoint,
+  webBreakpointThresholds,
+  type LayoutIntent,
+} from '../layout/adaptive-intents.ts';
 import {
   LEFT_MAX, LEFT_MIN, RIGHT_MAX, RIGHT_MIN,
   persistShellLayout, readShellLayout, type ShellLayout,
@@ -11,20 +17,30 @@ export function useBreakpoint(): Breakpoint {
   const [bp, setBp] = useState<Breakpoint>(() => {
     if (typeof window === 'undefined') return 'desktop';
     const w = window.innerWidth;
-    if (w < 768) return 'mobile';
-    if (w < 1280) return 'tablet';
+    if (w < webBreakpointThresholds.compactMaxExclusive) return 'mobile';
+    if (w < webBreakpointThresholds.mediumMaxExclusive) return 'tablet';
     return 'desktop';
   });
   useEffect(() => {
     const update = () => {
       const w = window.innerWidth;
-      setBp(w < 768 ? 'mobile' : w < 1280 ? 'tablet' : 'desktop');
+      setBp(
+        w < webBreakpointThresholds.compactMaxExclusive
+          ? 'mobile'
+          : w < webBreakpointThresholds.mediumMaxExclusive
+            ? 'tablet'
+            : 'desktop',
+      );
     };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
   return bp;
+}
+
+export function useLayoutIntent(): LayoutIntent {
+  return layoutIntentFromWebBreakpoint(useBreakpoint());
 }
 
 function useShellLayout() {
@@ -90,6 +106,7 @@ export function AppShell({
   contextTitle: string;
 }) {
   const breakpoint = useBreakpoint();
+  const layoutIntent = layoutIntentFromWebBreakpoint(breakpoint);
   const [layout, updateLayout] = useShellLayout();
   const [navOpen, setNavOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
@@ -127,6 +144,7 @@ export function AppShell({
     className={`shell product-shell breakpoint-${breakpoint}`}
     data-testid="app-shell"
     data-breakpoint={breakpoint}
+    data-layout-intent={layoutIntent}
     data-left-collapsed={layout.leftCollapsed}
     data-right-collapsed={layout.rightCollapsed}
     style={desktop ? {
@@ -138,7 +156,7 @@ export function AppShell({
       <div className="header-leading">
         {showDrawers && <button type="button" ref={navTriggerRef} className="icon-button" data-testid="nav-menu" aria-label={navTitle}
           aria-expanded={navOpen} onClick={() => { setNavOpen(true); setContextOpen(false); }}>
-          <Menu size={20} aria-hidden="true" />
+          <SemanticIcon intent="sessions" size={20} />
         </button>}
         {brand}
       </div>
@@ -146,7 +164,7 @@ export function AppShell({
         {headerActions}
         {showDrawers && <button type="button" ref={contextTriggerRef} className="icon-button" data-testid="context-menu" aria-label={contextTitle}
           aria-expanded={contextOpen} onClick={() => { setContextOpen(true); setNavOpen(false); }}>
-          <MoreHorizontal size={20} aria-hidden="true" />
+          <SemanticIcon intent="context" size={20} />
         </button>}
         {desktop && <>
           <button type="button" className="ghost-button icon-button" data-testid="toggle-left"

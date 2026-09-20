@@ -1,0 +1,33 @@
+{
+  "$description": "FleetSplice dark theme semantic colors (accepted d8639e3 baseline).",
+  "colorScheme": { "$type": "string", "$value": "dark" },
+  "color": {
+    "canvas": { "$type": "color", "$value": "#10171c" },
+    "surface": { "$type": "color", "$value": "#151e25" },
+    "panel": { "$type": "color", "$value": "#19232b" },
+    "raised": { "$type": "color", "$value": "#202e37" },
+    "text": { "$type": "color", "$value": "#edf3f6" },
+    "textMuted": { "$type": "color", "$value": "#b3c4ce" },
+    "border": { "$type": "color", "$value": "#425966" },
+    "hover": { "$type": "color", "$value": "#2a3e48" },
+    "accent": { "$type": "color", "$value": "#92d5df" },
+    "onAccent": { "$type": "color", "$value": "#082a33" },
+    "accentHover": { "$type": "color", "$value": "#b4e5ec" },
+    "selected": { "$type": "color", "$value": "#263d47" },
+    "selectedText": { "$type": "color", "$value": "#bce8ed" },
+    "focus": { "$type": "color", "$value": "#9be3ef" },
+    "online": { "$type": "color", "$value": "#76d4af" },
+    "offline": { "$type": "color", "$value": "#eac179" },
+    "success": { "$type": "color", "$value": "#76d4af" },
+    "attention": { "$type": "color", "$value": "#eac179" },
+    "warning": { "$type": "color", "$value": "#eac179" },
+    "danger": { "$type": "color", "$value": "#ef9a9a" },
+    "streaming": { "$type": "color", "$value": "#9be3ef" },
+    "tool": { "$type": "color", "$value": "#9bb8c8" },
+    "warningBg": { "$type": "color", "$value": "#3b2c18" },
+    "warningText": { "$type": "color", "$value": "#ffe0ac" },
+    "warningBorder": { "$type": "color", "$value": "#a18254" },
+    "footer": { "$type": "color", "$value": "#19232b" },
+    "shadowColor": { "$type": "color", "$value": "#00000044" }
+  }
+}

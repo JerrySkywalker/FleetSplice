@@ -27,7 +27,7 @@ import {
   ApprovalCard, OwnershipSurface, ReviewCard, SessionConnectPreview, SessionItem,
   StreamingMessage, ToolActivityCard,
 } from './components/Presentation.tsx';
-import { SendHorizontal, Square, Waypoints } from 'lucide-react';
+import { SemanticIcon } from './icons/semantic-icons.tsx';
 
 type SnapshotCausalityRow = {
   snapshotSeq: number;
@@ -453,14 +453,14 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         />
         <div className="native-controls composer-actions">
           {mode === 'send' || mode === 'steer_interrupt' || mode === 'viewer' ? <button type="submit" className="primary" data-testid="composer-send" disabled={!canControl || thread?.status !== 'idle' || !text.trim() || mode === 'viewer'}>
-            <SendHorizontal size={14} aria-hidden="true" /> {t('Send', '发送')} <span aria-hidden="true">↑</span>
+            <SemanticIcon intent="send" size={14} /> {t('Send', '发送')} <span aria-hidden="true">↑</span>
           </button> : null}
           {mode === 'steer_interrupt' || (mode === 'viewer' && !!thread?.activeTurnId) ? <>
             <button type="button" disabled={!canControl || !steer || !thread?.activeTurnId || !text.trim() || mode === 'viewer'} onClick={() => void command('native.steer')}>
-              <Waypoints size={16} aria-hidden="true" /> {steer ? t('Steer', '引导') : t('Steer unavailable', '引导不可用')}
+              <SemanticIcon intent="steer" size={16} /> {steer ? t('Steer', '引导') : t('Steer unavailable', '引导不可用')}
             </button>
             <button type="button" disabled={!canControl || !interrupt || !thread?.activeTurnId || mode === 'viewer'} onClick={() => void command('native.interrupt')}>
-              <Square size={14} aria-hidden="true" /> {interrupt ? t('Interrupt', '中断') : t('Interrupt unavailable', '中断不可用')}
+              <SemanticIcon intent="interrupt" size={14} /> {interrupt ? t('Interrupt', '中断') : t('Interrupt unavailable', '中断不可用')}
             </button>
           </> : null}
           {mode === 'receipt_lookup' ? <button type="button" disabled={busy || !pending} onClick={lookup}>{t('Check receipt', '查询回执')}</button> : null}

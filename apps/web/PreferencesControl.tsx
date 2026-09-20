@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Settings } from 'lucide-react';
+import { SemanticIcon } from './icons/semantic-icons.tsx';
 import { translate, type Locale } from './i18n.ts';
 import type { Appearance } from './preferences.ts';
 import { useBreakpoint } from './components/AppShell.tsx';
@@ -23,7 +23,7 @@ export function PreferencesControl({ locale, appearance, saved, onLocale, onAppe
       title={label}
       aria-haspopup="dialog" aria-controls="preferences-dialog" aria-expanded={open}
       onClick={() => { dialog.current?.showModal(); setOpen(true); }}>
-      <Settings size={16} aria-hidden="true" />
+      <SemanticIcon intent="settings" size={16} />
       {!mobile ? <span className="preferences-label">{label}</span> : null}
     </button>
     <dialog id="preferences-dialog" ref={dialog} aria-labelledby="preferences-title"

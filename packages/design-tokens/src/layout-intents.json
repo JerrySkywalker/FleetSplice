@@ -1,0 +1,21 @@
+{
+  "$description": "Shared adaptive layout intents. Exact breakpoints are platform-local.",
+  "intents": [
+    {
+      "name": "compact",
+      "meaning": "Single-column conversation focus; navigation and context as overlays/sheets.",
+      "webMapsFrom": "mobile (<768px today; Web-local threshold)"
+    },
+    {
+      "name": "medium",
+      "meaning": "Conversation-first with abbreviated chrome; side panels as drawers.",
+      "webMapsFrom": "tablet (<1280px today; Web-local threshold)"
+    },
+    {
+      "name": "expanded",
+      "meaning": "Three-pane shell with persistent navigation and context.",
+      "webMapsFrom": "desktop (≥1280px today; Web-local threshold)"
+    }
+  ],
+  "note": "Future Flutter chooses thresholds via MediaQuery/constraints. Do not require Web pixel cuts."
+}

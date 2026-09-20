@@ -1,0 +1,31 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "FleetSplice G05C shared foundation tokens. Small DTCG-aligned set for Web + future Flutter.",
+  "spacing": {
+    "1": { "$type": "dimension", "$value": "4px" },
+    "2": { "$type": "dimension", "$value": "8px" },
+    "3": { "$type": "dimension", "$value": "12px" },
+    "4": { "$type": "dimension", "$value": "16px" },
+    "5": { "$type": "dimension", "$value": "24px" },
+    "6": { "$type": "dimension", "$value": "32px" }
+  },
+  "radii": {
+    "sm": { "$type": "dimension", "$value": "6px" },
+    "md": { "$type": "dimension", "$value": "8px" },
+    "lg": { "$type": "dimension", "$value": "12px" }
+  },
+  "controls": {
+    "compactHeight": { "$type": "dimension", "$value": "32px" },
+    "touchHeight": { "$type": "dimension", "$value": "36px" }
+  },
+  "typography": {
+    "body": { "$type": "dimension", "$value": "14px" },
+    "small": { "$type": "dimension", "$value": "12px" },
+    "label": { "$type": "dimension", "$value": "11px" },
+    "title": { "$type": "dimension", "$value": "18px" }
+  },
+  "motion": {
+    "fastDuration": { "$type": "duration", "$value": "100ms" },
+    "normalDuration": { "$type": "duration", "$value": "160ms" }
+  }
+}

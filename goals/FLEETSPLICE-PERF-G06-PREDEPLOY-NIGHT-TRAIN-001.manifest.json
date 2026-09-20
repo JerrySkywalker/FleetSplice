@@ -1,0 +1,83 @@
+{
+  "schema": "fleetsplice-night-train.v1",
+  "train_id": "FLEETSPLICE-PERF-G06-PREDEPLOY-NIGHT-TRAIN-001",
+  "base_head": "95bd3b60c21886e62b23b72e897f86e73a0c3616",
+  "branch": "train/perf-g06-predeploy-night-001",
+  "serial": true,
+  "remote_tencent_work": false,
+  "stop_after": "T10",
+  "children": [
+    [
+      "T00",
+      "FLEETSPLICE-NIGHT-T00-PERF-DECISION-FREEZE-001",
+      "goals/FLEETSPLICE-NIGHT-T00-PERF-DECISION-FREEZE-001.md"
+    ],
+    [
+      "T01",
+      "FLEETSPLICE-NIGHT-T01-DISCOVERY-INCREMENTAL-001",
+      "goals/FLEETSPLICE-NIGHT-T01-DISCOVERY-INCREMENTAL-001.md"
+    ],
+    [
+      "T02",
+      "FLEETSPLICE-NIGHT-T02-PRE-EFFECT-READ-CONSOLIDATION-001",
+      "goals/FLEETSPLICE-NIGHT-T02-PRE-EFFECT-READ-CONSOLIDATION-001.md"
+    ],
+    [
+      "T03",
+      "FLEETSPLICE-NIGHT-T03-PERF-CLOSEOUT-001",
+      "goals/FLEETSPLICE-NIGHT-T03-PERF-CLOSEOUT-001.md"
+    ],
+    [
+      "T04",
+      "FLEETSPLICE-NIGHT-T04-G06-PREDEPLOY-ARCH-ADMISSION-001",
+      "goals/FLEETSPLICE-NIGHT-T04-G06-PREDEPLOY-ARCH-ADMISSION-001.md"
+    ],
+    [
+      "T05",
+      "FLEETSPLICE-NIGHT-T05-REMOTE-ADOPTION-HCP-001",
+      "goals/FLEETSPLICE-NIGHT-T05-REMOTE-ADOPTION-HCP-001.md"
+    ],
+    [
+      "T06",
+      "FLEETSPLICE-NIGHT-T06-REMOTE-HCP-WSS-ENROLLMENT-001",
+      "goals/FLEETSPLICE-NIGHT-T06-REMOTE-HCP-WSS-ENROLLMENT-001.md"
+    ],
+    [
+      "T07",
+      "FLEETSPLICE-NIGHT-T07-WEBAUTHN-BROWSER-SECURITY-001",
+      "goals/FLEETSPLICE-NIGHT-T07-WEBAUTHN-BROWSER-SECURITY-001.md"
+    ],
+    [
+      "T08",
+      "FLEETSPLICE-NIGHT-T08-RECONNECT-NOREPLAY-001",
+      "goals/FLEETSPLICE-NIGHT-T08-RECONNECT-NOREPLAY-001.md"
+    ],
+    [
+      "T09",
+      "FLEETSPLICE-NIGHT-T09-PREDEPLOY-PACKAGING-DOCTOR-001",
+      "goals/FLEETSPLICE-NIGHT-T09-PREDEPLOY-PACKAGING-DOCTOR-001.md"
+    ],
+    [
+      "T10",
+      "FLEETSPLICE-NIGHT-T10-LOCAL-REMOTE-TOPOLOGY-ACCEPTANCE-001",
+      "goals/FLEETSPLICE-NIGHT-T10-LOCAL-REMOTE-TOPOLOGY-ACCEPTANCE-001.md"
+    ]
+  ],
+  "gates": [
+    {
+      "after": "T03",
+      "id": "P",
+      "condition": "performance P1 2/2 proven, no authority/no-replay regression"
+    },
+    {
+      "after": "T04",
+      "id": "A",
+      "condition": "remote Native Adoption fits accepted HCP/Architecture 0.1 without managed-path regression"
+    },
+    {
+      "after": "T10",
+      "id": "T",
+      "condition": "WAITING_SERVER_READY; no Tencent access"
+    }
+  ]
+}

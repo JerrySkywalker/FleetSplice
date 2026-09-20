@@ -2,8 +2,9 @@
 
 The Owner accepts the final local G05C product baseline. Canonical product
 implementation is the UI-portability freeze head below. Near-term UI/UX
-engineering remains frozen; development returns to functional product work.
-G06 remains unstarted: Tencent deployment is deferred until the server is ready.
+engineering remains frozen. Performance Gate P for this train has frozen
+measured P1 optimizations. G06 predeploy local implementation is started;
+Tencent deployment remains deferred until the server is ready.
 
 ```text
 ARCHITECTURE_0_1_READY=true
@@ -16,13 +17,16 @@ VERSION_SHA_ROLE=EVIDENCE_AND_INCARCATION_METADATA
 VERSION_SHA_NOT_PRODUCT_COMPATIBILITY_ALLOWLIST=true
 NEAR_TERM_UI_UX_DEVELOPMENT=FROZEN
 NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK
-G06_STARTED=false
-TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY
+G06_STARTED=true
+G06_PHASE=PREDEPLOY_LOCAL
+TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY
 TENCENT_TARGET=tencent-pek-01
+TENCENT_DEPLOYED=false
 REMOTE_TENCENT_WORK=false
-IMPLEMENTATION_AUTHORIZED=NONE
-PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
-NEXT_OWNER_DECISION=FUNCTIONAL_PRODUCT_WORK_THEN_LATER_G06_WHEN_SERVER_READY
+G06_LIVE_ACCEPTANCE=false
+IMPLEMENTATION_AUTHORIZED=PERF_G06_PREDEPLOY_NIGHT_TRAIN_ONLY
+PRODUCT_IMPLEMENTATION_AUTHORIZED=PERF_G06_PREDEPLOY_NIGHT_TRAIN_ONLY
+NEXT_OWNER_DECISION=COMPLETE_PREDEPLOY_THEN_WAIT_TENCENT_SERVER_READY
 ```
 
 Historical native-control closeout evidence remains at
@@ -36,6 +40,7 @@ Authoritative product pointers:
 - [Owner Thesis](../product/owner-thesis.md)
 - [Implementation roadmap](../v0.1/implementation-roadmap.md)
 - [G05C closeout receipt](receipts/G05C-native-control-closeout.md)
+- G06 remote Adoption seam: [ADR 0007](../adr/0007-remote-native-adoption-hcp.md)
 - UI portability freeze artifacts:
   `V:\artifacts\FleetSplice\FLEETSPLICE-G05C-UI-PORTABILITY-FREEZE-FINAL-001`
 - Final promotion hygiene artifacts:
@@ -47,9 +52,8 @@ native agents and existing tools own execution, terminal, editor, Git, worktrees
 and the development environment.
 
 The responsive Web/mobile surface is already implemented and accepted under the
-UI-portability freeze. Future G06 must reuse that surface and validate it on a
-real remote topology; it must not re-implement mobile UI as a first invention.
+UI-portability freeze. G06 reuses that surface through typed remote AdoptionPort
+HCP; it must not re-implement mobile UI as a first invention.
 
-G06 requires separate Owner authorization plus Tencent deployment admission.
-Do not treat this promotion as G06 start, Tencent access, DNS/TLS/auth mutation,
-or main merge.
+Do not treat predeploy local work as Tencent access, DNS/TLS/auth mutation, or
+main merge. Live remote acceptance remains blocked on server readiness.

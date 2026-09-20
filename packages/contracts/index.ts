@@ -46,7 +46,10 @@ export type Hcp = { v: 1; connectionId: string; target: Target } & (
   { kind: 'command'; command: EdgeCommand } |
   { kind: 'receipt'; receipt: Receipt } |
   { kind: 'event'; event: NativeEvent } |
-  { kind: 'closed'; reason: string }
+  { kind: 'closed'; reason: string } |
+  { kind: 'adoption.request'; requestId: string; op: 'snapshot' | 'execute' | 'renewClient' | 'lookup' | 'pollRealtime'; body: Record<string, unknown> } |
+  { kind: 'adoption.response'; requestId: string; ok: boolean; code: string | null; body: Record<string, unknown> | null } |
+  { kind: 'adoption.realtime'; envelope: Record<string, unknown> }
 );
 export type Lane = { origin?: 'FLEETSPLICE_MANAGED'; sessionId: string; laneId: string; segmentId: string; title: string; target: Target; root: string; fence: Fence; state: string; nativeThreadId: string | null; nativeTurnId: string | null; requestedModel: string | null; requestedReasoningEffort: string | null; effectiveModel: string | null; effectiveReasoningEffort: string | null; requestedPermission?: PermissionPreset; effectivePermission?: NativePermissionEvidence; activity: { text: string; status: string }[]; transcript: { role: 'user' | 'assistant' | 'system'; text: string }[] };
 export type CommandRecord = { command: FleetCommand; plan: Plan; status: string; receipt: Receipt | null };
@@ -85,7 +88,10 @@ const hcp = { oneOf: [
   obj({ ...hcpBase, kind: literal('command'), command: edgeCommand }),
   obj({ ...hcpBase, kind: literal('receipt'), receipt }),
   obj({ ...hcpBase, kind: literal('event'), event }),
-  obj({ ...hcpBase, kind: literal('closed'), reason: str(120) })
+  obj({ ...hcpBase, kind: literal('closed'), reason: str(120) }),
+  obj({ ...hcpBase, kind: literal('adoption.request'), requestId: uuid, op: { enum: ['snapshot', 'execute', 'renewClient', 'lookup', 'pollRealtime'] }, body: { type: 'object' } }),
+  obj({ ...hcpBase, kind: literal('adoption.response'), requestId: uuid, ok: { type: 'boolean' }, code: nullable(str(120)), body: { anyOf: [{ type: 'object' }, { type: 'null' }] } }),
+  obj({ ...hcpBase, kind: literal('adoption.realtime'), envelope: { type: 'object' } })
 ] };
 export const schemas = { command, plan, edgeCommand, hcp };
 const ajv = new Ajv2020.default({ strict: true, allErrors: false });

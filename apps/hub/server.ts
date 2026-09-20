@@ -9,6 +9,7 @@ import { HubKernel, AdmissionRejected, type ClientGrant } from './kernel.ts';
 import { Journal } from '../../packages/journal/index.ts';
 import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 import type { AdoptionPort, AdoptionClient } from '../../packages/native-adoption/types.ts';
+import { RemoteAdoptionPortProxy } from '../../packages/remote-adoption/index.ts';
 
 export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[] };
 const equalSecret = (a: string, b: string) => {
@@ -25,11 +26,13 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   let nativeRevision = '0';
   let nativeUnsubscribe: (() => void) | null = null;
   let edge: WebSocket | null = null; let usedBootstrap = false; let hcpAccepted = false;
+  const remoteAdoption = adoption instanceof RemoteAdoptionPortProxy ? adoption : null;
   const pending = new Map<string, { resolve: (receipt: Receipt) => void; reject: () => void; timer: NodeJS.Timeout }>();
   const send = (message: Hcp) => {
     requireThat(edge?.readyState === WebSocket.OPEN && edge.bufferedAmount < 262144, 'EDGE_DISCONNECTED');
     edge.send(canonical(message));
   };
+  if (remoteAdoption) remoteAdoption.setSender(send);
   const journal = new Journal(path.join(config.stateDirectory, 'hub.sqlite'));
   const kernel = new HubKernel(journal, config.target, config.root, (command: EdgeCommand) => new Promise((resolve, reject) => {
     const timer = setTimeout(() => { pending.delete(command.edgeCommandId); reject(new Fault('RECEIPT_UNKNOWN')); }, 55000);
@@ -213,11 +216,19 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
             else journal.append('LATE_RECEIPT_OBSERVATION', message.receipt.edgeCommandId, message.receipt);
           } else if (message.kind === 'event') kernel.event(message.event);
           else if (message.kind === 'closed') kernel.disconnect(message.reason);
+          else if (message.kind === 'adoption.response' || message.kind === 'adoption.realtime') {
+            requireThat(remoteAdoption, 'HCP_UNEXPECTED_MESSAGE');
+            remoteAdoption.accept(message);
+          }
           else throw new Fault('HCP_UNEXPECTED_MESSAGE');
         }
       } catch { kernel.disconnect('RECOVERY_REQUIRED'); ws.close(); }
     });
-    ws.on('close', () => { edge = null; kernel.disconnect(); for (const item of pending.values()) { clearTimeout(item.timer); item.reject(); } pending.clear(); });
+    ws.on('close', () => {
+      edge = null; kernel.disconnect();
+      remoteAdoption?.bumpGeneration(); remoteAdoption?.close('EDGE_DISCONNECTED');
+      for (const item of pending.values()) { clearTimeout(item.timer); item.reject(); } pending.clear();
+    });
     ws.on('error', () => { kernel.disconnect(); });
   });
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(config.port, '127.0.0.1', resolve); });

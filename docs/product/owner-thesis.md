@@ -1,8 +1,8 @@
 # FleetSplice Owner Thesis and Product Boundary
 
-Status: Reconciled with the Owner-accepted G05C local implementation.
+Status: Reconciled with the Owner-accepted final G05C product baseline.
 This document does **not** authorize further product implementation or G06.
-The [current status](../train/current-status.md) controls closeout readiness.
+The [current status](../train/current-status.md) controls readiness.
 
 ## Why FleetSplice exists
 
@@ -113,8 +113,10 @@ that decision:
 
 ## Near-term route
 
-The Owner accepts G05C Native Local Control at implementation head
-`ba8c6fa84db528b9821be5aa672e8267ae744c70`. Its accepted local train proves:
+The Owner accepts the final local G05C product baseline at implementation head
+`017a89472436702a9f6228bf680a3674bb0a2d32`. Historical native-control closeout
+evidence remains at `ba8c6fa84db528b9821be5aa672e8267ae744c70`. The accepted
+local train proves:
 
 - safe local operation, persistent proxy and explicit Workspace targeting;
 - live model/reasoning discovery and read-only native coding;
@@ -134,10 +136,12 @@ Known debts do not individually reopen G05C. Accelerated renewal testing does
 not prove unattended wall-clock endurance: a real 2–4h+ soak is required before
 final G06/v0.1 release acceptance.
 
-G06 remains unstarted and requires a separate Owner authorization. It projects
-the already-proven surface through Tencent Hub + WebUI and authenticated
-outbound WSS to a real phone/browser. It should not invent native control
-semantics for the first time. No new capability is authorized by this closeout.
+G06 remains unstarted and requires a separate Owner authorization plus Tencent
+server readiness (`TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY`, target
+`tencent-pek-01`). It reuses the already-proven control surface and already-
+accepted responsive Web/mobile UI through Tencent Hub + WebUI and authenticated
+outbound WSS. It should not invent native control semantics or re-implement
+mobile UI for the first time. No new capability is authorized by this promotion.
 
 After real phone dogfood, feature breadth follows observed pain rather than a
 precommitted workstation checklist.

@@ -218,11 +218,21 @@
     }
   ],
   "model_scope": "G04A explicit Owner override; future execution re-admits routing",
-  "active_goal": "G04A",
+  "active_goal": "G05C_FINAL_PROMOTION",
   "visible_increment_rule": true,
   "owner_resume_required_for_g05": true,
-  "g05_started": false,
-  "current_status": "docs/train/G04A-status.md",
+  "g05_started": true,
+  "g05c_final_product_baseline_ready": true,
+  "g05c_final_product_implementation_head": "017a89472436702a9f6228bf680a3674bb0a2d32",
+  "g05c_final_product_implementation_tree": "521c0781debdbdac1b23886471b8f612f8c89701",
+  "primary_native_path": "NATIVE_ADOPTED",
+  "near_term_ui_ux_development": "FROZEN",
+  "next_development_class": "FUNCTIONAL_PRODUCT_WORK",
+  "g06_started": false,
+  "tencent_deployment_gate": "DEFERRED_SERVER_NOT_READY",
+  "tencent_target": "tencent-pek-01",
+  "remote_tencent_work": false,
+  "current_status": "docs/train/current-status.md",
   "g04a_start": {
     "branch": "planning/v0.1-full-train",
     "head": "2597f03a2288bdd11c1b94a3e5cc4bfee42ad7ac",
@@ -232,6 +242,8 @@
     "tencent_mvp_role": "HUB_AND_WEBUI",
     "separate_relay_required": false,
     "hcp_g05": "SAME_HOST_LOOPBACK",
-    "hcp_g06_onward": "AUTHENTICATED_EDGE_INITIATED_WSS"
+    "hcp_g06_onward": "AUTHENTICATED_EDGE_INITIATED_WSS",
+    "tencent_target": "tencent-pek-01",
+    "tencent_deployment_gate": "DEFERRED_SERVER_NOT_READY"
   }
 }

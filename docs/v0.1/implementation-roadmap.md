@@ -5,10 +5,12 @@ This is the current visible-increment planning view under the accepted
 and [Owner Thesis](../product/owner-thesis.md). Historical receipts remain
 immutable evidence.
 
-G05C's local implementation is Owner-accepted at
-`ba8c6fa84db528b9821be5aa672e8267ae744c70`. Its post-reboot closeout passes both local smoke lanes; see [current status](../train/current-status.md) and the
-[closeout receipt](../train/receipts/G05C-native-control-closeout.md).
-`G05C_ACCEPTED=true`, `G06_STARTED=false`, and
+G05C's canonical local product baseline is
+`017a89472436702a9f6228bf680a3674bb0a2d32`. See [current status](../train/current-status.md)
+and the [closeout receipt](../train/receipts/G05C-native-control-closeout.md).
+`G05C_FINAL_PRODUCT_BASELINE_READY=true`, `NEAR_TERM_UI_UX_DEVELOPMENT=FROZEN`,
+`NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK`, `G06_STARTED=false`,
+`TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY`, and
 `PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE`. Older intermediate execution states
 are retained in the linked history and confer no current authority.
 
@@ -29,7 +31,9 @@ G05 local real Codex
  -> G05B safe local operation
  -> G05B-R1 persistent-proxy correction
  -> G05C Native Agent Control Parity
- -> G06 Tencent Hub / remote phone alpha.1
+ -> G05C final product baseline / UI portability freeze
+ -> functional product work (near-term UI/UX frozen)
+ -> G06 Tencent Hub / remote phone alpha.1 (reuse proven Web/mobile surface)
  -> G07 two-host mobile control
  -> G08 durable session / honest recovery
  -> G09 explicit migration or NO_QUALIFIED_TARGET
@@ -44,8 +48,8 @@ G05 local real Codex
 | G05A | Accepted G05 and explicit G05A-only authorization | Localized/themed real local Codex browser, compact preferences; same commands and native continuity. | `PASS_M0_1_OWNER_UX_FOUNDATION` |
 | G05B | Accepted G05A and explicit G05B-only authorization | Safe ordinary-user start/stop/status/doctor, predecessor classification, detached supervisor, clean native closure. | `PASS_M0_2_SAFE_LOCAL_OPERATION` |
 | G05B-R1 | Accepted G05B and bounded correction authorization | Persistent per-user proxy configuration; fresh-shell operation without `syncproxy`; real detached-lifecycle dogfood. | `PASS_G05B_R1_PERSISTENT_PROXY` |
-| G05C | Accepted local native-control train; bounded documentation closeout | Workspace and live capability / session permission controls; native TUI adoption, same-thread continuation, source/timing/activity, exact-turn Steer/Interrupt, renewal, inspectable command approvals, viewer isolation, TUI/Web race safety and return to TUI. Post-reboot two-lane smoke passes; exact-head acceptance is bound by the current status. | `PASS_G05C_NATIVE_CONTROL_CLOSEOUT` with matching independent acceptance |
-| G06 | Accepted and personally dogfooded G05C plus separate Owner authorization and Tencent deployment admission | Project the already-proven control surface to a secure real phone/browser session through Tencent Hub + WebUI and authenticated outbound Edge WSS; add mobile UI, Owner auth, reconnect and needs-attention behavior. | `PASS_M1_REMOTE_MOBILE_MVP`; `v0.1-alpha.1` |
+| G05C | Accepted local native-control train; bounded documentation closeout; UI portability freeze | Workspace and live capability / session permission controls; native TUI adoption, same-thread continuation, source/timing/activity, exact-turn Steer/Interrupt, renewal, inspectable command approvals, viewer isolation, TUI/Web race safety and return to TUI; accepted responsive Web/mobile surface and frozen near-term UI/UX. | `PASS_G05C_FINAL_PROMOTION_READY_FOR_INDEPENDENT_REVIEW` with matching independent acceptance |
+| G06 | Accepted and personally dogfooded G05C plus separate Owner authorization and Tencent deployment admission | Project the already-proven control surface and already-accepted responsive Web/mobile UI to a secure real phone/browser session through Tencent Hub + WebUI and authenticated outbound Edge WSS; validate reconnect, Owner auth and needs-attention behavior on the real remote topology. Do not re-implement mobile UI as a first invention. | `PASS_M1_REMOTE_MOBILE_MVP`; `v0.1-alpha.1` |
 | G07 | G06; ZenBook and O2b/O4b | Real turns on both selected Hosts, exact identity on reconnect, viewer/controller/takeover. | `PASS_M2_MULTI_HOST` |
 | G08 | G07; D1a when recovery/backup first used | Complete durable session/history, journals/cursors/checkpoints and restart/loss reconciliation. | `PASS_M3_DURABLE_SESSION` |
 | G09 | G08; qualified candidate evidence and explicit target confirmation if activating | Actual migration or visibly honest `NO_QUALIFIED_TARGET`. | `PASS_M4_PROVIDER_MIGRATION` |
@@ -69,8 +73,9 @@ environment, not a replacement ADE. The following rules constrain sequencing:
   An embedded or remote terminal is not a prerequisite for G06.
 - Full editor, Git GUI/diff IDE, worktree manager, embedded browser and generic
   multi-agent dashboard do not block the first phone-control loop.
-- Mobile UI is first implemented and validated in G06 against the real remote
-  topology, not prebuilt as a miniature desktop ADE during G05C.
+- The responsive/mobile Web surface is already implemented and accepted in the
+  G05C final product baseline. G06 reuses that surface and validates it against
+  the real remote topology; it does not first invent mobile UI.
 - A feature that may be useful later does not become a prerequisite merely by
   appearing on a future-product checklist. Post-G06 breadth is selected from
   real Owner dogfood pain.
@@ -86,7 +91,9 @@ HCP remains the same semantic protocol from local loopback to authenticated
 remote WSS. G06 uses Tencent Hub + WebUI; there is no separate FleetSplice Relay
 service/protocol and no phone-to-development-host inbound listening port. The
 Edge initiates the remote connection and provider credentials remain local by
-default.
+default. Target host identity remains `tencent-pek-01` when deployment is later
+authorized. Current gate:
+`TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY`.
 
 Remote enrollment/auth, ZenBook, full history, ACP, Admin/WSL, TUI, provider
 migration, generic helper breadth, AuthorityAnchor or G10 policy cannot become

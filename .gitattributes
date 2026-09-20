@@ -1,0 +1,3 @@
+# Design-token generated outputs must stay LF so tokens:check is reproducible
+# under Windows core.autocrlf=true.
+packages/design-tokens/generated/** text eol=lf

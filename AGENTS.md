@@ -1,10 +1,10 @@
 # FleetSplice repository rules
 
 FleetSplice Architecture 0.1 is accepted. `ARCHITECTURE_0_1_READY=true`.
-The Owner-accepted local implementation reaches G05C at
-`ba8c6fa84db528b9821be5aa672e8267ae744c70`, tree
-`37cccb8d342d65433330e90f342be9662fa49d28`. The post-reboot closeout has passed both local smoke lanes;
-`docs/train/current-status.md` binds final independent acceptance.
+The canonical local G05C product implementation baseline is
+`017a89472436702a9f6228bf680a3674bb0a2d32`, tree
+`521c0781debdbdac1b23886471b8f612f8c89701`. Near-term UI/UX development is
+frozen. `docs/train/current-status.md` binds current readiness.
 
 Read these current pointers before changing the repository:
 
@@ -18,9 +18,15 @@ Read these current pointers before changing the repository:
 Current authorization state:
 
 ```text
-G05C_ACCEPTED=true
-G05C_CLOSEOUT=LOCAL_SMOKE_PASS_EXACT_HEAD_ACCEPTANCE_BOUND
+ARCHITECTURE_0_1_READY=true
+G05C_FINAL_PRODUCT_BASELINE_READY=true
+PRIMARY_NATIVE_PATH=NATIVE_ADOPTED
+NEAR_TERM_UI_UX_DEVELOPMENT=FROZEN
+NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK
 G06_STARTED=false
+TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY
+TENCENT_TARGET=tencent-pek-01
+REMOTE_TENCENT_WORK=false
 IMPLEMENTATION_AUTHORIZED=NONE
 PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
 ```
@@ -66,16 +72,15 @@ Owner instruction and a bounded Goal.
 12. G03 Git objects, historical research, fixtures and accepted receipts are
     immutable evidence. Normative or status corrections are additive; do not
     rewrite historical receipts to make them look current.
-13. G05C, when separately authorized, is limited to **Native Agent Control
-    Parity**: Workspace targeting, live model/reasoning discovery, permission
-    presets including YOLO, effective permission, native Codex tool activity,
-    approval, interrupt, steer, basic activity projection and simple side-panel
-    collapse. It does not include Tencent deployment, phone UI, embedded
+13. G05C Native Agent Control Parity is complete at the final product baseline
+    above. Historical closeout evidence at `ba8c6fa84db528b9821be5aa672e8267ae744c70`
+    remains immutable. G05C does not include Tencent deployment, embedded
     terminal, editor, Git IDE, browser or worktree manager.
-14. G06, when separately authorized after accepted local G05C dogfood, projects
-    the already-proven control surface to a real phone/browser through Tencent
-    Hub + WebUI and authenticated outbound WSS. G06 should not be the first
-    place native-agent control semantics are invented.
+14. G06, when separately authorized after accepted local G05C dogfood and Tencent
+    server readiness, reuses the already-proven responsive Web/mobile surface and
+    validates it through Tencent Hub + WebUI and authenticated outbound WSS. G06
+    should not invent native-agent control semantics or re-implement the mobile
+    Web surface for the first time.
 15. Post-G06 feature breadth is dogfood-driven. A capability does not become a
     prerequisite merely because it appears useful in another ADE or remote CLI
     project.

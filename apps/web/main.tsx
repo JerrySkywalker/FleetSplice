@@ -212,7 +212,8 @@ function App() {
         {!lane?.transcript.length && <div className="empty"><div className="empty-symbol">↗</div><h2>{t('emptyHeading')}</h2><p>{t(lane ? 'emptySession' : 'emptyNoSession')}</p><div className="path">{t('browser')} <span>→</span> Hub <span>→</span> SKYFORGE Edge <span>→</span> Codex</div></div>}
         {lane?.transcript.map((item, index) => <article className={`message ${item.role}`} key={index}><div className="message-label">{t(item.role === 'user' ? 'you' : item.role === 'assistant' ? 'codex' : 'session')}</div><div className="message-text" data-testid={item.role === 'assistant' ? 'assistant-text' : undefined}>{(item.role === 'system' ? systemText(locale, item.text) : item.text) || (lane.state === 'RUNNING' ? '…' : '')}</div></article>)}
       </div>
-      <form className="composer" onSubmit={e => { e.preventDefault(); void command('turn.submit', { text: prompt }); }}>
+      <form className="composer composer-surface" onSubmit={e => { e.preventDefault(); void command('turn.submit', { text: prompt }); }}>
+        <textarea id="prompt" data-testid="managed-prompt" placeholder={t('promptPlaceholder')} aria-label={t('messageCodex')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'} rows={1}/>
         <SessionConfigBar
           modelLabel={t('model')} reasoningLabel={t('reasoning')} permissionLabel={t('permission')}
           controllerLabel={controlled ? t('haveControl') : t('viewer')}
@@ -224,7 +225,10 @@ function App() {
           onModel={chooseModel} onReasoning={setSelectedReasoning} onPermission={value => setSelectedPermission(value as PermissionPreset)}
           mutationSupported={true}
         />
-        <label htmlFor="prompt">{t('messageCodex')}</label><textarea id="prompt" placeholder={t('promptPlaceholder')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'}/><div><span>{t('readOnlyHint')}</span><button className="primary" disabled={!available || !controlled || lane?.state !== 'IDLE' || !prompt.trim()}>{t('sendMessage')} <span aria-hidden="true">↑</span></button></div></form>
+        <div className="composer-actions">
+          <button className="primary" disabled={!available || !controlled || lane?.state !== 'IDLE' || !prompt.trim()}>{t('sendMessage')} <span aria-hidden="true">↑</span></button>
+        </div>
+      </form>
     </main>
     <aside className="context"><div className="eyebrow">{t('controlContext')}</div><h3>{t('nativeCapabilities')}</h3><p className="muted">{t('liveCatalogHint')}</p><p className="muted">{t('newSessionConfigurationHint')}</p>
       <button disabled={!available || !workspace?.registered || !workspace.valid} onClick={() => command('native.capabilities.read')}>{t('refreshCapabilities')}</button>

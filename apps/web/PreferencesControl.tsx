@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
+import { Settings } from 'lucide-react';
 import { translate, type Locale } from './i18n.ts';
 import type { Appearance } from './preferences.ts';
+import { useBreakpoint } from './components/AppShell.tsx';
 
 export function PreferencesControl({ locale, appearance, saved, onLocale, onAppearance }: {
   locale: Locale; appearance: Appearance; saved: boolean;
@@ -9,11 +11,21 @@ export function PreferencesControl({ locale, appearance, saved, onLocale, onAppe
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const breakpoint = useBreakpoint();
+  const mobile = breakpoint === 'mobile';
   const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
+  const label = t('preferences');
   return <>
-    <button ref={trigger} type="button" className="preferences-trigger" data-testid="preferences"
+    <button ref={trigger} type="button"
+      className={`preferences-trigger${mobile ? ' preferences-trigger-icon' : ' icon-text-button'}`}
+      data-testid="preferences"
+      aria-label={label}
+      title={label}
       aria-haspopup="dialog" aria-controls="preferences-dialog" aria-expanded={open}
-      onClick={() => { dialog.current?.showModal(); setOpen(true); }}><span aria-hidden="true">⚙</span> {t('preferences')}</button>
+      onClick={() => { dialog.current?.showModal(); setOpen(true); }}>
+      <Settings size={16} aria-hidden="true" />
+      {!mobile ? <span className="preferences-label">{label}</span> : null}
+    </button>
     <dialog id="preferences-dialog" ref={dialog} aria-labelledby="preferences-title"
       onKeyDown={event => {
         if (event.key !== 'Tab') return;

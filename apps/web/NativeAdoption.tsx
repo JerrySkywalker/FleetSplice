@@ -429,7 +429,18 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         />)}
         {!snapshot?.compatibility.capabilities.approvalResolve.available && (snapshot?.approvals?.some(a => a.threadId === thread.id && a.status === 'PENDING') ?? false) && <p className="muted" data-testid="approval-capability-note">{approvalResolveUnavailableLabel(thread.permission, locale === 'zh-CN')}</p>}
       </section>}
-      {thread?.attached && <form className="composer sticky-composer composer-surface" data-testid="composer-surface" data-control-mode={mode} onSubmit={event => { event.preventDefault(); void command('native.submit'); }}>
+      {thread?.attached && <form className="composer composer-surface" data-testid="composer-surface" data-control-mode={mode} onSubmit={event => { event.preventDefault(); void command('native.submit'); }}>
+        <textarea
+          id="native-prompt"
+          data-testid="native-prompt"
+          aria-label={t('Message Codex', '发送给 Codex')}
+          placeholder={t('Message Codex…', '发送给 Codex…')}
+          maxLength={16000}
+          value={text}
+          onChange={event => setText(event.target.value)}
+          disabled={!canControl || mode === 'review' || mode === 'receipt_lookup'}
+          rows={1}
+        />
         <SessionConfigBar
           modelLabel={t('Model', '模型')} reasoningLabel={t('Reasoning', '推理')} permissionLabel={t('Permission', '权限')}
           controllerLabel={controlled ? t('You control this session', '你控制此会话') : t('Read-only viewer', '只读查看者')}
@@ -440,10 +451,9 @@ export function NativeAdoption({ client, request, locale, preferences }: {
           effectiveModel={thread?.model ?? ''}
           effectivePermission={permission.label}
         />
-        <textarea id="native-prompt" data-testid="native-prompt" aria-label={t('Message', '消息')} maxLength={16000} value={text} onChange={event => setText(event.target.value)} disabled={!canControl || mode === 'review' || mode === 'receipt_lookup'} rows={2}/>
         <div className="native-controls composer-actions">
           {mode === 'send' || mode === 'steer_interrupt' || mode === 'viewer' ? <button type="submit" className="primary" data-testid="composer-send" disabled={!canControl || thread?.status !== 'idle' || !text.trim() || mode === 'viewer'}>
-            <SendHorizontal size={16} aria-hidden="true" /> {t('Send', '发送')}
+            <SendHorizontal size={14} aria-hidden="true" /> {t('Send', '发送')} <span aria-hidden="true">↑</span>
           </button> : null}
           {mode === 'steer_interrupt' || (mode === 'viewer' && !!thread?.activeTurnId) ? <>
             <button type="button" disabled={!canControl || !steer || !thread?.activeTurnId || !text.trim() || mode === 'viewer'} onClick={() => void command('native.steer')}>

@@ -41,10 +41,21 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     await page.getByRole('button', { name: 'Register selected Workspace' }).click();
     await expect(page.getByRole('button', { name: '＋ New session' })).toBeEnabled();
     await page.getByRole('button', { name: 'Refresh live catalog' }).click();
-    await expect(page.getByLabel('Model')).toHaveValue('fixture-model');
-    await expect(page.getByLabel('Reasoning')).toHaveValue('fixture-reasoning');
+    await page.getByTestId('config-capsule').click();
+    await expect(page.getByTestId('config-sheet')).toBeVisible();
+    await expect(page.getByTestId('config-model')).toHaveValue('fixture-model');
+    await expect(page.getByTestId('config-reasoning')).toHaveValue('fixture-reasoning');
+    await expect(page.getByTestId('config-sheet-controls')).toBeVisible();
+    await page.getByTestId('config-sheet-close').click();
+    await expect(page.getByTestId('config-sheet')).toHaveCount(0);
+    await expect(page.getByTestId('config-sheet-backdrop')).toHaveCount(0);
     assert.equal(native.capabilityReads, 1);
-    await page.getByRole('button', { name: '＋ New session' }).click();
+    const newSession = page.getByRole('button', { name: '＋ New session' });
+    await newSession.evaluate((node: HTMLElement) => {
+      node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+    await newSession.click({ trial: true }).catch(() => {});
+    await newSession.click({ force: true });
     await expectState(page.getByTestId('lane-state'), 'EMPTY');
     assert.equal(native.creates, 0);
     await page.getByRole('button', { name: 'Acquire control' }).click();

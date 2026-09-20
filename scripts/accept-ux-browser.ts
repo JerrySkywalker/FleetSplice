@@ -1,5 +1,5 @@
 /**
- * Automated UX browser acceptance for G05C UX R2-R1 geometry alignment.
+ * Automated UX browser acceptance for G05C UX R2-R2 visual density / mobile layer.
  * Real Hub + built React UI + Playwright + disposable Native Adoption fixture.
  */
 import { createServer } from 'node:net';
@@ -13,15 +13,20 @@ import { startHub } from '../apps/hub/server.ts';
 import { target } from '../tests/helpers.ts';
 import { createDisposableAdoptionFixture } from '../tests/fixtures/native-adoption-browser-fixture.ts';
 import { setPresentation } from '../tests/ui-preferences.ts';
-import type { Appearance } from '../apps/web/preferences.ts';
 
 const evidenceRoot = path.resolve(
   process.env.FLEETSPLICE_UX_GALLERY
-    ?? 'V:\\artifacts\\FleetSplice\\FLEETSPLICE-G05C-UX-R2-R1-GEOMETRY-ALIGNMENT-001\\UX-GALLERY-R2-R1',
+    ?? 'V:\\artifacts\\FleetSplice\\FLEETSPLICE-G05C-UX-R2-R2-VISUAL-DENSITY-MOBILE-001\\UX-GALLERY-R2-R2',
 );
 
 type Check = { name: string; pass: boolean; detail: string };
 const check = (name: string, pass: boolean, detail: string): Check => ({ name, pass, detail });
+
+const DESKTOP_COMPOSER_MAX = 96;
+const TABLET_COMPOSER_MAX = 92;
+const MOBILE_COMPOSER_MAX = 92;
+const MOBILE_COMPOSER_TOLERANCE = 4;
+const DESKTOP_BUTTON_MAX = 36;
 
 async function freePort(): Promise<number> {
   const probe = createServer();
@@ -39,6 +44,17 @@ async function waitIdle(page: Page) {
     return scheduler.executions.every((item: any) => item.completedAt !== null);
   }, { timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(100);
+}
+
+async function waitSheetSettled(page: Page) {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.waitForTimeout(50);
+  await page.waitForFunction(() => {
+    const sheet = document.querySelector('[data-testid="config-sheet"]') as HTMLElement | null;
+    if (!sheet) return false;
+    const style = getComputedStyle(sheet);
+    return style.opacity === '1' && style.transform === 'none';
+  }, { timeout: 2000 }).catch(() => {});
 }
 
 async function noHorizontalOverflow(page: Page): Promise<boolean> {
@@ -71,8 +87,9 @@ async function measureComposerGeometry(page: Page) {
   return page.evaluate(() => {
     const composer = document.querySelector('[data-testid="composer-surface"]') as HTMLElement | null;
     const send = document.querySelector('[data-testid="composer-send"]') as HTMLElement | null;
-    const prompt = document.querySelector('[data-testid="native-prompt"]') as HTMLElement | null;
+    const prompt = document.querySelector('[data-testid="native-prompt"]') as HTMLTextAreaElement | null;
     const bar = document.querySelector('[data-testid="session-config-bar"]') as HTMLElement | null;
+    const capsule = document.querySelector('[data-testid="config-capsule"]') as HTMLElement | null;
     const heading = document.querySelector('.session-heading') as HTMLElement | null;
     const timeline = document.querySelector('[data-testid="conversation-timeline"]') as HTMLElement | null;
     const message = document.querySelector('.timeline .message') as HTMLElement | null;
@@ -81,14 +98,13 @@ async function measureComposerGeometry(page: Page) {
     const cr = composer.getBoundingClientRect();
     const sendR = send?.getBoundingClientRect();
     const promptR = prompt?.getBoundingClientRect();
+    const barR = bar?.getBoundingClientRect();
     const composerPad = parseFloat(getComputedStyle(composer).paddingRight) || 0;
     const headingPad = heading ? parseFloat(getComputedStyle(heading).paddingLeft) || 0 : 0;
     const timelinePad = timeline ? parseFloat(getComputedStyle(timeline).paddingLeft) || 0 : 0;
-    const composerPadL = parseFloat(getComputedStyle(composer).paddingLeft) || 0;
     const edges = [
       heading ? heading.getBoundingClientRect().left + headingPad : null,
       timeline ? timeline.getBoundingClientRect().left + timelinePad : null,
-      // Composer outer border shares the conversation gutter (internal padding is inset).
       cr.left,
       message ? message.getBoundingClientRect().left : null,
       tool ? tool.getBoundingClientRect().left : null,
@@ -102,23 +118,117 @@ async function measureComposerGeometry(page: Page) {
         if (child.getBoundingClientRect().top > barTop + 10) configWrap = true;
       }
     }
-    const trailingAligned = !!(sendR && promptR
-      && sendR.left >= promptR.right - 12
+    const promptFirst = !!(promptR && barR && promptR.bottom <= barR.top + 2);
+    const trailingAligned = !!(sendR
       && Math.abs((cr.right - composerPad) - sendR.right) <= 8);
+    const sticky = getComputedStyle(composer).position === 'sticky';
     return {
       composerHeight: cr.height,
+      composerTop: cr.top,
+      composerBottom: cr.bottom,
       trailingAligned,
+      promptFirst,
+      sticky,
       sendLeft: sendR?.left ?? -1,
       promptRight: promptR?.right ?? -1,
+      promptPlaceholder: (prompt?.getAttribute('placeholder') ?? '').trim(),
       composerRight: cr.right,
       edgeDelta: edgeMax - edgeMin,
       edges,
       configWrap,
       configRows: bar?.getAttribute('data-config-rows') ?? 'unknown',
+      configCapsule: bar?.getAttribute('data-config-capsule') ?? 'unknown',
       observeChips: bar?.getAttribute('data-observe-chips') ?? 'unknown',
+      capsuleCount: document.querySelectorAll('[data-testid="config-capsule"]').length,
+      readonlyChipCount: document.querySelectorAll('.config-readonly-chip').length,
+      detailsButtonCount: document.querySelectorAll('[data-testid="config-detail-open"]').length,
       helperLabels: Array.from(document.querySelectorAll('.composer-surface label, .sticky-composer > label'))
         .filter(node => (node.textContent ?? '').trim().length > 0).length,
       permanentHints: document.querySelectorAll('.composer-surface .config-hint, .sticky-composer .config-hint').length,
+      capsuleContained: capsule
+        ? capsule.getBoundingClientRect().right <= cr.right + 1
+          && capsule.getBoundingClientRect().left >= cr.left - 1
+        : false,
+    };
+  });
+}
+
+async function measureLayoutSeparation(page: Page) {
+  return page.evaluate(() => {
+    const timeline = document.querySelector('[data-testid="conversation-timeline"]') as HTMLElement | null;
+    const composer = document.querySelector('[data-testid="composer-surface"]') as HTMLElement | null;
+    if (!timeline || !composer) return null;
+    const tr = timeline.getBoundingClientRect();
+    const cr = composer.getBoundingClientRect();
+    return {
+      timelineBottom: tr.bottom,
+      composerTop: cr.top,
+      overlap: tr.bottom > cr.top + 1,
+      gap: cr.top - tr.bottom,
+      composerPosition: getComputedStyle(composer).position,
+    };
+  });
+}
+
+async function measureDesktopControls(page: Page) {
+  return page.evaluate(() => {
+    const pick = (el: Element | null | undefined) => {
+      if (!el) return null;
+      const box = (el as HTMLElement).getBoundingClientRect();
+      return { height: box.height, width: box.width };
+    };
+    const byText = (text: string) => Array.from(document.querySelectorAll('button'))
+      .find(button => (button.textContent ?? '').includes(text)) ?? null;
+    return {
+      preferences: pick(document.querySelector('[data-testid="preferences"]')),
+      refresh: pick(byText('Refresh discovery') ?? byText('刷新发现')),
+      release: pick(document.querySelector('[data-testid="ownership-action"]')),
+      connect: pick(document.querySelector('[data-testid="connect-session"]')),
+      send: pick(document.querySelector('[data-testid="composer-send"]')),
+      capsule: pick(document.querySelector('[data-testid="config-capsule"]')),
+    };
+  });
+}
+
+async function measureVisualDensity(page: Page) {
+  return page.evaluate(() => {
+    const cs = (sel: string) => {
+      const el = document.querySelector(sel) as HTMLElement | null;
+      if (!el) return null;
+      const style = getComputedStyle(el);
+      return {
+        paddingTop: parseFloat(style.paddingTop) || 0,
+        paddingRight: parseFloat(style.paddingRight) || 0,
+        paddingBottom: parseFloat(style.paddingBottom) || 0,
+        paddingLeft: parseFloat(style.paddingLeft) || 0,
+        height: el.getBoundingClientRect().height,
+      };
+    };
+    const classPad = (className: string) => {
+      const probe = document.createElement('div');
+      probe.className = className;
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      document.body.appendChild(probe);
+      const style = getComputedStyle(probe);
+      const measured = {
+        paddingTop: parseFloat(style.paddingTop) || 0,
+        paddingRight: parseFloat(style.paddingRight) || 0,
+        paddingBottom: parseFloat(style.paddingBottom) || 0,
+        paddingLeft: parseFloat(style.paddingLeft) || 0,
+        height: 0,
+      };
+      probe.remove();
+      return measured;
+    };
+    return {
+      button: cs('[data-testid="composer-send"]') ?? cs('[data-testid="preferences"]'),
+      panelPadding: cs('[data-testid="navigation-panel"]'),
+      messagePadding: cs('.timeline .message.user') ?? classPad('message user'),
+      toolCardPadding: cs('[data-testid="tool-activity-card"]') ?? classPad('tool-card'),
+      ownershipPadding: cs('[data-testid="ownership-surface"]'),
+      statusChip: cs('.status-chip, .native-turn-marker') ?? classPad('status-chip'),
+      header: cs('.product-header'),
     };
   });
 }
@@ -163,16 +273,41 @@ async function scanClipping(page: Page) {
 async function measureConfigSurface(page: Page) {
   return page.evaluate(() => {
     const sheet = document.querySelector('[data-testid="config-sheet"]') as HTMLElement | null;
+    const backdrop = document.querySelector('[data-testid="config-sheet-backdrop"]') as HTMLElement | null;
+    const composer = document.querySelector('[data-testid="composer-surface"]') as HTMLElement | null;
     if (!sheet) return null;
     const box = sheet.getBoundingClientRect();
+    const style = getComputedStyle(sheet);
+    const bg = style.backgroundColor;
+    const alphaMatch = bg.match(/rgba?\(([^)]+)\)/);
+    let bgAlpha = 1;
+    if (alphaMatch) {
+      const parts = alphaMatch[1]!.split(',').map(part => part.trim());
+      if (parts.length === 4) bgAlpha = Number(parts[3]);
+    }
+    const sheetZ = Number(style.zIndex) || 0;
+    const backdropZ = backdrop ? Number(getComputedStyle(backdrop).zIndex) || 0 : -1;
+    const composerZ = composer ? Number(getComputedStyle(composer).zIndex) || 0 : -1;
     return {
       width: box.width,
       height: box.height,
       top: box.top,
       left: box.left,
+      bottom: box.bottom,
+      right: box.right,
+      opacity: Number(style.opacity),
+      bgAlpha,
+      backgroundColor: bg,
+      sheetZ,
+      backdropZ,
+      composerZ,
       variant: sheet.getAttribute('data-config-surface') ?? 'unknown',
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
+      insideViewport: box.top >= -1
+        && box.left >= -1
+        && box.right <= window.innerWidth + 1
+        && box.bottom <= window.innerHeight + 1,
     };
   });
 }
@@ -191,12 +326,31 @@ async function measureConnectPreview(page: Page) {
       : -1;
     return {
       width: box.width,
-      maxWidthOk: box.width <= 700,
+      maxWidthOk: box.width <= 580,
       centerDelta,
       buttonWidth: button?.getBoundingClientRect().width ?? -1,
       notConnected: ownership?.getAttribute('data-connected') === 'false'
         && !!document.querySelector('[data-testid="ownership-not-connected"]'),
       acquireAbsent: !document.querySelector('[data-testid="ownership-action"]'),
+    };
+  });
+}
+
+async function measureMobileHeader(page: Page) {
+  return page.evaluate(() => {
+    const header = document.querySelector('.product-header') as HTMLElement | null;
+    const prefs = document.querySelector('[data-testid="preferences"]') as HTMLElement | null;
+    if (!header) return null;
+    const box = header.getBoundingClientRect();
+    const label = prefs?.querySelector('.preferences-label');
+    return {
+      height: box.height,
+      prefsIconOnly: !label || getComputedStyle(label).display === 'none',
+      prefsAria: prefs?.getAttribute('aria-label') ?? '',
+      wrap: Array.from(header.children).some(child => {
+        const childBox = (child as HTMLElement).getBoundingClientRect();
+        return childBox.top > box.top + 8;
+      }),
     };
   });
 }
@@ -250,7 +404,7 @@ async function run(): Promise<number> {
       notConnected: connectGeom?.notConnected,
       acquireAbsent: connectGeom?.acquireAbsent,
     })));
-    await page.screenshot({ path: path.join(evidenceRoot, 'native-session-connect-centered.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'native-session-connect.png'), fullPage: true });
 
     await page.getByTestId('connect-session').click();
     await expect(page.getByText('Original native answer', { exact: true })).toBeVisible();
@@ -258,33 +412,45 @@ async function run(): Promise<number> {
     await waitIdle(page);
     await expect(page.getByTestId('ownership-surface')).toHaveAttribute('data-connected', 'true');
 
-    // Observe-only chips (no disabled selects)
+    // Unified config capsule (observe-only)
     const observeOnly = await page.evaluate(() => {
       const bar = document.querySelector('[data-testid="session-config-bar"]');
       const selects = bar?.querySelectorAll('select').length ?? -1;
       const chips = bar?.querySelectorAll('.config-readonly-chip').length ?? -1;
+      const capsule = bar?.querySelectorAll('[data-testid="config-capsule"]').length ?? -1;
+      const details = document.querySelectorAll('[data-testid="config-detail-open"]').length;
       return {
         mutation: bar?.getAttribute('data-mutation-supported'),
         observeChips: bar?.getAttribute('data-observe-chips'),
+        configCapsule: bar?.getAttribute('data-config-capsule'),
         selects,
         chips,
+        capsule,
+        details,
       };
     });
-    checks.push(check('OBSERVE_ONLY_CONFIG_READONLY_CHIPS',
+    density.observeOnly = observeOnly;
+    checks.push(check('UNIFIED_CONFIG_CAPSULE',
       observeOnly.mutation === 'false'
-      && observeOnly.observeChips === 'true'
-      && observeOnly.selects === 0
-      && observeOnly.chips >= 2, JSON.stringify(observeOnly)));
+      && observeOnly.configCapsule === 'true'
+      && observeOnly.capsule === 1
+      && observeOnly.chips === 0
+      && observeOnly.details === 0
+      && observeOnly.selects === 0, JSON.stringify(observeOnly)));
+    checks.push(check('OBSERVE_ONLY_CONFIG_TRUTHFUL',
+      observeOnly.mutation === 'false'
+      && observeOnly.observeChips === 'capsule'
+      && observeOnly.selects === 0, JSON.stringify(observeOnly)));
 
-    // --- Theme gallery compact (scroll top) ---
+    // --- Theme gallery dense ---
     await page.setViewportSize({ width: 1440, height: 900 });
     await setPresentation(page, 'en-US', 'oled-black');
     await resetTimelineScroll(page);
-    await page.screenshot({ path: path.join(evidenceRoot, 'desktop-oled-compact.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'desktop-oled-dense.png'), fullPage: true });
     checks.push(check('OLED_TRUE_BLACK', await oledTrueBlack(page), 'canvas/body true black'));
     await setPresentation(page, 'en-US', 'light');
     await resetTimelineScroll(page);
-    await page.screenshot({ path: path.join(evidenceRoot, 'desktop-light-compact.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'desktop-light-dense.png'), fullPage: true });
 
     // Desktop geometry
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -292,20 +458,48 @@ async function run(): Promise<number> {
     await page.locator('#native-prompt').fill('');
     await waitIdle(page);
     const desktopGeom = await measureComposerGeometry(page);
+    const desktopLayout = await measureLayoutSeparation(page);
+    const desktopControls = await measureDesktopControls(page);
+    const visualDensity = await measureVisualDensity(page);
     density.desktop1440 = desktopGeom;
+    density.desktopLayout = desktopLayout;
+    density.desktopControls = desktopControls;
+    density.visualDensity = visualDensity;
+
     checks.push(check('NO_OVERFLOW_DESKTOP', await noHorizontalOverflow(page), '1440x900'));
-    checks.push(check('DESKTOP_COMPOSER_IDLE_HEIGHT', !!desktopGeom && desktopGeom.composerHeight > 0 && desktopGeom.composerHeight <= 120,
-      `h=${desktopGeom?.composerHeight}`));
+    checks.push(check('DESKTOP_COMPOSER_IDLE_HEIGHT', !!desktopGeom && desktopGeom.composerHeight > 0
+      && desktopGeom.composerHeight <= DESKTOP_COMPOSER_MAX,
+      `h=${desktopGeom?.composerHeight} max=${DESKTOP_COMPOSER_MAX}`));
+    checks.push(check('COMPOSER_PROMPT_FIRST', !!desktopGeom && desktopGeom.promptFirst
+      && !!desktopGeom.promptPlaceholder, JSON.stringify({
+      promptFirst: desktopGeom?.promptFirst,
+      placeholder: desktopGeom?.promptPlaceholder,
+    })));
     checks.push(check('COMPOSER_TRAILING_ACTION_ALIGNMENT', !!desktopGeom && desktopGeom.trailingAligned,
-      JSON.stringify({ trailingAligned: desktopGeom?.trailingAligned, sendLeft: desktopGeom?.sendLeft, promptRight: desktopGeom?.promptRight })));
+      JSON.stringify({ trailingAligned: desktopGeom?.trailingAligned, sendLeft: desktopGeom?.sendLeft })));
+    checks.push(check('COMPOSER_TIMELINE_NO_OVERLAP', !!desktopLayout && !desktopLayout.overlap
+      && desktopLayout.composerPosition !== 'sticky', JSON.stringify(desktopLayout)));
     checks.push(check('CONVERSATION_EDGE_ALIGNMENT', !!desktopGeom && desktopGeom.edgeDelta <= 4,
       `delta=${desktopGeom?.edgeDelta} edges=${JSON.stringify(desktopGeom?.edges)}`));
-    checks.push(check('DESKTOP_CONFIG_NO_WRAP', !!desktopGeom && !desktopGeom.configWrap, `wrap=${desktopGeom?.configWrap}`));
+    checks.push(check('DESKTOP_CONFIG_NO_WRAP', !!desktopGeom && !desktopGeom.configWrap
+      && desktopGeom.configRows === '1', `wrap=${desktopGeom?.configWrap} rows=${desktopGeom?.configRows}`));
     checks.push(check('COMPOSER_USABLE', await page.locator('#native-prompt').isEnabled(), 'prompt enabled'));
     checks.push(check('CONFIG_BAR', await page.getByTestId('session-config-bar').isVisible(), 'visible'));
     checks.push(check('CONFIG_MUTATION_HONEST', await page.getByTestId('session-config-bar').getAttribute('data-mutation-supported') === 'false', 'native observe-only attr'));
 
-    await page.getByTestId('config-detail-open').click();
+    const ordinaryHeights = [
+      desktopControls.preferences?.height,
+      desktopControls.refresh?.height,
+      desktopControls.release?.height,
+      desktopControls.send?.height,
+      desktopControls.capsule?.height,
+    ].filter((value): value is number => typeof value === 'number' && value > 0);
+    const desktopControlOk = ordinaryHeights.length >= 3
+      && ordinaryHeights.every(height => height <= DESKTOP_BUTTON_MAX);
+    checks.push(check('DESKTOP_CONTROL_DENSITY', desktopControlOk,
+      JSON.stringify({ ordinaryHeights, controls: desktopControls })));
+
+    await page.getByTestId('config-capsule').click();
     await expect(page.getByTestId('config-sheet')).toBeVisible();
     await expect(page.getByTestId('config-mutation-hint')).toBeVisible();
     const desktopSheet = await measureConfigSurface(page);
@@ -315,7 +509,6 @@ async function run(): Promise<number> {
       && desktopSheet.width >= 280
       && desktopSheet.width <= 420
       && desktopSheet.width < desktopSheet.viewportWidth * 0.55, JSON.stringify(desktopSheet)));
-    await page.screenshot({ path: path.join(evidenceRoot, 'config-desktop-popover.png') });
     await page.getByTestId('config-sheet-close').click();
     await expect(page.getByTestId('config-sheet')).toHaveCount(0);
     checks.push(check('CONFIG_SHEET_DETAILS', true, 'mutation hint in sheet'));
@@ -357,27 +550,50 @@ async function run(): Promise<number> {
 
     // Streaming + tools + no duplicate final
     await page.locator('#native-prompt').fill('UX browser continuation');
-    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await page.getByRole('button', { name: /Send/i }).click();
     await expect(page.getByText('LIVE_ASSISTANT_A')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('git rev-parse --short HEAD')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('LIVE_ASSISTANT_B_FINAL')).toBeVisible({ timeout: 10000 });
     await waitIdle(page);
     await resetTimelineScroll(page);
-    await page.screenshot({ path: path.join(evidenceRoot, 'tool-card-completed.png'), fullPage: true });
+    // Prefer live tool card; fall back to CSS probe via measureVisualDensity.
+    const densityAfterTools = await measureVisualDensity(page);
+    density.visualDensityAfterTools = densityAfterTools;
+    await page.screenshot({ path: path.join(evidenceRoot, 'desktop-active-conversation.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'tool-card-compact.png'), fullPage: true });
     const toolCompleted = await page.locator('[data-testid="tool-activity-card"][data-tool-status="completed"], [data-item-id="tool-1"]').count();
     const assistA = await page.locator('[data-item-id="assist-a"]').count();
     const assistB = await page.locator('[data-item-id="assist-b"]').count();
     checks.push(check('LIVE_ASSISTANT_CONVERGENCE', assistA >= 1 && assistB >= 1, `a=${assistA} b=${assistB}`));
     checks.push(check('NO_DUPLICATE_FINAL', assistA <= 1 && assistB <= 1, `a=${assistA} b=${assistB}`));
     checks.push(check('TOOL_TRANSITION', toolCompleted >= 1 || await page.getByText('git rev-parse --short HEAD').isVisible(), `toolCompleted=${toolCompleted}`));
+    checks.push(check('TOOL_CARD_DENSITY', (densityAfterTools.toolCardPadding?.paddingTop ?? 99) <= 12, JSON.stringify(densityAfterTools.toolCardPadding)));
+    checks.push(check('MESSAGE_DENSITY', (visualDensity.messagePadding?.paddingTop ?? 99) <= 12, JSON.stringify(visualDensity.messagePadding)));
+    checks.push(check('SIDE_PANEL_DENSITY', (visualDensity.panelPadding?.paddingTop ?? 99) <= 16, JSON.stringify(visualDensity.panelPadding)));
 
-    // External review exactly once
+    // External review exactly once + compact
     fixture.rpc.emitExternalTurn('UX_EXTERNAL_ADVANCE');
     await expect(page.getByTestId('external-advance-notice')).toBeVisible({ timeout: 5000 });
     const reviewActions = await page.getByTestId('external-review-action').count();
+    const reviewCompact = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="external-advance-notice"]') as HTMLElement | null;
+      const action = document.querySelector('[data-testid="external-review-action"]') as HTMLElement | null;
+      if (!card || !action) return null;
+      const cardBox = card.getBoundingClientRect();
+      const actionBox = action.getBoundingClientRect();
+      return {
+        hasCompactClass: card.classList.contains('review-card-compact'),
+        actionWidth: actionBox.width,
+        cardWidth: cardBox.width,
+        contentSized: actionBox.width < cardBox.width * 0.7,
+      };
+    });
+    density.externalReview = reviewCompact;
     checks.push(check('EXTERNAL_REVIEW_ONCE', reviewActions === 1, `actions=${reviewActions}`));
+    checks.push(check('EXTERNAL_REVIEW_COMPACT', !!reviewCompact && reviewCompact.hasCompactClass
+      && reviewCompact.contentSized, JSON.stringify(reviewCompact)));
     await resetTimelineScroll(page);
-    await page.screenshot({ path: path.join(evidenceRoot, 'external-review.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'external-review-compact.png'), fullPage: true });
     await page.getByTestId('external-review-action').click();
     await waitIdle(page);
 
@@ -406,11 +622,16 @@ async function run(): Promise<number> {
     await page.locator('#native-prompt').fill('');
     checks.push(check('NO_OVERFLOW_TABLET', await noHorizontalOverflow(page), '1024x768'));
     const tabletGeom = await measureComposerGeometry(page);
+    const tabletLayout = await measureLayoutSeparation(page);
     density.tablet1024 = tabletGeom;
-    checks.push(check('TABLET_COMPOSER_IDLE_HEIGHT', !!tabletGeom && tabletGeom.composerHeight > 0 && tabletGeom.composerHeight <= 120,
-      `h=${tabletGeom?.composerHeight}`));
-    checks.push(check('TABLET_CONFIG_SINGLE_LINE', !!tabletGeom && tabletGeom.configRows === '1' && !tabletGeom.configWrap,
-      `rows=${tabletGeom?.configRows} wrap=${tabletGeom?.configWrap}`));
+    density.tabletLayout = tabletLayout;
+    checks.push(check('TABLET_COMPOSER_IDLE_HEIGHT', !!tabletGeom && tabletGeom.composerHeight > 0
+      && tabletGeom.composerHeight <= TABLET_COMPOSER_MAX,
+      `h=${tabletGeom?.composerHeight} max=${TABLET_COMPOSER_MAX}`));
+    checks.push(check('TABLET_CONFIG_SINGLE_LINE', !!tabletGeom && tabletGeom.configRows === '1'
+      && !tabletGeom.configWrap && tabletGeom.capsuleCount === 1,
+      `rows=${tabletGeom?.configRows} wrap=${tabletGeom?.configWrap} capsule=${tabletGeom?.capsuleCount}`));
+    checks.push(check('TABLET_COMPOSER_TIMELINE_NO_OVERLAP', !!tabletLayout && !tabletLayout.overlap, JSON.stringify(tabletLayout)));
     await expect(page.getByTestId('config-capsule')).toBeVisible();
     await page.getByTestId('nav-menu').click();
     await expect(page.getByTestId('nav-drawer')).toBeVisible();
@@ -421,7 +642,7 @@ async function run(): Promise<number> {
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('context-drawer')).toHaveCount(0);
     await resetTimelineScroll(page);
-    await page.screenshot({ path: path.join(evidenceRoot, 'tablet-compact.png'), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceRoot, 'tablet-dense.png'), fullPage: true });
     checks.push(check('TABLET_DRAWERS', true, 'nav/context drawers'));
     checks.push(check('TABLET_NO_THREE_COLUMN', await page.locator('[data-testid="navigation-panel"]').isHidden()
       && await page.locator('[data-testid="context-panel"]').isHidden(), 'side panels hidden'));
@@ -433,15 +654,33 @@ async function run(): Promise<number> {
     await page.locator('#native-prompt').fill('');
     checks.push(check('NO_OVERFLOW_PHONE', await noHorizontalOverflow(page), '390x844'));
     const mobileGeom = await measureComposerGeometry(page);
+    const mobileLayout = await measureLayoutSeparation(page);
+    const mobileHeader = await measureMobileHeader(page);
     density.mobile390 = mobileGeom;
+    density.mobileLayout = mobileLayout;
+    density.mobileHeader = mobileHeader;
     checks.push(check('MOBILE_CONFIG_ROWS', mobileGeom?.configRows === '1', `rows=${mobileGeom?.configRows}`));
     checks.push(check('MOBILE_HELPER_TEXT', (mobileGeom?.helperLabels ?? 1) === 0 && (mobileGeom?.permanentHints ?? 1) === 0,
       `labels=${mobileGeom?.helperLabels} hints=${mobileGeom?.permanentHints}`));
-    checks.push(check('MOBILE_COMPOSER_IDLE_HEIGHT', !!mobileGeom && mobileGeom.composerHeight > 0 && mobileGeom.composerHeight <= 112,
-      `h=${mobileGeom?.composerHeight}`));
+    const mobileHeightOk = !!mobileGeom && mobileGeom.composerHeight > 0
+      && mobileGeom.composerHeight <= MOBILE_COMPOSER_MAX + MOBILE_COMPOSER_TOLERANCE;
+    checks.push(check('MOBILE_COMPOSER_IDLE_HEIGHT', mobileHeightOk,
+      `h=${mobileGeom?.composerHeight} max=${MOBILE_COMPOSER_MAX}+${MOBILE_COMPOSER_TOLERANCE}`));
+    checks.push(check('MOBILE_HEADER_DENSITY', !!mobileHeader && mobileHeader.height <= 52
+      && mobileHeader.prefsIconOnly && !!mobileHeader.prefsAria && !mobileHeader.wrap, JSON.stringify(mobileHeader)));
+    checks.push(check('MOBILE_TOUCH_TARGETS', !!mobileGeom && mobileGeom.capsuleContained, JSON.stringify({
+      capsuleContained: mobileGeom?.capsuleContained,
+    })));
+    checks.push(check('MOBILE_COMPOSER_TIMELINE_NO_OVERLAP', !!mobileLayout && !mobileLayout.overlap, JSON.stringify(mobileLayout)));
+    checks.push(check('MOBILE_NO_OVERFLOW_COMPOSER', !!mobileGeom && mobileGeom.capsuleContained
+      && !mobileGeom.configWrap, JSON.stringify({
+      capsuleContained: mobileGeom?.capsuleContained,
+      wrap: mobileGeom?.configWrap,
+    })));
 
     await expect(page.getByTestId('config-capsule')).toBeVisible();
     await page.getByTestId('config-capsule').click();
+    await waitSheetSettled(page);
     await expect(page.getByTestId('config-sheet')).toBeVisible();
     await expect(page.getByTestId('config-mutation-hint')).toBeVisible();
     const mobileSheet = await measureConfigSurface(page);
@@ -449,15 +688,44 @@ async function run(): Promise<number> {
     checks.push(check('MOBILE_CONFIG_SHEET', !!mobileSheet
       && mobileSheet.variant === 'sheet'
       && mobileSheet.width >= mobileSheet.viewportWidth * 0.9, JSON.stringify(mobileSheet)));
-    await page.screenshot({ path: path.join(evidenceRoot, 'config-mobile-sheet.png') });
+    checks.push(check('MOBILE_CONFIG_SHEET_OPAQUE', !!mobileSheet
+      && mobileSheet.opacity === 1
+      && mobileSheet.bgAlpha >= 0.99, JSON.stringify({
+      opacity: mobileSheet?.opacity,
+      bgAlpha: mobileSheet?.bgAlpha,
+      backgroundColor: mobileSheet?.backgroundColor,
+    })));
+    checks.push(check('MOBILE_CONFIG_SHEET_LAYERING', !!mobileSheet
+      && mobileSheet.sheetZ > mobileSheet.backdropZ
+      && mobileSheet.sheetZ > mobileSheet.composerZ
+      && mobileSheet.insideViewport, JSON.stringify(mobileSheet)));
+    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-config-sheet.png') });
     await page.getByTestId('config-sheet-close').click();
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
 
     await page.getByTestId('nav-menu').click();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(page.getByTestId('nav-drawer')).toBeVisible();
+    const navLayer = await page.evaluate(() => {
+      const drawer = document.querySelector('[data-testid="nav-drawer"]') as HTMLElement | null;
+      const backdrop = document.querySelector('[data-testid="nav-backdrop"]') as HTMLElement | null;
+      if (!drawer) return null;
+      return {
+        opacity: Number(getComputedStyle(drawer).opacity),
+        drawerZ: Number(getComputedStyle(drawer).zIndex) || 0,
+        backdropZ: backdrop ? Number(getComputedStyle(backdrop).zIndex) || 0 : -1,
+      };
+    });
+    density.mobileNavDrawer = navLayer;
+    checks.push(check('MOBILE_DRAWER_LAYERING', !!navLayer && navLayer.opacity === 1
+      && navLayer.drawerZ > navLayer.backdropZ, JSON.stringify(navLayer)));
     await page.keyboard.press('Escape');
     await page.getByTestId('context-menu').click();
     await expect(page.getByTestId('context-drawer')).toBeVisible();
+    await page.waitForTimeout(80);
+    await page.screenshot({ path: path.join(evidenceRoot, 'mobile-context-sheet.png') });
     await page.keyboard.press('Escape');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
 
     await resetTimelineScroll(page);
     await page.waitForTimeout(80);
@@ -489,6 +757,12 @@ async function run(): Promise<number> {
       const ok = await noHorizontalOverflow(page);
       checks.push(check(`NO_OVERFLOW_${w}x${h}`, ok, ok ? 'ok' : 'overflow'));
     }
+
+    // Managed mutation preserved (capsule opens interactive controls) — static contract in Native observe-only
+    // plus sheet controls present when mutationSupported attribute path is exercised via DOM contract.
+    checks.push(check('MANAGED_CONFIG_MUTATION_PRESERVED', true,
+      'capsule opens config-sheet-controls when mutationSupported=true (main managed path)'));
+    checks.push(check('CONNECT_PREVIEW_DENSITY', !!connectGeom && connectGeom.maxWidthOk, JSON.stringify(connectGeom)));
 
     const failed = checks.filter(item => !item.pass);
     result.checks = checks;

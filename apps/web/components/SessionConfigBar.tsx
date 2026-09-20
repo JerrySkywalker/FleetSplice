@@ -5,15 +5,6 @@ import { abbreviateModel, abbreviatePermission, abbreviateReasoning, compactConf
 
 export type ConfigOption = { id: string; label: string; disabled?: boolean };
 
-function ReadonlyChip({
-  prefix, value, title, testId,
-}: { prefix?: string; value: string; title?: string; testId: string }) {
-  return <span className="config-readonly-chip" data-testid={testId} title={title ?? value} data-clipping-policy="ellipsis">
-    {prefix ? <span className="config-readonly-prefix">{prefix}</span> : null}
-    <span className="config-readonly-value text-ellipsis">{value}</span>
-  </span>;
-}
-
 export function SessionConfigBar({
   modelLabel, reasoningLabel, permissionLabel, controllerLabel,
   model, reasoning, permission,
@@ -48,7 +39,6 @@ export function SessionConfigBar({
   const breakpoint = useBreakpoint();
   const mobile = breakpoint === 'mobile';
   const tablet = breakpoint === 'tablet';
-  const desktop = breakpoint === 'desktop';
   const [sheetOpen, setSheetOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -81,55 +71,40 @@ export function SessionConfigBar({
     }
   }, [sheetOpen]);
 
-  const displayModel = abbreviateModel(observedModel);
-  const displayReasoning = abbreviateReasoning(observedReasoning);
-  const displayPermission = abbreviatePermission(observedPermission);
-  const hasReasoning = !!(observedReasoning ?? '').trim();
-
   const interactiveSelects = <>
     <label className="config-chip">
-      <span>{tablet ? 'M' : modelLabel}</span>
+      <span>{tablet || mobile ? 'M' : modelLabel}</span>
       <select data-testid="config-model" aria-label={modelLabel} title={modelTitle ?? model}
         value={model} disabled={modelDisabled || !models.length}
         onChange={event => onModel?.(event.target.value)}>
         {!models.length && <option value={model || ''}>{model || '—'}</option>}
         {models.map(item => <option key={item.id} value={item.id} disabled={item.disabled}>
-          {tablet ? abbreviateModel(item.label) : item.label}
+          {tablet || mobile ? abbreviateModel(item.label) : item.label}
         </option>)}
       </select>
     </label>
     <label className="config-chip">
-      <span>{tablet ? 'R' : reasoningLabel}</span>
+      <span>{tablet || mobile ? 'R' : reasoningLabel}</span>
       <select data-testid="config-reasoning" aria-label={reasoningLabel} title={reasoningTitle ?? reasoning}
         value={reasoning} disabled={reasoningDisabled || !reasonings.length}
         onChange={event => onReasoning?.(event.target.value)}>
         {!reasonings.length && <option value={reasoning || ''}>{reasoning || '—'}</option>}
         {reasonings.map(item => <option key={item.id} value={item.id} disabled={item.disabled}>
-          {tablet ? abbreviateReasoning(item.label) : item.label}
+          {tablet || mobile ? abbreviateReasoning(item.label) : item.label}
         </option>)}
       </select>
     </label>
     <label className="config-chip">
-      <span>{tablet ? 'P' : permissionLabel}</span>
+      <span>{tablet || mobile ? 'P' : permissionLabel}</span>
       <select data-testid="config-permission" aria-label={permissionLabel} title={permissionTitle ?? permission}
         value={permission} disabled={permissionDisabled || !permissions.length}
         onChange={event => onPermission?.(event.target.value)}>
         {!permissions.length && <option value={permission || ''}>{permission || '—'}</option>}
         {permissions.map(item => <option key={item.id} value={item.id} disabled={item.disabled}>
-          {tablet ? abbreviatePermission(item.label) : item.label}
+          {tablet || mobile ? abbreviatePermission(item.label) : item.label}
         </option>)}
       </select>
     </label>
-  </>;
-
-  const observeChips = <>
-    <ReadonlyChip prefix="M" value={displayModel} title={observedModel || undefined} testId="config-model-readonly" />
-    {hasReasoning ? (
-      <ReadonlyChip prefix="R" value={displayReasoning} title={observedReasoning || undefined} testId="config-reasoning-readonly" />
-    ) : desktop ? (
-      <ReadonlyChip prefix="R" value="—" title={reasoningLabel} testId="config-reasoning-readonly" />
-    ) : null}
-    <ReadonlyChip prefix="P" value={displayPermission} title={observedPermission || undefined} testId="config-permission-readonly" />
   </>;
 
   const controller = <div className="config-chip controller-chip status-chip" data-testid="config-controller" title={controllerLabel}>
@@ -166,9 +141,6 @@ export function SessionConfigBar({
     </dl>
   );
 
-  const useCapsule = mobile || (tablet && !mutationSupported);
-  const showDetailsTrigger = !mutationSupported && !useCapsule;
-
   const closeSurface = () => {
     setSheetOpen(false);
     triggerRef.current?.focus();
@@ -179,36 +151,26 @@ export function SessionConfigBar({
     className={`session-config-bar density-${breakpoint}`}
     data-testid="session-config-bar"
     data-mutation-supported={mutationSupported}
-    data-config-rows={useCapsule || mobile ? '1' : 'full'}
-    data-observe-chips={!mutationSupported ? 'true' : 'false'}
+    data-config-rows="1"
+    data-config-capsule="true"
+    data-observe-chips={!mutationSupported ? 'capsule' : 'false'}
   >
-    {useCapsule ? <>
-      <button
-        type="button"
-        ref={triggerRef}
-        className="config-capsule"
-        data-testid="config-capsule"
-        data-clipping-policy="ellipsis"
-        aria-expanded={sheetOpen}
-        aria-haspopup="dialog"
-        title={summary}
-        onClick={() => setSheetOpen(true)}
-      >
-        <span className="config-capsule-text text-ellipsis">{summary}</span>
-        <ChevronDown size={16} aria-hidden="true" />
-      </button>
-      {controller}
-    </> : <>
-      {mutationSupported ? interactiveSelects : observeChips}
-      {controller}
-      {showDetailsTrigger && (
-        <button type="button" ref={triggerRef} className="ghost-button config-detail-trigger" data-testid="config-detail-open"
-          aria-expanded={sheetOpen} aria-haspopup="dialog"
-          onClick={() => setSheetOpen(true)}>
-          Details
-        </button>
-      )}
-    </>}
+    <button
+      type="button"
+      ref={triggerRef}
+      className="config-capsule"
+      data-testid="config-capsule"
+      data-clipping-policy="ellipsis"
+      aria-expanded={sheetOpen}
+      aria-haspopup="dialog"
+      aria-label={`${modelLabel}: ${summary}`}
+      title={summary}
+      onClick={() => setSheetOpen(true)}
+    >
+      <span className="config-capsule-text text-ellipsis">{summary}</span>
+      <ChevronDown size={14} aria-hidden="true" />
+    </button>
+    {controller}
 
     {sheetOpen && <>
       <div className="drawer-backdrop" data-testid="config-sheet-backdrop" onClick={closeSurface} />
@@ -227,7 +189,7 @@ export function SessionConfigBar({
         </div>
         <div className="drawer-body">
           {detailRows}
-          {mutationSupported ? <div className="config-sheet-controls">{interactiveSelects}</div> : null}
+          {mutationSupported ? <div className="config-sheet-controls" data-testid="config-sheet-controls">{interactiveSelects}</div> : null}
         </div>
       </div>
     </>}

@@ -112,13 +112,15 @@ export function OwnershipSurface({
 export function ReviewCard({ title, body, actionLabel, disabled, onReview }: {
   title: string; body: string; actionLabel: string; disabled: boolean; onReview: () => void;
 }) {
-  return <div className="review-card notice-card severity-info" data-testid="external-advance-notice" data-severity="info">
-    <div className="notice-card-head">
-      <AlertTriangle size={16} aria-hidden="true" />
-      <strong>{title}</strong>
+  return <div className="review-card notice-card review-card-compact severity-info" data-testid="external-advance-notice" data-severity="info">
+    <div className="review-card-body">
+      <AlertTriangle size={16} className="review-card-icon" aria-hidden="true" />
+      <div className="review-card-copy">
+        <strong>{title}</strong>
+        <p>{body}</p>
+      </div>
     </div>
-    <p>{body}</p>
-    <button type="button" className="primary" data-testid="external-review-action" disabled={disabled} onClick={onReview}>{actionLabel}</button>
+    <button type="button" className="primary review-card-action" data-testid="external-review-action" disabled={disabled} onClick={onReview}>{actionLabel}</button>
   </div>;
 }
 

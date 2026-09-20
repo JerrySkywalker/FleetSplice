@@ -19,7 +19,9 @@
     "demo:owner-experience": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/demo-owner-experience.js",
     "capture:ux-baseline-r2": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/capture-ux-baseline.js",
     "tokens:generate": "node scripts/tokens/generate.mjs",
-    "tokens:check": "node scripts/tokens/check.mjs"
+    "tokens:check": "node scripts/tokens/check.mjs",
+    "perf:local-audit": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/perf/local-audit.js",
+    "perf:soak": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/perf/soak.js"
   },
   "dependencies": {
     "ajv": "8.20.0",

@@ -14,6 +14,7 @@ decision and consequence; record bodies remain historical accepted evidence.
 | [0004](0004-windows-runtime-storage-and-native-helper.md) | Per-user Edge and SQLite; generic helper/Admin/WSL breadth deferred, minimum journals G05, complete recovery/storage G08-G10. |
 | [0005](0005-shared-interaction-semantics-and-ui-reuse.md) | Shared Fleet-owned WebUI/future TUI; G06 now remote mobile alpha and G07 multi-host. |
 | [0006](0006-security-provenance-and-self-iteration.md) | Secret/privilege/provenance and independent activation boundaries; external anchor/continuity profile deferred. |
+| [0007](0007-remote-native-adoption-hcp.md) | Additive G06 predeploy binding: remote Hub `RemoteAdoptionPortProxy` over typed HCP to Edge Native Adoption; preserves `NATIVE_ADOPTED` primary path. |
 
 `ARCHITECTURE_0_1_READY=true`. No ADR is implementation authorization.
 [Current status](../train/G04A-status.md) governs formal G04/G04A acceptance and

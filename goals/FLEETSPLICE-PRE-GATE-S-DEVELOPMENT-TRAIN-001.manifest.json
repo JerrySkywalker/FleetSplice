@@ -1,0 +1,89 @@
+{
+  "schema": "fleetsplice-goal-train.v1",
+  "train_id": "FLEETSPLICE-PRE-GATE-S-DEVELOPMENT-TRAIN-001",
+  "product_base_head": "221e326bc74be1d9ae680e373d9fd40be1631ca3",
+  "implementation_base": "exact merge head containing this train document",
+  "implementation_branch": "train/pre-gate-s-development-001",
+  "artifact_root": "V:\\artifacts\\FleetSplice\\FLEETSPLICE-PRE-GATE-S-DEVELOPMENT-TRAIN-001",
+  "serial": true,
+  "child_count": 12,
+  "children": [
+    [
+      "S00",
+      "FLEETSPLICE-PGS-S00-INDEPENDENT-AUDIT-001"
+    ],
+    [
+      "S01",
+      "FLEETSPLICE-PGS-S01-PRODUCT-PATH-CONSOLIDATION-001"
+    ],
+    [
+      "S02",
+      "FLEETSPLICE-PGS-S02-DEPLOYMENT-DISCOVERY-001"
+    ],
+    [
+      "S03",
+      "FLEETSPLICE-PGS-S03-GENERIC-OIDC-001"
+    ],
+    [
+      "S04",
+      "FLEETSPLICE-PGS-S04-GATEWAY-DASHBOARD-001"
+    ],
+    [
+      "S05",
+      "FLEETSPLICE-PGS-S05-WINDOWS-AGENT-IPC-001"
+    ],
+    [
+      "S06",
+      "FLEETSPLICE-PGS-S06-RUNTIME-SHARING-001"
+    ],
+    [
+      "S07",
+      "FLEETSPLICE-PGS-S07-WINDOWS-DESKTOP-CLI-001"
+    ],
+    [
+      "S08",
+      "FLEETSPLICE-PGS-S08-DEVICE-PAIRING-001"
+    ],
+    [
+      "S09",
+      "FLEETSPLICE-PGS-S09-DURABLE-IDENTITY-RESTART-001"
+    ],
+    [
+      "S10",
+      "FLEETSPLICE-PGS-S10-REAL-NATIVE-REMOTE-E2E-001"
+    ],
+    [
+      "S11",
+      "FLEETSPLICE-PGS-S11-INSTALLER-DOGFOOD-CLOSEOUT-001"
+    ]
+  ],
+  "gates": [
+    {
+      "id": "A",
+      "after": "S01",
+      "purpose": "one production Gateway/Agent path and accepted Native Adoption boundary"
+    },
+    {
+      "id": "B",
+      "after": "S04",
+      "purpose": "generic self-hosting, OIDC and Fleet Dashboard product surface"
+    },
+    {
+      "id": "C",
+      "after": "S08",
+      "purpose": "Windows Agent/Desktop/runtime sharing/device pairing product"
+    },
+    {
+      "id": "S",
+      "after": "S11",
+      "purpose": "Owner production deployment admission; train must stop"
+    }
+  ],
+  "forbidden_production_actions": [
+    "Tencent access or mutation",
+    "production DNS or TLS",
+    "production OIDC application or secret",
+    "production device enrollment key",
+    "main merge"
+  ]
+}

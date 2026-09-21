@@ -12,8 +12,9 @@ import { permits, readCeiling } from '../../packages/permissions/index.ts';
 import { nativeAdoptionEdge } from './native-adoption.ts';
 import { agentAdoptionEndpoint, acceptAgentAdoptionHcp } from '../../packages/product-path/index.ts';
 import { mayShareWorkspace, type RuntimeSharing } from '../../packages/agent-runtime/index.ts';
+import { signEnrollmentChallenge, type HostEnrollmentPrivateMaterial } from '../../packages/remote-enrollment/index.ts';
 
-export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
+export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; enrollment?: HostEnrollmentPrivateMaterial; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
 
 /**
  * Native adoption has an HCP endpoint in the product Edge itself.  The former
@@ -26,9 +27,10 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   requireThat(canonical(identity) === canonical(config.identity), 'EDGE_LOCAL_IDENTITY_CHANGED');
   requireThat((config.workspaces ?? []).some(binding => binding.valid && binding.root.toLowerCase() === identity.root.toLowerCase() && binding.rootIdentity === identity.rootIdentity && canonical(binding.target) === canonical(config.target)), 'WORKSPACE_BINDING_UNPROVABLE');
   const local = await nativeAdoptionEdge(identity.root, config.stateDirectory);
+  const enrollment = config.enrollment;
   const socket = new WebSocket(`ws://127.0.0.1:${config.port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', {
     perMessageDeflate: false, maxPayload: 262144, origin: `http://127.0.0.1:${config.port}`,
-    headers: { Authorization: `Bearer ${config.hcpToken}` },
+    headers: enrollment ? {} : { Authorization: `Bearer ${config.hcpToken}` },
   });
   const kernel = { connected: false, quarantine: () => { kernel.connected = false; } };
   const send = (message: Hcp) => {
@@ -45,12 +47,15 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
       return { status: snapshot.observationFailure ? 'degraded' as const : 'healthy' as const, discoveredSessions: snapshot.threads.length, evidence: snapshot.observationFailure?.code ?? 'Native inventory, thread cwd, exact root proof and Workspace binding observed.' };
     } catch (error) { return { status: 'unavailable' as const, discoveredSessions: 0, evidence: error instanceof Fault ? error.code : 'RUNTIME_OBSERVATION_UNAVAILABLE' }; }
   };
-  socket.on('open', () => send({ ...envelope, kind: 'hello', identity, recovered: false }));
+  socket.on('open', () => send({ ...envelope, kind: 'hello', identity, recovered: false, ...(enrollment ? { enrollment: { fleetId: enrollment.fleetId, hostId: enrollment.hostId, environmentId: enrollment.environmentId, enrollmentGeneration: enrollment.enrollmentGeneration, publicKeySpkiPem: enrollment.publicKeySpkiPem, publicFingerprint: enrollment.publicFingerprint } } : {}) }));
   socket.on('message', async (bytes, binary) => {
     try {
       requireThat(!binary, 'HCP_BINARY_REJECTED');
       const message = validate<Hcp>('hcp', parseJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes as Buffer)));
-      if (message.kind === 'ready' && !kernel.connected) {
+      if (message.kind === 'enrollment.challenge' && !kernel.connected) {
+        requireThat(!!enrollment && canonical(message.challenge.expected) === canonical({ fleetId: enrollment.fleetId, hostId: enrollment.hostId, environmentId: enrollment.environmentId, enrollmentGeneration: enrollment.enrollmentGeneration, publicKeySpkiPem: enrollment.publicKeySpkiPem, publicFingerprint: enrollment.publicFingerprint }), 'ENROLLMENT_IDENTITY_MISMATCH');
+        send({ ...envelope, kind: 'enrollment.proof', hostId: enrollment.hostId, proof: signEnrollmentChallenge(enrollment, message.challenge) });
+      } else if (message.kind === 'ready' && !kernel.connected) {
         requireThat(!message.recoveryRequired, 'RECOVERY_REQUIRED');
         kernel.connected = true;
         const observation = await observeRuntime();

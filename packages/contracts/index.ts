@@ -40,8 +40,11 @@ export type Plan = { v: 1; planId: string; commandId: string; intentDigest: stri
 export type EdgeCommand = { v: 1; edgeCommandId: string; stepDigest: string; planDigest: string; plan: Plan; command: FleetCommand };
 export type Receipt = { edgeCommandId: string; status: 'SUCCEEDED' | 'REJECTED' | 'AMBIGUOUS_EFFECT' | 'DISPATCHED'; code: string; nativeThreadId: string | null; nativeTurnId: string | null; nativeRequestId: string | null; nativeProcessId: number | null; nativeInstanceId: string | null; nativeCapabilities: NativeCapabilityCatalog | null; nativeConfiguration: NativeSessionConfiguration | null };
 export type NativeEvent = { laneId: string; edgeCommandId: string; kind: 'delta' | 'turnStarted' | 'turnCompleted' | 'blocked' | 'tool' | 'configurationInvalidated'; text: string; threadId: string | null; turnId: string | null; status: string };
+export type EnrollmentIdentity = { fleetId: string; hostId: string; environmentId: string; enrollmentGeneration: string; publicKeySpkiPem: string; publicFingerprint: string };
 export type Hcp = { v: 1; connectionId: string; target: Target } & (
-  { kind: 'hello'; identity: { principal: string; sid: string; sessionId: number; elevated: false; root: string; rootIdentity: string }; recovered: boolean } |
+  { kind: 'hello'; identity: { principal: string; sid: string; sessionId: number; elevated: false; root: string; rootIdentity: string }; recovered: boolean; enrollment?: EnrollmentIdentity } |
+  { kind: 'enrollment.challenge'; challenge: { challengeId: string; nonce: string; issuedAt: number; expiresAt: number; expected: EnrollmentIdentity } } |
+  { kind: 'enrollment.proof'; hostId: string; proof: { challengeId: string; signatureDerBase64: string } } |
   { kind: 'ready'; recoveryRequired: boolean } |
   { kind: 'command'; command: EdgeCommand } |
   { kind: 'receipt'; receipt: Receipt } |
@@ -82,8 +85,11 @@ const edgeCommand = obj({ v: literal(1), edgeCommandId: uuid, stepDigest: hash, 
 const receipt = obj({ edgeCommandId: uuid, status: { enum: ['SUCCEEDED', 'REJECTED', 'AMBIGUOUS_EFFECT', 'DISPATCHED'] }, code: str(120), nativeThreadId: nullable(str(200)), nativeTurnId: nullable(str(200)), nativeRequestId: nullable(uuid), nativeProcessId: nullable({ type: 'integer', minimum: 1 }), nativeInstanceId: nullable(uuid), nativeCapabilities: nullable(capabilityCatalog), nativeConfiguration: nullable(nativeConfiguration) });
 const event = obj({ laneId: uuid, edgeCommandId: uuid, kind: { enum: ['delta', 'turnStarted', 'turnCompleted', 'blocked', 'tool', 'configurationInvalidated'] }, text: str(24000), threadId: nullable(str(200)), turnId: nullable(str(200)), status: str(120) });
 const hcpBase = { v: literal(1), connectionId: uuid, target };
+const enrollmentIdentity = obj({ fleetId: str(200), hostId: uuid, environmentId: uuid, enrollmentGeneration: rev, publicKeySpkiPem: str(8192), publicFingerprint: hash });
 const hcp = { oneOf: [
-  obj({ ...hcpBase, kind: literal('hello'), identity: obj({ principal: str(), sid: str(), sessionId: { type: 'integer', minimum: 1 }, elevated: literal(false), root: str(), rootIdentity: hash }), recovered: { type: 'boolean' } }),
+  optional({ ...hcpBase, kind: literal('hello'), identity: obj({ principal: str(), sid: str(), sessionId: { type: 'integer', minimum: 1 }, elevated: literal(false), root: str(), rootIdentity: hash }), recovered: { type: 'boolean' } }, { enrollment: enrollmentIdentity }),
+  obj({ ...hcpBase, kind: literal('enrollment.challenge'), challenge: obj({ challengeId: { type: 'string', pattern: '^[0-9a-f]{32}$' }, nonce: str(200), issuedAt: { type: 'integer', minimum: 1 }, expiresAt: { type: 'integer', minimum: 1 }, expected: enrollmentIdentity }) }),
+  obj({ ...hcpBase, kind: literal('enrollment.proof'), hostId: uuid, proof: obj({ challengeId: { type: 'string', pattern: '^[0-9a-f]{32}$' }, signatureDerBase64: str(4096) }) }),
   obj({ ...hcpBase, kind: literal('ready'), recoveryRequired: { type: 'boolean' } }),
   obj({ ...hcpBase, kind: literal('command'), command: edgeCommand }),
   obj({ ...hcpBase, kind: literal('receipt'), receipt }),

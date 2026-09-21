@@ -13,6 +13,7 @@ import { RemoteAdoptionPortProxy } from '../../packages/remote-adoption/index.ts
 import { gatewayAdoptionPort, type GatewayAdoptionCarriage } from '../../packages/product-path/index.ts';
 import { resolveDeploymentProfile, type DeploymentProfileInput } from '../../packages/deployment/index.ts';
 import { GenericOidcAuthenticator, type HumanPrincipal, type OidcProviderConfig } from '../../packages/oidc/index.ts';
+import { DeviceEnrollmentService } from '../../packages/device-enrollment/index.ts';
 
 export type HubAuthConfig = { mode: 'LOOPBACK_BOOTSTRAP' } | { mode: 'OIDC'; provider: OidcProviderConfig };
 export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[]; adoptionCarriage?: GatewayAdoptionCarriage; deployment?: DeploymentProfileInput; auth?: HubAuthConfig };
@@ -25,6 +26,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   const origin = `http://127.0.0.1:${config.port}`; const host = `127.0.0.1:${config.port}`;
   const deployment = resolveDeploymentProfile(config.deployment ?? { kind: 'LOOPBACK', publicBaseUrl: origin });
   const oidc = config.auth?.mode === 'OIDC' ? new GenericOidcAuthenticator(config.auth.provider) : null;
+  const devices = new DeviceEnrollmentService();
   const cookieName = oidc && deployment.kind !== 'LOOPBACK' ? '__Host-fleetsplice' : 'fleetsplice';
   const actorId = randomUUID();
   const sessions = new Map<string, { expiresAt: number; idleExpiresAt: number; principal: HumanPrincipal }>();
@@ -33,7 +35,10 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   const nativeStreams = new Set<ServerResponse>();
   let nativeRevision = '0';
   let nativeUnsubscribe: (() => void) | null = null;
-  let edge: WebSocket | null = null; let usedBootstrap = false; let hcpAccepted = false;
+  let edge: WebSocket | null = null; let usedBootstrap = false; let hcpAccepted = false; let hcpPending = false;
+  const edgeDetachWaiters = new Set<() => void>();
+  const edgeDetached = () => { hcpAccepted = false; hcpPending = false; for (const resolve of edgeDetachWaiters) resolve(); edgeDetachWaiters.clear(); };
+  const waitForEdgeDetach = () => !edge ? Promise.resolve() : new Promise<void>(resolve => edgeDetachWaiters.add(resolve));
   const remoteAdoption = adoptionPort instanceof RemoteAdoptionPortProxy ? adoptionPort : null;
   const pending = new Map<string, { resolve: (receipt: Receipt) => void; reject: () => void; timer: NodeJS.Timeout }>();
   const send = (message: Hcp) => {
@@ -143,6 +148,15 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         usedBootstrap = true; const opened = openSession({ id: createHash('sha256').update('loopback-development\0owner').digest('hex'), issuer: 'loopback-development', subject: 'owner', displayName: 'Loopback development owner', email: null, avatar: null, groups: [] });
         res.setHeader('Set-Cookie', opened.cookie); json(res, 200, { authenticated: true }); return;
       }
+      if (req.method === 'POST' && req.url === '/api/devices/enroll') {
+        // A device can create only a pending public-key request. Human session
+        // approval happens separately and no OIDC token ever reaches this route.
+        const requested = devices.request(await body(req), now()); json(res, 202, { requestId: requested.requestId, state: requested.state, publicFingerprint: requested.identity.publicFingerprint }); return;
+      }
+      if (req.method === 'GET' && /^\/api\/devices\/[0-9a-f-]{36}\/status$/.test(req.url ?? '')) {
+        const requestId = /^\/api\/devices\/([0-9a-f-]{36})\/status$/.exec(req.url!)![1]!;
+        const device = devices.status(requestId); json(res, 200, { requestId: device.requestId, state: device.state }); return;
+      }
       if (req.url?.startsWith('/api/')) {
         const authenticatedSession = session(req);
         if (req.method === 'POST' && req.url === '/api/auth/logout') {
@@ -170,13 +184,19 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
             runtimes: adoptionPort ? [{ adapterId: 'codex-native', enabled: true, shared: true, status: runtimeStatus, discoveredSessions, observation }] : [],
             sessions: { discovered: discoveredSessions, active: activeSessions },
             attention: [...(gatewayStatus === 'online' ? [] : [{ code: 'HOST_CONNECTION_UNKNOWN' }]), ...(observation ? [{ code: observation }] : [])],
-            devices: [],
+            devices: devices.projections(),
           }); return;
         }
         if (req.method === 'POST' && req.url === '/api/client') {
           requireThat(canonical(await body(req)) === '{}', 'SCHEMA_INVALID'); requireThat(clients.size < 64, 'CLIENT_LIMIT');
           const client = { actorId, clientInstanceId: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt: Math.min(now() + 30 * 60_000, sessions.get(authenticatedSession)!.expiresAt), csrf: randomBytes(32).toString('hex'), session: authenticatedSession };
           clients.set(client.clientInstanceId, client); const { session: _, ...projection } = client; json(res, 200, projection); return;
+        }
+        if (req.method === 'GET' && req.url === '/api/devices') { grant(req); json(res, 200, devices.projections()); return; }
+        if (req.method === 'POST' && /^\/api\/devices\/[0-9a-f-]{36}\/(approve|revoke)$/.test(req.url ?? '')) {
+          grant(req); requireThat(canonical(await body(req)) === '{}', 'SCHEMA_INVALID');
+          const match = /^\/api\/devices\/([0-9a-f-]{36})\/(approve|revoke)$/.exec(req.url!)!;
+          const device = match[2] === 'approve' ? devices.approve(match[1]!) : devices.revoke(match[1]!); json(res, 200, { requestId: device.requestId, state: device.state }); return;
         }
         if (req.method === 'POST' && req.url === '/api/client/renew') {
           // Authenticate again after reading the body; a concurrent rotation cannot
@@ -247,12 +267,14 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
     }
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 262144, perMessageDeflate: false, handleProtocols: protocols => protocols.has('fleetsplice.hcp.v1') ? 'fleetsplice.hcp.v1' : false });
+  const enrollmentRequired = new WeakMap<WebSocket, boolean>();
   server.on('upgrade', (req, socket, head) => {
-    if (hcpAccepted || req.url !== '/hcp/v1/connect' || req.headers.host !== host || req.socket.remoteAddress !== '127.0.0.1' || req.headers.origin !== origin || req.headers['sec-websocket-protocol'] !== 'fleetsplice.hcp.v1' || !equalSecret(req.headers.authorization ?? '', `Bearer ${config.hcpToken}`)) { socket.destroy(); return; }
-    wss.handleUpgrade(req, socket, head, ws => { hcpAccepted = true; wss.emit('connection', ws); });
+    const bootstrapAccepted = equalSecret(req.headers.authorization ?? '', `Bearer ${config.hcpToken}`);
+    if (hcpAccepted || hcpPending || req.url !== '/hcp/v1/connect' || req.headers.host !== host || req.socket.remoteAddress !== '127.0.0.1' || req.headers.origin !== origin || req.headers['sec-websocket-protocol'] !== 'fleetsplice.hcp.v1') { socket.destroy(); return; }
+    hcpPending = true; wss.handleUpgrade(req, socket, head, ws => { enrollmentRequired.set(ws, !bootstrapAccepted); wss.emit('connection', ws); });
   });
   wss.on('connection', (ws: WebSocket) => {
-    edge = ws; let hello = false;
+    edge = ws; let hello = false; let pendingEnrollment: Extract<Hcp, { kind: 'hello' }> | null = null; let connectedHostId: string | null = null;
     ws.on('message', (data, binary) => {
       try {
         requireThat(!binary, 'HCP_BINARY_REJECTED');
@@ -260,7 +282,15 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         requireThat(message.connectionId === config.target.connectionId && canonical(message.target) === canonical(config.target), 'STALE_CONNECTION');
         if (message.kind === 'hello' && !hello) {
           requireThat(message.identity.sid === config.sid && message.identity.principal === config.principal && message.identity.sessionId === config.sessionId && message.identity.root === config.root && message.identity.rootIdentity === config.target.rootIdentity, 'EDGE_IDENTITY_REJECTED');
-          hello = true; kernel.ready(message.recovered); send({ v: 1, kind: 'ready', connectionId: config.target.connectionId, target: config.target, recoveryRequired: kernel.status === 'RECOVERY_REQUIRED' });
+          if (enrollmentRequired.get(ws)) {
+            requireThat(!!message.enrollment && message.enrollment.hostId === config.target.hostId && message.enrollment.environmentId === config.target.environmentId, 'HOST_NOT_ENROLLED');
+            const challenge = devices.issueChallenge(message.enrollment.hostId, now()); requireThat(canonical(challenge.expected) === canonical(message.enrollment), 'ENROLLMENT_IDENTITY_MISMATCH');
+            pendingEnrollment = message; send({ v: 1, kind: 'enrollment.challenge', connectionId: config.target.connectionId, target: config.target, challenge }); return;
+          }
+          hello = true; hcpAccepted = true; hcpPending = false; kernel.ready(message.recovered); send({ v: 1, kind: 'ready', connectionId: config.target.connectionId, target: config.target, recoveryRequired: kernel.status === 'RECOVERY_REQUIRED' });
+        } else if (message.kind === 'enrollment.proof' && !hello && pendingEnrollment) {
+          requireThat(message.hostId === pendingEnrollment.enrollment!.hostId, 'ENROLLMENT_IDENTITY_MISMATCH'); devices.admitProof(message.hostId, message.proof, now()); connectedHostId = message.hostId;
+          hello = true; hcpAccepted = true; hcpPending = false; kernel.ready(pendingEnrollment.recovered); send({ v: 1, kind: 'ready', connectionId: config.target.connectionId, target: config.target, recoveryRequired: kernel.status === 'RECOVERY_REQUIRED' });
         } else {
           requireThat(hello, 'HCP_NOT_ADMITTED');
           if (message.kind === 'receipt') {
@@ -278,14 +308,15 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
       } catch { kernel.disconnect('RECOVERY_REQUIRED'); ws.close(); }
     });
     ws.on('close', () => {
-      edge = null; kernel.disconnect();
+      if (connectedHostId) devices.disconnect(connectedHostId);
+      edge = null; edgeDetached(); kernel.disconnect();
       remoteAdoption?.bumpGeneration(); remoteAdoption?.close('EDGE_DISCONNECTED');
       for (const item of pending.values()) { clearTimeout(item.timer); item.reject(); } pending.clear();
     });
     ws.on('error', () => { kernel.disconnect(); });
   });
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(config.port, '127.0.0.1', resolve); });
-  return { kernel, close: async () => {
+  return { kernel, waitForEdgeDetach, close: async () => {
     if (nativeUnsubscribe) { nativeUnsubscribe(); nativeUnsubscribe = null; }
     for (const stream of streams) stream.end();
     for (const stream of nativeStreams) stream.end();
@@ -296,7 +327,10 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
 if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.once('message', async (config: HubConfig) => {
   try {
     const hub = await startHub(config); process.send!({ kind: 'hubListening' });
-    process.on('message', async message => { if ((message as any).kind === 'stop') { await hub.close(); process.exit(0); } });
+    process.on('message', async message => {
+      if ((message as any).kind === 'stop') { await hub.close(); process.exit(0); }
+      if ((message as any).kind === 'waitEdgeDetach') { await hub.waitForEdgeDetach(); process.send!({ kind: 'edgeDetached' }); }
+    });
     process.on('disconnect', async () => { await hub.close(); process.exit(2); });
   } catch { process.send!({ kind: 'error', code: 'HUB_START_FAILED' }); process.exitCode = 1; }
 });

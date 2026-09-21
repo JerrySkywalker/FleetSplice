@@ -68,19 +68,33 @@ export async function launch(root: string, executable: string, port = 43155, opt
   });
   let hub: ChildProcess | null = null; let edge: ChildProcess | null = null; let closing = false;
   let runtimeObservation: { status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string } = { status: 'unavailable', discoveredSessions: 0, evidence: 'Runtime discovery has not been observed.' };
+  const observeEdge = (child: ChildProcess) => child.on('message', (message: unknown) => {
+    const observation = message as { kind?: string; status?: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions?: number; evidence?: string };
+    if (observation.kind === 'runtimeObservation' && typeof observation.status === 'string' && Number.isInteger(observation.discoveredSessions) && typeof observation.evidence === 'string') runtimeObservation = { status: observation.status, discoveredSessions: Number(observation.discoveredSessions), evidence: observation.evidence };
+  });
+  const startEdge = async (enrollment?: EdgeConfig['enrollment']) => {
+    const child = start(path.join(installation, 'apps/edge/main.js'), env); observeEdge(child);
+    const edgeReady = wait(child, 'edgeReady');
+    child.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, enrollment, workspaces, productPath, runtimeSharing } satisfies EdgeConfig);
+    await edgeReady; return child;
+  };
+  const awaitHubDetach = () => {
+    const detached = wait(hub!, 'edgeDetached', 25000); hub!.send({ kind: 'waitEdgeDetach' }); return detached;
+  };
+  const closeEdge = async (child: ChildProcess, waitForHubDetach: Promise<unknown>): Promise<void> => {
+    const edgeClosed = wait(child, 'edgeClosed', 25000); const edgeExit = onceExit(child, 26000);
+    child.send({ kind: 'stop' });
+    const closed = await edgeClosed;
+    requireThat(closed.provenClosed === true && await edgeExit, 'EDGE_REPLACEMENT_CLOSURE_UNPROVEN');
+    await waitForHubDetach;
+  };
   try {
     hub = start(path.join(installation, 'apps/hub/server.js'), hubEnv);
     const hubReady = wait(hub, 'hubListening');
     hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken, workspaces,
       ...(productPath === 'NATIVE_ADOPTION' ? { adoptionCarriage: { kind: 'REMOTE_ADOPTION' as const, target, send: () => { throw new Error('HCP_NOT_CONNECTED'); } } } : {}) } satisfies HubConfig);
     await hubReady;
-    edge = start(path.join(installation, 'apps/edge/main.js'), env);
-    edge.on('message', (message: unknown) => {
-      const observation = message as { kind?: string; status?: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions?: number; evidence?: string };
-      if (observation.kind === 'runtimeObservation' && typeof observation.status === 'string' && Number.isInteger(observation.discoveredSessions) && typeof observation.evidence === 'string') runtimeObservation = { status: observation.status, discoveredSessions: Number(observation.discoveredSessions), evidence: observation.evidence };
-    });
-    const edgeReady = wait(edge, 'edgeReady'); edge.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, workspaces, productPath, runtimeSharing } satisfies EdgeConfig);
-    await edgeReady;
+    edge = await startEdge();
   } catch (error) {
     // Browser command admission has not been exposed: there can be no native effect.
     if (edge?.connected) edge.send({ kind: 'stop' }); if (hub?.connected) hub.send({ kind: 'stop' });
@@ -90,10 +104,8 @@ export async function launch(root: string, executable: string, port = 43155, opt
   }
   const stop = async (): Promise<boolean> => {
     if (closing) return false; closing = true;
-    const edgeClosed = wait(edge!, 'edgeClosed', 25000); const edgeExit = onceExit(edge!, 26000);
-    edge!.send({ kind: 'stop' });
     let proven = false;
-    try { proven = (await edgeClosed).provenClosed === true && await edgeExit; } catch { /* Keep RUNNING when closure is uncertain. */ }
+    try { await closeEdge(edge!, awaitHubDetach()); proven = true; } catch { /* Keep RUNNING when closure is uncertain. */ }
     const hubExit = onceExit(hub!, 10000); if (hub!.connected) hub!.send({ kind: 'stop' });
     const hubStopped = await hubExit;
     if (proven && hubStopped) durableWrite(currentGuard, { ...guard, state: 'CLOSED', nativeExitObserved: true, quiescent: true, closure: 'NATIVE_EXIT_AND_COMPONENT_CLOSURE_PROVEN' });
@@ -116,7 +128,13 @@ export async function launch(root: string, executable: string, port = 43155, opt
     };
     edge.on('message', handler); edge.send({ kind: 'runtimeSharing', id, sharing });
   });
-  return { url: `http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`, origin: `http://127.0.0.1:${port}`, directory, runId, target, identity, productPath, runtimeObservation: () => runtimeObservation, setRuntimeSharing, stop, health };
+  const replaceEdgeWithEnrollment = async (enrollment: NonNullable<EdgeConfig['enrollment']>) => {
+    requireThat(!closing && hub?.exitCode === null && edge?.exitCode === null, 'EDGE_REPLACEMENT_NOT_ADMITTED');
+    const prior = edge; const detached = awaitHubDetach();
+    await closeEdge(prior, detached);
+    edge = await startEdge(enrollment);
+  };
+  return { url: `http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`, origin: `http://127.0.0.1:${port}`, directory, runId, target, identity, productPath, runtimeObservation: () => runtimeObservation, setRuntimeSharing, replaceEdgeWithEnrollment, stop, health };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

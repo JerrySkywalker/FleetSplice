@@ -38,6 +38,8 @@ fn set_runtime_sharing(sharing: Value) -> Result<Value, String> { agent_control(
 #[tauri::command]
 fn drain_agent() -> Result<Value, String> { agent_control("drain", None) }
 #[tauri::command]
+fn request_pairing() -> Result<Value, String> { agent_control("pairing.request", Some(json!({ "hostName": env::var("COMPUTERNAME").unwrap_or_else(|_| "Windows Host".into()) }))) }
+#[tauri::command]
 fn autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> { app.autolaunch().is_enabled().map_err(|e| e.to_string()) }
 #[tauri::command]
 fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool, String> {
@@ -74,7 +76,7 @@ fn main() {
       }).build(app)?;
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![agent_status, agent_runtimes, set_runtime_sharing, drain_agent, autostart_enabled, set_autostart, open_dashboard, open_logs])
+    .invoke_handler(tauri::generate_handler![agent_status, agent_runtimes, set_runtime_sharing, drain_agent, request_pairing, autostart_enabled, set_autostart, open_dashboard, open_logs])
     .run(tauri::generate_context!())
     .expect("FleetSplice Desktop failed to run");
 }

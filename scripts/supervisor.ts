@@ -9,6 +9,7 @@ import { classifyPredecessor, discoverCodex, evidenceFromEdge, probeProcess, res
 import { launch } from './local.ts';
 import { AGENT_IPC_MAX_BYTES, AGENT_IPC_VERSION, parseAgentIpcRequest, validateAgentConfiguration, type AgentConfiguration, type AgentIpcRequest, type AgentRuntimeProjection } from '../packages/agent-ipc/index.ts';
 import { defaultRuntimeSharing, runtimeRegistry, updateSharing, type RuntimeSharing } from '../packages/agent-runtime/index.ts';
+import { generateHostEnrollmentKey, type HostEnrollmentPrivateMaterial } from '../packages/remote-enrollment/index.ts';
 
 export function supervisorHealthCode(health: { hub: string; edge: string; edgeAdmission: string } | undefined, nativeCodex: string): 'RUNNING' | 'RECOVERY_REQUIRED' {
   return health?.hub === 'RUNNING' && health.edge === 'RUNNING' && health.edgeAdmission === 'READY' && !['EXITED_OR_REUSED', 'UNPROVABLE'].includes(nativeCodex) ? 'RUNNING' : 'RECOVERY_REQUIRED';
@@ -35,7 +36,20 @@ export async function supervisorEntrypoint() {
   const predecessor = classifyPredecessor(base);
   requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
   const pipe = `\\\\.\\pipe\\fleetsplice-g05-${identity.sid}`;
-  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false; const activeProxy = supervisorProxy(); let configuration: AgentConfiguration = { gatewayUrl: null }; let sharing: RuntimeSharing = defaultRuntimeSharing();
+  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false; const activeProxy = supervisorProxy(); let configuration: AgentConfiguration = { gatewayUrl: null }; let sharing: RuntimeSharing = defaultRuntimeSharing(); let pairing: HostEnrollmentPrivateMaterial | null = null; let pairingRequestId: string | null = null; let pairingTimer: NodeJS.Timeout | null = null;
+  const monitorPairing = () => {
+    if (!pairing || !pairingRequestId || !run || stopping) return;
+    pairingTimer = setTimeout(async () => {
+      try {
+        const response = await fetch(`${run!.origin}/api/devices/${pairingRequestId}/status`, { headers: { Origin: run!.origin } });
+        requireThat(response.status === 200, 'DEVICE_ENROLLMENT_STATUS_UNAVAILABLE');
+        const status = await response.json() as { state: 'PENDING' | 'APPROVED' | 'REVOKED' };
+        if (status.state === 'APPROVED') { await run!.replaceEdgeWithEnrollment(pairing!); pairingRequestId = null; pairingTimer = null; return; }
+        if (status.state === 'REVOKED') { pairing = null; pairingRequestId = null; pairingTimer = null; return; }
+      } catch { /* Approval is not inferred; retain the existing Edge and surface pending state until a later status read. */ }
+      monitorPairing();
+    }, 1000);
+  };
   const runtimes = (): AgentRuntimeProjection[] => {
     const observation = run?.runtimeObservation() ?? { status: 'unavailable' as const, discoveredSessions: 0, evidence: 'Agent NativeAdoption carriage is not running.' };
     return runtimeRegistry({ sharing, codexInstalled: run?.productPath === 'NATIVE_ADOPTION', health: observation.status, discoveredSessions: observation.discoveredSessions, evidence: observation.evidence });
@@ -64,9 +78,21 @@ export async function supervisorEntrypoint() {
         } catch (error) { await reply(socket, { v: AGENT_IPC_VERSION, code: error instanceof Error ? error.message : 'RUNTIME_SHARING_INVALID' }); }
         return;
       }
+      if (request.command === 'pairing.request') {
+        try {
+          requireThat(!!run && !!request.body && typeof request.body.hostName === 'string' && request.body.hostName.trim().length > 0 && request.body.hostName.length <= 80, 'DEVICE_ENROLLMENT_INVALID');
+          requireThat(!pairingRequestId, 'DEVICE_ENROLLMENT_ALREADY_PENDING');
+          pairing = generateHostEnrollmentKey({ fleetId: 'fleetsplice-local', hostId: run.target.hostId, environmentId: run.target.environmentId, enrollmentGeneration: '1' });
+          const identity = { fleetId: pairing.fleetId, hostId: pairing.hostId, environmentId: pairing.environmentId, enrollmentGeneration: pairing.enrollmentGeneration, publicKeySpkiPem: pairing.publicKeySpkiPem, publicFingerprint: pairing.publicFingerprint };
+          const response = await fetch(`${run.origin}/api/devices/enroll`, { method: 'POST', headers: { Origin: run.origin, 'Content-Type': 'application/json' }, body: canonical({ hostName: request.body.hostName.trim(), identity }) });
+          requireThat(response.status === 202, 'DEVICE_ENROLLMENT_REQUEST_REJECTED'); const enrolled = await response.json() as { requestId: string; state: string; publicFingerprint: string }; pairingRequestId = enrolled.requestId; monitorPairing();
+          await reply(socket, { v: AGENT_IPC_VERSION, code: 'PENDING_OWNER_APPROVAL', ...enrolled, approvalUrl: run.url });
+        } catch (error) { await reply(socket, { v: AGENT_IPC_VERSION, code: error instanceof Error ? error.message : 'DEVICE_ENROLLMENT_REQUEST_REJECTED' }); }
+        return;
+      }
       if (request.command === 'diagnostics') { const health = run?.health(); await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', diagnostics: { pipe: 'WINDOWS_NAMED_PIPE_SID_SCOPED', networkListener: false, runId: run?.runId ?? null, hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', configuration, runtimes: runtimes() } }); return; }
       if (!run || stopping) { await reply(socket, { v: AGENT_IPC_VERSION, code: 'STOP_NOT_ADMITTED' }); return; }
-      stopping = true; const proven = await run.stop(); await reply(socket, { v: AGENT_IPC_VERSION, code: proven ? 'CLOSED' : 'UNKNOWN_CLOSURE', runId: run.runId, nativeExitObserved: proven });
+      stopping = true; if (pairingTimer) clearTimeout(pairingTimer); const proven = await run.stop(); await reply(socket, { v: AGENT_IPC_VERSION, code: proven ? 'CLOSED' : 'UNKNOWN_CLOSURE', runId: run.runId, nativeExitObserved: proven });
       server.close(() => process.exit(proven ? 0 : 2));
     };
     socket.on('data', bytes => {
@@ -83,7 +109,7 @@ export async function supervisorEntrypoint() {
   } catch (error) {
     server.close(); throw error;
   }
-  process.on('SIGTERM', async () => { if (run && !stopping) { stopping = true; await run.stop(); } server.close(() => process.exit(2)); });
+  process.on('SIGTERM', async () => { if (run && !stopping) { stopping = true; if (pairingTimer) clearTimeout(pairingTimer); await run.stop(); } server.close(() => process.exit(2)); });
   // Detached supervisor stays alive; its stdio is ignored by the launcher.
   while (!stopping) await delay(60000);
 }

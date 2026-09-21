@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FleetSplice",
+  "version": "0.1.0",
+  "identifier": "io.fleetsplice.desktop",
+  "build": { "beforeBuildCommand": "npm run desktop:build", "frontendDist": "../dist" },
+  "app": { "windows": [{ "label": "main", "title": "FleetSplice", "width": 960, "height": 680, "minWidth": 640, "minHeight": 480 }] },
+  "bundle": { "active": true, "targets": ["nsis"], "icon": ["icons/icon.ico"] }
+}

@@ -6,6 +6,11 @@ Thumbs.db
 
 # G05 build and disposable validation output (runtime state lives outside repos)
 node_modules/
+apps/desktop/dist/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/icons/*
+!apps/desktop/src-tauri/icons/icon.ico
 dist/
 test-results/
 playwright-report/

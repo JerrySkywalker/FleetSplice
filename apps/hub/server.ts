@@ -106,11 +106,11 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
     const cookie = new RegExp(`(?:^|;\\s*)${cookieName}=([0-9a-f]{64})(?:;|$)`).exec(req.headers.cookie ?? '')?.[1];
     const current = cookie ? sessions.get(cookie) : undefined;
     requireThat(cookie && current && current.expiresAt > now() && current.idleExpiresAt > now(), 'AUTH_REQUIRED');
-    current.idleExpiresAt = Math.min(current.expiresAt, now() + 15 * 60_000); return cookie;
+    if (oidc) current.idleExpiresAt = Math.min(current.expiresAt, now() + 15 * 60_000); return cookie;
   };
   const openSession = (principal: HumanPrincipal) => {
     const token = randomBytes(32).toString('hex'); const expiresAt = now() + 8 * 60 * 60_000;
-    sessions.set(token, { expiresAt, idleExpiresAt: Math.min(expiresAt, now() + 15 * 60_000), principal });
+    sessions.set(token, { expiresAt, idleExpiresAt: oidc ? Math.min(expiresAt, now() + 15 * 60_000) : expiresAt, principal });
     return { token, cookie: `${cookieName}=${token}; ${oidc && deployment.kind !== 'LOOPBACK' ? 'Secure; ' : ''}HttpOnly; SameSite=Strict; Path=/` };
   };
   const grant = (req: IncomingMessage) => {
@@ -151,6 +151,27 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         }
         if (req.method === 'GET' && req.url === '/api/auth/principal') {
           const principal = sessions.get(authenticatedSession)!.principal; json(res, 200, { principal, mode: oidc ? 'OIDC' : 'LOOPBACK_BOOTSTRAP' }); return;
+        }
+        if (req.method === 'GET' && req.url === '/api/fleet/summary') {
+          let discoveredSessions = 0; let activeSessions = 0; let runtimeStatus: 'healthy' | 'degraded' | 'unavailable' = hcpAccepted ? 'healthy' : 'unavailable';
+          let observation: string | null = null;
+          if (adoptionPort) {
+            try {
+              const native = await adoptionPort.snapshot({}); discoveredSessions = native.threads.length; activeSessions = native.threads.filter(thread => thread.activeTurnId !== null).length;
+              runtimeStatus = native.observationFailure ? 'degraded' : 'healthy'; observation = native.observationFailure?.code ?? null;
+            } catch { runtimeStatus = 'unavailable'; observation = 'RUNTIME_OBSERVATION_UNAVAILABLE'; }
+          } else {
+            const managed = kernel.snapshot(); discoveredSessions = managed.lanes.length; activeSessions = managed.lanes.filter(lane => lane.state === 'RUNNING').length;
+          }
+          const gatewayStatus = adoptionPort ? (hcpAccepted ? 'online' : 'unknown') : (kernel.status === 'READY' ? 'online' : 'unknown');
+          json(res, 200, {
+            gateway: { status: gatewayStatus, deployment: deployment.discovery },
+            hosts: [{ hostId: config.target.hostId, status: gatewayStatus, lastSeen: hcpAccepted ? 'CONNECTED_NOW' : 'UNKNOWN' }],
+            runtimes: adoptionPort ? [{ adapterId: 'codex-native', enabled: true, shared: true, status: runtimeStatus, discoveredSessions, observation }] : [],
+            sessions: { discovered: discoveredSessions, active: activeSessions },
+            attention: [...(gatewayStatus === 'online' ? [] : [{ code: 'HOST_CONNECTION_UNKNOWN' }]), ...(observation ? [{ code: observation }] : [])],
+            devices: [],
+          }); return;
         }
         if (req.method === 'POST' && req.url === '/api/client') {
           requireThat(canonical(await body(req)) === '{}', 'SCHEMA_INVALID'); requireThat(clients.size < 64, 'CLIENT_LIMIT');

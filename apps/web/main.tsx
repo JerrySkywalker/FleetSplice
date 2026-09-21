@@ -9,6 +9,7 @@ import { NativeAdoption } from './NativeAdoption.tsx';
 import { BrowserClientSession } from './client-session.ts';
 import { SessionConfigBar } from './components/SessionConfigBar.tsx';
 import { OwnershipSurface } from './components/Presentation.tsx';
+import { GatewayDashboard } from './components/GatewayDashboard.tsx';
 import './style.css';
 
 type Client = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; csrf: string };
@@ -145,7 +146,7 @@ function App() {
     // A new P1 native thread also needs a live model/reasoning selection. Keep
     // the explicit guidance pending while the Owner refreshes that catalog.
     if (!lane.nativeThreadId && !configurationSelected) return;
-    if (available && !continueButton.current?.disabled) continueButton.current?.focus();
+    if (available && !continueButton.current?.disabled) requestAnimationFrame(() => continueButton.current?.focus());
     setFocusLane(null);
   }, [focusLane, busy, controlled, available, configurationSelected, pending, lane?.laneId, snapshot?.status]);
   function acknowledgeRejection(e: unknown, value: FleetCommand): boolean {
@@ -189,10 +190,11 @@ function App() {
     const model = models.find(item => item.id === value);
     setSelectedModel(value); setSelectedReasoning(model?.defaultReasoningEffort ?? '');
   }
-  if (nativeMode && client) return <NativeAdoption client={client} request={request} locale={locale}
-    preferences={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}/>;
+  if (nativeMode && client) return <><GatewayDashboard request={request} ready={true}/><NativeAdoption client={client} request={request} locale={locale}
+    preferences={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}/></>;
   return <div className="shell">
     <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('edition')}</span></div><div className="owner"><PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/><span className="owner-name">Jerry</span><span className="avatar">J</span></div></header>
+    <GatewayDashboard request={request} ready={!!client}/>
     <aside className="navigation">
       <div className="eyebrow">{t('yourFleet')}</div><div className="host"><span className={`dot ${snapshot?.status === 'READY' ? 'online' : ''}`}/><strong>SKYFORGE-01</strong></div><div className="environment">└ &nbsp; windows-user</div>
       <label className="section-title" htmlFor="workspace">{t('newWorkspaceTarget')}</label>

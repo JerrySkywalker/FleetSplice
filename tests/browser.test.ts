@@ -37,6 +37,10 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
   try {
     await page.goto(`${origin}/#bootstrap=${bootstrapToken}`);
     await expectState(page.getByTestId('connection-status'), 'READY');
+    await expect(page.getByTestId('fleet-summary')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Fleet navigation' }).getByRole('button', { name: 'Settings' })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Fleet navigation' }).getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByText(/Authentication: LOOPBACK_BOOTSTRAP/)).toBeVisible();
     assert.equal(new URL(page.url()).hash, '');
     await page.getByRole('button', { name: 'Register selected Workspace' }).click();
     await expect(page.getByRole('button', { name: '＋ New session' })).toBeEnabled();

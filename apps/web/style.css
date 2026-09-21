@@ -595,3 +595,14 @@ dialog p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-bottom
   .ownership-surface { flex-wrap: wrap; }
   .composer, .sticky-composer { margin-inline: 10px; }
 }
+
+.gateway-dashboard { grid-column: 1 / -1; border-bottom: 1px solid var(--border); background: var(--surface); padding: 10px 18px; }
+.gateway-nav { display: flex; gap: 6px; overflow-x: auto; }
+.gateway-nav button { white-space: nowrap; border: 0; border-radius: 6px; background: transparent; color: var(--muted); padding: 6px 9px; font-size: 12px; }
+.gateway-nav button.selected { color: var(--selected-text); background: var(--selected); }
+.fleet-summary { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: 8px; margin-top: 10px; }
+.fleet-summary > div, .gateway-panel { border: 1px solid var(--border); border-radius: 8px; padding: 8px; font-size: 12px; }
+.fleet-summary small, .fleet-summary span { display: block; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-summary strong { display: block; font-size: 16px; margin: 2px 0; }
+.gateway-panel { margin: 10px 0 0; color: var(--muted); }
+@media (max-width: 700px) { .fleet-summary { grid-template-columns: repeat(2, minmax(100px, 1fr)); } }

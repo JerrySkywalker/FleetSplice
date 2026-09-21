@@ -25,7 +25,8 @@ export class ReconnectNoReplayCoordinator {
   private readonly clients = new Map<string, ReconnectClient>();
   private readonly commandReceipts = new Map<string, unknown>();
   private readonly realtimeCursor = { revision: '0' };
-  private lane: ControllerLane = { laneId: 'default', controllerClientId: null, fence: 0, edgeFenceAck: 0 };
+  // edgeFenceAck starts behind fence so first lane acquire requires an explicit Edge ack.
+  private lane: ControllerLane = { laneId: 'default', controllerClientId: null, fence: 0, edgeFenceAck: -1 };
   private edgeConnected = true;
   private coldStartBlocked = false;
 

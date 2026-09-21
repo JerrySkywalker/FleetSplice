@@ -9,10 +9,12 @@ G05C's canonical local product baseline is
 `017a89472436702a9f6228bf680a3674bb0a2d32`. See [current status](../train/current-status.md)
 and the [closeout receipt](../train/receipts/G05C-native-control-closeout.md).
 `G05C_FINAL_PRODUCT_BASELINE_READY=true`, `NEAR_TERM_UI_UX_DEVELOPMENT=FROZEN`,
-`NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK`, `G06_STARTED=false`,
-`TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY`, and
-`PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE`. Older intermediate execution states
-are retained in the linked history and confer no current authority.
+`NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK`, `G06_STARTED=true`,
+`G06_PHASE=PREDEPLOY_LOCAL_COMPLETE`, `G06_PREDEPLOY_READY=true`,
+`TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY`,
+`G06_LIVE_ACCEPTANCE=false`, and `PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE`.
+Older intermediate execution states are retained in the linked history and
+confer no current authority.
 
 `PRIMARY_NATIVE_PATH=NATIVE_ADOPTED`: ordinary `codex --yolo`, no wrapper,
 same native TUI thread, cooperative Web control and return to the original TUI.

@@ -24,19 +24,21 @@ PRIMARY_NATIVE_PATH=NATIVE_ADOPTED
 NEAR_TERM_UI_UX_DEVELOPMENT=FROZEN
 NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK
 G06_STARTED=true
-G06_PHASE=PREDEPLOY_LOCAL
+G06_PHASE=PREDEPLOY_LOCAL_COMPLETE
+G06_PREDEPLOY_READY=true
 TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY
 TENCENT_TARGET=tencent-pek-01
 TENCENT_DEPLOYED=false
 REMOTE_TENCENT_WORK=false
 G06_LIVE_ACCEPTANCE=false
-IMPLEMENTATION_AUTHORIZED=PERF_G06_PREDEPLOY_NIGHT_TRAIN_ONLY
-PRODUCT_IMPLEMENTATION_AUTHORIZED=PERF_G06_PREDEPLOY_NIGHT_TRAIN_ONLY
+V0_1_ALPHA_1_RELEASED=false
+IMPLEMENTATION_AUTHORIZED=NONE
+PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
 ```
 
-This train authorizes only the bounded PERF/G06-predeploy night Goals.
-Do not begin product G07, contact Tencent, or merge main without a later explicit
-Owner instruction and a bounded Goal.
+G06 predeploy local work on this train is complete. Do not begin product G07,
+contact Tencent, or merge main without a later explicit Owner instruction and a
+bounded Goal.
 
 1. FleetSplice is a **control plane for coding agents in existing development
    environments**, not an AI IDE/ADE. Do not expand a Goal into an editor,

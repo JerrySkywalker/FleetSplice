@@ -3,8 +3,8 @@
 The Owner accepts the final local G05C product baseline. Canonical product
 implementation is the UI-portability freeze head below. Near-term UI/UX
 engineering remains frozen. Performance Gate P for this train has frozen
-measured P1 optimizations. G06 predeploy local implementation is started;
-Tencent deployment remains deferred until the server is ready.
+measured P1 optimizations. G06 predeploy local implementation is complete and
+waiting on Tencent server readiness; live remote acceptance has not run.
 
 ```text
 ARCHITECTURE_0_1_READY=true
@@ -18,15 +18,17 @@ VERSION_SHA_NOT_PRODUCT_COMPATIBILITY_ALLOWLIST=true
 NEAR_TERM_UI_UX_DEVELOPMENT=FROZEN
 NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK
 G06_STARTED=true
-G06_PHASE=PREDEPLOY_LOCAL
+G06_PHASE=PREDEPLOY_LOCAL_COMPLETE
+G06_PREDEPLOY_READY=true
 TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY
 TENCENT_TARGET=tencent-pek-01
 TENCENT_DEPLOYED=false
 REMOTE_TENCENT_WORK=false
 G06_LIVE_ACCEPTANCE=false
-IMPLEMENTATION_AUTHORIZED=PERF_G06_PREDEPLOY_NIGHT_TRAIN_ONLY
-PRODUCT_IMPLEMENTATION_AUTHORIZED=PERF_G06_PREDEPLOY_NIGHT_TRAIN_ONLY
-NEXT_OWNER_DECISION=COMPLETE_PREDEPLOY_THEN_WAIT_TENCENT_SERVER_READY
+V0_1_ALPHA_1_RELEASED=false
+IMPLEMENTATION_AUTHORIZED=NONE
+PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
+NEXT_OWNER_DECISION=WAIT_TENCENT_SERVER_READY_THEN_LIVE_G06_ADMISSION
 ```
 
 Historical native-control closeout evidence remains at

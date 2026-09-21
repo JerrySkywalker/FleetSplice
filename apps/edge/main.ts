@@ -11,8 +11,9 @@ import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 import { permits, readCeiling } from '../../packages/permissions/index.ts';
 import { nativeAdoptionEdge } from './native-adoption.ts';
 import { agentAdoptionEndpoint, acceptAgentAdoptionHcp } from '../../packages/product-path/index.ts';
+import { mayShareWorkspace, type RuntimeSharing } from '../../packages/agent-runtime/index.ts';
 
-export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY' };
+export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
 
 /**
  * Native adoption has an HCP endpoint in the product Edge itself.  The former
@@ -23,6 +24,7 @@ export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity
 async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   const identity = await localIdentity(config.identity.root, config.identity.sid);
   requireThat(canonical(identity) === canonical(config.identity), 'EDGE_LOCAL_IDENTITY_CHANGED');
+  requireThat((config.workspaces ?? []).some(binding => binding.valid && binding.root.toLowerCase() === identity.root.toLowerCase() && binding.rootIdentity === identity.rootIdentity && canonical(binding.target) === canonical(config.target)), 'WORKSPACE_BINDING_UNPROVABLE');
   const local = await nativeAdoptionEdge(identity.root, config.stateDirectory);
   const socket = new WebSocket(`ws://127.0.0.1:${config.port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', {
     perMessageDeflate: false, maxPayload: 262144, origin: `http://127.0.0.1:${config.port}`,
@@ -35,6 +37,14 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   };
   const envelope = { v: 1 as const, target: config.target, connectionId: config.target.connectionId };
   const endpoint = agentAdoptionEndpoint({ kind: 'NATIVE_ADOPTION', target: config.target, port: local.adapter, send });
+  let sharing = config.runtimeSharing;
+  const observeRuntime = async () => {
+    if (!sharing || !mayShareWorkspace(sharing, identity.root)) return { status: 'unavailable' as const, discoveredSessions: 0, evidence: 'Codex is installed but unshared by Agent policy.' };
+    try {
+      const snapshot = await local.adapter.snapshot({ discover: true });
+      return { status: snapshot.observationFailure ? 'degraded' as const : 'healthy' as const, discoveredSessions: snapshot.threads.length, evidence: snapshot.observationFailure?.code ?? 'Native inventory, thread cwd, exact root proof and Workspace binding observed.' };
+    } catch (error) { return { status: 'unavailable' as const, discoveredSessions: 0, evidence: error instanceof Fault ? error.code : 'RUNTIME_OBSERVATION_UNAVAILABLE' }; }
+  };
   socket.on('open', () => send({ ...envelope, kind: 'hello', identity, recovered: false }));
   socket.on('message', async (bytes, binary) => {
     try {
@@ -42,8 +52,15 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
       const message = validate<Hcp>('hcp', parseJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes as Buffer)));
       if (message.kind === 'ready' && !kernel.connected) {
         requireThat(!message.recoveryRequired, 'RECOVERY_REQUIRED');
-        kernel.connected = true; endpoint.startRealtimePush(); process.send?.({ kind: 'edgeReady' });
-      } else await acceptAgentAdoptionHcp(endpoint, config.target, message);
+        kernel.connected = true;
+        const observation = await observeRuntime();
+        process.send?.({ kind: 'runtimeObservation', ...observation });
+        if (sharing && mayShareWorkspace(sharing, identity.root)) endpoint.startRealtimePush();
+        process.send?.({ kind: 'edgeReady' });
+      } else {
+        requireThat(!!sharing && mayShareWorkspace(sharing, identity.root), 'RUNTIME_UNSHARED');
+        await acceptAgentAdoptionHcp(endpoint, config.target, message);
+      }
     } catch {
       kernel.connected = false; socket.close(); process.send?.({ kind: 'error', code: 'EDGE_ADMISSION_CLOSED' });
     }
@@ -52,6 +69,13 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   socket.on('error', () => { kernel.connected = false; });
   return {
     kernel,
+    setRuntimeSharing: async (next: RuntimeSharing) => {
+      const wasShared = !!sharing && mayShareWorkspace(sharing, identity.root); sharing = next;
+      const isShared = mayShareWorkspace(sharing, identity.root);
+      if (wasShared && !isShared) endpoint.stop();
+      if (!wasShared && isShared) endpoint.startRealtimePush();
+      const observation = await observeRuntime(); process.send?.({ kind: 'runtimeObservation', ...observation }); return observation;
+    },
     close: async () => { endpoint.stop(); socket.close(); local.close(); return true; },
   };
 }
@@ -114,9 +138,18 @@ export async function startEdge(config: EdgeConfig) {
 if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.once('message', async (config: EdgeConfig) => {
   try {
     const edge = await startEdge(config);
-    process.on('message', async message => { if ((message as any).kind === 'stop') {
-      const provenClosed = await edge.close(); process.send!({ kind: 'edgeClosed', provenClosed }); process.exit(provenClosed ? 0 : 2);
-    } });
+    process.on('message', async message => {
+      if ((message as any).kind === 'stop') {
+        const provenClosed = await edge.close(); process.send!({ kind: 'edgeClosed', provenClosed }); process.exit(provenClosed ? 0 : 2);
+      }
+      if ((message as any).kind === 'runtimeSharing') {
+        try {
+          const update = (edge as { setRuntimeSharing?: (value: RuntimeSharing) => Promise<unknown> }).setRuntimeSharing;
+          requireThat(!!update, 'RUNTIME_SHARING_UNAVAILABLE');
+          process.send!({ id: (message as any).id, result: await update((message as any).sharing) });
+        } catch (error) { process.send!({ id: (message as any).id, error: error instanceof Fault ? error.code : 'RUNTIME_SHARING_UNAVAILABLE' }); }
+      }
+    });
     process.on('disconnect', async () => {
       edge.kernel.connected = false; edge.kernel.quarantine('SUPERVISOR_LOST');
       // Do not orphan a managed native process. If closure is uncertain this Edge

@@ -8,6 +8,7 @@ import { canonical, requireThat } from '../packages/contracts/index.ts';
 import { classifyPredecessor, discoverCodex, evidenceFromEdge, probeProcess, resolveProxy, type Guard, type ProxyResolution } from '../packages/local-operation/index.ts';
 import { launch } from './local.ts';
 import { AGENT_IPC_MAX_BYTES, AGENT_IPC_VERSION, parseAgentIpcRequest, validateAgentConfiguration, type AgentConfiguration, type AgentIpcRequest, type AgentRuntimeProjection } from '../packages/agent-ipc/index.ts';
+import { defaultRuntimeSharing, runtimeRegistry, updateSharing, type RuntimeSharing } from '../packages/agent-runtime/index.ts';
 
 export function supervisorHealthCode(health: { hub: string; edge: string; edgeAdmission: string } | undefined, nativeCodex: string): 'RUNNING' | 'RECOVERY_REQUIRED' {
   return health?.hub === 'RUNNING' && health.edge === 'RUNNING' && health.edgeAdmission === 'READY' && !['EXITED_OR_REUSED', 'UNPROVABLE'].includes(nativeCodex) ? 'RUNNING' : 'RECOVERY_REQUIRED';
@@ -34,8 +35,11 @@ export async function supervisorEntrypoint() {
   const predecessor = classifyPredecessor(base);
   requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
   const pipe = `\\\\.\\pipe\\fleetsplice-g05-${identity.sid}`;
-  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false; const activeProxy = supervisorProxy(); let configuration: AgentConfiguration = { gatewayUrl: null };
-  const runtimes = (): AgentRuntimeProjection[] => [{ adapterId: 'codex-native', kind: 'Codex', enabled: run?.productPath === 'NATIVE_ADOPTION', shared: false, status: run?.productPath === 'NATIVE_ADOPTION' ? 'healthy' : 'unavailable', discoveredSessions: 0, evidence: run?.productPath === 'NATIVE_ADOPTION' ? 'Agent NativeAdoption carriage admitted; sharing policy is not configured yet.' : 'Agent not running NativeAdoption.' }];
+  const token = randomBytes(32).toString('hex'); let run: Awaited<ReturnType<typeof launch>> | null = null; let stopping = false; const activeProxy = supervisorProxy(); let configuration: AgentConfiguration = { gatewayUrl: null }; let sharing: RuntimeSharing = defaultRuntimeSharing();
+  const runtimes = (): AgentRuntimeProjection[] => {
+    const observation = run?.runtimeObservation() ?? { status: 'unavailable' as const, discoveredSessions: 0, evidence: 'Agent NativeAdoption carriage is not running.' };
+    return runtimeRegistry({ sharing, codexInstalled: run?.productPath === 'NATIVE_ADOPTION', health: observation.status, discoveredSessions: observation.discoveredSessions, evidence: observation.evidence });
+  };
   const server = createServer(socket => {
     let received = ''; let handled = false; socket.setTimeout(10000, () => socket.destroy()); socket.on('error', () => {});
     const handle = async () => {
@@ -52,7 +56,14 @@ export async function supervisorEntrypoint() {
       if (request.command === 'config.get') { await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', configuration }); return; }
       if (request.command === 'config.set') { try { configuration = validateAgentConfiguration(request.body); await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', configuration }); } catch (error) { await reply(socket, { v: AGENT_IPC_VERSION, code: error instanceof Error ? error.message : 'AGENT_CONFIGURATION_INVALID' }); } return; }
       if (request.command === 'runtime.list') { await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', runtimes: runtimes() }); return; }
-      if (request.command === 'runtime.setSharing') { await reply(socket, { v: AGENT_IPC_VERSION, code: 'RUNTIME_SHARING_NOT_CONFIGURED' }); return; }
+      if (request.command === 'runtime.setSharing') {
+        try {
+          const next = updateSharing(sharing, request.body); requireThat(!!run, 'RUNTIME_SHARING_UNAVAILABLE');
+          await run.setRuntimeSharing(next); sharing = next;
+          await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', sharing, runtimes: runtimes(), evidence: 'Sharing changed through the admitted Edge; discovery remains observation-only.' });
+        } catch (error) { await reply(socket, { v: AGENT_IPC_VERSION, code: error instanceof Error ? error.message : 'RUNTIME_SHARING_INVALID' }); }
+        return;
+      }
       if (request.command === 'diagnostics') { const health = run?.health(); await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', diagnostics: { pipe: 'WINDOWS_NAMED_PIPE_SID_SCOPED', networkListener: false, runId: run?.runId ?? null, hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', configuration, runtimes: runtimes() } }); return; }
       if (!run || stopping) { await reply(socket, { v: AGENT_IPC_VERSION, code: 'STOP_NOT_ADMITTED' }); return; }
       stopping = true; const proven = await run.stop(); await reply(socket, { v: AGENT_IPC_VERSION, code: proven ? 'CLOSED' : 'UNKNOWN_CLOSURE', runId: run.runId, nativeExitObserved: proven });
@@ -66,7 +77,7 @@ export async function supervisorEntrypoint() {
   });
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(pipe, resolve); });
   try {
-    run = await launch(root!, executable!, 43155, { environment: { ...process.env, ...activeProxy.environment }, onGuardCommitted: guard => {
+    run = await launch(root!, executable!, 43155, { environment: { ...process.env, ...activeProxy.environment }, runtimeSharing: sharing, onGuardCommitted: guard => {
       durable(path.join(base, guard.runId, 'control.json'), { v: AGENT_IPC_VERSION, pipe, token, runId: guard.runId, identity: guard.identity });
     } });
   } catch (error) {

@@ -9,6 +9,7 @@ import { assertFreshIncarnation, classifyPredecessor, edgeAdmissionState, guardP
 import type { EdgeConfig } from '../apps/edge/main.ts';
 import type { HubConfig } from '../apps/hub/server.ts';
 import { workspaceBindings } from '../packages/workspaces/index.ts';
+import { defaultRuntimeSharing, type RuntimeSharing } from '../packages/agent-runtime/index.ts';
 
 const durableWrite = (file: string, value: unknown) => {
   const fd = openSync(file, 'w', 0o600); try { writeSync(fd, canonical(value)); fsyncSync(fd); } finally { closeSync(fd); }
@@ -19,12 +20,13 @@ const onceExit = (child: ChildProcess, timeout: number) => new Promise<boolean>(
   child.once('exit', () => { clearTimeout(timer); resolve(true); });
   child.once('error', () => { clearTimeout(timer); resolve(false); });
 });
-export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY' };
+export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
 
 // Internal lifecycle primitive. G05B starts it only from the detached local
 // supervisor after all no-effect qualification has passed.
 export async function launch(root: string, executable: string, port = 43155, options: LaunchOptions = {}) {
   const productPath = options.productPath ?? 'NATIVE_ADOPTION';
+  const runtimeSharing = options.runtimeSharing ?? defaultRuntimeSharing();
   requireThat(process.version === 'v24.20.0' && process.versions.sqlite === '3.53.4', 'NODE_RUNTIME_UNQUALIFIED');
   requireThat(Number.isInteger(port) && port > 1024 && port < 65536, 'INVALID_PORT');
   const identity = await localIdentity(root);
@@ -65,6 +67,7 @@ export async function launch(root: string, executable: string, port = 43155, opt
     child.on('message', handler); child.once('error', reject);
   });
   let hub: ChildProcess | null = null; let edge: ChildProcess | null = null; let closing = false;
+  let runtimeObservation: { status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string } = { status: 'unavailable', discoveredSessions: 0, evidence: 'Runtime discovery has not been observed.' };
   try {
     hub = start(path.join(installation, 'apps/hub/server.js'), hubEnv);
     const hubReady = wait(hub, 'hubListening');
@@ -72,7 +75,11 @@ export async function launch(root: string, executable: string, port = 43155, opt
       ...(productPath === 'NATIVE_ADOPTION' ? { adoptionCarriage: { kind: 'REMOTE_ADOPTION' as const, target, send: () => { throw new Error('HCP_NOT_CONNECTED'); } } } : {}) } satisfies HubConfig);
     await hubReady;
     edge = start(path.join(installation, 'apps/edge/main.js'), env);
-    const edgeReady = wait(edge, 'edgeReady'); edge.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, workspaces, productPath } satisfies EdgeConfig);
+    edge.on('message', (message: unknown) => {
+      const observation = message as { kind?: string; status?: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions?: number; evidence?: string };
+      if (observation.kind === 'runtimeObservation' && typeof observation.status === 'string' && Number.isInteger(observation.discoveredSessions) && typeof observation.evidence === 'string') runtimeObservation = { status: observation.status, discoveredSessions: Number(observation.discoveredSessions), evidence: observation.evidence };
+    });
+    const edgeReady = wait(edge, 'edgeReady'); edge.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, workspaces, productPath, runtimeSharing } satisfies EdgeConfig);
     await edgeReady;
   } catch (error) {
     // Browser command admission has not been exposed: there can be no native effect.
@@ -98,7 +105,18 @@ export async function launch(root: string, executable: string, port = 43155, opt
     const journal = productPath === 'NATIVE_ADOPTION' ? 'native-edge.sqlite' : 'edge.sqlite';
     return { hub: hubState, edge: edgeState, edgeAdmission: edgeState === 'RUNNING' ? edgeAdmissionState(path.join(directory, journal)) : 'UNPROVABLE' as const };
   };
-  return { url: `http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`, origin: `http://127.0.0.1:${port}`, directory, runId, target, identity, productPath, stop, health };
+  const setRuntimeSharing = async (sharing: RuntimeSharing) => await new Promise<{ status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string }>((resolve, reject) => {
+    if (!edge?.connected) { reject(new Error('RUNTIME_SHARING_UNAVAILABLE')); return; }
+    const id = randomUUID(); const timer = setTimeout(() => { edge?.off('message', handler); reject(new Error('RUNTIME_SHARING_TIMEOUT')); }, 10000);
+    const handler = (message: unknown) => {
+      const response = message as { id?: string; result?: { status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string }; error?: string };
+      if (response.id !== id) return;
+      clearTimeout(timer); edge?.off('message', handler);
+      if (response.error) reject(new Error(response.error)); else if (response.result) resolve(response.result); else reject(new Error('RUNTIME_SHARING_UNAVAILABLE'));
+    };
+    edge.on('message', handler); edge.send({ kind: 'runtimeSharing', id, sharing });
+  });
+  return { url: `http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`, origin: `http://127.0.0.1:${port}`, directory, runId, target, identity, productPath, runtimeObservation: () => runtimeObservation, setRuntimeSharing, stop, health };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

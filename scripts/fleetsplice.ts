@@ -238,10 +238,11 @@ export async function fleetspliceEntrypoint() {
       if (operation === 'config' && args[2] === 'get' && args.length === 3) { output(code(await control('config.get'))); return; }
       if (operation === 'config' && args[2] === 'set' && args.length === 4) { output(code(await control('config.set', { gatewayUrl: args[3] === 'none' ? null : args[3] }))); return; }
       if (operation === 'runtimes' && args.length === 2) { output(code(await control('runtime.list'))); return; }
+      if (operation === 'runtimes' && args[2] === 'sharing' && args.length === 4) { output(code(await control('runtime.setSharing', JSON.parse(args[3]!)))); return; }
       if (operation === 'diagnostics' && args.length === 2) { output(code(await control('diagnostics'))); return; }
       if (operation === 'drain' && args.length === 2) { output(code(await control('drain'))); return; }
     } catch { error('AGENT_IPC_UNAVAILABLE'); return; }
-    error('USAGE: fleetsplice agent status|config get|config set <gateway-url|none>|runtimes|diagnostics|drain'); return;
+    error('USAGE: fleetsplice agent status|config get|config set <gateway-url|none>|runtimes [sharing <json>]|diagnostics|drain'); return;
   }
   if (command === 'doctor') return await doctor(workspace);
   if (command === 'retire-stale') return retire(args);

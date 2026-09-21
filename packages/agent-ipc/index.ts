@@ -5,7 +5,7 @@ export const AGENT_IPC_MAX_BYTES = 8192;
 export type AgentIpcCommand = 'status' | 'config.get' | 'config.set' | 'runtime.list' | 'runtime.setSharing' | 'diagnostics' | 'drain';
 export type AgentIpcRequest = { v: typeof AGENT_IPC_VERSION; token: string; command: AgentIpcCommand; body?: Record<string, unknown> };
 export type AgentConfiguration = { gatewayUrl: string | null };
-export type AgentRuntimeProjection = { adapterId: string; kind: string; enabled: boolean; shared: boolean; status: 'unavailable' | 'healthy' | 'degraded'; discoveredSessions: number; evidence: string };
+export type AgentRuntimeProjection = { adapterId: string; kind: string; installed: boolean; discoverable: boolean; enabled: boolean; shared: boolean; status: 'unavailable' | 'healthy' | 'degraded'; discoveredSessions: number; evidence: string };
 
 export function parseAgentIpcRequest(value: unknown): AgentIpcRequest {
   requireThat(!!value && typeof value === 'object' && !Array.isArray(value), 'AGENT_IPC_REQUEST_INVALID');

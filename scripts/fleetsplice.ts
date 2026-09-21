@@ -9,6 +9,7 @@ import { canonical, requireThat } from '../packages/contracts/index.ts';
 import { readRegistry, changeRegistry, workspaceValidity } from '../packages/workspaces/index.ts';
 import { readCeiling, writeCeiling, PRESETS } from '../packages/permissions/index.ts';
 import type { PermissionPreset } from '../packages/contracts/index.ts';
+import { AGENT_IPC_VERSION, type AgentIpcCommand } from '../packages/agent-ipc/index.ts';
 import { candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, G05C_P1_OWNER_RETIREMENT_RUNS, guardPath, networkPreflight, proxyConfigurationRequired, readUserProxyConfiguration, resolveExplicitProxy, resolveProxy, retireOwnerAuthorizedUnknown, retireOwnerAuthorizedUnprovable, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration, type Guard, type Predecessor, type UserProxyConfiguration } from '../packages/local-operation/index.ts';
 
 const base = () => path.join(process.env.LOCALAPPDATA ?? '', 'FleetSplice', 'G05');
@@ -16,7 +17,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const output = (value: string) => process.stdout.write(`${value}\n`);
 const error = (value: string) => { process.stderr.write(`${value}\n`); process.exitCode = 2; };
 const code = (value: unknown) => canonical(value);
-type ControlFile = { pipe: string; token: string; runId: string };
+type ControlFile = { v: number; pipe: string; token: string; runId: string };
 type SupervisorBootstrap = { taskName: string; node: string; supervisor: string; workspace: string; codex: string; localAppData: string; environment: Record<string, string>; proxySource: string };
 const durable = (file: string, value: unknown) => { const handle = openSync(file, 'wx', 0o600); try { writeSync(handle, canonical(value)); fsyncSync(handle); } finally { closeSync(handle); } };
 
@@ -24,7 +25,7 @@ function currentGuard(): Guard | null {
   const file = guardPath(base());
   try { return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as Guard : null; } catch { return null; }
 }
-async function control(command: 'status' | 'stop'): Promise<any> {
+async function control(command: AgentIpcCommand, body?: Record<string, unknown>): Promise<any> {
   const guard = currentGuard(); requireThat(guard?.state === 'RUNNING' && typeof guard.runId === 'string', 'SUPERVISOR_UNAVAILABLE');
   const file = path.join(base(), guard.runId, 'control.json'); requireThat(existsSync(file), 'SUPERVISOR_UNAVAILABLE');
   const detail = JSON.parse(readFileSync(file, 'utf8')) as ControlFile;
@@ -32,7 +33,7 @@ async function control(command: 'status' | 'stop'): Promise<any> {
     const socket = createConnection(detail.pipe); let received = ''; const timer = setTimeout(() => { socket.destroy(); reject(new Error('SUPERVISOR_TIMEOUT')); }, 12000);
     socket.setEncoding('utf8'); socket.once('error', reject); socket.on('data', value => { received += value; if (received.length > 16384) socket.destroy(); });
     socket.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(received)); } catch { reject(new Error('SUPERVISOR_RESPONSE_INVALID')); } });
-    socket.on('connect', () => socket.write(`${code({ token: detail.token, command })}\n`));
+    socket.on('connect', () => socket.write(`${code({ v: AGENT_IPC_VERSION, token: detail.token, command, ...(body === undefined ? {} : { body }) })}\n`));
   });
 }
 function describePredecessor(predecessor: Predecessor): string[] {
@@ -228,11 +229,23 @@ export async function fleetspliceEntrypoint() {
     if (registry) requireThat(registry.entries.some(e => e.root.toLowerCase() === (workspaceIndex < 0 ? selected!.root : workspace).toLowerCase()), 'WORKSPACE_NOT_REGISTERED');
     return await start(workspaceIndex < 0 && selected ? selected.root : workspace);
   }
-  if (command === 'stop') { try { const result = await control('stop'); output(`FleetSplice stop: ${result.code}\nRun: ${result.runId ?? 'none'}\nNative exit observed: ${result.nativeExitObserved === true}`); if (result.code !== 'CLOSED') process.exitCode = 2; } catch { error('RECOVERY_REQUIRED\nSUPERVISOR_UNAVAILABLE'); } return; }
+  if (command === 'stop') { try { const result = await control('drain'); output(`FleetSplice stop: ${result.code}\nRun: ${result.runId ?? 'none'}\nNative exit observed: ${result.nativeExitObserved === true}`); if (result.code !== 'CLOSED') process.exitCode = 2; } catch { error('RECOVERY_REQUIRED\nSUPERVISOR_UNAVAILABLE'); } return; }
   if (command === 'status') return await status();
+  if (command === 'agent') {
+    const operation = args[1];
+    try {
+      if (operation === 'status') { output(code(await control('status'))); return; }
+      if (operation === 'config' && args[2] === 'get' && args.length === 3) { output(code(await control('config.get'))); return; }
+      if (operation === 'config' && args[2] === 'set' && args.length === 4) { output(code(await control('config.set', { gatewayUrl: args[3] === 'none' ? null : args[3] }))); return; }
+      if (operation === 'runtimes' && args.length === 2) { output(code(await control('runtime.list'))); return; }
+      if (operation === 'diagnostics' && args.length === 2) { output(code(await control('diagnostics'))); return; }
+      if (operation === 'drain' && args.length === 2) { output(code(await control('drain'))); return; }
+    } catch { error('AGENT_IPC_UNAVAILABLE'); return; }
+    error('USAGE: fleetsplice agent status|config get|config set <gateway-url|none>|runtimes|diagnostics|drain'); return;
+  }
   if (command === 'doctor') return await doctor(workspace);
   if (command === 'retire-stale') return retire(args);
   if (command === 'configure') return await configure(args.slice(1));
-  error('USAGE: fleetsplice start|stop|status|doctor|configure|native-demo|adopt [--workspace ABSOLUTE_ROOT]');
+  error('USAGE: fleetsplice start|stop|status|doctor|agent|configure|native-demo|adopt [--workspace ABSOLUTE_ROOT]');
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) fleetspliceEntrypoint().catch(reason => error(`PRECHECK_FAILED\n${reason instanceof Error ? reason.message : 'UNKNOWN'}\nNO_RUNTIME_STATE_MUTATED=true`));

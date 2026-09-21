@@ -10,13 +10,15 @@ import { Journal } from '../../packages/journal/index.ts';
 import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 import type { AdoptionPort, AdoptionClient } from '../../packages/native-adoption/types.ts';
 import { RemoteAdoptionPortProxy } from '../../packages/remote-adoption/index.ts';
+import { gatewayAdoptionPort, type GatewayAdoptionCarriage } from '../../packages/product-path/index.ts';
 
-export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[] };
+export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[]; adoptionCarriage?: GatewayAdoptionCarriage };
 const equalSecret = (a: string, b: string) => {
   const left = Buffer.from(a); const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 };
 export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: () => number = Date.now) {
+  const adoptionPort = adoption ?? (config.adoptionCarriage ? gatewayAdoptionPort(config.adoptionCarriage) : undefined);
   const origin = `http://127.0.0.1:${config.port}`; const host = `127.0.0.1:${config.port}`;
   const actorId = randomUUID();
   const sessions = new Map<string, number>();
@@ -26,7 +28,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   let nativeRevision = '0';
   let nativeUnsubscribe: (() => void) | null = null;
   let edge: WebSocket | null = null; let usedBootstrap = false; let hcpAccepted = false;
-  const remoteAdoption = adoption instanceof RemoteAdoptionPortProxy ? adoption : null;
+  const remoteAdoption = adoptionPort instanceof RemoteAdoptionPortProxy ? adoptionPort : null;
   const pending = new Map<string, { resolve: (receipt: Receipt) => void; reject: () => void; timer: NodeJS.Timeout }>();
   const send = (message: Hcp) => {
     requireThat(edge?.readyState === WebSocket.OPEN && edge.bufferedAmount < 262144, 'EDGE_DISCONNECTED');
@@ -46,10 +48,10 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   };
   /** Catch-up only (reconnect / missed buffer). Not the primary delivery path. */
   const catchUpNativeRealtime = async () => {
-    if (!adoption?.pollRealtime || nativeStreams.size === 0) return;
+    if (!adoptionPort?.pollRealtime || nativeStreams.size === 0) return;
     try {
       const since = nativeRevision;
-      const page = await adoption.pollRealtime(since);
+      const page = await adoptionPort.pollRealtime(since);
       // pollRealtime may publish a new control observation that live subscribeRealtime
       // already wrote and advanced nativeRevision. Never double-write those envelopes.
       if (page.events.length) {
@@ -78,8 +80,8 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
     void catchUpNativeRealtime();
   };
   const ensureNativeSubscription = () => {
-    if (nativeUnsubscribe || !adoption?.subscribeRealtime) return;
-    nativeUnsubscribe = adoption.subscribeRealtime(envelope => {
+    if (nativeUnsubscribe || !adoptionPort?.subscribeRealtime) return;
+    nativeUnsubscribe = adoptionPort.subscribeRealtime(envelope => {
       nativeRevision = envelope.revision;
       writeNative(envelope);
     });
@@ -138,7 +140,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
           // Retire old credentials before crossing IPC. Any failure or lost response
           // is closed; neither this route nor the browser retries the renewal.
           clients.delete(previous.clientInstanceId);
-          if (adoption) await adoption.renewClient(adoptionClient(previous), adoptionClient(next), value.continuity);
+          if (adoptionPort) await adoptionPort.renewClient(adoptionClient(previous), adoptionClient(next), value.continuity);
           else requireThat(value.continuity === null, 'CLIENT_RENEWAL_REJECTED');
           requireThat(session(req) === authenticatedSession && next.expiresAt > now(), 'CLIENT_RENEWAL_EXPIRED');
           clients.set(next.clientInstanceId, next);
@@ -152,7 +154,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
           req.on('close', () => { clearTimeout(expiry); streams.delete(res); }); return;
         }
         if (req.method === 'GET' && req.url === '/api/native/events') {
-          requireThat(!!adoption, 'ROUTE_NOT_FOUND');
+          requireThat(!!adoptionPort, 'ROUTE_NOT_FOUND');
           requireThat(req.headers.origin === origin || req.headers['sec-fetch-site'] === 'same-origin', 'OBSERVATION_ORIGIN_REJECTED');
           requireThat(nativeStreams.size < 16, 'OBSERVER_LIMIT');
           res.writeHead(200, { 'Content-Type': 'text/event-stream', Connection: 'keep-alive' });
@@ -162,17 +164,17 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
           req.on('close', () => { clearTimeout(expiry); nativeStreams.delete(res); stopNativeSubscription(); }); return;
         }
         grant(req);
-        if (req.method === 'GET' && req.url === '/api/mode') { json(res, 200, { mode: adoption ? 'NATIVE_ADOPTION' : 'FLEETSPLICE_MANAGED' }); return; }
-        if (adoption) {
+        if (req.method === 'GET' && req.url === '/api/mode') { json(res, 200, { mode: adoptionPort ? 'NATIVE_ADOPTION' : 'FLEETSPLICE_MANAGED' }); return; }
+        if (adoptionPort) {
           if (req.method === 'GET' && (req.url === '/api/native/snapshot' || req.url?.startsWith('/api/native/snapshot?'))) {
             const discover = new URL(req.url!, origin).searchParams.get('discover') === '1';
-            json(res, 200, await adoption.snapshot(discover ? { discover: true } : {})); return;
+            json(res, 200, await adoptionPort.snapshot(discover ? { discover: true } : {})); return;
           }
           if (req.method === 'POST' && req.url === '/api/native/commands') {
-            const command = await body(req); const client = grant(req); json(res, 200, await adoption.execute(command, adoptionClient(client))); catchUpAfterCommandIfNeeded(); return;
+            const command = await body(req); const client = grant(req); json(res, 200, await adoptionPort.execute(command, adoptionClient(client))); catchUpAfterCommandIfNeeded(); return;
           }
           if (req.method === 'GET' && /^\/api\/native\/commands\/[a-zA-Z0-9_-]{1,200}$/.test(req.url ?? '')) {
-            const receipt = await adoption.lookup(req.url!.slice('/api/native/commands/'.length)); json(res, receipt ? 200 : 404, receipt ?? { error: 'COMMAND_UNKNOWN_NO_REPLAY' }); return;
+            const receipt = await adoptionPort.lookup(req.url!.slice('/api/native/commands/'.length)); json(res, receipt ? 200 : 404, receipt ?? { error: 'COMMAND_UNKNOWN_NO_REPLAY' }); return;
           }
           throw new Fault('ROUTE_NOT_FOUND');
         }

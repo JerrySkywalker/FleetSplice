@@ -9,9 +9,55 @@ import { localIdentity, principalProof, rootProof, type LocalIdentity } from './
 import { verifyWorkspace, verifyWorkspaceNow } from '../../packages/workspaces/index.ts';
 import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 import { permits, readCeiling } from '../../packages/permissions/index.ts';
+import { nativeAdoptionEdge } from './native-adoption.ts';
+import { agentAdoptionEndpoint, acceptAgentAdoptionHcp } from '../../packages/product-path/index.ts';
 
-export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; workspaces?: WorkspaceBinding[] };
+export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY' };
+
+/**
+ * Native adoption has an HCP endpoint in the product Edge itself.  The former
+ * disposable topology is therefore not required to carry an AdoptionPort over
+ * the wire.  LEGACY_MANAGED_LOCAL_ONLY remains below only for historical local
+ * lifecycle compatibility; it is never a remote product mode.
+ */
+async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
+  const identity = await localIdentity(config.identity.root, config.identity.sid);
+  requireThat(canonical(identity) === canonical(config.identity), 'EDGE_LOCAL_IDENTITY_CHANGED');
+  const local = await nativeAdoptionEdge(identity.root, config.stateDirectory);
+  const socket = new WebSocket(`ws://127.0.0.1:${config.port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', {
+    perMessageDeflate: false, maxPayload: 262144, origin: `http://127.0.0.1:${config.port}`,
+    headers: { Authorization: `Bearer ${config.hcpToken}` },
+  });
+  const kernel = { connected: false, quarantine: () => { kernel.connected = false; } };
+  const send = (message: Hcp) => {
+    requireThat(socket.readyState === WebSocket.OPEN && socket.bufferedAmount < 262144, 'HCP_BACKPRESSURE_OR_DISCONNECTED');
+    socket.send(canonical(message));
+  };
+  const envelope = { v: 1 as const, target: config.target, connectionId: config.target.connectionId };
+  const endpoint = agentAdoptionEndpoint({ kind: 'NATIVE_ADOPTION', target: config.target, port: local.adapter, send });
+  socket.on('open', () => send({ ...envelope, kind: 'hello', identity, recovered: false }));
+  socket.on('message', async (bytes, binary) => {
+    try {
+      requireThat(!binary, 'HCP_BINARY_REJECTED');
+      const message = validate<Hcp>('hcp', parseJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes as Buffer)));
+      if (message.kind === 'ready' && !kernel.connected) {
+        requireThat(!message.recoveryRequired, 'RECOVERY_REQUIRED');
+        kernel.connected = true; endpoint.startRealtimePush(); process.send?.({ kind: 'edgeReady' });
+      } else await acceptAgentAdoptionHcp(endpoint, config.target, message);
+    } catch {
+      kernel.connected = false; socket.close(); process.send?.({ kind: 'error', code: 'EDGE_ADMISSION_CLOSED' });
+    }
+  });
+  socket.on('close', () => { kernel.connected = false; endpoint.stop(); process.send?.({ kind: 'edgeDisconnected' }); });
+  socket.on('error', () => { kernel.connected = false; });
+  return {
+    kernel,
+    close: async () => { endpoint.stop(); socket.close(); local.close(); return true; },
+  };
+}
+
 export async function startEdge(config: EdgeConfig) {
+  if (config.productPath === 'NATIVE_ADOPTION') return await startNativeAdoptionHcpEdge(config);
   const identity = await localIdentity(config.identity.root, config.identity.sid);
   requireThat(canonical(identity) === canonical(config.identity), 'EDGE_LOCAL_IDENTITY_CHANGED');
   const journal = new Journal(path.join(config.stateDirectory, 'edge.sqlite'));

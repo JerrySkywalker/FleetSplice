@@ -19,11 +19,12 @@ const onceExit = (child: ChildProcess, timeout: number) => new Promise<boolean>(
   child.once('exit', () => { clearTimeout(timer); resolve(true); });
   child.once('error', () => { clearTimeout(timer); resolve(false); });
 });
-export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void };
+export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY' };
 
 // Internal lifecycle primitive. G05B starts it only from the detached local
 // supervisor after all no-effect qualification has passed.
 export async function launch(root: string, executable: string, port = 43155, options: LaunchOptions = {}) {
+  const productPath = options.productPath ?? 'NATIVE_ADOPTION';
   requireThat(process.version === 'v24.20.0' && process.versions.sqlite === '3.53.4', 'NODE_RUNTIME_UNQUALIFIED');
   requireThat(Number.isInteger(port) && port > 1024 && port < 65536, 'INVALID_PORT');
   const identity = await localIdentity(root);
@@ -67,10 +68,11 @@ export async function launch(root: string, executable: string, port = 43155, opt
   try {
     hub = start(path.join(installation, 'apps/hub/server.js'), hubEnv);
     const hubReady = wait(hub, 'hubListening');
-    hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken, workspaces } satisfies HubConfig);
+    hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken, workspaces,
+      ...(productPath === 'NATIVE_ADOPTION' ? { adoptionCarriage: { kind: 'REMOTE_ADOPTION' as const, target, send: () => { throw new Error('HCP_NOT_CONNECTED'); } } } : {}) } satisfies HubConfig);
     await hubReady;
     edge = start(path.join(installation, 'apps/edge/main.js'), env);
-    const edgeReady = wait(edge, 'edgeReady'); edge.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, workspaces } satisfies EdgeConfig);
+    const edgeReady = wait(edge, 'edgeReady'); edge.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, workspaces, productPath } satisfies EdgeConfig);
     await edgeReady;
   } catch (error) {
     // Browser command admission has not been exposed: there can be no native effect.
@@ -93,9 +95,10 @@ export async function launch(root: string, executable: string, port = 43155, opt
   hub.on('exit', () => { if (!closing && edge?.connected) edge.disconnect(); });
   const health = () => {
     const hubState = hub?.exitCode === null ? 'RUNNING' : 'STOPPED'; const edgeState = edge?.exitCode === null ? 'RUNNING' : 'STOPPED';
-    return { hub: hubState, edge: edgeState, edgeAdmission: edgeState === 'RUNNING' ? edgeAdmissionState(path.join(directory, 'edge.sqlite')) : 'UNPROVABLE' as const };
+    const journal = productPath === 'NATIVE_ADOPTION' ? 'native-edge.sqlite' : 'edge.sqlite';
+    return { hub: hubState, edge: edgeState, edgeAdmission: edgeState === 'RUNNING' ? edgeAdmissionState(path.join(directory, journal)) : 'UNPROVABLE' as const };
   };
-  return { url: `http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`, origin: `http://127.0.0.1:${port}`, directory, runId, target, identity, stop, health };
+  return { url: `http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`, origin: `http://127.0.0.1:${port}`, directory, runId, target, identity, productPath, stop, health };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -5,7 +5,7 @@ import type { RealtimeInvalidateEnvelope } from '../contracts/realtime-bus.ts';
 
 export type AdoptionHcpSender = (message: Hcp) => void;
 
-type LocalAdoptionSurface = {
+export type LocalAdoptionSurface = {
   snapshot: AdoptionPort['snapshot'];
   execute: AdoptionPort['execute'];
   renewClient: AdoptionPort['renewClient'];

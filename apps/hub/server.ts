@@ -11,8 +11,9 @@ import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 import type { AdoptionPort, AdoptionClient } from '../../packages/native-adoption/types.ts';
 import { RemoteAdoptionPortProxy } from '../../packages/remote-adoption/index.ts';
 import { gatewayAdoptionPort, type GatewayAdoptionCarriage } from '../../packages/product-path/index.ts';
+import { resolveDeploymentProfile, type DeploymentProfileInput } from '../../packages/deployment/index.ts';
 
-export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[]; adoptionCarriage?: GatewayAdoptionCarriage };
+export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[]; adoptionCarriage?: GatewayAdoptionCarriage; deployment?: DeploymentProfileInput };
 const equalSecret = (a: string, b: string) => {
   const left = Buffer.from(a); const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
@@ -20,6 +21,7 @@ const equalSecret = (a: string, b: string) => {
 export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: () => number = Date.now) {
   const adoptionPort = adoption ?? (config.adoptionCarriage ? gatewayAdoptionPort(config.adoptionCarriage) : undefined);
   const origin = `http://127.0.0.1:${config.port}`; const host = `127.0.0.1:${config.port}`;
+  const deployment = resolveDeploymentProfile(config.deployment ?? { kind: 'LOOPBACK', publicBaseUrl: origin });
   const actorId = randomUUID();
   const sessions = new Map<string, number>();
   const clients = new Map<string, ClientGrant & { csrf: string; session: string }>();
@@ -114,6 +116,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
       requireThat(req.headers.host === host && req.socket.remoteAddress === '127.0.0.1', 'HOST_REJECTED');
       if (req.headers.origin) requireThat(req.headers.origin === origin, 'ORIGIN_REJECTED');
       if (req.method === 'POST') requireThat(req.headers.origin === origin && req.headers['content-type'] === 'application/json', 'ORIGIN_OR_CONTENT_TYPE_REJECTED');
+      if (req.method === 'GET' && req.url === '/.well-known/fleetsplice') { json(res, 200, deployment.discovery); return; }
       if (req.method === 'POST' && req.url === '/api/bootstrap') {
         const value = await body(req) as any;
         requireThat(value && Object.keys(value).length === 1 && typeof value.token === 'string' && !usedBootstrap && equalSecret(value.token, config.bootstrapToken), 'BOOTSTRAP_REJECTED');

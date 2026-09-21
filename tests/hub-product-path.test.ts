@@ -35,6 +35,8 @@ test('production Hub config selects RemoteAdoptionPortProxy over its HCP connect
       const timer = setTimeout(() => reject(new Error('HCP_READY_TIMEOUT')), 5000);
       socket.on('message', bytes => { const message = JSON.parse(String(bytes)); if (message.kind === 'ready') { clearTimeout(timer); resolve(); } });
     });
+    const discovery = await fetch(`${origin}/.well-known/fleetsplice`);
+    assert.deepEqual(await discovery.json(), { version: 1, profile: 'LOOPBACK', apiBaseUrl: `${origin}/api/`, realtimeUrl: `${origin}/api/events`, hcpUrl: `ws://127.0.0.1:${port}/hcp/v1/connect`, loginUrl: `${origin}/auth/login`, enrollment: { supported: true, url: `${origin}/api/devices/enroll`, keyType: 'Ed25519' } });
     const boot = await fetch(`${origin}/api/bootstrap`, { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify({ token: bootstrapToken }) });
     assert.equal(boot.status, 200); const cookie = boot.headers.get('set-cookie')!;
     const clientResponse = await fetch(`${origin}/api/client`, { method: 'POST', headers: { origin, cookie, 'content-type': 'application/json' }, body: '{}' });

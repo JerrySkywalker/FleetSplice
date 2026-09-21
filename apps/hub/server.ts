@@ -12,8 +12,10 @@ import type { AdoptionPort, AdoptionClient } from '../../packages/native-adoptio
 import { RemoteAdoptionPortProxy } from '../../packages/remote-adoption/index.ts';
 import { gatewayAdoptionPort, type GatewayAdoptionCarriage } from '../../packages/product-path/index.ts';
 import { resolveDeploymentProfile, type DeploymentProfileInput } from '../../packages/deployment/index.ts';
+import { GenericOidcAuthenticator, type HumanPrincipal, type OidcProviderConfig } from '../../packages/oidc/index.ts';
 
-export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[]; adoptionCarriage?: GatewayAdoptionCarriage; deployment?: DeploymentProfileInput };
+export type HubAuthConfig = { mode: 'LOOPBACK_BOOTSTRAP' } | { mode: 'OIDC'; provider: OidcProviderConfig };
+export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[]; adoptionCarriage?: GatewayAdoptionCarriage; deployment?: DeploymentProfileInput; auth?: HubAuthConfig };
 const equalSecret = (a: string, b: string) => {
   const left = Buffer.from(a); const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
@@ -22,8 +24,10 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   const adoptionPort = adoption ?? (config.adoptionCarriage ? gatewayAdoptionPort(config.adoptionCarriage) : undefined);
   const origin = `http://127.0.0.1:${config.port}`; const host = `127.0.0.1:${config.port}`;
   const deployment = resolveDeploymentProfile(config.deployment ?? { kind: 'LOOPBACK', publicBaseUrl: origin });
+  const oidc = config.auth?.mode === 'OIDC' ? new GenericOidcAuthenticator(config.auth.provider) : null;
+  const cookieName = oidc && deployment.kind !== 'LOOPBACK' ? '__Host-fleetsplice' : 'fleetsplice';
   const actorId = randomUUID();
-  const sessions = new Map<string, number>();
+  const sessions = new Map<string, { expiresAt: number; idleExpiresAt: number; principal: HumanPrincipal }>();
   const clients = new Map<string, ClientGrant & { csrf: string; session: string }>();
   const streams = new Set<ServerResponse>();
   const nativeStreams = new Set<ServerResponse>();
@@ -99,8 +103,15 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
     return parseJson(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
   };
   const session = (req: IncomingMessage): string => {
-    const cookie = /(?:^|;\s*)fleetsplice=([0-9a-f]{64})(?:;|$)/.exec(req.headers.cookie ?? '')?.[1];
-    requireThat(cookie && (sessions.get(cookie) ?? 0) > now(), 'AUTH_REQUIRED'); return cookie;
+    const cookie = new RegExp(`(?:^|;\\s*)${cookieName}=([0-9a-f]{64})(?:;|$)`).exec(req.headers.cookie ?? '')?.[1];
+    const current = cookie ? sessions.get(cookie) : undefined;
+    requireThat(cookie && current && current.expiresAt > now() && current.idleExpiresAt > now(), 'AUTH_REQUIRED');
+    current.idleExpiresAt = Math.min(current.expiresAt, now() + 15 * 60_000); return cookie;
+  };
+  const openSession = (principal: HumanPrincipal) => {
+    const token = randomBytes(32).toString('hex'); const expiresAt = now() + 8 * 60 * 60_000;
+    sessions.set(token, { expiresAt, idleExpiresAt: Math.min(expiresAt, now() + 15 * 60_000), principal });
+    return { token, cookie: `${cookieName}=${token}; ${oidc && deployment.kind !== 'LOOPBACK' ? 'Secure; ' : ''}HttpOnly; SameSite=Strict; Path=/` };
   };
   const grant = (req: IncomingMessage) => {
     const client = clients.get(String(req.headers['x-fleet-client']));
@@ -117,17 +128,33 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
       if (req.headers.origin) requireThat(req.headers.origin === origin, 'ORIGIN_REJECTED');
       if (req.method === 'POST') requireThat(req.headers.origin === origin && req.headers['content-type'] === 'application/json', 'ORIGIN_OR_CONTENT_TYPE_REJECTED');
       if (req.method === 'GET' && req.url === '/.well-known/fleetsplice') { json(res, 200, deployment.discovery); return; }
+      if (req.method === 'GET' && req.url === '/auth/login') {
+        requireThat(oidc, 'OIDC_NOT_CONFIGURED'); const started = await oidc.start(); res.writeHead(302, { Location: started.authorizationUrl }); res.end(); return;
+      }
+      if (req.method === 'GET' && req.url?.startsWith('/auth/oidc/callback?')) {
+        requireThat(oidc, 'OIDC_NOT_CONFIGURED'); const url = new URL(req.url, origin); const principal = await oidc.complete({ state: url.searchParams.get('state') ?? '', code: url.searchParams.get('code') ?? '' });
+        const existing = [...sessions.values()][0]?.principal; requireThat(!existing || existing.id === principal.id, 'OIDC_OWNER_ADMISSION_REJECTED');
+        const opened = openSession(principal); res.writeHead(302, { Location: '/', 'Set-Cookie': opened.cookie }); res.end(); return;
+      }
       if (req.method === 'POST' && req.url === '/api/bootstrap') {
+        requireThat(!oidc, 'OIDC_REQUIRED');
         const value = await body(req) as any;
         requireThat(value && Object.keys(value).length === 1 && typeof value.token === 'string' && !usedBootstrap && equalSecret(value.token, config.bootstrapToken), 'BOOTSTRAP_REJECTED');
-        usedBootstrap = true; const token = randomBytes(32).toString('hex'); sessions.set(token, now() + 8 * 60 * 60_000);
-        res.setHeader('Set-Cookie', `fleetsplice=${token}; HttpOnly; SameSite=Strict; Path=/`); json(res, 200, { authenticated: true }); return;
+        usedBootstrap = true; const opened = openSession({ id: createHash('sha256').update('loopback-development\0owner').digest('hex'), issuer: 'loopback-development', subject: 'owner', displayName: 'Loopback development owner', email: null, avatar: null, groups: [] });
+        res.setHeader('Set-Cookie', opened.cookie); json(res, 200, { authenticated: true }); return;
       }
       if (req.url?.startsWith('/api/')) {
         const authenticatedSession = session(req);
+        if (req.method === 'POST' && req.url === '/api/auth/logout') {
+          for (const [id, client] of clients) if (client.session === authenticatedSession) clients.delete(id);
+          sessions.delete(authenticatedSession); res.setHeader('Set-Cookie', `${cookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`); json(res, 200, { loggedOut: true }); return;
+        }
+        if (req.method === 'GET' && req.url === '/api/auth/principal') {
+          const principal = sessions.get(authenticatedSession)!.principal; json(res, 200, { principal, mode: oidc ? 'OIDC' : 'LOOPBACK_BOOTSTRAP' }); return;
+        }
         if (req.method === 'POST' && req.url === '/api/client') {
           requireThat(canonical(await body(req)) === '{}', 'SCHEMA_INVALID'); requireThat(clients.size < 64, 'CLIENT_LIMIT');
-          const client = { actorId, clientInstanceId: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt: Math.min(now() + 30 * 60_000, sessions.get(authenticatedSession)!), csrf: randomBytes(32).toString('hex'), session: authenticatedSession };
+          const client = { actorId, clientInstanceId: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt: Math.min(now() + 30 * 60_000, sessions.get(authenticatedSession)!.expiresAt), csrf: randomBytes(32).toString('hex'), session: authenticatedSession };
           clients.set(client.clientInstanceId, client); const { session: _, ...projection } = client; json(res, 200, projection); return;
         }
         if (req.method === 'POST' && req.url === '/api/client/renew') {
@@ -138,7 +165,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
           requireThat(value && Object.keys(value).sort().join(',') === 'continuity,grantId,grantRevision' &&
             value.grantId === previous.grantId && value.grantRevision === previous.grantRevision, 'CLIENT_RENEWAL_REJECTED');
           const next = { ...previous, grantRevision: String(BigInt(previous.grantRevision) + 1n),
-            expiresAt: Math.min(now() + 30 * 60_000, sessions.get(authenticatedSession)!), csrf: randomBytes(32).toString('hex') };
+            expiresAt: Math.min(now() + 30 * 60_000, sessions.get(authenticatedSession)!.expiresAt), csrf: randomBytes(32).toString('hex') };
           requireThat(next.expiresAt > previous.expiresAt, 'CLIENT_RENEWAL_SESSION_LIMIT');
           // Retire old credentials before crossing IPC. Any failure or lost response
           // is closed; neither this route nor the browser retries the renewal.
@@ -153,7 +180,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
           requireThat(req.headers.origin === origin || req.headers['sec-fetch-site'] === 'same-origin', 'OBSERVATION_ORIGIN_REJECTED');
           requireThat(streams.size < 16, 'OBSERVER_LIMIT');
           res.writeHead(200, { 'Content-Type': 'text/event-stream', Connection: 'keep-alive' }); res.write(`data: ${kernel.snapshot().cursor}\n\n`); streams.add(res);
-          const expiry = setTimeout(() => res.end(), Math.min(30 * 60_000, sessions.get(authenticatedSession)! - now()));
+          const expiry = setTimeout(() => res.end(), Math.min(30 * 60_000, sessions.get(authenticatedSession)!.expiresAt - now(), sessions.get(authenticatedSession)!.idleExpiresAt - now()));
           req.on('close', () => { clearTimeout(expiry); streams.delete(res); }); return;
         }
         if (req.method === 'GET' && req.url === '/api/native/events') {
@@ -163,7 +190,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
           res.writeHead(200, { 'Content-Type': 'text/event-stream', Connection: 'keep-alive' });
           res.write(`data: ${JSON.stringify({ revision: nativeRevision, eventId: `hello-${nativeRevision}`, stream: 'fleet.control', kind: 'reconnect', threadId: null, turnId: null })}\n\n`);
           nativeStreams.add(res); ensureNativeSubscription(); void catchUpNativeRealtime();
-          const expiry = setTimeout(() => res.end(), Math.min(30 * 60_000, sessions.get(authenticatedSession)! - now()));
+          const expiry = setTimeout(() => res.end(), Math.min(30 * 60_000, sessions.get(authenticatedSession)!.expiresAt - now(), sessions.get(authenticatedSession)!.idleExpiresAt - now()));
           req.on('close', () => { clearTimeout(expiry); nativeStreams.delete(res); stopNativeSubscription(); }); return;
         }
         grant(req);

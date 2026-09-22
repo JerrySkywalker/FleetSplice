@@ -53,8 +53,8 @@ export async function changeRegistry(host: WorkspaceHost, operation: 'add' | 're
     acl(temporary, host.sid, false); renameSync(temporary, file); return registry;
   } finally { closeSync(fd); unlinkSync(lock); if (existsSync(temporary)) unlinkSync(temporary); }
 }
-export async function workspaceBindings(root: string, host: WorkspaceHost, target: Target): Promise<WorkspaceBinding[]> {
-  const registry = readRegistry(host);
+export async function workspaceBindings(root: string, host: WorkspaceHost, target: Target, env: NodeJS.ProcessEnv = process.env): Promise<WorkspaceBinding[]> {
+  const registry = readRegistry(host, env);
   if (!registry) return [{ registryId: target.workspaceId, displayName: path.basename(root), root, rootIdentity: target.rootIdentity, target, valid: true }];
   const current = registry.entries.find(e => e.root === root && e.rootIdentity === target.rootIdentity);
   requireThat(current && await workspaceValidity(current), 'WORKSPACE_NOT_REGISTERED_OR_REPLACED');

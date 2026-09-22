@@ -111,11 +111,51 @@ test('closed remote adoption proxy fails closed without effect', async () => {
   try {
     await pair.proxy.snapshot({ discover: true });
     pair.proxy.close('EDGE_DISCONNECTED');
-    await assert.rejects(() => pair.proxy.snapshot({}), /EDGE_DISCONNECTED|ADOPTION_REMOTE/);
+    await assert.rejects(() => pair.proxy.snapshot({}), /EDGE_DISCONNECTED/);
   } finally {
     await pair.close();
     fx.journal.close();
   }
+});
+
+test('transient unbind preserves realtime subscribers while rejecting stale generations and terminal dispose is final', async () => {
+  const tgt = target();
+  const firstMessages: Hcp[] = [];
+  const proxy = new RemoteAdoptionPortProxy(tgt, message => firstMessages.push(message));
+  // A Gateway construction sender is not an admitted Edge binding.
+  proxy.unbind(undefined, 'EDGE_DISCONNECTED');
+  const firstGeneration = proxy.bindSender(message => firstMessages.push(message));
+  const observed: string[] = [];
+  proxy.subscribeRealtime(envelope => observed.push(envelope.revision));
+
+  const pending = proxy.snapshot({});
+  const request = firstMessages.at(-1)!;
+  assert.equal(request.kind, 'adoption.request');
+  proxy.unbind(firstGeneration, 'EDGE_DISCONNECTED');
+  await assert.rejects(pending, /EDGE_DISCONNECTED/);
+
+  const secondGeneration = proxy.bindSender(() => {});
+  // Model a late close from the detached socket: it cannot unbind the newer Edge.
+  assert.equal(proxy.unbind(firstGeneration, 'EDGE_DISCONNECTED'), false);
+  assert.throws(() => proxy.accept({
+    v: 1, kind: 'adoption.response', connectionId: tgt.connectionId, target: tgt,
+    requestId: request.requestId, ok: true, code: null, body: {},
+  }, firstGeneration), /STALE_CONNECTION/);
+  assert.throws(() => proxy.accept({
+    v: 1, kind: 'adoption.realtime', connectionId: tgt.connectionId, target: tgt,
+    envelope: { revision: '1', eventId: 'old', stream: 'fleet.native', kind: 'old', threadId: null, turnId: null },
+  }, firstGeneration), /STALE_CONNECTION/);
+  assert.deepEqual(observed, []);
+
+  proxy.accept({
+    v: 1, kind: 'adoption.realtime', connectionId: tgt.connectionId, target: tgt,
+    envelope: { revision: '2', eventId: 'new', stream: 'fleet.native', kind: 'new', threadId: null, turnId: null },
+  }, secondGeneration);
+  assert.deepEqual(observed, ['2']);
+
+  proxy.dispose('GATEWAY_DISPOSED');
+  await assert.rejects(proxy.snapshot({}), /GATEWAY_DISPOSED/);
+  assert.throws(() => proxy.subscribeRealtime(() => {}), /GATEWAY_DISPOSED/);
 });
 
 test('duplicate adoption requestId returns original response without re-dispatch', async () => {

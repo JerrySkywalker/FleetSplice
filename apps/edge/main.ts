@@ -1,4 +1,4 @@
-import { WebSocket } from 'ws';
+import { WebSocket, type ClientOptions } from 'ws';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonical, parseJson, requireThat, validate, Fault, type Hcp, type Receipt, type Target } from '../../packages/contracts/index.ts';
@@ -14,7 +14,21 @@ import { agentAdoptionEndpoint, acceptAgentAdoptionHcp } from '../../packages/pr
 import { mayShareWorkspace, type RuntimeSharing } from '../../packages/agent-runtime/index.ts';
 import { signEnrollmentChallenge, type HostEnrollmentPrivateMaterial } from '../../packages/remote-enrollment/index.ts';
 
-export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; enrollment?: HostEnrollmentPrivateMaterial; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
+export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; hcpUrl?: string; /** Explicit S10-only trust injection; production relies on normal OS trust. */ testTlsCaPem?: string; enrollment?: HostEnrollmentPrivateMaterial; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
+
+export function resolveEdgeHcpEndpoint(config: Pick<EdgeConfig, 'port' | 'hcpUrl' | 'testTlsCaPem'>) {
+  const value = config.hcpUrl ?? `ws://localhost:${config.port}/hcp/v1/connect`;
+  let url: URL;
+  try { url = new URL(value); } catch { throw new Fault('EDGE_HCP_ENDPOINT_INVALID'); }
+  const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+  requireThat(!url.username && !url.password && !url.hash && !url.search && url.pathname === '/hcp/v1/connect', 'EDGE_HCP_ENDPOINT_INVALID');
+  requireThat(url.protocol === 'wss:' || (url.protocol === 'ws:' && loopback), 'EDGE_HCP_ENDPOINT_MUST_BE_WSS');
+  requireThat(!config.testTlsCaPem || url.protocol === 'wss:', 'EDGE_TEST_TLS_CA_REQUIRES_WSS');
+  const origin = new URL(url.toString()); origin.protocol = url.protocol === 'wss:' ? 'https:' : 'http:'; origin.pathname = ''; origin.search = ''; origin.hash = '';
+  const options: ClientOptions = { perMessageDeflate: false, maxPayload: 262144, origin: origin.toString().replace(/\/$/, ''), rejectUnauthorized: true,
+    ...(config.testTlsCaPem ? { ca: config.testTlsCaPem } : {}) };
+  return { url: url.toString(), options };
+}
 
 /**
  * Native adoption has an HCP endpoint in the product Edge itself.  The former
@@ -28,8 +42,9 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   requireThat((config.workspaces ?? []).some(binding => binding.valid && binding.root.toLowerCase() === identity.root.toLowerCase() && binding.rootIdentity === identity.rootIdentity && canonical(binding.target) === canonical(config.target)), 'WORKSPACE_BINDING_UNPROVABLE');
   const local = await nativeAdoptionEdge(identity.root, config.stateDirectory);
   const enrollment = config.enrollment;
-  const socket = new WebSocket(`ws://127.0.0.1:${config.port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', {
-    perMessageDeflate: false, maxPayload: 262144, origin: `http://127.0.0.1:${config.port}`,
+  const hcp = resolveEdgeHcpEndpoint(config);
+  const socket = new WebSocket(hcp.url, 'fleetsplice.hcp.v1', {
+    ...hcp.options,
     headers: enrollment ? {} : { Authorization: `Bearer ${config.hcpToken}` },
   });
   const kernel = { connected: false, quarantine: () => { kernel.connected = false; } };
@@ -66,8 +81,8 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
         requireThat(!!sharing && mayShareWorkspace(sharing, identity.root), 'RUNTIME_UNSHARED');
         await acceptAgentAdoptionHcp(endpoint, config.target, message);
       }
-    } catch {
-      kernel.connected = false; socket.close(); process.send?.({ kind: 'error', code: 'EDGE_ADMISSION_CLOSED' });
+    } catch (error) {
+      kernel.connected = false; socket.close(); process.send?.({ kind: 'error', code: error instanceof Fault ? error.code : 'EDGE_ADMISSION_CLOSED' });
     }
   });
   socket.on('close', () => { kernel.connected = false; endpoint.stop(); process.send?.({ kind: 'edgeDisconnected' }); });
@@ -92,8 +107,9 @@ export async function startEdge(config: EdgeConfig) {
   const journal = new Journal(path.join(config.stateDirectory, 'edge.sqlite'));
   journal.set('root', identity.root);
   const native = new CodexDriver(config.executable, identity.root);
-  const socket = new WebSocket(`ws://127.0.0.1:${config.port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', {
-    perMessageDeflate: false, maxPayload: 262144, origin: `http://127.0.0.1:${config.port}`, headers: { Authorization: `Bearer ${config.hcpToken}` }
+  const hcp = resolveEdgeHcpEndpoint(config);
+  const socket = new WebSocket(hcp.url, 'fleetsplice.hcp.v1', {
+    ...hcp.options, headers: { Authorization: `Bearer ${config.hcpToken}` }
   });
   const send = (message: Hcp) => {
     requireThat(socket.readyState === WebSocket.OPEN && socket.bufferedAmount < 262144, 'HCP_BACKPRESSURE_OR_DISCONNECTED'); socket.send(canonical(message));

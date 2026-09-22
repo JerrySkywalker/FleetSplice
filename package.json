@@ -18,6 +18,7 @@
     "accept:native-browser": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/accept-native-browser.js",
     "accept:ux-browser": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/accept-ux-browser.js",
     "accept:native-live": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/accept-native-live.js",
+    "accept:s10-real-native": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/accept-s10-real-native.js",
     "demo:owner-experience": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/demo-owner-experience.js",
     "capture:ux-baseline-r2": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/capture-ux-baseline.js",
     "tokens:generate": "node scripts/tokens/generate.mjs",

@@ -23,24 +23,59 @@ export class RemoteAdoptionPortProxy implements AdoptionPort {
   }>();
   private readonly realtimeListeners = new Set<(envelope: RealtimeInvalidateEnvelope) => void>();
   private generation = 0;
-  private closed = false;
+  private disposed = false;
+  private disposeCode = 'GATEWAY_DISPOSED';
 
   constructor(
     private readonly target: Target,
-    private send: AdoptionHcpSender,
+    private send: AdoptionHcpSender | null,
     private readonly timeoutMs = 15_000,
   ) {}
 
-  setSender(send: AdoptionHcpSender) { this.send = send; }
+  /**
+   * Bind one admitted Edge connection. A rebind never carries pending work to
+   * the new Edge: the old generation is failed closed before the sender moves.
+   */
+  bindSender(send: AdoptionHcpSender): number {
+    requireThat(!this.disposed, this.disposeCode);
+    this.generation++;
+    this.failPending('STALE_CONNECTION');
+    this.send = send;
+    return this.generation;
+  }
+
+  /** Compatibility entry point for callers that replace an admitted sender. */
+  setSender(send: AdoptionHcpSender) { return this.bindSender(send); }
 
   /** Hub connection generation; stale responses for older generations are ignored. */
   bumpGeneration() { this.generation++; this.failPending('STALE_CONNECTION'); }
 
-  close(code = 'EDGE_DISCONNECTED') {
-    this.closed = true;
+  /**
+   * A socket disconnect is recoverable at Gateway scope. It fails in-flight
+   * work and removes the sender, but deliberately preserves SSE subscribers.
+   * A stale close cannot unbind a newer generation.
+   */
+  unbind(generation?: number, code = 'EDGE_DISCONNECTED'): boolean {
+    if (this.disposed || (generation !== undefined && generation !== this.generation)) return false;
+    this.generation++;
+    this.send = null;
+    this.failPending(code);
+    return true;
+  }
+
+  /** Terminal Gateway lifecycle disposal. This is intentionally irreversible. */
+  dispose(code = 'GATEWAY_DISPOSED') {
+    if (this.disposed) return;
+    this.disposeCode = code;
+    this.disposed = true;
+    this.generation++;
+    this.send = null;
     this.failPending(code);
     this.realtimeListeners.clear();
   }
+
+  /** @deprecated Prefer unbind() for a connection or dispose() for Gateway shutdown. */
+  close(code = 'EDGE_DISCONNECTED') { this.dispose(code); }
 
   private failPending(code: string) {
     for (const [id, item] of this.pending) {
@@ -51,8 +86,10 @@ export class RemoteAdoptionPortProxy implements AdoptionPort {
   }
 
   /** Ingest an HCP message from Edge. */
-  accept(message: Hcp) {
-    requireThat(!this.closed, 'EDGE_DISCONNECTED');
+  accept(message: Hcp, generation?: number) {
+    requireThat(!this.disposed, this.disposeCode);
+    requireThat(this.send !== null, 'EDGE_DISCONNECTED');
+    requireThat(generation === undefined || generation === this.generation, 'STALE_CONNECTION');
     requireThat(message.connectionId === this.target.connectionId, 'STALE_CONNECTION');
     if (message.kind === 'adoption.response') {
       const item = this.pending.get(message.requestId);
@@ -71,7 +108,9 @@ export class RemoteAdoptionPortProxy implements AdoptionPort {
   }
 
   private request(op: 'snapshot' | 'execute' | 'renewClient' | 'lookup' | 'pollRealtime', body: Record<string, unknown>): Promise<unknown> {
-    requireThat(!this.closed, 'EDGE_DISCONNECTED');
+    requireThat(!this.disposed, this.disposeCode);
+    const sender = this.send;
+    requireThat(sender !== null, 'EDGE_DISCONNECTED');
     const requestId = randomUUID();
     const generation = this.generation;
     const message: Hcp = {
@@ -96,7 +135,7 @@ export class RemoteAdoptionPortProxy implements AdoptionPort {
         reject,
         timer,
       });
-      try { this.send(message); }
+      try { sender(message); }
       catch (error) {
         clearTimeout(timer);
         this.pending.delete(requestId);
@@ -135,6 +174,7 @@ export class RemoteAdoptionPortProxy implements AdoptionPort {
   }
 
   subscribeRealtime(listener: (envelope: RealtimeInvalidateEnvelope) => void): () => void {
+    requireThat(!this.disposed, this.disposeCode);
     this.realtimeListeners.add(listener);
     return () => { this.realtimeListeners.delete(listener); };
   }

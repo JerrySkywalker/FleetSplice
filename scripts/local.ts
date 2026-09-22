@@ -20,20 +20,21 @@ const onceExit = (child: ChildProcess, timeout: number) => new Promise<boolean>(
   child.once('exit', () => { clearTimeout(timer); resolve(true); });
   child.once('error', () => { clearTimeout(timer); resolve(false); });
 });
-export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing; hostIdentity?: Pick<Target, 'hostId' | 'hostGeneration' | 'environmentId' | 'environmentGeneration'>; enrollment?: EdgeConfig['enrollment'] };
+export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing; hostIdentity?: Pick<Target, 'hostId' | 'hostGeneration' | 'environmentId' | 'environmentGeneration'>; enrollment?: EdgeConfig['enrollment']; /** Deployment carriage is explicit: listener bind never becomes public identity. */ transport?: Pick<HubConfig, 'deployment' | 'listener'> & Pick<EdgeConfig, 'hcpUrl' | 'testTlsCaPem'> };
 
 // Internal lifecycle primitive. G05B starts it only from the detached local
 // supervisor after all no-effect qualification has passed.
 export async function launch(root: string, executable: string, port = 43155, options: LaunchOptions = {}) {
   const productPath = options.productPath ?? 'NATIVE_ADOPTION';
   const runtimeSharing = options.runtimeSharing ?? defaultRuntimeSharing();
+  const environment = { ...(options.environment ?? process.env) };
   requireThat(process.version === 'v24.20.0' && process.versions.sqlite === '3.53.4', 'NODE_RUNTIME_UNQUALIFIED');
   requireThat(Number.isInteger(port) && port > 1024 && port < 65536, 'INVALID_PORT');
   const identity = await localIdentity(root);
   const target: Target = { authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: options.hostIdentity?.hostId ?? randomUUID(), hostGeneration: options.hostIdentity?.hostGeneration ?? '1', environmentId: options.hostIdentity?.environmentId ?? randomUUID(), environmentGeneration: options.hostIdentity?.environmentGeneration ?? '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: identity.rootIdentity, agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() };
-  const workspaces = await workspaceBindings(identity.root, { principal: identity.principal, sid: identity.sid }, target);
+  const workspaces = await workspaceBindings(identity.root, { principal: identity.principal, sid: identity.sid }, target, environment);
   const installation = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const base = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'G05');
+  const base = path.join(environment.LOCALAPPDATA!, 'FleetSplice', 'G05');
   mkdirSync(base, { recursive: true });
   // User-only evidence boundary. Control tokens never cross argv, logs, journals, or browser URLs.
   execFileSync('icacls.exe', [base, '/inheritance:r', '/grant:r', `*${identity.sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F'], { windowsHide: true, stdio: 'ignore' });
@@ -56,7 +57,7 @@ export async function launch(root: string, executable: string, port = 43155, opt
   durableWrite(path.join(directory, 'admission.json'), { runId, target, identity, workspaces, policy: 'windows-user.read-only', nativeContinuity: 'ephemeral-private-stdio', node: process.version, sqlite: process.versions.sqlite });
   await options.onGuardCommitted?.(guard);
   const hcpToken = randomBytes(32).toString('hex'); const bootstrapToken = randomBytes(32).toString('hex');
-  const env = { ...(options.environment ?? process.env) };
+  const env = environment;
   for (const key of Object.keys(env)) if (/FLEETSPLICE|BOOTSTRAP|HCP_TOKEN/i.test(key)) delete env[key];
   const hubEnv = Object.fromEntries(Object.entries(env).filter(([key]) => ['SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'PATH', 'PATHEXT', 'COMSPEC', 'LOCALAPPDATA', 'USERPROFILE', 'APPDATA', 'COMPUTERNAME', 'USERNAME'].includes(key.toUpperCase())));
   const start = (file: string, childEnv: NodeJS.ProcessEnv): ChildProcess => fork(file, [], { cwd: installation, env: childEnv, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
@@ -75,7 +76,8 @@ export async function launch(root: string, executable: string, port = 43155, opt
   const startEdge = async (enrollment?: EdgeConfig['enrollment']) => {
     const child = start(path.join(installation, 'apps/edge/main.js'), env); observeEdge(child);
     const edgeReady = wait(child, 'edgeReady');
-    child.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, enrollment, workspaces, productPath, runtimeSharing } satisfies EdgeConfig);
+    child.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, enrollment, workspaces, productPath, runtimeSharing,
+      hcpUrl: options.transport?.hcpUrl, testTlsCaPem: options.transport?.testTlsCaPem } satisfies EdgeConfig);
     await edgeReady; return child;
   };
   const awaitHubDetach = () => {
@@ -91,7 +93,7 @@ export async function launch(root: string, executable: string, port = 43155, opt
   try {
     hub = start(path.join(installation, 'apps/hub/server.js'), hubEnv);
     const hubReady = wait(hub, 'hubListening');
-    hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, durableStateDirectory: path.join(base, 'hub-state'), webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken, workspaces,
+    hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, durableStateDirectory: path.join(base, 'hub-state'), webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken, workspaces, deployment: options.transport?.deployment, listener: options.transport?.listener,
       ...(productPath === 'NATIVE_ADOPTION' ? { adoptionCarriage: { kind: 'REMOTE_ADOPTION' as const, target, send: () => { throw new Error('HCP_NOT_CONNECTED'); } } } : {}) } satisfies HubConfig);
     await hubReady;
     edge = await startEdge(options.enrollment);
@@ -134,7 +136,8 @@ export async function launch(root: string, executable: string, port = 43155, opt
     await closeEdge(prior, detached);
     edge = await startEdge(enrollment);
   };
-  return { url: `http://127.0.0.1:${port}/#bootstrap=${bootstrapToken}`, origin: `http://127.0.0.1:${port}`, directory, runId, target, identity, productPath, runtimeObservation: () => runtimeObservation, setRuntimeSharing, replaceEdgeWithEnrollment, stop, health };
+  const origin = options.transport?.deployment?.publicBaseUrl ?? `http://127.0.0.1:${port}`;
+  return { url: `${origin}/#bootstrap=${bootstrapToken}`, origin, directory, runId, target, identity, productPath, runtimeObservation: () => runtimeObservation, setRuntimeSharing, replaceEdgeWithEnrollment, stop, health };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -17,6 +17,18 @@ versioned, non-secret endpoint data.
 Only the explicit `LOOPBACK` profile permits HTTP/WS, and it must use
 `localhost`, `127.0.0.1`, or `[::1]`. All other profiles require HTTPS/WSS.
 
+## Gateway listener binding
+
+The Gateway listener is configured separately from its public identity. A
+deployment supplies a physical bind host/port and, for every non-loopback
+profile, already-provisioned TLS key/certificate material. FleetSplice derives
+Host, Origin and discovery endpoints from the deployment profile rather than
+from the bind address. It never creates DNS records, certificates, OIDC
+applications or a reverse-proxy configuration. Agents use the explicit (or
+discovered) HCP URL; a non-loopback `ws://` endpoint is rejected. Normal TLS
+verification remains enabled. A test may inject an ephemeral CA explicitly,
+but that is not a production trust default.
+
 ## Advanced endpoint overrides
 
 An advanced profile may override API, realtime, HCP, login, or enrollment URLs

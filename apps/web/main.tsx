@@ -101,7 +101,7 @@ function App() {
     return () => events?.close();
   }, []);
   useEffect(() => { timeline.current?.scrollTo({ top: timeline.current.scrollHeight }); }, [snapshot?.cursor]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!catalogVersion || catalogSeen.current === catalogVersion) return;
     const catalog = snapshot?.capabilities!; const priorModel = selectedModel; const priorReasoning = selectedReasoning;
     catalogSeen.current = catalogVersion;
@@ -146,7 +146,8 @@ function App() {
     // A new P1 native thread also needs a live model/reasoning selection. Keep
     // the explicit guidance pending while the Owner refreshes that catalog.
     if (!lane.nativeThreadId && !configurationSelected) return;
-    if (available && !continueButton.current?.disabled) requestAnimationFrame(() => continueButton.current?.focus());
+    const button = continueButton.current;
+    if (available && button && !button.disabled) button.focus();
     setFocusLane(null);
   }, [focusLane, busy, controlled, available, configurationSelected, pending, lane?.laneId, snapshot?.status]);
   function acknowledgeRejection(e: unknown, value: FleetCommand): boolean {

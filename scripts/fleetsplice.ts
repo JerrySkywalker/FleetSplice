@@ -10,7 +10,8 @@ import { readRegistry, changeRegistry, workspaceValidity } from '../packages/wor
 import { readCeiling, writeCeiling, PRESETS } from '../packages/permissions/index.ts';
 import type { PermissionPreset } from '../packages/contracts/index.ts';
 import { AGENT_IPC_VERSION, type AgentIpcCommand } from '../packages/agent-ipc/index.ts';
-import { candidateCodexPaths, classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverCodex, discoverNode, G05B_OWNER_RETIREMENT_RUN, G05C_P1_OWNER_RETIREMENT_RUNS, guardPath, networkPreflight, proxyConfigurationRequired, readUserProxyConfiguration, resolveExplicitProxy, resolveProxy, retireOwnerAuthorizedUnknown, retireOwnerAuthorizedUnprovable, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration, type Guard, type Predecessor, type UserProxyConfiguration } from '../packages/local-operation/index.ts';
+import { discoverDaemon } from '../packages/native-adoption/discovery.ts';
+import { classifyPredecessor, clearUserProxyConfiguration, closeSafePredecessor, discoverNode, G05B_OWNER_RETIREMENT_RUN, G05C_P1_OWNER_RETIREMENT_RUNS, guardPath, networkPreflight, proxyConfigurationRequired, readUserProxyConfiguration, resolveExplicitProxy, resolveProxy, retireOwnerAuthorizedUnknown, retireOwnerAuthorizedUnprovable, userProxyConfigPath, verifyLocalEndpointAvailability, writeUserProxyConfiguration, type Guard, type Predecessor, type UserProxyConfiguration } from '../packages/local-operation/index.ts';
 
 const base = () => path.join(process.env.LOCALAPPDATA ?? '', 'FleetSplice', 'G05');
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -70,7 +71,8 @@ async function preflight(root: string) {
   if (registry) requireThat(registry.entries.some(e => e.root === workspaceIdentity.root && e.rootIdentity === workspaceIdentity.rootIdentity), 'WORKSPACE_MISSING_OR_REPLACED');
   const identity = await localIdentity(root);
   const node = discoverNode([process.execPath]);
-  const codex = discoverCodex(candidateCodexPaths());
+  const native = discoverDaemon();
+  const codex = { path: native.executablePath!, version: native.reportedVersion ?? 'unknown', sha256: native.sha256 };
   const installation = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const supervisorLauncher = path.resolve(installation, '..', 'scripts', 'start-supervisor.ps1');
   const requiredBuild = [
@@ -136,7 +138,7 @@ async function status(readOnly = true) {
   const configuration = readUserProxyConfiguration(); const proxy = resolveProxy(process.env, undefined, undefined, configuration);
   let runtime = 'UNQUALIFIED', runtimePath = 'UNQUALIFIED', codex = 'UNQUALIFIED', codexHash = 'UNQUALIFIED';
   try { const qualified = discoverNode([process.execPath]); runtime = `${qualified.version} / SQLite ${qualified.sqlite}`; runtimePath = qualified.path; } catch { /* shown in status */ }
-  try { const qualified = discoverCodex(candidateCodexPaths()); codex = `${qualified.version} / ${qualified.path}`; codexHash = qualified.sha256; } catch { /* shown in status */ }
+  try { const qualified = discoverDaemon(); codex = `${qualified.reportedVersion ?? 'unknown'} / ${qualified.executablePath ?? 'UNQUALIFIED'}`; codexHash = qualified.sha256 ?? 'UNQUALIFIED'; } catch { /* shown in status */ }
   if (predecessor.guard?.state === 'RUNNING') {
     try { const state = await control('status'); const guard = currentGuard()!; output(`FleetSplice: ${state.code}\nHost: SKYFORGE-01\nPrincipal: ${guard.identity.principal}\nElevated: ${guard.identity.elevated}\nWorkspace: ${guard.identity.root}\nSupervisor: ${state.supervisor}\nHub: ${state.hub}\nEdge: ${state.edge}\nEdge admission: ${state.edgeAdmission}\nNative Codex: ${state.nativeCodex}\nGuard: ${guard.state}\nRun: ${state.runId}\nNode: ${state.nodeVersion} / SQLite ${state.sqliteVersion}\nNode path: ${state.runtimePath}\nCodex: ${state.codexPath}\nCodex SHA-256: ${state.codexSha256}\nProxy: ${state.proxy}\nProxy source: ${state.proxySource}\nNetwork preflight: PASS\n${describeProxyConfiguration(configuration).join('\n')}`); return; } catch { /* Stale RUNNING is handled below. */ }
   }
@@ -146,7 +148,7 @@ async function status(readOnly = true) {
 }
 async function doctor(root: string) {
   let node = 'UNQUALIFIED', nodePath = 'UNQUALIFIED', codex = 'UNQUALIFIED', codexHash = 'UNQUALIFIED'; try { const qualified = discoverNode([process.execPath]); node = `${qualified.version} / SQLite ${qualified.sqlite}`; nodePath = qualified.path; } catch { /* shown below */ }
-  try { const qualified = discoverCodex(candidateCodexPaths()); codex = `${qualified.version} / ${qualified.path}`; codexHash = qualified.sha256; } catch { /* shown below */ }
+  try { const qualified = discoverDaemon(); codex = `${qualified.reportedVersion ?? 'unknown'} / ${qualified.executablePath ?? 'UNQUALIFIED'}`; codexHash = qualified.sha256 ?? 'UNQUALIFIED'; } catch { /* shown below */ }
   const configuration = readUserProxyConfiguration(); const proxy = resolveProxy(process.env, undefined, undefined, configuration); const predecessor = classifyPredecessor(base());
   output(`FleetSplice Doctor (read-only)\nRuntime: ${node}\nRuntime path: ${nodePath}\nCodex: ${codex}\nCodex SHA-256: ${codexHash}\nWorkspace: ${root}\nProxy: ${proxy.display ?? 'direct'}\nProxy source: ${proxy.source}\nNetwork preflight: NOT_RUN_READ_ONLY\n${describeProxyConfiguration(configuration).join('\n')}\nCurrent guard: ${predecessor.guard?.state ?? 'NONE'}\nProcess conflicts: ${predecessor.conflicts.length}\nSafe automatic closure: ${['SAFE_NO_EFFECT', 'SAFE_TERMINAL'].includes(predecessor.kind)}\nExplicit Owner retirement required: ${predecessor.kind === 'AMBIGUOUS_TERMINAL'}`);
   describePredecessor(predecessor).forEach(output);
@@ -238,11 +240,12 @@ export async function fleetspliceEntrypoint() {
       if (operation === 'config' && args[2] === 'get' && args.length === 3) { output(code(await control('config.get'))); return; }
       if (operation === 'config' && args[2] === 'set' && args.length === 4) { output(code(await control('config.set', { gatewayUrl: args[3] === 'none' ? null : args[3] }))); return; }
       if (operation === 'runtimes' && args.length === 2) { output(code(await control('runtime.list'))); return; }
+      if (operation === 'runtimes' && ['pause', 'resume'].includes(args[2] ?? '') && args.length === 3) { output(code(await control('runtime.setSharing', { action: args[2] }))); return; }
       if (operation === 'runtimes' && args[2] === 'sharing' && args.length === 4) { output(code(await control('runtime.setSharing', JSON.parse(args[3]!)))); return; }
       if (operation === 'diagnostics' && args.length === 2) { output(code(await control('diagnostics'))); return; }
       if (operation === 'drain' && args.length === 2) { output(code(await control('drain'))); return; }
     } catch { error('AGENT_IPC_UNAVAILABLE'); return; }
-    error('USAGE: fleetsplice agent status|config get|config set <gateway-url|none>|runtimes [sharing <json>]|diagnostics|drain'); return;
+    error('USAGE: fleetsplice agent status|config get|config set <gateway-url|none>|runtimes [pause|resume|sharing <json>]|diagnostics|drain'); return;
   }
   if (command === 'doctor') return await doctor(workspace);
   if (command === 'retire-stale') return retire(args);

@@ -54,7 +54,8 @@ export async function launch(root: string, executable: string, port = 43155, opt
   const guard: Guard = { state: 'RUNNING', runId, target, identity, workspaces, nativeExitObserved: false, quiescent: false };
   // Runtime commit point: no native process exists before this durable guard.
   durableWrite(currentGuard, guard);
-  durableWrite(path.join(directory, 'admission.json'), { runId, target, identity, workspaces, policy: 'windows-user.read-only', nativeContinuity: 'ephemeral-private-stdio', node: process.version, sqlite: process.versions.sqlite });
+  durableWrite(path.join(directory, 'admission.json'), { runId, target, identity, workspaces, policy: 'windows-user.read-only', productPath,
+    nativeContinuity: productPath === 'NATIVE_ADOPTION' ? 'shared-daemon-adopted' : 'ephemeral-private-stdio', node: process.version, sqlite: process.versions.sqlite });
   await options.onGuardCommitted?.(guard);
   const hcpToken = randomBytes(32).toString('hex'); const bootstrapToken = randomBytes(32).toString('hex');
   const env = environment;

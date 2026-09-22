@@ -40,6 +40,9 @@ test('product Gateway serves declared HTTPS/WSS identity while binding separatel
 });
 
 test('Edge endpoint rejects public cleartext and preserves strict TLS verification', () => {
+  const local = resolveEdgeHcpEndpoint({ port: 43155 });
+  assert.equal(local.url, 'ws://127.0.0.1:43155/hcp/v1/connect');
+  assert.equal(local.options.origin, 'http://127.0.0.1:43155');
   assert.throws(() => resolveEdgeHcpEndpoint({ port: 43155, hcpUrl: 'ws://fleet.example/hcp/v1/connect' }), /EDGE_HCP_ENDPOINT_MUST_BE_WSS/);
   assert.throws(() => resolveEdgeHcpEndpoint({ port: 43155, hcpUrl: 'ws://localhost/hcp/v1/connect', testTlsCaPem: 'test' }), /EDGE_TEST_TLS_CA_REQUIRES_WSS/);
   const endpoint = resolveEdgeHcpEndpoint({ port: 43155, hcpUrl: 'wss://fleet.example/hcp/v1/connect' });

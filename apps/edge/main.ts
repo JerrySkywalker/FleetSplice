@@ -17,7 +17,10 @@ import { signEnrollmentChallenge, type HostEnrollmentPrivateMaterial } from '../
 export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; hcpUrl?: string; /** Explicit S10-only trust injection; production relies on normal OS trust. */ testTlsCaPem?: string; enrollment?: HostEnrollmentPrivateMaterial; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
 
 export function resolveEdgeHcpEndpoint(config: Pick<EdgeConfig, 'port' | 'hcpUrl' | 'testTlsCaPem'>) {
-  const value = config.hcpUrl ?? `ws://localhost:${config.port}/hcp/v1/connect`;
+  // The product Hub's default loopback origin is 127.0.0.1. Keep the Edge
+  // default byte-for-byte aligned; explicit public HTTPS/WSS endpoints retain
+  // their configured host and origin.
+  const value = config.hcpUrl ?? `ws://127.0.0.1:${config.port}/hcp/v1/connect`;
   let url: URL;
   try { url = new URL(value); } catch { throw new Fault('EDGE_HCP_ENDPOINT_INVALID'); }
   const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';

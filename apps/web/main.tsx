@@ -138,7 +138,7 @@ function App() {
   const configurationSelected = !!chosenModel && chosenModel.supportedReasoningEfforts.some(item => item.reasoningEffort === selectedReasoning) && permissions.some(item => item.preset === selectedPermission && item.allowed);
   const receipt = snapshot?.commands.at(-1);
   // Guidance only: successful acquire focuses the separate explicit action. It never invokes it.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!focusLane || busy) return;
     if (focusLane !== lane?.laneId || snapshot?.status !== 'READY' || document.querySelector('dialog[open]')) { setFocusLane(null); return; }
     // A successful receipt can precede its observation refresh. Wait for that observation.
@@ -147,7 +147,11 @@ function App() {
     // the explicit guidance pending while the Owner refreshes that catalog.
     if (!lane.nativeThreadId && !configurationSelected) return;
     const button = continueButton.current;
-    if (available && button && !button.disabled) button.focus();
+    // This is a post-acquire accessibility contract, not a best-effort hint:
+    // commit focus in the layout phase so a concurrent observation paint cannot
+    // leave the newly enabled explicit action inactive.
+    if (!available || !button || button.disabled) return;
+    button.focus();
     setFocusLane(null);
   }, [focusLane, busy, controlled, available, configurationSelected, pending, lane?.laneId, snapshot?.status]);
   function acknowledgeRejection(e: unknown, value: FleetCommand): boolean {
@@ -180,7 +184,22 @@ function App() {
       if (family === 'logicalSession.create') setSelected(record.plan.laneId);
       if (family === 'turn.submit' && record.status === 'SUCCEEDED') setPrompt('');
       await refresh();
-      if (family === 'sessionLane.acquireControl' && record.status === 'SUCCEEDED') setFocusLane(lane?.laneId ?? null);
+      // Bind guidance to the accepted receipt, never the pre-refresh render's
+      // lane closure. The latter may still be null while React applies the
+      // observation that made Continue available.
+      if (family === 'sessionLane.acquireControl' && record.status === 'SUCCEEDED') {
+        setFocusLane(record.plan.laneId);
+        // The command receipt is authoritative, but the corresponding
+        // observation can render one frame later. Retry only a bounded number
+        // of frames to place keyboard guidance on the explicit next action.
+        let frames = 0;
+        const focusContinue = () => {
+          const button = continueButton.current;
+          if (button && !button.disabled) { button.focus(); return; }
+          if (++frames < 8) requestAnimationFrame(focusContinue);
+        };
+        requestAnimationFrame(focusContinue);
+      }
     } catch (e) {
       if (acknowledgeRejection(e, value)) await refresh();
       else setError({ key: 'commandUncertain', code: errorCode(e) });

@@ -5,7 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat } from '../packages/contracts/index.ts';
-import { classifyPredecessor, discoverCodex, evidenceFromEdge, probeProcess, resolveProxy, type Guard, type ProxyResolution } from '../packages/local-operation/index.ts';
+import { classifyPredecessor, evidenceFromEdge, probeProcess, resolveProxy, type Guard, type ProxyResolution } from '../packages/local-operation/index.ts';
+import { discoverDaemon } from '../packages/native-adoption/discovery.ts';
 import { launch } from './local.ts';
 import { AGENT_IPC_MAX_BYTES, AGENT_IPC_VERSION, parseAgentIpcRequest, validateAgentConfiguration, type AgentConfiguration, type AgentIpcRequest, type AgentRuntimeProjection } from '../packages/agent-ipc/index.ts';
 import { defaultRuntimeSharing, runtimeRegistry, updateSharing, validateRuntimeSharing, type RuntimeSharing } from '../packages/agent-runtime/index.ts';
@@ -32,7 +33,8 @@ export async function supervisorEntrypoint() {
   const root = option('--workspace'); const executable = option('--codex');
   requireThat(typeof root === 'string' && typeof executable === 'string', 'SUPERVISOR_USAGE');
   const identity = await localIdentity(root!);
-  const qualifiedCodex = discoverCodex([executable!]);
+  const qualifiedCodex = discoverDaemon();
+  requireThat(qualifiedCodex.executablePath?.toLowerCase() === path.resolve(executable!).toLowerCase(), 'NATIVE_DAEMON_EXECUTABLE_CHANGED');
   const base = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'G05');
   const predecessor = classifyPredecessor(base);
   requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
@@ -76,14 +78,19 @@ export async function supervisorEntrypoint() {
         let nativeCodex = 'NOT_STARTED';
         if (run?.productPath === 'NATIVE_ADOPTION') nativeCodex = 'NATIVE_ADOPTED';
         else if (run) try { const native = evidenceFromEdge(path.join(run.directory, 'edge.sqlite')); if (native.process) { const observed = probeProcess(native.process.processId); nativeCodex = observed.exists && observed.identity?.creationTime === native.process.creationTime ? 'RUNNING' : 'EXITED_OR_REUSED'; } } catch { nativeCodex = 'UNPROVABLE'; }
-        await reply(socket, { v: AGENT_IPC_VERSION, code: run ? supervisorHealthCode(health, nativeCodex) : 'STARTING', runId: run?.runId ?? null, supervisor: 'RUNNING', hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', edgeAdmission: health?.edgeAdmission ?? 'STARTING', nativeCodex, runtimePath: process.execPath, nodeVersion: process.version, sqliteVersion: process.versions.sqlite, codexPath: qualifiedCodex.path, codexSha256: qualifiedCodex.sha256, proxy: activeProxy.display ?? 'direct', proxySource: activeProxy.source, configuration, ...(run ? { url: run.url } : {}) }); return;
+        await reply(socket, { v: AGENT_IPC_VERSION, code: run ? supervisorHealthCode(health, nativeCodex) : 'STARTING', runId: run?.runId ?? null, supervisor: 'RUNNING', hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', edgeAdmission: health?.edgeAdmission ?? 'STARTING', nativeCodex, runtimePath: process.execPath, nodeVersion: process.version, sqliteVersion: process.versions.sqlite, codexPath: qualifiedCodex.executablePath, codexSha256: qualifiedCodex.sha256, proxy: activeProxy.display ?? 'direct', proxySource: activeProxy.source, configuration, ...(run ? { url: run.url } : {}) }); return;
       }
       if (request.command === 'config.get') { await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', configuration }); return; }
       if (request.command === 'config.set') { try { configuration = validateAgentConfiguration(request.body); persistAgent(); await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', configuration }); } catch (error) { await reply(socket, { v: AGENT_IPC_VERSION, code: error instanceof Error ? error.message : 'AGENT_CONFIGURATION_INVALID' }); } return; }
       if (request.command === 'runtime.list') { await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', runtimes: runtimes() }); return; }
       if (request.command === 'runtime.setSharing') {
         try {
-          const next = updateSharing(sharing, request.body); requireThat(!!run, 'RUNTIME_SHARING_UNAVAILABLE');
+          const action = request.body?.action;
+          requireThat(action === undefined || action === 'pause' || action === 'resume', 'RUNTIME_SHARING_INVALID');
+          // The installed .cmd launcher cannot portably preserve JSON quoting
+          // through every Windows shell.  These two narrow actions retain the
+          // already-admitted scope instead of asking the user to retype it.
+          const next = action === 'pause' ? { ...sharing, shared: false } : action === 'resume' ? { ...sharing, shared: true } : updateSharing(sharing, request.body); requireThat(!!run, 'RUNTIME_SHARING_UNAVAILABLE');
           await run.setRuntimeSharing(next); sharing = next; persistAgent();
           await reply(socket, { v: AGENT_IPC_VERSION, code: 'OK', sharing, runtimes: runtimes(), evidence: 'Sharing changed through the admitted Edge; discovery remains observation-only.' });
         } catch (error) { await reply(socket, { v: AGENT_IPC_VERSION, code: error instanceof Error ? error.message : 'RUNTIME_SHARING_INVALID' }); }

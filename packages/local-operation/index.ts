@@ -399,6 +399,39 @@ function readableFleetSpliceJournal(file: string): boolean {
     } finally { db.close(); }
   } catch { return false; }
 }
+type LifecycleJournal = { file: string; kind: 'LEGACY_MANAGED' | 'NATIVE_ADOPTION' };
+/**
+ * A native-adoption Edge talks to a shared daemon, so its journal intentionally
+ * differs from the historical managed-child journal.  Its compatibility probe
+ * is observation-only: it may prove the daemon and protocol, but cannot have
+ * admitted a FleetSplice native effect.  Anything beyond those exact records
+ * stays a recovery boundary.
+ */
+function nativeAdoptionHasOnlyObservationEvidence(file: string): boolean {
+  try {
+    const rows = readEvidence(file);
+    return rows.length > 0 && rows.every(row => row.kind === 'NATIVE_COMPATIBILITY' && typeof row.key === 'string' && row.key.length > 0 &&
+      !!row.value && typeof row.value === 'object' && typeof (row.value as any).identity?.endpointIdentity === 'string' &&
+      typeof (row.value as any).identity?.executablePath === 'string' && !!(row.value as any).compatibility && typeof (row.value as any).compatibility === 'object');
+  } catch { return false; }
+}
+function lifecycleJournal(base: string, guard: Guard): LifecycleJournal | null {
+  const directory = path.join(base, guard.runId);
+  const legacy = path.join(directory, 'edge.sqlite'); const adopted = path.join(directory, 'native-edge.sqlite');
+  let productPath: unknown;
+  try { productPath = safeJson<{ productPath?: unknown }>(path.join(directory, 'admission.json')).productPath; } catch { return null; }
+  // A run owns exactly one Edge evidence format.  Never let a new declaration
+  // hide an additional historical journal.
+  if (existsSync(legacy) && existsSync(adopted)) return null;
+  if (productPath === 'NATIVE_ADOPTION') return existsSync(adopted) ? { file: adopted, kind: 'NATIVE_ADOPTION' } : null;
+  if (productPath === 'LEGACY_MANAGED_LOCAL_ONLY') return existsSync(legacy) ? { file: legacy, kind: 'LEGACY_MANAGED' } : null;
+  // Pre-declaration native-adoption records are recognized only by their
+  // unambiguous one-journal footprint; all other old records retain legacy
+  // handling or fail closed.
+  if (productPath === undefined && !existsSync(legacy) && existsSync(adopted)) return { file: adopted, kind: 'NATIVE_ADOPTION' };
+  if (productPath === undefined && existsSync(legacy) && !existsSync(adopted)) return { file: legacy, kind: 'LEGACY_MANAGED' };
+  return null;
+}
 function classifyEvidence(guard: Guard, evidence: NativeEvidence, process: (processId: number) => ProcessProbe, conflicts: ProcessProbe[]): Predecessor {
   const matchingConflicts = conflicts.filter(item => item.exists);
   if (matchingConflicts.length) return { kind: 'LIVE_OR_CONFLICTING', guard, evidence, exactNativeExitProven: false, conflicts: matchingConflicts, reason: 'FLEETSPLICE_PROCESS_PRESENT' };
@@ -487,9 +520,14 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
   if (guard.state === 'RETIRED_UNPROVABLE') return retiredUnprovablePredecessor(base, guard, process, conflicts);
   if (!guardIsSound(guard, base)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'GUARD_OR_ADMISSION_MISMATCH' };
   if (!readableFleetSpliceJournal(path.join(base, guard.runId, 'hub.sqlite'))) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'HUB_JOURNAL_UNPROVABLE' };
-  if (!readableFleetSpliceJournal(path.join(base, guard.runId, 'edge.sqlite'))) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_JOURNAL_UNPROVABLE' };
+  const journal = lifecycleJournal(base, guard);
+  if (!journal || !readableFleetSpliceJournal(journal.file)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_JOURNAL_UNPROVABLE' };
+  if (journal.kind === 'NATIVE_ADOPTION') {
+    if (!nativeAdoptionHasOnlyObservationEvidence(journal.file)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_EFFECT_EVIDENCE_UNPROVABLE' };
+    return { kind: 'SAFE_NO_EFFECT', guard, evidence: emptyEvidence(), exactNativeExitProven: true, conflicts: [], reason: 'NATIVE_ADOPTION_COMPATIBILITY_ONLY' };
+  }
   let evidence: NativeEvidence;
-  try { evidence = evidenceFromEdge(path.join(base, guard.runId, 'edge.sqlite')); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_EVIDENCE_UNREADABLE' }; }
+  try { evidence = evidenceFromEdge(journal.file); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_EVIDENCE_UNREADABLE' }; }
   return classifyEvidence(guard, evidence, process, conflicts);
 }
 

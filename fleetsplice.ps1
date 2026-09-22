@@ -6,6 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $candidates = @(
+  (Join-Path $PSScriptRoot 'runtime\node.exe'),
   (Join-Path $env:LOCALAPPDATA 'FleetSplice\runtime\node-v24.20.0-win-x64\node.exe'),
   (Join-Path $env:LOCALAPPDATA 'FleetSplice\toolcache\node-v24.20.0-win-x64\node.exe'),
   (Join-Path $env:LOCALAPPDATA 'Programs\nodejs\node.exe'),

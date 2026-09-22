@@ -74,3 +74,7 @@ GATE_S=OWNER_PRODUCTION_DEPLOYMENT_ADMISSION_REQUIRED
 
 The full-suite managed-pin debt above remains visible in the final package; it
 is not erased, waived, or represented as an S11 regression fix.
+
+PASS token: `PASS_PGS_S11_INSTALLER_DOGFOOD_CLOSEOUT`
+
+Train terminal token: `PASS_PRE_GATE_S_TRAIN_OWNER_DEPLOYMENT_ADMISSION_REQUIRED`

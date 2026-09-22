@@ -1,4 +1,5 @@
 import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, sign, verify, createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { Fault, requireThat } from '../contracts/json.ts';
 
 export type HostEnrollmentIdentity = {
@@ -37,6 +38,18 @@ export const ephemeralFileCustody: DpapiCustodyAdapter = {
   protect: plaintext => Buffer.from(plaintext),
   unprotect: blob => Buffer.from(blob),
 };
+
+const dpapi = (operation: 'Protect' | 'Unprotect', value: Buffer): Buffer => {
+  requireThat(process.platform === 'win32', 'WINDOWS_DPAPI_UNAVAILABLE');
+  const script = `$ErrorActionPreference='Stop';Add-Type -AssemblyName System.Security;$b=[Convert]::FromBase64String([Console]::In.ReadToEnd().Trim());$r=[System.Security.Cryptography.ProtectedData]::${operation}($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($r))`;
+  try {
+    const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { input: value.toString('base64'), encoding: 'utf8', windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    return Buffer.from(output, 'base64');
+  } catch { throw new Fault('WINDOWS_DPAPI_CUSTODY_FAILED'); }
+};
+
+/** Windows CurrentUser DPAPI; plaintext enters PowerShell only through stdin. */
+export const windowsCurrentUserDpapiCustody: DpapiCustodyAdapter = { protect: value => dpapi('Protect', value), unprotect: value => dpapi('Unprotect', value) };
 
 export function fingerprintSpkiPem(publicKeySpkiPem: string): string {
   return createHash('sha256').update(publicKeySpkiPem).digest('hex');

@@ -20,7 +20,7 @@ const onceExit = (child: ChildProcess, timeout: number) => new Promise<boolean>(
   child.once('exit', () => { clearTimeout(timer); resolve(true); });
   child.once('error', () => { clearTimeout(timer); resolve(false); });
 });
-export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
+export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing; hostIdentity?: Pick<Target, 'hostId' | 'hostGeneration' | 'environmentId' | 'environmentGeneration'>; enrollment?: EdgeConfig['enrollment'] };
 
 // Internal lifecycle primitive. G05B starts it only from the detached local
 // supervisor after all no-effect qualification has passed.
@@ -30,7 +30,7 @@ export async function launch(root: string, executable: string, port = 43155, opt
   requireThat(process.version === 'v24.20.0' && process.versions.sqlite === '3.53.4', 'NODE_RUNTIME_UNQUALIFIED');
   requireThat(Number.isInteger(port) && port > 1024 && port < 65536, 'INVALID_PORT');
   const identity = await localIdentity(root);
-  const target: Target = { authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: randomUUID(), hostGeneration: '1', environmentId: randomUUID(), environmentGeneration: '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: identity.rootIdentity, agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() };
+  const target: Target = { authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: options.hostIdentity?.hostId ?? randomUUID(), hostGeneration: options.hostIdentity?.hostGeneration ?? '1', environmentId: options.hostIdentity?.environmentId ?? randomUUID(), environmentGeneration: options.hostIdentity?.environmentGeneration ?? '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: identity.rootIdentity, agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() };
   const workspaces = await workspaceBindings(identity.root, { principal: identity.principal, sid: identity.sid }, target);
   const installation = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const base = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'G05');
@@ -91,10 +91,10 @@ export async function launch(root: string, executable: string, port = 43155, opt
   try {
     hub = start(path.join(installation, 'apps/hub/server.js'), hubEnv);
     const hubReady = wait(hub, 'hubListening');
-    hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken, workspaces,
+    hub.send({ port, target, root: identity.root, sid: identity.sid, principal: identity.principal, sessionId: identity.sessionId, stateDirectory: directory, durableStateDirectory: path.join(base, 'hub-state'), webDirectory: path.join(installation, 'web'), hcpToken, bootstrapToken, workspaces,
       ...(productPath === 'NATIVE_ADOPTION' ? { adoptionCarriage: { kind: 'REMOTE_ADOPTION' as const, target, send: () => { throw new Error('HCP_NOT_CONNECTED'); } } } : {}) } satisfies HubConfig);
     await hubReady;
-    edge = await startEdge();
+    edge = await startEdge(options.enrollment);
   } catch (error) {
     // Browser command admission has not been exposed: there can be no native effect.
     if (edge?.connected) edge.send({ kind: 'stop' }); if (hub?.connected) hub.send({ kind: 'stop' });

@@ -4,6 +4,7 @@ import { fingerprintSpkiPem, HostEnrollmentRegistry, issueEnrollmentChallenge, v
 
 export type DeviceEnrollmentRequest = { requestId: string; hostName: string; requestedAt: number; identity: HostEnrollmentIdentity; state: 'PENDING' | 'APPROVED' | 'REVOKED' };
 export type DeviceProjection = { requestId: string; hostName: string; hostId: string; publicFingerprint: string; enrollmentGeneration: string; state: 'PENDING' | 'APPROVED' | 'REVOKED'; requestedAt: number; lastSeen: string | null; runtimeSharing: 'UNKNOWN' };
+export type DurableDeviceEnrollmentState = { v: 1; records: DeviceEnrollmentRequest[] };
 
 const label = (value: unknown) => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 80 && !/[\u0000-\u001f\u007f]/.test(value);
 const identity = (value: unknown): HostEnrollmentIdentity => {
@@ -21,6 +22,19 @@ export class DeviceEnrollmentService {
   private readonly enrollment = new HostEnrollmentRegistry();
   private readonly challenges = new Map<string, EnrollmentChallenge>();
   private readonly connected = new Set<string>();
+
+  constructor(state?: DurableDeviceEnrollmentState) {
+    if (!state) return;
+    requireThat(state.v === 1 && Array.isArray(state.records), 'DURABLE_IDENTITY_STORE_INVALID');
+    for (const record of state.records) {
+      requireThat(typeof record.requestId === 'string' && /^[0-9a-f-]{36}$/.test(record.requestId) && label(record.hostName) && Number.isInteger(record.requestedAt) && ['PENDING', 'APPROVED', 'REVOKED'].includes(record.state), 'DURABLE_IDENTITY_STORE_INVALID');
+      const enrolled = identity(record.identity); this.records.set(record.requestId, { requestId: record.requestId, hostName: record.hostName, requestedAt: record.requestedAt, identity: enrolled, state: record.state });
+    }
+    for (const record of this.records.values()) if (record.state === 'APPROVED') this.enrollment.enroll(record.identity);
+    for (const record of this.records.values()) if (record.state === 'REVOKED') this.enrollment.revoke(record.identity);
+  }
+
+  durableState(): DurableDeviceEnrollmentState { return { v: 1, records: [...this.records.values()].map(value => structuredClone(value)) }; }
   request(value: unknown, now = Date.now()): DeviceEnrollmentRequest {
     requireThat(!!value && typeof value === 'object' && !Array.isArray(value), 'DEVICE_ENROLLMENT_INVALID'); const item = value as Record<string, unknown>;
     requireThat(Object.keys(item).sort().join(',') === 'hostName,identity' && label(item.hostName), 'DEVICE_ENROLLMENT_INVALID');
@@ -39,7 +53,7 @@ export class DeviceEnrollmentService {
     const value = this.records.get(requestId); requireThat(!!value, 'DEVICE_ENROLLMENT_NOT_FOUND'); return structuredClone(value);
   }
   issueChallenge(hostId: string, now = Date.now()): EnrollmentChallenge {
-    const device = [...this.records.values()].find(value => value.identity.hostId === hostId && value.state === 'APPROVED'); requireThat(device, 'HOST_NOT_ENROLLED');
+    const device = [...this.records.values()].find(value => value.identity.hostId === hostId); requireThat(device, 'HOST_NOT_ENROLLED');
     this.enrollment.requireActive(device.identity); const challenge = issueEnrollmentChallenge(device.identity, now); this.challenges.set(challenge.challengeId, challenge); return structuredClone(challenge);
   }
   admitProof(hostId: string, proof: EnrollmentProof, now = Date.now()) {

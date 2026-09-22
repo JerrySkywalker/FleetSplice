@@ -14,9 +14,10 @@ import { gatewayAdoptionPort, type GatewayAdoptionCarriage } from '../../package
 import { resolveDeploymentProfile, type DeploymentProfileInput } from '../../packages/deployment/index.ts';
 import { GenericOidcAuthenticator, type HumanPrincipal, type OidcProviderConfig } from '../../packages/oidc/index.ts';
 import { DeviceEnrollmentService } from '../../packages/device-enrollment/index.ts';
+import { DurableIdentityStore } from '../../packages/durable-identity/index.ts';
 
 export type HubAuthConfig = { mode: 'LOOPBACK_BOOTSTRAP' } | { mode: 'OIDC'; provider: OidcProviderConfig };
-export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[]; adoptionCarriage?: GatewayAdoptionCarriage; deployment?: DeploymentProfileInput; auth?: HubAuthConfig };
+export type HubConfig = { port: number; target: Target; root: string; sid: string; principal: string; sessionId: number; stateDirectory: string; durableStateDirectory?: string; webDirectory: string; hcpToken: string; bootstrapToken: string; workspaces?: WorkspaceBinding[]; adoptionCarriage?: GatewayAdoptionCarriage; deployment?: DeploymentProfileInput; auth?: HubAuthConfig };
 const equalSecret = (a: string, b: string) => {
   const left = Buffer.from(a); const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
@@ -26,7 +27,18 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   const origin = `http://127.0.0.1:${config.port}`; const host = `127.0.0.1:${config.port}`;
   const deployment = resolveDeploymentProfile(config.deployment ?? { kind: 'LOOPBACK', publicBaseUrl: origin });
   const oidc = config.auth?.mode === 'OIDC' ? new GenericOidcAuthenticator(config.auth.provider) : null;
-  const devices = new DeviceEnrollmentService();
+  const authorityStore = new DurableIdentityStore(path.join(config.durableStateDirectory ?? config.stateDirectory, 'gateway-authority.json'), value => {
+    const item = value as { v?: unknown; configurationDigest?: unknown; ownerId?: unknown }; requireThat(item?.v === 1 && typeof item.configurationDigest === 'string' && /^[0-9a-f]{64}$/.test(item.configurationDigest) && (item.ownerId === null || typeof item.ownerId === 'string'), 'DURABLE_IDENTITY_STORE_INVALID'); return item as { v: 1; configurationDigest: string; ownerId: string | null };
+  });
+  const configurationDigest = createHash('sha256').update(canonical({ deployment: deployment.discovery, auth: config.auth ?? { mode: 'LOOPBACK_BOOTSTRAP' } })).digest('hex');
+  const restoredAuthority = authorityStore.read();
+  if (restoredAuthority) requireThat(restoredAuthority.configurationDigest === configurationDigest, 'DURABLE_IDENTITY_CONFIG_MISMATCH');
+  const persistAuthority = (ownerId: string | null) => authorityStore.write({ v: 1 as const, configurationDigest, ownerId });
+  const deviceStore = new DurableIdentityStore(path.join(config.durableStateDirectory ?? config.stateDirectory, 'device-identities.json'), value => {
+    const item = value as { v?: unknown; records?: unknown }; requireThat(item?.v === 1 && Array.isArray(item.records), 'DURABLE_IDENTITY_STORE_INVALID'); return item as import('../../packages/device-enrollment/index.ts').DurableDeviceEnrollmentState;
+  });
+  const devices = new DeviceEnrollmentService(deviceStore.read() ?? undefined);
+  const persistDevices = () => deviceStore.write(devices.durableState());
   const cookieName = oidc && deployment.kind !== 'LOOPBACK' ? '__Host-fleetsplice' : 'fleetsplice';
   const actorId = randomUUID();
   const sessions = new Map<string, { expiresAt: number; idleExpiresAt: number; principal: HumanPrincipal }>();
@@ -138,7 +150,8 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
       }
       if (req.method === 'GET' && req.url?.startsWith('/auth/oidc/callback?')) {
         requireThat(oidc, 'OIDC_NOT_CONFIGURED'); const url = new URL(req.url, origin); const principal = await oidc.complete({ state: url.searchParams.get('state') ?? '', code: url.searchParams.get('code') ?? '' });
-        const existing = [...sessions.values()][0]?.principal; requireThat(!existing || existing.id === principal.id, 'OIDC_OWNER_ADMISSION_REJECTED');
+        const existing = restoredAuthority?.ownerId ?? [...sessions.values()][0]?.principal.id; requireThat(!existing || existing === principal.id, 'OIDC_OWNER_ADMISSION_REJECTED');
+        persistAuthority(principal.id);
         const opened = openSession(principal); res.writeHead(302, { Location: '/', 'Set-Cookie': opened.cookie }); res.end(); return;
       }
       if (req.method === 'POST' && req.url === '/api/bootstrap') {
@@ -151,7 +164,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
       if (req.method === 'POST' && req.url === '/api/devices/enroll') {
         // A device can create only a pending public-key request. Human session
         // approval happens separately and no OIDC token ever reaches this route.
-        const requested = devices.request(await body(req), now()); json(res, 202, { requestId: requested.requestId, state: requested.state, publicFingerprint: requested.identity.publicFingerprint }); return;
+        const requested = devices.request(await body(req), now()); persistDevices(); json(res, 202, { requestId: requested.requestId, state: requested.state, publicFingerprint: requested.identity.publicFingerprint }); return;
       }
       if (req.method === 'GET' && /^\/api\/devices\/[0-9a-f-]{36}\/status$/.test(req.url ?? '')) {
         const requestId = /^\/api\/devices\/([0-9a-f-]{36})\/status$/.exec(req.url!)![1]!;
@@ -196,7 +209,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         if (req.method === 'POST' && /^\/api\/devices\/[0-9a-f-]{36}\/(approve|revoke)$/.test(req.url ?? '')) {
           grant(req); requireThat(canonical(await body(req)) === '{}', 'SCHEMA_INVALID');
           const match = /^\/api\/devices\/([0-9a-f-]{36})\/(approve|revoke)$/.exec(req.url!)!;
-          const device = match[2] === 'approve' ? devices.approve(match[1]!) : devices.revoke(match[1]!); json(res, 200, { requestId: device.requestId, state: device.state }); return;
+          const device = match[2] === 'approve' ? devices.approve(match[1]!) : devices.revoke(match[1]!); persistDevices(); json(res, 200, { requestId: device.requestId, state: device.state }); return;
         }
         if (req.method === 'POST' && req.url === '/api/client/renew') {
           // Authenticate again after reading the body; a concurrent rotation cannot

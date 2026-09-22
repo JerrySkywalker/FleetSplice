@@ -21,6 +21,15 @@ test('Gateway enrollment requires explicit approval and never receives a private
   assert.equal(service.projections()[0]!.lastSeen, 'CONNECTED_NOW'); assert.equal(service.revoke(requested.requestId).state, 'REVOKED');
 });
 
+test('public enrollment generation and revocation survive a durable state restore', () => {
+  const material = generateHostEnrollmentKey({ fleetId: 'fleet', hostId: 'host', environmentId: 'env', enrollmentGeneration: '1' });
+  const service = new DeviceEnrollmentService(); const requested = service.request({ hostName: 'SKYFORGE-01', identity: { fleetId: material.fleetId, hostId: material.hostId, environmentId: material.environmentId, enrollmentGeneration: material.enrollmentGeneration, publicKeySpkiPem: material.publicKeySpkiPem, publicFingerprint: material.publicFingerprint } });
+  service.approve(requested.requestId); const restored = new DeviceEnrollmentService(service.durableState());
+  const challenge = restored.issueChallenge(material.hostId); restored.admitProof(material.hostId, signEnrollmentChallenge(material, challenge));
+  restored.revoke(requested.requestId); const revoked = new DeviceEnrollmentService(restored.durableState());
+  assert.throws(() => revoked.issueChallenge(material.hostId), /ENROLLMENT_REVOKED/);
+});
+
 test('approved device completes the Gateway HCP challenge without a bootstrap bearer', async () => {
   const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve)); const port = (probe.address() as { port: number }).port; await new Promise<void>(resolve => probe.close(() => resolve()));
   const target: Target = { authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: randomUUID(), hostGeneration: '1', environmentId: randomUUID(), environmentGeneration: '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: 'a'.repeat(64), agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() };

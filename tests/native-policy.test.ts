@@ -23,9 +23,10 @@ test('native policy disables every inherited MCP name and rejects unqualified in
   assert.throws(() => integrationPolicy({ ...response, config: { ...response.config, agents: { enabled: true } } }), /NATIVE_AGENTS_NOT_DISABLED/);
 });
 
-test('pinned native binary suppresses inherited integrations, notify and image tools, with a final effect gate', { timeout: 90000 }, async () => {
+test('pinned native binary suppresses inherited integrations, notify and image tools, with a final effect gate', { timeout: 90000 }, async context => {
+  const fixture = managedNativeFixture(context); if (!fixture) return;
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-native-policy-'));
-  const executable = managedNativeFixture().path;
+  const executable = fixture.path;
   const worker = fileURLToPath(new URL('./native-policy-worker.js', import.meta.url));
   const results: Record<string, unknown> = {};
   for (const scenario of ['suppressed', 'control']) {

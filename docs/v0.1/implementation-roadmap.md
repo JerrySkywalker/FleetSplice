@@ -12,7 +12,8 @@ and the [closeout receipt](../train/receipts/G05C-native-control-closeout.md).
 `NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK`, `G06_STARTED=true`,
 `G06_PHASE=PREDEPLOY_LOCAL_COMPLETE`, `G06_PREDEPLOY_READY=true`,
 `TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY`,
-`G06_LIVE_ACCEPTANCE=false`, and `PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE`.
+`G06_LIVE_ACCEPTANCE=false`. Current bounded implementation authorization and
+the later Pre-Gate-S S11 closeout are maintained only in [current status](../train/current-status.md).
 Older intermediate execution states are retained in the linked history and
 confer no current authority.
 
@@ -95,7 +96,7 @@ service/protocol and no phone-to-development-host inbound listening port. The
 Edge initiates the remote connection and provider credentials remain local by
 default. Target host identity remains `tencent-pek-01` when deployment is later
 authorized. Current gate:
-`TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY`.
+see [current status](../train/current-status.md) and the Gate S decision package.
 
 Remote enrollment/auth, ZenBook, full history, ACP, Admin/WSL, TUI, provider
 migration, generic helper breadth, AuthorityAnchor or G10 policy cannot become

@@ -121,8 +121,8 @@ export async function startEdge(config: EdgeConfig) {
   const kernel = new EdgeKernel(journal, config.target, native, async () => {
     const root = await rootProof(identity.root);
     requireThat(root.rootIdentity === identity.rootIdentity, 'WORKSPACE_REPLACED');
-    // Parent/child token identity is immutable for these non-elevated processes.
-    requireThat(process.env.COMPUTERNAME === 'SKYFORGE-01', 'WRONG_HOST');
+    // Parent/child token identity was proved at admission and is immutable for
+    // these non-elevated processes; hostname labels are not authority.
   }, event => { try { send({ ...envelope, kind: 'event', event }); } catch { kernel.connected = false; } }, async () => {
     requireThat(native.pid, 'NATIVE_PROCESS_UNKNOWN'); const proof = principalProof(native.pid);
     requireThat(proof.sid === identity.sid && proof.sessionId === identity.sessionId && !proof.elevated, 'NATIVE_PRINCIPAL_REJECTED');

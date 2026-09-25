@@ -1,9 +1,13 @@
 # Pre-Gate-S Development Train
 
-The accepted product baseline is the G06 predeploy night-train head
+This train completed locally through S11. See [current status](current-status.md)
+and the immutable [S11 receipt](receipts/PGS-S11-installer-dogfood-closeout.md).
+Gate S remains unadmitted. The following sequence records the train's scope.
+
+The starting product baseline was the G06 predeploy night-train head
 `221e326bc74be1d9ae680e373d9fd40be1631ca3`.
 
-The next product-development train is
+The completed local product-development train is
 [FLEETSPLICE-PRE-GATE-S-DEVELOPMENT-TRAIN-001](../../goals/FLEETSPLICE-PRE-GATE-S-DEVELOPMENT-TRAIN-001.md).
 
 Its purpose is to turn the proven G06 remote primitives into a complete

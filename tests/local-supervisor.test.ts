@@ -1,5 +1,4 @@
 import test from 'node:test';
-import { managedNativeFixture } from './managed-native-fixture.ts';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -7,7 +6,8 @@ import { createConnection } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { candidateCodexPaths, discoverCodex } from '../packages/local-operation/index.ts';
+import { discoverDaemon } from '../packages/native-adoption/discovery.ts';
+import { AGENT_IPC_VERSION } from '../packages/agent-ipc/index.ts';
 import { fleetspliceEntrypoint } from '../scripts/fleetsplice.ts';
 import { supervisorEntrypoint, supervisorHealthCode } from '../scripts/supervisor.ts';
 
@@ -26,7 +26,7 @@ async function control(detail: ControlFile, command: 'status' | 'stop'): Promise
     const socket = createConnection(detail.pipe); let response = ''; const timer = setTimeout(() => { socket.destroy(); reject(new Error('CONTROL_TIMEOUT')); }, 10000);
     socket.setEncoding('utf8'); socket.once('error', error => { clearTimeout(timer); reject(error); }); socket.on('data', value => { response += value; });
     socket.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(response)); } catch { reject(new Error('CONTROL_RESPONSE_INVALID')); } });
-    socket.on('connect', () => socket.write(`${JSON.stringify({ token: detail.token, command })}\n`));
+    socket.on('connect', () => socket.write(`${JSON.stringify({ v: AGENT_IPC_VERSION, token: detail.token, command })}\n`));
   });
 }
 
@@ -56,11 +56,13 @@ test('broker rejects and removes a corrupt private bootstrap before any task can
   assert.notEqual(result.status, 0); assert.equal(existsSync(bootstrap), false); assert.equal(existsSync(path.join(bootstrapDirectory, 'environment-guard.json')), false);
 });
 
-test('detached supervisor keeps one local writer, serves a second terminal, and only closes after proven shutdown', async () => {
+test('detached supervisor keeps one local writer, serves a second terminal, and only closes after proven shutdown', {
+  skip: process.env.FLEETSPLICE_NATIVE_SUPERVISOR_TEST === '1' ? false : 'Requires opt-in FLEETSPLICE_NATIVE_SUPERVISOR_TEST=1 and a qualified ordinary native daemon; a historical managed pin cannot qualify the current supervisor.',
+}, async () => {
   assert.equal(typeof supervisorEntrypoint, 'function');
   const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-supervisor-appdata-'));
   const workspace = mkdtempSync(path.join(tmpdir(), 'fleetsplice-supervisor-workspace-'));
-  const executable = managedNativeFixture().path;
+  const executable = discoverDaemon().executablePath!;
   const supervisor = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'supervisor.js');
   const supervisorLauncher = path.join(process.cwd(), 'scripts', 'start-supervisor.ps1');
   const env = { ...process.env, LOCALAPPDATA: localAppData };
@@ -77,7 +79,7 @@ test('detached supervisor keeps one local writer, serves a second terminal, and 
       return JSON.parse(readFileSync(path.join(localAppData, 'FleetSplice', 'G05', guard.runId, 'control.json'), 'utf8')) as ControlFile;
     }, 'supervisor control publication');
     const first = await eventually(async () => { const state = await control(detail!, 'status'); assert.equal(state.code, 'RUNNING'); return state; }, 'first healthy control status');
-    assert.equal(first.code, 'RUNNING'); assert.equal(first.hub, 'RUNNING'); assert.equal(first.edge, 'RUNNING'); assert.equal(first.edgeAdmission, 'READY'); assert.equal(first.nativeCodex, 'NOT_STARTED');
+    assert.equal(first.code, 'RUNNING'); assert.equal(first.hub, 'RUNNING'); assert.equal(first.edge, 'RUNNING'); assert.equal(first.edgeAdmission, 'READY'); assert.equal(first.nativeCodex, 'NATIVE_ADOPTED');
     assert.equal(first.runtimePath, process.execPath); assert.equal(first.codexPath, executable); assert.equal(first.codexSha256.length, 64); assert.equal(first.proxy, 'http://127.0.0.1:7890'); assert.equal(first.proxySource, 'explicit-env');
     assert.equal(existsSync(bootstrap), false, 'proxy handoff is consumed before the supervisor runtime begins');
     const taskXml = spawnSync('schtasks.exe', ['/Query', '/TN', taskName, '/XML'], { encoding: 'utf8', windowsHide: true }); assert.equal(taskXml.status, 0); assert.doesNotMatch(`${taskXml.stdout}${taskXml.stderr}`, new RegExp(proxySecret));

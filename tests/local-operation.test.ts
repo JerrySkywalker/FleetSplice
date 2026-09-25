@@ -71,9 +71,25 @@ test('stale permission rejection closes safely but malformed and ambiguous resul
   }
 });
 
-test('exact Node and native Codex discovery retain the accepted pins', () => {
+test('repository Node discovery retains its qualified runtime', () => {
   const node = discoverNode([process.execPath]); assert.equal(node.version, 'v24.20.0'); assert.equal(node.sqlite, '3.53.4');
-  const codex = managedNativeFixture(); assert.match(codex.path, /codex\.exe$/i); assert.equal(codex.version, '0.153.4'); assert.equal(codex.sha256.length, 64);
+});
+test('explicit historical managed Codex fixture retains the accepted pin', context => {
+  const codex = managedNativeFixture(context); if (!codex) return;
+  assert.match(codex.path, /codex\.exe$/i); assert.equal(codex.version, '0.153.4'); assert.equal(codex.sha256.length, 64);
+});
+test('managed fixture absence skips explicitly while supplied unqualified artifacts fail closed', () => {
+  const reasons: string[] = []; const context = { skip: (reason?: string) => { reasons.push(reason ?? ''); } };
+  assert.equal(managedNativeFixture(context, {}), null); assert.equal(reasons.length, 1);
+  assert.match(reasons[0]!, /FLEETSPLICE_MANAGED_TEST_CODEX/);
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-unqualified-codex-'));
+  const executable = path.join(directory, 'codex.exe'); writeFileSync(executable, 'not a qualified native artifact');
+  for (const fixture of ['', path.join(directory, 'missing.exe'), executable]) {
+    assert.throws(() => managedNativeFixture(context, { FLEETSPLICE_MANAGED_TEST_CODEX: fixture }), /CODEX_ARTIFACT_UNQUALIFIED/);
+  }
+  assert.equal(reasons.length, 1, 'invalid explicit fixtures never become skips');
+  assert.throws(() => discoverCodex([]), /CODEX_ARTIFACT_UNQUALIFIED/);
+  assert.throws(() => discoverCodex([executable]), /CODEX_ARTIFACT_UNQUALIFIED/);
 });
 test('persistent proxy configuration is private, atomic, fail-closed, and has the required precedence', async () => {
   const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-proxy-config-'));

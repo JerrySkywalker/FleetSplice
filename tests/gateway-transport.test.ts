@@ -5,7 +5,7 @@ import { request } from 'node:https';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createPrivateKey, randomBytes, randomUUID, X509Certificate } from 'node:crypto';
 import { WebSocket } from 'ws';
 import { startHub } from '../apps/hub/server.ts';
 import { resolveEdgeHcpEndpoint } from '../apps/edge/main.ts';
@@ -13,6 +13,18 @@ import { createEphemeralTlsMaterial } from '../packages/remote-transport/index.t
 import type { Target } from '../packages/contracts/index.ts';
 
 const target = (): Target => ({ authorityId: randomUUID(), hubRuntimeId: randomUUID(), edgeRuntimeId: randomUUID(), connectionId: randomUUID(), hubRecoveryGeneration: '1', edgeRecoveryGeneration: '1', hostId: randomUUID(), hostGeneration: '1', environmentId: randomUUID(), environmentGeneration: '1', workspaceId: randomUUID(), workspaceGeneration: '1', rootIdentity: 'a'.repeat(64), agentBindingId: randomUUID(), executionBindingId: randomUUID(), providerBindingId: randomUUID() });
+
+test('local TLS material is fresh, uniquely keyed and restricted to localhost', () => {
+  const first = createEphemeralTlsMaterial(), second = createEphemeralTlsMaterial();
+  assert.notEqual(first.keyPem, second.keyPem);
+  const cert = new X509Certificate(first.certPem);
+  assert.ok(Date.parse(cert.validFrom) <= Date.now());
+  assert.ok(Date.parse(cert.validTo) > Date.now());
+  assert.equal(cert.checkHost('localhost'), 'localhost');
+  assert.equal(cert.checkHost('fleet.example'), undefined);
+  assert.equal(cert.checkPrivateKey(createPrivateKey(first.keyPem)), true);
+  assert.throws(() => createEphemeralTlsMaterial('fleet.example'), /EPHEMERAL_TLS_HOSTNAME_FIXED_FOR_FIXTURE/);
+});
 
 async function vacantPort() {
   const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));

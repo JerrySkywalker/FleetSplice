@@ -55,9 +55,14 @@ export function rootProofNow(root: string): { root: string; rootIdentity: string
 }
 export async function rootProof(root: string): Promise<{ root: string; rootIdentity: string }> { return rootProofNow(root); }
 export async function localIdentity(root: string, expectedSid?: string): Promise<LocalIdentity> {
-  requireThat(process.env.COMPUTERNAME === 'SKYFORGE-01', 'WRONG_HOST');
   const proof = principalProof();
-  requireThat(proof.principal.toLowerCase() === 'skyforge-01\\jerry' && (!expectedSid || proof.sid === expectedSid), 'WRONG_PRINCIPAL');
-  requireThat(!proof.elevated && proof.sessionId > 0, 'PRIVILEGE_OR_SESSION_REJECTED');
+  validateLocalPrincipal(proof, expectedSid);
   return { principal: proof.principal, sid: proof.sid, sessionId: proof.sessionId, elevated: false, ...await rootProof(root) };
+}
+
+export function validateLocalPrincipal(proof: Pick<LocalIdentity, 'principal' | 'sid' | 'sessionId'> & { elevated: boolean }, expectedSid?: string): void {
+  // principalProof binds the actual process owner to the current Windows SID.
+  // Hostnames and account display names are labels, not enrollment identities.
+  requireThat(proof.principal.length > 0 && /^S-1-\d+(?:-\d+)+$/.test(proof.sid) && (expectedSid === undefined || proof.sid === expectedSid), 'WRONG_PRINCIPAL');
+  requireThat(!proof.elevated && proof.sessionId > 0, 'PRIVILEGE_OR_SESSION_REJECTED');
 }

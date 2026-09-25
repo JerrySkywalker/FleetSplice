@@ -15,7 +15,9 @@ Read these current pointers before changing the repository:
 - Normative G04A amendment: `docs/architecture/amendments/g04a-visible-mvp-simplification.md`.
 - G05B-R1 correction receipt: `docs/train/receipts/G05B-R1-persistent-proxy.md`.
 
-Current authorization state:
+The current readiness and bounded authorization are maintained in
+`docs/train/current-status.md`. The following is the historical G06 predeploy
+authorization snapshot, preceding the Pre-Gate-S and ZenBook14 local trains:
 
 ```text
 ARCHITECTURE_0_1_READY=true

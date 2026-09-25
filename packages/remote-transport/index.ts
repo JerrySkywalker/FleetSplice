@@ -1,6 +1,8 @@
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
 import { X509Certificate } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { WebSocketServer, WebSocket, type ClientOptions } from 'ws';
 import { requireThat } from '../contracts/json.ts';
@@ -11,19 +13,27 @@ export type EphemeralTlsMaterial = {
   certPem: string;
 };
 
-const fixtureDir = path.resolve(process.cwd(), 'packages/remote-transport/fixtures');
-
 /**
- * Local/test TLS only. Loads disposable fixture material generated for overnight
- * predeploy tests. Never production certificate evidence.
+ * Local/test TLS only. Fresh, explicitly trusted localhost material prevents
+ * historical fixture expiry from changing test results. Requires OpenSSL on
+ * PATH; never installs trust or creates production certificates.
  */
 export function createEphemeralTlsMaterial(hostname = 'localhost'): EphemeralTlsMaterial {
   requireThat(hostname === 'localhost', 'EPHEMERAL_TLS_HOSTNAME_FIXED_FOR_FIXTURE');
-  return {
-    hostname,
-    keyPem: readFileSync(path.join(fixtureDir, 'key.pem'), 'utf8'),
-    certPem: readFileSync(path.join(fixtureDir, 'cert.pem'), 'utf8'),
-  };
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-local-test-tls-'));
+  const key = path.join(directory, 'key.pem'), cert = path.join(directory, 'cert.pem');
+  const config = path.join(directory, 'openssl.cnf');
+  try {
+    writeFileSync(config, '[req]\ndistinguished_name=dn\n[dn]\n', { mode: 0o600 });
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2',
+      '-config', config,
+      '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost',
+      '-keyout', key, '-out', cert], { windowsHide: true, stdio: 'pipe', timeout: 20000 });
+    return { hostname, keyPem: readFileSync(key, 'utf8'), certPem: readFileSync(cert, 'utf8') };
+  } finally {
+    for (const file of [key, cert, config]) if (existsSync(file)) unlinkSync(file);
+    rmdirSync(directory);
+  }
 }
 
 export type RemoteWssProfile = {

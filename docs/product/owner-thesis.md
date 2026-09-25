@@ -136,9 +136,10 @@ Known debts do not individually reopen G05C. Accelerated renewal testing does
 not prove unattended wall-clock endurance: a real 2–4h+ soak is required before
 final G06/v0.1 release acceptance.
 
-G06 remains unstarted and requires a separate Owner authorization plus Tencent
-server readiness (`TENCENT_DEPLOYMENT_GATE=DEFERRED_SERVER_NOT_READY`, target
-`tencent-pek-01`). It reuses the already-proven control surface and already-
+G06 local predeploy is complete; live deployment requires separate Owner
+admission and Tencent readiness (target `tencent-pek-01`). See
+[current status](../train/current-status.md) for the later Pre-Gate-S closeout
+and bounded local requalification authority. G06 reuses the proven control surface and
 accepted responsive Web/mobile UI through Tencent Hub + WebUI and authenticated
 outbound WSS. It should not invent native control semantics or re-implement
 mobile UI for the first time. No new capability is authorized by this promotion.

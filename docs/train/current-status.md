@@ -1,19 +1,16 @@
 # Current FleetSplice development status
 
 Architecture 0.1 is accepted. G06 predeploy local implementation and the
-Pre-Gate-S S00-S11 train are complete locally. The controlling handoff is
-`78c6d08bc1feead8496cea85a3ec52b3e2a0d4a1`; the older root/main checkout is not
-the implementation baseline. The [S11 receipt](receipts/PGS-S11-installer-dogfood-closeout.md)
-and its terminal tokens supersede earlier pre-S11 readiness wording. Historical
-receipts remain unchanged, including S11's 274-pass/3-fail managed-pin debt.
-
-The Owner's `FLEETSPLICE-ZENBOOK14-REQUALIFICATION-EXTERNAL-DAEMON-BLOCKER-CLOSEOUT-001`
-bounded the review and closeout of the preserved local source/test/documentation
-repairs, non-daemon gates, Gate S preparation and one PR on
-`train/zenbook14-local-requalify-gate-s-prep-001`.
-It did not authorize merge, production mutations, deployment or G07. Near-term
-UI/UX remains frozen. The G05C freeze below is historical product provenance,
-not the current implementation HEAD.
+Pre-Gate-S S00-S11 train are complete locally. Independently reviewed PR #11
+head `1658f89027b283db2941d76346b0482e965d1657` was merged into
+`train/pre-gate-s-development-001` at
+`a659eec21e4828a55e9210b9a3b88c08ab507b9a`. The previous controlling
+handoff `78c6d08bc1feead8496cea85a3ec52b3e2a0d4a1` is historical ancestry,
+not the current implementation head. The [S11 receipt](receipts/PGS-S11-installer-dogfood-closeout.md)
+and its terminal tokens remain historical evidence, including S11's
+274-pass/3-fail managed-pin debt. Near-term UI/UX remains frozen. The G05C
+freeze below is historical product provenance, not the current implementation
+head.
 
 ```text
 ARCHITECTURE_0_1_READY=true
@@ -29,6 +26,8 @@ NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK
 G06_STARTED=true
 G06_PHASE=PREDEPLOY_LOCAL_COMPLETE
 G06_PREDEPLOY_READY=true
+CURRENT_IMPLEMENTATION_HEAD=a659eec21e4828a55e9210b9a3b88c08ab507b9a
+PR11_MERGED=true
 TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY
 TENCENT_TARGET=tencent-pek-01
 TENCENT_DEPLOYED=false
@@ -38,11 +37,17 @@ V0_1_ALPHA_1_RELEASED=false
 PRE_GATE_S_IMPLEMENTATION_COMPLETE=true
 PRE_GATE_S_S11=COMPLETED_LOCALLY
 GATE_S=OWNER_PRODUCTION_DEPLOYMENT_ADMISSION_REQUIRED
+GATE_S_ADMITTED=false
 G07_STARTED=false
 IMPLEMENTATION_AUTHORIZED=NONE
 PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
-NEXT_OWNER_DECISION=GATE_S_ADMISSION_INPUTS_AND_ACCEPTANCE_POLICY
+NEXT_ACTION=FLEETSPLICE-GATE-S-PRODUCTION-READINESS-AUDIT
+ZENBOOK14_ROLE=PRIMARY_DEVELOPMENT
 ZENBOOK14_S10_STATUS=BLOCKED_EXTERNAL_CODEX_MANAGED_DAEMON_UNAVAILABLE
+FIRST_LIVE_G06_EDGE=SKYFORGE-01
+SKYFORGE_FRESH_QUALIFICATION_REQUIRED=true
+HUMAN_AUTH_CONTRACT=GENERIC_OIDC
+PRODUCTION_IDP=OWNER_SELECTED_CANDIDATE_PENDING_CONFIGURATION:CASDOOR
 ```
 
 Historical native-control closeout evidence remains at
@@ -57,8 +62,10 @@ Authoritative product pointers:
 - [Implementation roadmap](../v0.1/implementation-roadmap.md)
 - [G05C closeout receipt](receipts/G05C-native-control-closeout.md)
 - G06 remote Adoption seam: [ADR 0007](../adr/0007-remote-native-adoption-hcp.md)
-- [Gate S decision package](gate-s-admission-package.md): unresolved production
-  inputs, generic OIDC versus passkey acceptance, and first live G06 Edge.
+- [Gate S decision package](gate-s-admission-package.md): Owner auth and Edge
+  decisions recorded; production inputs remain unresolved.
+- [First-live-G06 OIDC amendment](../architecture/amendments/gate-s-g06-human-oidc.md):
+  the narrow normative replacement for historical passkey-specific wording.
 - UI portability freeze artifacts:
   `V:\artifacts\FleetSplice\FLEETSPLICE-G05C-UI-PORTABILITY-FREEZE-FINAL-001`
 - Final promotion hygiene artifacts:
@@ -94,7 +101,16 @@ an unqualified portability question, not evidence of a FleetSplice product
 regression on this host. Discovery and native identity/capability checks remain
 fail-closed; fixture tests cannot substitute for real same-thread acceptance.
 
-Earlier SKYFORGE S10 results remain historical evidence, not ZenBook14 results.
-This local closeout is neither Tencent deployment nor live G06 acceptance. The
-[Gate S package](gate-s-admission-package.md) leaves the first live Edge and
-production OIDC acceptance for an explicit Owner decision.
+Earlier SKYFORGE S10 results remain historical evidence, not ZenBook14 or live
+G06 acceptance. SKYFORGE-01 is the Owner-selected first live G06 Edge; it needs
+fresh qualification of native runtime, principal, workspace, outbound path and
+availability before enrollment or deployment. ZenBook14 remains the primary
+development machine. The two machines must not share copied credentials or
+authority state. This is one-Edge G06 planning, not G07 or two-host operation.
+
+The Owner selected generic OIDC for first live G06 and Casdoor as the first
+production IdP candidate, pending configuration and independent readiness
+audit. No production IdP application or secret is created by this decision.
+The next action is `FLEETSPLICE-GATE-S-PRODUCTION-READINESS-AUDIT`, not
+production deployment. Tencent remains undeployed, Gate S unadmitted, and
+live G06 acceptance unrun.

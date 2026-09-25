@@ -1,6 +1,7 @@
 import { Fault, requireThat } from '../contracts/index.ts';
 
 export type DeploymentProfileKind = 'LOOPBACK' | 'LAN' | 'PUBLIC_HTTPS' | 'PRIVATE_OVERLAY';
+/** Runtime profile resolution is separate from offline Gate S admission v2. */
 export type DeploymentProfileInput = {
   kind: DeploymentProfileKind;
   publicBaseUrl: string;

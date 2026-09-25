@@ -95,8 +95,10 @@ remote WSS. G06 uses Tencent Hub + WebUI; there is no separate FleetSplice Relay
 service/protocol and no phone-to-development-host inbound listening port. The
 Edge initiates the remote connection and provider credentials remain local by
 default. Target host identity remains `tencent-pek-01` when deployment is later
-authorized. Current gate:
-see [current status](../train/current-status.md) and the Gate S decision package.
+authorized. The completed production-readiness audit is
+`BLOCKED_INFRASTRUCTURE_NOT_READY`. See [current status](../train/current-status.md)
+and the [Gate S decision package](../train/gate-s-admission-package.md) for the
+active v2 admission draft, offline validator and later external gate sequence.
 
 Remote enrollment/auth, ZenBook, full history, ACP, Admin/WSL, TUI, provider
 migration, generic helper breadth, AuthorityAnchor or G10 policy cannot become

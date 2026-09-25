@@ -25,10 +25,17 @@ export function createEphemeralTlsMaterial(hostname = 'localhost'): EphemeralTls
   const config = path.join(directory, 'openssl.cnf');
   try {
     writeFileSync(config, '[req]\ndistinguished_name=dn\n[dn]\n', { mode: 0o600 });
-    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2',
-      '-config', config,
-      '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost',
-      '-keyout', key, '-out', cert], { windowsHide: true, stdio: 'pipe', timeout: 20000 });
+    try {
+      execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2',
+        '-config', config,
+        '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost',
+        '-keyout', key, '-out', cert], { windowsHide: true, stdio: 'pipe', timeout: 20000 });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new Error('OPENSSL_LOCAL_TEST_TLS_REQUIRED: OpenSSL on PATH is required for ephemeral localhost test TLS only');
+      }
+      throw error;
+    }
     return { hostname, keyPem: readFileSync(key, 'utf8'), certPem: readFileSync(cert, 'utf8') };
   } finally {
     for (const file of [key, cert, config]) if (existsSync(file)) unlinkSync(file);

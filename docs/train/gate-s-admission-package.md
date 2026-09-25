@@ -68,10 +68,51 @@ workspace, outbound-network and availability qualification is required before
 enrollment/deployment. Do not copy credentials or authority state between the
 machines. This decision does not start G07 or constitute two-host operation.
 
-## Next gate: production-readiness audit
+## Current sequence after the readiness audit
 
-The next action is `FLEETSPLICE-GATE-S-PRODUCTION-READINESS-AUDIT`, not
-deployment. A later bounded audit must independently inspect:
+The Owner reported the completed readiness audit disposition as
+`BLOCKED_INFRASTRUCTURE_NOT_READY`. Local implementation can continue, but this
+does not make production infrastructure ready or authorize deployment.
+
+The active machine-readable draft is
+[Gate S admission v2](gate-s-admission-v2.template.json). Its resolved decision
+metadata records generic OIDC and SKYFORGE-01 while every production value
+remains `UNRESOLVED`. Historical v1 `packages/predeploy/placeholders.ts` remains
+the local predeploy invariant, including its former RP_ID field; it is not the
+active generic OIDC admission requirement. The v2 draft is the authoritative
+machine-readable production input surface for a future Gate S review. This
+human-readable package explains the evidence and ownership required for each
+field. The [admission v2 architecture amendment](../architecture/amendments/gate-s-admission-v2-offline-preflight.md)
+records that separation.
+
+Copy the v2 template to a local, untracked draft outside the repository and
+fill only values established by the Owner and later infrastructure audit. Never
+place OIDC client secrets, TLS private keys, bearer tokens or provider
+credentials in the draft. `OIDC_SECRET_CUSTODY_REFERENCE_OR_POLICY` is a
+reference such as `policy://...`, `vault://...` or `document://...`, not a
+secret. `CORS_ORIGINS` is an array of exact HTTPS origins. The offline command
+is `npm run preflight -- <path-to-admission-v2.json>`. It prints JSON findings
+and a short human summary; exit status 0 means
+`READY_FOR_EXTERNAL_INFRA_VALIDATION`, 1 means `UNRESOLVED_OWNER_INPUT`, and 2
+means `INVALID_CONFIGURATION`. This command reads only the local file. It does
+not resolve DNS, contact an IdP or Edge, issue TLS material, write production
+configuration, or admit Gate S.
+
+For local build/test prerequisites, run `npm run development:doctor`. It
+checks the qualified Node/SQLite pair, installed npm closure, Rust/Tauri,
+Playwright/Edge and OpenSSL. OpenSSL is required by ephemeral localhost test
+TLS generation only; the doctor does not make it a production FleetSplice
+runtime dependency or install it.
+
+The future sequence is: production admission draft, offline preflight, external
+infrastructure audit with evidence, then explicit Owner authorization for a
+separate deployment Goal. The completed audit's infrastructure blocker must be
+resolved before a later audit can establish production readiness. Fresh
+SKYFORGE qualification and real mobile acceptance remain separate gates.
+
+## Readiness audit checklist (historical request)
+
+The completed audit was requested to inspect:
 
 1. Tencent PEK server readiness.
 2. DNS and production hostname availability.
@@ -83,9 +124,9 @@ deployment. A later bounded audit must independently inspect:
 7. Fresh SKYFORGE Edge qualification.
 8. External/mobile acceptance device, network and window readiness.
 
-This package records no audit result or production value. Unresolved fields in
-the admission table remain placeholders until that dedicated audit obtains
-evidence and the Owner admits a later bounded deployment Goal.
+No production value is established by the reported blocked audit. Unresolved
+fields in the admission table remain placeholders until a later authorized
+audit obtains evidence and the Owner admits a bounded deployment Goal.
 
 ## Review and later admission record
 
@@ -102,7 +143,8 @@ DECISION_A=GENERIC_OIDC
 PRODUCTION_IDP=OWNER_SELECTED_CANDIDATE_PENDING_CONFIGURATION:CASDOOR
 DECISION_B=SKYFORGE-01_FIRST_LIVE_G06_EDGE
 PRODUCTION_VALUES_COMPLETE=false
-NEXT_ACTION=FLEETSPLICE-GATE-S-PRODUCTION-READINESS-AUDIT
+GATE_S_READINESS_AUDIT=BLOCKED_INFRASTRUCTURE_NOT_READY
+NEXT_EXTERNAL_GATE=PRODUCTION_INFRASTRUCTURE_PREPARED_AND_OWNER_REAUTHORIZES_GATE_S
 GATE_S=OWNER_PRODUCTION_DEPLOYMENT_ADMISSION_REQUIRED
 GATE_S_ADMITTED=false
 TENCENT_DEPLOYED=false

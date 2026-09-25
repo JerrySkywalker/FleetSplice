@@ -1,10 +1,11 @@
 # Current FleetSplice development status
 
 Architecture 0.1 is accepted. G06 predeploy local implementation and the
-Pre-Gate-S S00-S11 train are complete locally. Independently reviewed PR #11
-head `1658f89027b283db2941d76346b0482e965d1657` was merged into
+Pre-Gate-S S00-S11 train are complete locally. PR #11 was merged into
 `train/pre-gate-s-development-001` at
-`a659eec21e4828a55e9210b9a3b88c08ab507b9a`. The previous controlling
+`a659eec21e4828a55e9210b9a3b88c08ab507b9a`; PR #12 then merged the
+Owner's Gate S decisions at `552843ed36f213b80228457cd6bd0a5bf34e1117`.
+The previous controlling
 handoff `78c6d08bc1feead8496cea85a3ec52b3e2a0d4a1` is historical ancestry,
 not the current implementation head. The [S11 receipt](receipts/PGS-S11-installer-dogfood-closeout.md)
 and its terminal tokens remain historical evidence, including S11's
@@ -26,8 +27,9 @@ NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK
 G06_STARTED=true
 G06_PHASE=PREDEPLOY_LOCAL_COMPLETE
 G06_PREDEPLOY_READY=true
-CURRENT_IMPLEMENTATION_HEAD=a659eec21e4828a55e9210b9a3b88c08ab507b9a
+CURRENT_IMPLEMENTATION_HEAD=552843ed36f213b80228457cd6bd0a5bf34e1117
 PR11_MERGED=true
+PR12_MERGED=true
 TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY
 TENCENT_TARGET=tencent-pek-01
 TENCENT_DEPLOYED=false
@@ -41,7 +43,12 @@ GATE_S_ADMITTED=false
 G07_STARTED=false
 IMPLEMENTATION_AUTHORIZED=NONE
 PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
-NEXT_ACTION=FLEETSPLICE-GATE-S-PRODUCTION-READINESS-AUDIT
+LOCAL_PRODUCT_IMPLEMENTATION_READY=true
+PRE_GATE_S_LOCAL_HARDENING=PASS_WITH_DOCUMENTED_LOCAL_DEBT_PR_READY
+GATE_S_READINESS_AUDIT=BLOCKED_INFRASTRUCTURE_NOT_READY
+PRODUCTION_INFRASTRUCTURE_READY=false
+NEXT_EXTERNAL_GATE=PRODUCTION_INFRASTRUCTURE_PREPARED_AND_OWNER_REAUTHORIZES_GATE_S
+NEXT_LOCAL_WORK=INVESTIGATE_BROWSER_OBSERVATION_TEST_TIMING_UNDER_SIMULTANEOUS_LOCAL_PACKAGE_LOAD
 ZENBOOK14_ROLE=PRIMARY_DEVELOPMENT
 ZENBOOK14_S10_STATUS=BLOCKED_EXTERNAL_CODEX_MANAGED_DAEMON_UNAVAILABLE
 FIRST_LIVE_G06_EDGE=SKYFORGE-01
@@ -111,6 +118,17 @@ authority state. This is one-Edge G06 planning, not G07 or two-host operation.
 The Owner selected generic OIDC for first live G06 and Casdoor as the first
 production IdP candidate, pending configuration and independent readiness
 audit. No production IdP application or secret is created by this decision.
-The next action is `FLEETSPLICE-GATE-S-PRODUCTION-READINESS-AUDIT`, not
-production deployment. Tencent remains undeployed, Gate S unadmitted, and
-live G06 acceptance unrun.
+The Owner reported that the production-readiness audit is complete with disposition
+`BLOCKED_INFRASTRUCTURE_NOT_READY`. This is an external infrastructure gate,
+not a local product implementation blocker. Tencent remains undeployed, Gate S
+unadmitted, and live G06 acceptance unrun. The active admission draft and
+offline check are linked from the [Gate S package](gate-s-admission-package.md).
+
+The local hardening train passed post-soak serial and default-concurrency
+qualification (285 passed, 3 named skips, 0 failed in each). During overlapping
+local package compilation and fixture soak, the legacy synthetic browser test
+intermittently missed different five-second UI observation assertions. No
+consistent product root cause was proven, so no speculative browser source or
+timeout change was made. That mixed-load test timing remains a bounded local
+investigation debt; it does not imply ZenBook14 S10, live G06, or Gate S
+acceptance.

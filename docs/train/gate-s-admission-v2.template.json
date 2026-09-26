@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "decisions": {
     "HUMAN_AUTH_CONTRACT": "GENERIC_OIDC",
-    "FIRST_LIVE_EDGE": "SKYFORGE-01"
+    "FIRST_LIVE_EDGE": "ZENBOOK14"
   },
   "values": {
     "PUBLIC_HOSTNAME": "UNRESOLVED",

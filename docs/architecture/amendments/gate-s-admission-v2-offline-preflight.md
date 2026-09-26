@@ -9,7 +9,7 @@ active generic OIDC Gate S input. The active machine-readable production draft
 is `GateSAdmissionDraftV2` in `packages/predeploy/admission-v2.ts`, with an
 unresolved template at `docs/train/gate-s-admission-v2.template.json`.
 
-The draft records `GENERIC_OIDC` and `SKYFORGE-01` only as resolved Owner
+The draft records `GENERIC_OIDC` and `ZENBOOK14` only as resolved Owner
 decisions. `FIRST_LIVE_EDGE` is not a production value: offline preflight
 enforces the decision and rejects a `values.FIRST_LIVE_EDGE` override. The 21
 production infrastructure inputs start `UNRESOLVED`. The draft carries an OIDC
@@ -21,3 +21,9 @@ audit and explicit deployment authorization remain separate gates.
 
 This amendment does not change runtime identity, native qualification,
 enrollment, authority fencing, or historical receipts.
+
+The Owner's portable-host decision supersedes the earlier SKYFORGE first-live
+selection. ZenBook14 is the primary development host and first live G06 Edge;
+SKYFORGE is offline and optional. No fresh SKYFORGE qualification is required
+for Gate S or first live G06. ZenBook14 still requires real native-runtime and
+remote-path qualification before those later gates can pass.

@@ -12,7 +12,7 @@ export const GATE_S_FIELDS = [
 export type GateSField = (typeof GATE_S_FIELDS)[number];
 export const GATE_S_OWNER_DECISIONS = {
   HUMAN_AUTH_CONTRACT: 'GENERIC_OIDC',
-  FIRST_LIVE_EDGE: 'SKYFORGE-01',
+  FIRST_LIVE_EDGE: 'ZENBOOK14',
 } as const;
 export type GateSAdmissionDraftV2 = {
   schemaVersion: typeof GATE_S_ADMISSION_VERSION;

@@ -23,6 +23,7 @@ const complete = () => ({
 test('v2 draft retains explicit unresolved fields and resolved owner decisions', () => {
   const template = JSON.parse(readFileSync('docs/train/gate-s-admission-v2.template.json', 'utf8'));
   assert.deepEqual(template, createGateSAdmissionDraftV2());
+  assert.equal(template.decisions.FIRST_LIVE_EDGE, 'ZENBOOK14');
   const report = validateGateSAdmission(createGateSAdmissionDraftV2());
   assert.equal(report.category, 'UNRESOLVED_OWNER_INPUT');
   assert.equal(report.unresolved.length, 21);

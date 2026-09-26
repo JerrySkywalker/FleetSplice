@@ -43,18 +43,20 @@ PRE_GATE_S_S11=COMPLETED_LOCALLY
 GATE_S=OWNER_PRODUCTION_DEPLOYMENT_ADMISSION_REQUIRED
 GATE_S_ADMITTED=false
 G07_STARTED=false
-IMPLEMENTATION_AUTHORIZED=NONE
-PRODUCT_IMPLEMENTATION_AUTHORIZED=NONE
+IMPLEMENTATION_AUTHORIZED=FLEETSPLICE-PORTABLE-HOST-RUNTIME-TRAIN-001
+PRODUCT_IMPLEMENTATION_AUTHORIZED=FLEETSPLICE-PORTABLE-HOST-RUNTIME-TRAIN-001_P01_P06_ONLY
 LOCAL_PRODUCT_IMPLEMENTATION_READY=true
 PRE_GATE_S_LOCAL_HARDENING=PASS_WITH_DOCUMENTED_LOCAL_DEBT_PR_READY
 GATE_S_READINESS_AUDIT=BLOCKED_INFRASTRUCTURE_NOT_READY
 PRODUCTION_INFRASTRUCTURE_READY=false
 NEXT_EXTERNAL_GATE=PRODUCTION_INFRASTRUCTURE_PREPARED_AND_OWNER_REAUTHORIZES_GATE_S
-NEXT_LOCAL_WORK=INVESTIGATE_BROWSER_OBSERVATION_TEST_TIMING_UNDER_SIMULTANEOUS_LOCAL_PACKAGE_LOAD
-ZENBOOK14_ROLE=PRIMARY_DEVELOPMENT
+NEXT_LOCAL_WORK=PORTABLE_HOST_RUNTIME_TRAIN_P00_P06
+PORTABLE_HOST_RUNTIME_TRAIN=AUTHORIZED
+ZENBOOK14_ROLE=PRIMARY_DEVELOPMENT_AND_FIRST_LIVE_G06_EDGE
 ZENBOOK14_S10_STATUS=BLOCKED_EXTERNAL_CODEX_MANAGED_DAEMON_UNAVAILABLE
-FIRST_LIVE_G06_EDGE=SKYFORGE-01
-SKYFORGE_FRESH_QUALIFICATION_REQUIRED=true
+FIRST_LIVE_G06_EDGE=ZENBOOK14
+SKYFORGE_ROLE=OFFLINE_OPTIONAL_FUTURE_NODE
+SKYFORGE_FRESH_QUALIFICATION_REQUIRED=false
 HUMAN_AUTH_CONTRACT=GENERIC_OIDC
 PRODUCTION_IDP=OWNER_SELECTED_CANDIDATE_PENDING_CONFIGURATION:CASDOOR
 ```
@@ -111,10 +113,13 @@ regression on this host. Discovery and native identity/capability checks remain
 fail-closed; fixture tests cannot substitute for real same-thread acceptance.
 
 Earlier SKYFORGE S10 results remain historical evidence, not ZenBook14 or live
-G06 acceptance. SKYFORGE-01 is the Owner-selected first live G06 Edge; it needs
-fresh qualification of native runtime, principal, workspace, outbound path and
-availability before enrollment or deployment. ZenBook14 remains the primary
-development machine. The two machines must not share copied credentials or
+G06 acceptance. The Owner's portable-host decision supersedes the SKYFORGE
+first-live selection: ZenBook14 is the primary development machine and first
+live G06 Edge. SKYFORGE is an offline optional future node; fresh SKYFORGE
+qualification is not a prerequisite for this train, Gate S, first Owner dogfood,
+or first live G06 acceptance. ZenBook14 requires real native-runtime,
+principal, workspace, outbound-path and availability qualification before live
+enrollment or deployment. The machines must not share copied credentials or
 authority state. This is one-Edge G06 planning, not G07 or two-host operation.
 
 The Owner selected generic OIDC for first live G06 and Casdoor as the first

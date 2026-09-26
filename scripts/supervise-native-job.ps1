@@ -50,6 +50,7 @@ public static class FleetNativeJob {
   public static int Run(string exe, string endpoint, string cwd) {
     IntPtr job=IntPtr.Zero;
     ProcessInfo child=new ProcessInfo();
+    bool assigned=false;
     try {
       job=CreateJobObject(IntPtr.Zero,null); Check(job!=IntPtr.Zero,"CREATE_JOB_FAILED");
       ExtendedLimit limits=new ExtendedLimit(); limits.BasicLimitInformation.LimitFlags=0x00002000;
@@ -58,16 +59,25 @@ public static class FleetNativeJob {
       string listener="unix://"+endpoint.Replace('\\','/');
       StringBuilder command=new StringBuilder("\""+exe+"\" app-server --listen \""+listener+"\"");
       Check(CreateProcess(exe,command,IntPtr.Zero,IntPtr.Zero,false,0x08000004,IntPtr.Zero,cwd,ref startup,out child),"CREATE_SUSPENDED_FAILED");
-      Check(AssignProcessToJobObject(job,child.hProcess),"ASSIGN_JOB_FAILED");
+      Check(AssignProcessToJobObject(job,child.hProcess),"ASSIGN_JOB_FAILED"); assigned=true;
       Check(ResumeThread(child.hThread)!=0xffffffff,"RESUME_THREAD_FAILED");
       Console.WriteLine("PID="+child.dwProcessId); Console.Out.Flush();
       Task<string> input=Task.Factory.StartNew(() => Console.ReadLine());
       while (!input.IsCompleted && WaitForSingleObject(child.hProcess,100)!=0) { }
       return 0;
     } finally {
-      if (job!=IntPtr.Zero) CloseHandle(job);
-      if (child.hProcess!=IntPtr.Zero) { WaitForSingleObject(child.hProcess,10000); CloseHandle(child.hProcess); }
-      if (child.hThread!=IntPtr.Zero) CloseHandle(child.hThread);
+      try {
+        // CreateProcess may succeed before Job assignment fails. A suspended
+        // process outside the Job must be terminated through its exact handle.
+        if (child.hProcess!=IntPtr.Zero && !assigned && WaitForSingleObject(child.hProcess,0)!=0) {
+          Check(TerminateProcess(child.hProcess,1),"UNASSIGNED_PROCESS_TERMINATION_FAILED");
+          Check(WaitForSingleObject(child.hProcess,10000)==0,"UNASSIGNED_PROCESS_EXIT_UNPROVABLE");
+        }
+      } finally {
+        if (job!=IntPtr.Zero) CloseHandle(job);
+        if (child.hProcess!=IntPtr.Zero) { WaitForSingleObject(child.hProcess,10000); CloseHandle(child.hProcess); }
+        if (child.hThread!=IntPtr.Zero) CloseHandle(child.hThread);
+      }
     }
   }
 }

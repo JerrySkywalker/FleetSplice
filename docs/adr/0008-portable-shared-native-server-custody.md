@@ -56,7 +56,9 @@ The Agent's foreground process is held by a FleetSplice-owned Windows Job with
 parent-death window without changing Codex's installed binary or its managed
 daemon guard. The helper closes the Job on Agent stdin closure, native exit, or
 helper exit. Agent shutdown proves the exact native PID and creation time have
-ended before it releases the owner lock.
+ended before it releases the owner lock. If Windows refuses Job assignment
+after creating the suspended process, the helper terminates that exact process
+and proves its exit before releasing its handle.
 
 An observation-only predecessor can contain several native server
 incarnations after sharing pause and cold resume. Automatic safe closure proves

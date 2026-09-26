@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, rmdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { AgentSupervisedNativeServer, proveSupervisedEndpoint } from '../apps/edge/supervised-native-server.ts';
@@ -21,7 +21,8 @@ const live = () => {
   };
   const cleanup = () => {
     assert.equal(path.dirname(directory).toLowerCase(), path.resolve(process.env.LOCALAPPDATA!).toLowerCase());
-    rmdirSync(directory); rmdirSync(workspace);
+    if (existsSync(directory)) rmdirSync(directory);
+    rmdirSync(workspace);
   };
   return { options, cleanup };
 };
@@ -73,6 +74,27 @@ test('crash before readiness cleans the exact child, endpoint and owner lock', s
   assert.equal(alive(pid), false);
   assert.equal(existsSync(path.join(options.directory, 'owner.lock')), false);
   cleanup();
+});
+
+test('failed Job assignment terminates the exact suspended Codex process', skipped, () => {
+  const { options, cleanup } = live();
+  const source = readFileSync(path.join(process.cwd(), 'scripts', 'supervise-native-job.ps1'), 'utf8');
+  const assignment = 'Check(AssignProcessToJobObject(job,child.hProcess),"ASSIGN_JOB_FAILED"); assigned=true;';
+  assert.ok(source.includes(assignment));
+  const fault = source.replace(assignment, 'Console.Error.WriteLine("CREATED_PID="+child.dwProcessId); Check(false,"ASSIGN_JOB_FAILED");');
+  const script = path.join(options.workspace, 'job-assignment-fault.ps1');
+  writeFileSync(script, fault);
+  try {
+    const result = spawnSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script,
+        '-Executable', executable!, '-Endpoint', path.join(options.directory, 'fault.sock'), '-Workspace', options.workspace],
+      { encoding: 'utf8', windowsHide: true, timeout: 20000 });
+    assert.notEqual(result.status, 0);
+    const match = /CREATED_PID=(\d+)/.exec(result.stderr);
+    assert.ok(match, 'the fault ran after exact CreateProcess success');
+    assert.match(result.stderr, /ASSIGN_\s*JOB_FAILED/);
+    assert.equal(alive(Number(match[1])), false, 'the unassigned suspended child exited');
+  } finally { unlinkSync(script); cleanup(); }
 });
 
 test('forced child exit is fenced and cleaned without an orphan', skipped, async () => {

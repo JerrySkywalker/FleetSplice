@@ -59,7 +59,8 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   const startLocal = async () => {
     if (local) return;
     const started = await nativeAdoptionEdge(identity.root, config.stateDirectory,
-      { custody: config.nativeServerCustody, executable: config.executable, environment: process.env });
+      { custody: config.nativeServerCustody, executable: config.executable, environment: process.env,
+        onNativeClose: () => process.send?.({ kind: 'runtimeObservation', status: 'unavailable', discoveredSessions: 0, evidence: 'NATIVE_CONNECTION_LOST' }) });
     local = started;
     endpoint = agentAdoptionEndpoint({ kind: 'NATIVE_ADOPTION', target: config.target, port: started.adapter, send });
   };

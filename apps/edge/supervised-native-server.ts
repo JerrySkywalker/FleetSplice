@@ -81,6 +81,7 @@ async function realInitialize(identity: NativeArtifactIdentity, workspace: strin
 
 export type SupervisedServerOptions = {
   executable: string; workspace: string; directory?: string; environment?: NodeJS.ProcessEnv;
+  onExit?: () => void;
   /** Test seam for readiness failure; product use always calls the official initialize probe. */
   ready?: Ready;
   /** Test seam for OS drift. Product use always calls the Windows proof. */
@@ -183,6 +184,7 @@ export class AgentSupervisedNativeServer {
       });
       child.on('error', () => {}); // Start failure is observed below; native stderr is never logged.
       this.child = child;
+      child.once('exit', () => this.options.onExit?.());
       requireThat(Number.isSafeInteger(child.pid) && child.pid! > 0, 'NATIVE_SUPERVISED_SPAWN_FAILED');
       for (let attempt = 0; attempt < 30 && !socketExists(endpoint); attempt++) {
         requireThat(child.exitCode === null && child.signalCode === null,

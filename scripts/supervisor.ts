@@ -76,7 +76,11 @@ export async function supervisorEntrypoint() {
       if (request.command === 'status') {
         const health = run?.health();
         let nativeCodex = 'NOT_STARTED';
-        if (run?.productPath === 'NATIVE_ADOPTION') nativeCodex = sharing.enabled && sharing.shared ? 'NATIVE_ADOPTED' : 'NATIVE_UNSHARED';
+        if (run?.productPath === 'NATIVE_ADOPTION') {
+          const observation = run.runtimeObservation();
+          nativeCodex = sharing.enabled && sharing.shared ? observation.status === 'healthy' ? 'NATIVE_ADOPTED' :
+            observation.evidence === 'NATIVE_CONNECTION_LOST' ? 'EXITED_OR_REUSED' : 'UNPROVABLE' : 'NATIVE_UNSHARED';
+        }
         else if (run) try { const native = evidenceFromEdge(path.join(run.directory, 'edge.sqlite')); if (native.process) { const observed = probeProcess(native.process.processId); nativeCodex = observed.exists && observed.identity?.creationTime === native.process.creationTime ? 'RUNNING' : 'EXITED_OR_REUSED'; } } catch { nativeCodex = 'UNPROVABLE'; }
         await reply(socket, { v: AGENT_IPC_VERSION, code: run ? supervisorHealthCode(health, nativeCodex) : 'STARTING', runId: run?.runId ?? null, supervisor: 'RUNNING', hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', edgeAdmission: health?.edgeAdmission ?? 'STARTING', nativeCodex, runtimePath: process.execPath, nodeVersion: process.version, sqliteVersion: process.versions.sqlite, codexPath: qualifiedCodex.executablePath, codexSha256: qualifiedCodex.sha256, proxy: activeProxy.display ?? 'direct', proxySource: activeProxy.source, configuration, ...(run ? { url: run.url } : {}) }); return;
       }

@@ -11,7 +11,7 @@ import { Fault, requireThat } from '../../packages/contracts/json.ts';
 import type { NativeServerCustody } from '../../packages/native-adoption/types.ts';
 import { AgentSupervisedNativeServer } from './supervised-native-server.ts';
 
-export type NativeEdgeCustodyOptions = { custody?: NativeServerCustody; executable?: string; environment?: NodeJS.ProcessEnv };
+export type NativeEdgeCustodyOptions = { custody?: NativeServerCustody; executable?: string; environment?: NodeJS.ProcessEnv; onNativeClose?: () => void };
 export async function nativeAdoptionEdge(workspace: string, stateDirectory: string, options: NativeEdgeCustodyOptions = {}) {
   const root = rootProofNow(workspace);
   const journal = new Journal(path.join(stateDirectory, 'native-edge.sqlite'));
@@ -28,7 +28,7 @@ export async function nativeAdoptionEdge(workspace: string, stateDirectory: stri
   requireThat(custody === 'CODEX_MANAGED_DAEMON' || custody === 'AGENT_SUPERVISED', 'NATIVE_SERVER_CUSTODY_INVALID');
   if (custody === 'AGENT_SUPERVISED') requireThat(!!options.executable, 'NATIVE_SUPERVISED_EXECUTABLE_REQUIRED');
   const supervisor = custody === 'AGENT_SUPERVISED' ? new AgentSupervisedNativeServer({
-    executable: options.executable!, workspace: root.root, environment: options.environment,
+    executable: options.executable!, workspace: root.root, environment: options.environment, onExit: options.onNativeClose,
   }) : null;
   let identity;
   try { identity = supervisor ? await supervisor.start() : discoverDaemon(); }
@@ -39,7 +39,7 @@ export async function nativeAdoptionEdge(workspace: string, stateDirectory: stri
   const identityNow = supervisor ? () => supervisor.assertCurrent(identity) : discoverDaemon;
   let adapter: NativeAdoptionAdapter;
   try {
-    adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, identityNow, () => rootProofNow(root.root), journal, new NativeActivityJournal(journal));
+    adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, identityNow, () => rootProofNow(root.root), journal, new NativeActivityJournal(journal), Date.now, 20_000, options.onNativeClose);
   } catch (error) { rpc.close(); await supervisor?.stop(); journal.close(); throw error; }
   try {
     for (const input of provenance) adapter.restoreInput(input.command, input.receipt);

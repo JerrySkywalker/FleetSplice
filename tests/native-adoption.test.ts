@@ -225,7 +225,7 @@ class Rpc implements NativeRpc {
     throw Error('unexpected fixture RPC');
   }
 }
-async function setup(options: { version?: string; sha?: string; missing?: string[]; now?: () => number; custody?: NativeServerCustody } = {}) {
+async function setup(options: { version?: string; sha?: string; missing?: string[]; now?: () => number; custody?: NativeServerCustody; onNativeClose?: () => void } = {}) {
   const rpc = new Rpc(); for (const method of options.missing ?? []) rpc.missing.add(method);
   let identity: NativeArtifactIdentity = { executablePath: 'C:\\official\\codex.exe', reportedVersion: options.version ?? 'future-build', sha256: options.sha ?? 'b'.repeat(64),
     processId: 100, processCreationTime: '123456', endpoint: 'C:\\user\\native.sock', endpointIdentity: 'socket-birth',
@@ -235,7 +235,7 @@ async function setup(options: { version?: string; sha?: string; missing?: string
   const journal = new Journal(path.join(mkdtempSync(path.join(tmpdir(), 'fleet-activity-')), 'native.sqlite'));
   const activity = new NativeActivityJournal(journal);
   const adapter = new NativeAdoptionAdapter(structuredClone(identity), rpc, workspace, 'workspace-identity', () => identity,
-    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) }, activity, options.now, 0);
+    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) }, activity, options.now, 0, options.onNativeClose);
   await adapter.qualify();
   const client = randomUUID(); const expiresAt = (options.now ?? Date.now)() + 600000;
   const authority = { clientInstanceId: client, sessionBinding: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt };
@@ -247,6 +247,13 @@ async function setup(options: { version?: string; sha?: string; missing?: string
   const attach = async () => execute(command(await adapter.snapshot(), 'native.attach'));
   return { rpc, adapter, command, execute, attach, client, expiresAt, evidence, journal, activity, authority, replace: (change: Partial<NativeArtifactIdentity>) => { identity = { ...identity, ...change }; } };
 }
+test('native connection loss fences the adapter and updates Agent observation', async () => {
+  let closed = 0;
+  const r = await setup({ custody: 'AGENT_SUPERVISED', onNativeClose: () => { closed++; } });
+  r.rpc.close();
+  assert.equal(closed, 1);
+  assert.equal((await r.adapter.snapshot()).state, 'NATIVE_CONNECTION_LOST');
+});
 test('adoption version and SHA are evidence rather than an allowlist; runtime capabilities admit ADOPT_FULL', async () => {
   for (const [version, sha] of [['future.9000', 'a'.repeat(64)], ['unversioned-development', 'c'.repeat(64)]]) {
     const r = await setup({ version, sha });

@@ -64,13 +64,14 @@ export class NativeAdoptionAdapter {
     private readonly rootNow: () => { root: string; rootIdentity: string },
     private readonly evidence: AdoptionEvidence, private readonly activityJournal: NativeActivityJournal,
     private readonly now: () => number = Date.now,
-    private readonly discoveryIntervalMs = 20_000) {
+    private readonly discoveryIntervalMs = 20_000,
+    private readonly onNativeClose?: () => void) {
     this.incarnation = incarnationOf(identity);
     activityJournal.assertRecovery(this.incarnation);
     this.compatibility = { profile: 'UNSUPPORTED', observedAt: new Date().toISOString(),
       capabilities: Object.fromEntries(keys.map(key => [key, { available: false, evidence: 'NOT_OBSERVED' }])) as Compatibility['capabilities'] };
     rpc.onEvent = message => { try { this.event(message); } catch { this.state = 'NATIVE_JOURNAL_UNPROVABLE'; this.controller = null; this.fence++; } };
-    rpc.onClose = () => { this.state = 'NATIVE_CONNECTION_LOST'; this.controller = null; this.fence++; };
+    rpc.onClose = () => { this.state = 'NATIVE_CONNECTION_LOST'; this.controller = null; this.fence++; this.onNativeClose?.(); };
   }
   private serial<T>(operation: () => Promise<T>): Promise<T> {
     const next = this.queue.then(operation); this.queue = next.catch(() => {}); return next;

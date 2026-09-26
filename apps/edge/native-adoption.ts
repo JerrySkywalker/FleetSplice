@@ -8,8 +8,11 @@ import { assertSameIncarnation } from '../../packages/native-adoption/compatibil
 import { rootProofNow } from './identity.ts';
 import { Journal } from '../../packages/journal/index.ts';
 import { Fault, requireThat } from '../../packages/contracts/json.ts';
+import type { NativeServerCustody } from '../../packages/native-adoption/types.ts';
+import { AgentSupervisedNativeServer } from './supervised-native-server.ts';
 
-export async function nativeAdoptionEdge(workspace: string, stateDirectory: string) {
+export type NativeEdgeCustodyOptions = { custody?: NativeServerCustody; executable?: string; environment?: NodeJS.ProcessEnv; onNativeClose?: () => void };
+export async function nativeAdoptionEdge(workspace: string, stateDirectory: string, options: NativeEdgeCustodyOptions = {}) {
   const root = rootProofNow(workspace);
   const journal = new Journal(path.join(stateDirectory, 'native-edge.sqlite'));
   // Cold restart does not replay or forget any possibly dispatched operation.
@@ -21,28 +24,42 @@ export async function nativeAdoptionEdge(workspace: string, stateDirectory: stri
     const command = JSON.parse(String(attempt.value)).command;
     if (['native.submit', 'native.steer'].includes(command?.family)) provenance.push({ command, receipt: JSON.parse(String(receipt.value)) });
   }
-  const identity = discoverDaemon(); const rpc = await OfficialNativeRpc.connect(identity);
+  const custody = options.custody ?? 'CODEX_MANAGED_DAEMON';
+  requireThat(custody === 'CODEX_MANAGED_DAEMON' || custody === 'AGENT_SUPERVISED', 'NATIVE_SERVER_CUSTODY_INVALID');
+  if (custody === 'AGENT_SUPERVISED') requireThat(!!options.executable, 'NATIVE_SUPERVISED_EXECUTABLE_REQUIRED');
+  const supervisor = custody === 'AGENT_SUPERVISED' ? new AgentSupervisedNativeServer({
+    executable: options.executable!, workspace: root.root, environment: options.environment,
+    runId: path.basename(stateDirectory), onExit: options.onNativeClose,
+  }) : null;
+  let identity;
+  try { identity = supervisor ? await supervisor.start() : discoverDaemon(); }
+  catch (error) { journal.close(); throw error; }
+  let rpc;
+  try { rpc = await OfficialNativeRpc.connect(identity); }
+  catch (error) { await supervisor?.stop(); journal.close(); throw error; }
+  const identityNow = supervisor ? () => supervisor.assertCurrent(identity) : discoverDaemon;
   let adapter: NativeAdoptionAdapter;
   try {
-    adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, discoverDaemon, () => rootProofNow(root.root), journal, new NativeActivityJournal(journal));
-  } catch (error) { rpc.close(); journal.close(); throw error; }
+    adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, identityNow, () => rootProofNow(root.root), journal, new NativeActivityJournal(journal), Date.now, 20_000, options.onNativeClose);
+  } catch (error) { rpc.close(); await supervisor?.stop(); journal.close(); throw error; }
   try {
     for (const input of provenance) adapter.restoreInput(input.command, input.receipt);
     const initialized = await rpc.call('initialize', { clientInfo: { name: 'fleetsplice_native_adoption', version: '0.1.0' }, capabilities: { experimentalApi: true } });
-    requireThat(typeof initialized.codexHome === 'string' && initialized.codexHome.toLowerCase() === nativeHome().toLowerCase(), 'NATIVE_SERVER_HOME_MISMATCH');
-    rpc.initialized(); assertSameIncarnation(identity, discoverDaemon());
+    requireThat(typeof initialized.codexHome === 'string' && initialized.codexHome.toLowerCase() ===
+      (options.environment?.CODEX_HOME ? path.resolve(options.environment.CODEX_HOME) : nativeHome()).toLowerCase(), 'NATIVE_SERVER_HOME_MISMATCH');
+    rpc.initialized(); assertSameIncarnation(identity, identityNow());
     await adapter.qualify();
-    return { adapter, close: () => { adapter.close(); journal.close(); } };
-  } catch (error) { adapter.close(); journal.close(); throw error; }
+    return { adapter, close: async () => { adapter.close(); await supervisor?.stop(); journal.close(); } };
+  } catch (error) { adapter.close(); await supervisor?.stop(); journal.close(); throw error; }
 }
-if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.once('message', async (config: { workspace: string; stateDirectory: string }) => {
+if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.once('message', async (config: { workspace: string; stateDirectory: string } & NativeEdgeCustodyOptions) => {
   try {
-    const edge = await nativeAdoptionEdge(config.workspace, config.stateDirectory);
+    const edge = await nativeAdoptionEdge(config.workspace, config.stateDirectory, config);
     let pushUnsubscribe: (() => void) | null = null;
     process.send!({ kind: 'nativeReady' });
     process.on('message', async (message: any) => {
-      if (message.kind === 'stop') { pushUnsubscribe?.(); edge.close(); process.exit(0); }
       try {
+        if (message.kind === 'stop') { pushUnsubscribe?.(); await edge.close(); process.exit(0); }
         if (message.kind === 'subscribeRealtimePush') {
           pushUnsubscribe?.();
           pushUnsubscribe = edge.adapter.subscribeRealtime(envelope => {
@@ -61,6 +78,6 @@ if (process.send && process.argv[1] === fileURLToPath(import.meta.url)) process.
         process.send!({ id: message.id, result });
       } catch (error) { process.send!({ id: message.id, error: error instanceof Fault ? error.code : 'NATIVE_EDGE_REQUEST_FAILED' }); }
     });
-    process.on('disconnect', () => { pushUnsubscribe?.(); edge.close(); process.exit(0); });
+    process.on('disconnect', () => { pushUnsubscribe?.(); void edge.close().then(() => process.exit(0), () => { process.exitCode = 2; }); });
   } catch (error) { process.send!({ kind: 'error', code: error instanceof Error ? error.message : 'NATIVE_ADOPTION_START_FAILED' }); process.exitCode = 1; }
 });

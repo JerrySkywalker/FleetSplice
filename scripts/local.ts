@@ -7,6 +7,7 @@ import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat, type Target } from '../packages/contracts/index.ts';
 import { assertFreshIncarnation, classifyPredecessor, edgeAdmissionState, guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
 import type { EdgeConfig } from '../apps/edge/main.ts';
+import type { NativeServerCustody } from '../packages/native-adoption/types.ts';
 import type { HubConfig } from '../apps/hub/server.ts';
 import { workspaceBindings } from '../packages/workspaces/index.ts';
 import { defaultRuntimeSharing, type RuntimeSharing } from '../packages/agent-runtime/index.ts';
@@ -20,7 +21,7 @@ const onceExit = (child: ChildProcess, timeout: number) => new Promise<boolean>(
   child.once('exit', () => { clearTimeout(timer); resolve(true); });
   child.once('error', () => { clearTimeout(timer); resolve(false); });
 });
-export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing; hostIdentity?: Pick<Target, 'hostId' | 'hostGeneration' | 'environmentId' | 'environmentGeneration'>; enrollment?: EdgeConfig['enrollment']; /** Deployment carriage is explicit: listener bind never becomes public identity. */ transport?: Pick<HubConfig, 'deployment' | 'listener'> & Pick<EdgeConfig, 'hcpUrl' | 'testTlsCaPem'> };
+export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; nativeServerCustody?: NativeServerCustody; runtimeSharing?: RuntimeSharing; hostIdentity?: Pick<Target, 'hostId' | 'hostGeneration' | 'environmentId' | 'environmentGeneration'>; enrollment?: EdgeConfig['enrollment']; /** Deployment carriage is explicit: listener bind never becomes public identity. */ transport?: Pick<HubConfig, 'deployment' | 'listener'> & Pick<EdgeConfig, 'hcpUrl' | 'testTlsCaPem'> };
 
 // Internal lifecycle primitive. G05B starts it only from the detached local
 // supervisor after all no-effect qualification has passed.
@@ -55,7 +56,9 @@ export async function launch(root: string, executable: string, port = 43155, opt
   // Runtime commit point: no native process exists before this durable guard.
   durableWrite(currentGuard, guard);
   durableWrite(path.join(directory, 'admission.json'), { runId, target, identity, workspaces, policy: 'windows-user.read-only', productPath,
-    nativeContinuity: productPath === 'NATIVE_ADOPTION' ? 'shared-daemon-adopted' : 'ephemeral-private-stdio', node: process.version, sqlite: process.versions.sqlite });
+    nativeContinuity: productPath === 'NATIVE_ADOPTION' ? 'shared-native-server-adopted' : 'ephemeral-private-stdio',
+    nativeServerCustody: productPath === 'NATIVE_ADOPTION' ? options.nativeServerCustody ?? 'CODEX_MANAGED_DAEMON' : undefined,
+    node: process.version, sqlite: process.versions.sqlite });
   await options.onGuardCommitted?.(guard);
   const hcpToken = randomBytes(32).toString('hex'); const bootstrapToken = randomBytes(32).toString('hex');
   const env = environment;
@@ -63,10 +66,15 @@ export async function launch(root: string, executable: string, port = 43155, opt
   const hubEnv = Object.fromEntries(Object.entries(env).filter(([key]) => ['SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'PATH', 'PATHEXT', 'COMSPEC', 'LOCALAPPDATA', 'USERPROFILE', 'APPDATA', 'COMPUTERNAME', 'USERNAME'].includes(key.toUpperCase())));
   const start = (file: string, childEnv: NodeJS.ProcessEnv): ChildProcess => fork(file, [], { cwd: installation, env: childEnv, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
   const wait = (child: ChildProcess, kind: string, timeout = 30000): Promise<any> => new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${kind.toUpperCase()}_TIMEOUT`)), timeout);
-    const handler = (message: any) => { if (message.kind === kind) { clearTimeout(timer); child.off('message', handler); resolve(message); }
-      else if (message.kind === 'error') { clearTimeout(timer); child.off('message', handler); reject(new Error(message.code)); } };
-    child.on('message', handler); child.once('error', reject);
+    const cleanup = () => { clearTimeout(timer); child.off('message', handler); child.off('error', onError); child.off('exit', onExit); };
+    const onError = (error: Error) => { cleanup(); reject(error); };
+    const onExit = () => { cleanup(); reject(new Error(`${kind.toUpperCase()}_PROCESS_EXITED`)); };
+    const handler = (message: any) => {
+      if (message.kind === kind) { cleanup(); resolve(message); }
+      else if (message.kind === 'error') { cleanup(); reject(new Error(message.code)); }
+    };
+    const timer = setTimeout(() => { cleanup(); reject(new Error(`${kind.toUpperCase()}_TIMEOUT`)); }, timeout);
+    child.on('message', handler); child.once('error', onError); child.once('exit', onExit);
   });
   let hub: ChildProcess | null = null; let edge: ChildProcess | null = null; let closing = false;
   let runtimeObservation: { status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string } = { status: 'unavailable', discoveredSessions: 0, evidence: 'Runtime discovery has not been observed.' };
@@ -76,8 +84,14 @@ export async function launch(root: string, executable: string, port = 43155, opt
   });
   const startEdge = async (enrollment?: EdgeConfig['enrollment']) => {
     const child = start(path.join(installation, 'apps/edge/main.js'), env); observeEdge(child);
-    const edgeReady = wait(child, 'edgeReady');
+    // Real native history reconciliation can exceed the generic IPC wait after
+    // a supervised server replacement. Keep custody with this launcher until
+    // the Edge reports readiness; a timed-out replacement must remain visible
+    // to the caller for explicit closure rather than losing its child handle.
+    edge = child;
+    const edgeReady = wait(child, 'edgeReady', 120000);
     child.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, enrollment, workspaces, productPath, runtimeSharing,
+      nativeServerCustody: options.nativeServerCustody,
       hcpUrl: options.transport?.hcpUrl, testTlsCaPem: options.transport?.testTlsCaPem } satisfies EdgeConfig);
     await edgeReady; return child;
   };
@@ -122,7 +136,7 @@ export async function launch(root: string, executable: string, port = 43155, opt
   };
   const setRuntimeSharing = async (sharing: RuntimeSharing) => await new Promise<{ status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string }>((resolve, reject) => {
     if (!edge?.connected) { reject(new Error('RUNTIME_SHARING_UNAVAILABLE')); return; }
-    const id = randomUUID(); const timer = setTimeout(() => { edge?.off('message', handler); reject(new Error('RUNTIME_SHARING_TIMEOUT')); }, 10000);
+    const id = randomUUID(); const timer = setTimeout(() => { edge?.off('message', handler); reject(new Error('RUNTIME_SHARING_TIMEOUT')); }, 120000);
     const handler = (message: unknown) => {
       const response = message as { id?: string; result?: { status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string }; error?: string };
       if (response.id !== id) return;
@@ -131,14 +145,15 @@ export async function launch(root: string, executable: string, port = 43155, opt
     };
     edge.on('message', handler); edge.send({ kind: 'runtimeSharing', id, sharing });
   });
-  const replaceEdgeWithEnrollment = async (enrollment: NonNullable<EdgeConfig['enrollment']>) => {
+  const restartEdge = async (enrollment: EdgeConfig['enrollment'] = options.enrollment) => {
     requireThat(!closing && hub?.exitCode === null && edge?.exitCode === null, 'EDGE_REPLACEMENT_NOT_ADMITTED');
     const prior = edge; const detached = awaitHubDetach();
     await closeEdge(prior, detached);
     edge = await startEdge(enrollment);
   };
+  const replaceEdgeWithEnrollment = async (enrollment: NonNullable<EdgeConfig['enrollment']>) => restartEdge(enrollment);
   const origin = options.transport?.deployment?.publicBaseUrl ?? `http://127.0.0.1:${port}`;
-  return { url: `${origin}/#bootstrap=${bootstrapToken}`, origin, directory, runId, target, identity, productPath, runtimeObservation: () => runtimeObservation, setRuntimeSharing, replaceEdgeWithEnrollment, stop, health };
+  return { url: `${origin}/#bootstrap=${bootstrapToken}`, origin, directory, runId, target, identity, productPath, runtimeObservation: () => runtimeObservation, setRuntimeSharing, restartEdge, replaceEdgeWithEnrollment, stop, health };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

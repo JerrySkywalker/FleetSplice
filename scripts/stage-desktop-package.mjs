@@ -15,6 +15,7 @@ const required = [
   ['fleetsplice.ps1', 'fleetsplice.ps1'],
   ['fleetsplice.cmd', 'fleetsplice.cmd'],
   ['scripts/start-supervisor.ps1', 'scripts/start-supervisor.ps1'],
+  ['scripts/supervise-native-job.ps1', 'scripts/supervise-native-job.ps1'],
 ];
 const runtimeRoots = ['ajv', 'json-canonicalize', 'ws'];
 

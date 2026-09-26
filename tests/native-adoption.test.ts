@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { NativeAdoptionAdapter } from '../packages/native-adoption/adapter.ts';
 import { assertSameIncarnation, classifyCapabilities, incarnationOf } from '../packages/native-adoption/compatibility.ts';
 import { NativeRpcError, type NativeRpc } from '../packages/native-adoption/transport.ts';
-import type { AdoptionCommand, AdoptionSnapshot, NativeArtifactIdentity } from '../packages/native-adoption/types.ts';
+import type { AdoptionCommand, AdoptionSnapshot, NativeArtifactIdentity, NativeServerCustody } from '../packages/native-adoption/types.ts';
 import { rig } from './helpers.ts';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -225,15 +225,17 @@ class Rpc implements NativeRpc {
     throw Error('unexpected fixture RPC');
   }
 }
-async function setup(options: { version?: string; sha?: string; missing?: string[]; now?: () => number } = {}) {
+async function setup(options: { version?: string; sha?: string; missing?: string[]; now?: () => number; custody?: NativeServerCustody; onNativeClose?: () => void } = {}) {
   const rpc = new Rpc(); for (const method of options.missing ?? []) rpc.missing.add(method);
   let identity: NativeArtifactIdentity = { executablePath: 'C:\\official\\codex.exe', reportedVersion: options.version ?? 'future-build', sha256: options.sha ?? 'b'.repeat(64),
-    processId: 100, processCreationTime: '123456', endpoint: 'C:\\user\\native.sock', endpointIdentity: 'socket-birth', serverIncarnation: null };
+    processId: 100, processCreationTime: '123456', endpoint: 'C:\\user\\native.sock', endpointIdentity: 'socket-birth',
+    serverIncarnation: options.custody === 'AGENT_SUPERVISED' ? randomUUID() : null,
+    ...(options.custody ? { custody: options.custody } : {}) };
   const evidence: any[] = [];
   const journal = new Journal(path.join(mkdtempSync(path.join(tmpdir(), 'fleet-activity-')), 'native.sqlite'));
   const activity = new NativeActivityJournal(journal);
   const adapter = new NativeAdoptionAdapter(structuredClone(identity), rpc, workspace, 'workspace-identity', () => identity,
-    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) }, activity, options.now, 0);
+    () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) }, activity, options.now, 0, options.onNativeClose);
   await adapter.qualify();
   const client = randomUUID(); const expiresAt = (options.now ?? Date.now)() + 600000;
   const authority = { clientInstanceId: client, sessionBinding: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt };
@@ -245,6 +247,13 @@ async function setup(options: { version?: string; sha?: string; missing?: string
   const attach = async () => execute(command(await adapter.snapshot(), 'native.attach'));
   return { rpc, adapter, command, execute, attach, client, expiresAt, evidence, journal, activity, authority, replace: (change: Partial<NativeArtifactIdentity>) => { identity = { ...identity, ...change }; } };
 }
+test('native connection loss fences the adapter and updates Agent observation', async () => {
+  let closed = 0;
+  const r = await setup({ custody: 'AGENT_SUPERVISED', onNativeClose: () => { closed++; } });
+  r.rpc.close();
+  assert.equal(closed, 1);
+  assert.equal((await r.adapter.snapshot()).state, 'NATIVE_CONNECTION_LOST');
+});
 test('adoption version and SHA are evidence rather than an allowlist; runtime capabilities admit ADOPT_FULL', async () => {
   for (const [version, sha] of [['future.9000', 'a'.repeat(64)], ['unversioned-development', 'c'.repeat(64)]]) {
     const r = await setup({ version, sha });
@@ -252,6 +261,33 @@ test('adoption version and SHA are evidence rather than an allowlist; runtime ca
     assert.equal(r.adapter.identity.reportedVersion, version); assert.equal(r.adapter.identity.sha256, sha);
     assert.equal(r.rpc.calls.filter(c => c.method === 'thread/start').length, 0);
   }
+});
+
+test('both server custodians use the same capability profiles and retain custody in receipts', async () => {
+  for (const custody of ['CODEX_MANAGED_DAEMON', 'AGENT_SUPERVISED'] as const) {
+    const full = await setup({ custody });
+    assert.equal(full.adapter.compatibility.profile, 'ADOPT_FULL');
+    assert.equal((await full.adapter.snapshot()).daemon.custody, custody);
+    assert.equal((await full.attach()).daemon.custody, custody);
+    assert.equal((await full.execute(full.command(await full.adapter.snapshot(), 'native.submit'))).daemon.custody, custody);
+    const resume = await setup({ custody, missing: ['thread/turns/list'] });
+    assert.equal(resume.adapter.compatibility.profile, 'ADOPT_RESUME');
+    const unsupported = await setup({ custody, missing: ['thread/read', 'thread/resume', 'turn/start'] });
+    assert.equal(unsupported.adapter.compatibility.profile, 'UNSUPPORTED');
+  }
+  const historical = await setup();
+  assert.equal((await historical.attach()).daemon.custody, undefined);
+});
+
+test('supervised server restart fences old controller and command without replay', async () => {
+  const r = await setup({ custody: 'AGENT_SUPERVISED' });
+  await r.attach();
+  const old = r.command(await r.adapter.snapshot(), 'native.submit');
+  const before = r.rpc.calls.filter(call => call.method === 'turn/start').length;
+  r.replace({ serverIncarnation: randomUUID() });
+  assert.equal((await r.execute(old)).status, 'REJECTED');
+  assert.equal(r.rpc.calls.filter(call => call.method === 'turn/start').length, before);
+  assert.equal((await r.adapter.snapshot()).controller, null);
 });
 
 test('source uses exact client ID on the same native thread, preserves explicit labels, never attributes equal text', async () => {

@@ -12,6 +12,17 @@ const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
 export function nativeHome(): string {
   return realpathSync.native(process.env.CODEX_HOME || path.join(homedir(), '.codex'));
 }
+/** Official executable proof for Agent-supervised custody; no daemon is required. */
+export function discoverInstalledCodex(candidate: string): { executablePath: string; reportedVersion: string; sha256: string } {
+  requireThat(process.platform === 'win32' && path.win32.isAbsolute(candidate), 'OFFICIAL_CODEX_UNAVAILABLE');
+  const executablePath = realpathSync.native(candidate);
+  requireThat(path.basename(executablePath).toLowerCase() === 'codex.exe' &&
+    lstatSync(executablePath).isFile(), 'OFFICIAL_CODEX_UNAVAILABLE');
+  const reportedVersion = execFileSync(executablePath, ['--version'],
+    { encoding: 'utf8', windowsHide: true, timeout: 8000, maxBuffer: 65536 }).trim();
+  requireThat(/^codex-cli \d+\.\d+\.\d+/.test(reportedVersion), 'OFFICIAL_CODEX_VERSION_UNPROVABLE');
+  return { executablePath, reportedVersion, sha256: createHash('sha256').update(readFileSync(executablePath)).digest('hex') };
+}
 export function discoverDaemon(): NativeArtifactIdentity {
   requireThat(process.platform === 'win32', 'WINDOWS_NATIVE_ADOPTION_REQUIRED');
   const home = nativeHome();
@@ -52,5 +63,6 @@ if(-not $nativeSocket.Exists -or -not ($nativeSocket.Attributes -band [IO.FileAt
   const endpointIdentity = `${endpoint.toLowerCase()}:${proof.endpointCreated}`;
   return { executablePath: executable, reportedVersion: typeof status.appServerVersion === 'string' ? status.appServerVersion : null,
     sha256: createHash('sha256').update(readFileSync(executable)).digest('hex'), processId: pidState.pid,
-    processCreationTime: proof.created, endpoint, endpointIdentity, serverIncarnation: null };
+    processCreationTime: proof.created, endpoint, endpointIdentity, serverIncarnation: null,
+    custody: 'CODEX_MANAGED_DAEMON' };
 }

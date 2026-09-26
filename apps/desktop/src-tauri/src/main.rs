@@ -9,8 +9,13 @@ fn local_base() -> Result<PathBuf, String> {
 }
 
 fn resource_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  app.path().resource_dir().map_err(|_| "BUNDLED_AGENT_UNAVAILABLE".to_string())
-    .map(|path| path.join("package-resources"))
+  let root = app.path().resource_dir().map_err(|_| "BUNDLED_AGENT_UNAVAILABLE".to_string())?;
+  // Tauri preserves the staged `../package-resources` input below `_up_` in
+  // the NSIS layout. Resolve both supported layouts by the bundled script.
+  for candidate in [root.join("package-resources"), root.join("_up_").join("package-resources")] {
+    if candidate.join("fleetsplice.ps1").is_file() { return Ok(candidate); }
+  }
+  Err("BUNDLED_AGENT_UNAVAILABLE".into())
 }
 
 // The bundled Agent is a local child-only CLI.  It never receives Gateway or
@@ -20,9 +25,13 @@ fn resource_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 fn bundled_cli(app: &tauri::AppHandle, arguments: &[String]) -> Result<String, String> {
   let script = resource_root(app)?.join("fleetsplice.ps1");
   if !script.is_file() { return Err("BUNDLED_AGENT_UNAVAILABLE".into()); }
+  // Tauri's Windows resource path may be verbatim (\\?\C:\...). Windows
+  // PowerShell 5 accepts it as -File but then leaves $PSScriptRoot empty.
+  let script_path = script.to_string_lossy();
+  let script_path = script_path.strip_prefix(r"\\?\").unwrap_or(&script_path);
   let output = Command::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
     .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"])
-    .arg(script).args(arguments)
+    .arg(script_path).args(arguments)
     .creation_flags(0x08000000)
     .output().map_err(|_| "BUNDLED_AGENT_UNAVAILABLE".to_string())?;
   if !output.status.success() { return Err(String::from_utf8_lossy(&output.stderr).trim().to_string()); }
@@ -108,7 +117,9 @@ fn main() {
     .plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)))
     .setup(|app| {
       let handle = app.handle().clone();
-      tauri::async_runtime::spawn(async move { let _ = start_selected_agent(&handle); });
+      tauri::async_runtime::spawn(async move {
+        if let Err(error) = start_selected_agent(&handle) { eprintln!("DESKTOP_AGENT_START_FAILED:{error}"); }
+      });
       let open = MenuItem::with_id(app, "open", "Open FleetSplice / Settings", true, None::<&str>)?;
       let dashboard = MenuItem::with_id(app, "dashboard", "Open Dashboard", true, None::<&str>)?;
       let drain = MenuItem::with_id(app, "drain", "Drain and Exit", true, None::<&str>)?;

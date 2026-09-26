@@ -1,10 +1,13 @@
 // Deliberately Codex-specific. Artifact metadata never selects compatibility.
 import type { ApprovalIdentity, ApprovalView } from './approvals.ts';
 export type AgentOrigin = 'NATIVE_ADOPTED' | 'FLEETSPLICE_MANAGED';
+export type NativeServerCustody = 'CODEX_MANAGED_DAEMON' | 'AGENT_SUPERVISED';
 export type NativeArtifactIdentity = {
   executablePath: string | null; reportedVersion: string | null; sha256: string | null;
   processId: number; processCreationTime: string; endpoint: string;
   endpointIdentity: string; serverIncarnation: string | null;
+  /** Optional for historical receipts written before custody was recorded. */
+  custody?: NativeServerCustody;
 };
 export type Capability = { available: boolean; evidence: string };
 export type MessageSource =

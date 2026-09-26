@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 function Read-Bootstrap([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'SUPERVISOR_BOOTSTRAP_MISSING' }
   $value = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
-  foreach ($property in @('taskName', 'node', 'supervisor', 'workspace', 'codex', 'localAppData')) {
+  foreach ($property in @('taskName', 'node', 'supervisor', 'workspace', 'codex', 'codexHome', 'localAppData')) {
     if ($null -eq $value.$property -or [string]::IsNullOrWhiteSpace([string]$value.$property)) { throw 'SUPERVISOR_BOOTSTRAP_INVALID' }
   }
   if ([string]$value.proxySource -notin @('explicit-env', 'fleetsplice-user-config', 'windows-user-proxy', 'windows-system-proxy', 'direct')) { throw 'SUPERVISOR_PROXY_METADATA_INVALID' }
@@ -36,6 +36,8 @@ if ($RunBootstrap) {
         Set-Item -Path ("Env:" + $property.Name) -Value ([string]$property.Value)
       }
     }
+    if (-not (Test-Path -LiteralPath $config.codexHome -PathType Container)) { throw 'CODEX_HOME_UNAVAILABLE' }
+    $env:CODEX_HOME = [string]$config.codexHome
     $env:FLEETSPLICE_PROXY_SOURCE = [string]$config.proxySource
     # The task XML receives only this private file path, never proxy values.
     # Load the qualified values into this process, then erase the handoff before

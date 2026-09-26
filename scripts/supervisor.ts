@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat } from '../packages/contracts/index.ts';
 import { classifyPredecessor, evidenceFromEdge, probeProcess, resolveProxy, type Guard, type ProxyResolution } from '../packages/local-operation/index.ts';
-import { discoverDaemon } from '../packages/native-adoption/discovery.ts';
+import { discoverInstalledCodex } from '../packages/native-adoption/discovery.ts';
 import { launch } from './local.ts';
 import { AGENT_IPC_MAX_BYTES, AGENT_IPC_VERSION, parseAgentIpcRequest, validateAgentConfiguration, type AgentConfiguration, type AgentIpcRequest, type AgentRuntimeProjection } from '../packages/agent-ipc/index.ts';
 import { defaultRuntimeSharing, runtimeRegistry, updateSharing, validateRuntimeSharing, type RuntimeSharing } from '../packages/agent-runtime/index.ts';
@@ -33,8 +33,8 @@ export async function supervisorEntrypoint() {
   const root = option('--workspace'); const executable = option('--codex');
   requireThat(typeof root === 'string' && typeof executable === 'string', 'SUPERVISOR_USAGE');
   const identity = await localIdentity(root!);
-  const qualifiedCodex = discoverDaemon();
-  requireThat(qualifiedCodex.executablePath?.toLowerCase() === path.resolve(executable!).toLowerCase(), 'NATIVE_DAEMON_EXECUTABLE_CHANGED');
+  const qualifiedCodex = discoverInstalledCodex(executable!);
+  requireThat(qualifiedCodex.executablePath.toLowerCase() === path.resolve(executable!).toLowerCase(), 'NATIVE_SUPERVISED_EXECUTABLE_CHANGED');
   const base = path.join(process.env.LOCALAPPDATA!, 'FleetSplice', 'G05');
   const predecessor = classifyPredecessor(base);
   requireThat(['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind), 'RECOVERY_REQUIRED');
@@ -76,7 +76,7 @@ export async function supervisorEntrypoint() {
       if (request.command === 'status') {
         const health = run?.health();
         let nativeCodex = 'NOT_STARTED';
-        if (run?.productPath === 'NATIVE_ADOPTION') nativeCodex = 'NATIVE_ADOPTED';
+        if (run?.productPath === 'NATIVE_ADOPTION') nativeCodex = sharing.enabled && sharing.shared ? 'NATIVE_ADOPTED' : 'NATIVE_UNSHARED';
         else if (run) try { const native = evidenceFromEdge(path.join(run.directory, 'edge.sqlite')); if (native.process) { const observed = probeProcess(native.process.processId); nativeCodex = observed.exists && observed.identity?.creationTime === native.process.creationTime ? 'RUNNING' : 'EXITED_OR_REUSED'; } } catch { nativeCodex = 'UNPROVABLE'; }
         await reply(socket, { v: AGENT_IPC_VERSION, code: run ? supervisorHealthCode(health, nativeCodex) : 'STARTING', runId: run?.runId ?? null, supervisor: 'RUNNING', hub: health?.hub ?? 'STARTING', edge: health?.edge ?? 'STARTING', edgeAdmission: health?.edgeAdmission ?? 'STARTING', nativeCodex, runtimePath: process.execPath, nodeVersion: process.version, sqliteVersion: process.versions.sqlite, codexPath: qualifiedCodex.executablePath, codexSha256: qualifiedCodex.sha256, proxy: activeProxy.display ?? 'direct', proxySource: activeProxy.source, configuration, ...(run ? { url: run.url } : {}) }); return;
       }
@@ -121,7 +121,7 @@ export async function supervisorEntrypoint() {
   });
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(pipe, resolve); });
   try {
-    run = await launch(root!, executable!, 43155, { environment: { ...process.env, ...activeProxy.environment }, runtimeSharing: sharing, ...(pairing ? { hostIdentity: { hostId: pairing.hostId, hostGeneration: '1', environmentId: pairing.environmentId, environmentGeneration: '1' } } : {}), ...(pairing && !pairingRequestId ? { enrollment: pairing } : {}), onGuardCommitted: guard => {
+    run = await launch(root!, executable!, 43155, { environment: { ...process.env, ...activeProxy.environment }, productPath: 'NATIVE_ADOPTION', nativeServerCustody: 'AGENT_SUPERVISED', runtimeSharing: sharing, ...(pairing ? { hostIdentity: { hostId: pairing.hostId, hostGeneration: '1', environmentId: pairing.environmentId, environmentGeneration: '1' } } : {}), ...(pairing && !pairingRequestId ? { enrollment: pairing } : {}), onGuardCommitted: guard => {
       durable(path.join(base, guard.runId, 'control.json'), { v: AGENT_IPC_VERSION, pipe, token, runId: guard.runId, identity: guard.identity });
     } });
   } catch (error) {

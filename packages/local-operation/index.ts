@@ -407,13 +407,28 @@ type LifecycleJournal = { file: string; kind: 'LEGACY_MANAGED' | 'NATIVE_ADOPTIO
  * admitted a FleetSplice native effect.  Anything beyond those exact records
  * stays a recovery boundary.
  */
-function nativeAdoptionHasOnlyObservationEvidence(file: string): boolean {
+function nativeAdoptionObservationIdentity(file: string): { processId: number; processCreationTime: string } | 'DEFERRED' | null {
   try {
     const rows = readEvidence(file);
-    return rows.length > 0 && rows.every(row => row.kind === 'NATIVE_COMPATIBILITY' && typeof row.key === 'string' && row.key.length > 0 &&
-      !!row.value && typeof row.value === 'object' && typeof (row.value as any).identity?.endpointIdentity === 'string' &&
-      typeof (row.value as any).identity?.executablePath === 'string' && !!(row.value as any).compatibility && typeof (row.value as any).compatibility === 'object');
-  } catch { return false; }
+    if (rows.length === 1 && rows[0]?.kind === 'NATIVE_STARTUP_DEFERRED' &&
+      (rows[0].value as any)?.custody === 'AGENT_SUPERVISED' && (rows[0].value as any)?.reason === 'SHARING_DISABLED') return 'DEFERRED';
+    const compatibility = rows.filter(row => row.kind === 'NATIVE_COMPATIBILITY');
+    if (compatibility.length !== 1 || !rows.every(row => {
+      if (row.kind === 'NATIVE_COMPATIBILITY') return true;
+      if (row.kind === 'NATIVE_STARTUP_DEFERRED') return (row.value as any)?.custody === 'AGENT_SUPERVISED' && (row.value as any)?.reason === 'SHARING_DISABLED';
+      if (row.kind === 'NATIVE_DISCOVERY_NOT_ATTACHABLE') return row.key === (row.value as any)?.threadId &&
+        typeof (row.value as any)?.reason === 'string' && typeof (row.value as any)?.incarnation === 'string';
+      if (row.kind === 'NATIVE_OBSERVATION_FAILURE') return typeof (row.value as any)?.code === 'string';
+      return false;
+    })) return null;
+    const value = compatibility[0]!.value as any;
+    const identity = value?.identity;
+    if (!value?.compatibility || typeof value.compatibility !== 'object' ||
+      typeof identity?.endpointIdentity !== 'string' || typeof identity?.executablePath !== 'string' ||
+      !Number.isSafeInteger(identity?.processId) || identity.processId <= 0 ||
+      typeof identity?.processCreationTime !== 'string' || !/^\d+$/.test(identity.processCreationTime)) return null;
+    return { processId: identity.processId, processCreationTime: identity.processCreationTime };
+  } catch { return null; }
 }
 function lifecycleJournal(base: string, guard: Guard): LifecycleJournal | null {
   const directory = path.join(base, guard.runId);
@@ -523,7 +538,17 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
   const journal = lifecycleJournal(base, guard);
   if (!journal || !readableFleetSpliceJournal(journal.file)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_JOURNAL_UNPROVABLE' };
   if (journal.kind === 'NATIVE_ADOPTION') {
-    if (!nativeAdoptionHasOnlyObservationEvidence(journal.file)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_EFFECT_EVIDENCE_UNPROVABLE' };
+    const observed = nativeAdoptionObservationIdentity(journal.file);
+    if (!observed) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_EFFECT_EVIDENCE_UNPROVABLE' };
+    if (observed !== 'DEFERRED') {
+      const native = process(observed.processId);
+      const creation = native.identity && creationTicks(native.identity.creationTime);
+      const recorded = BigInt(observed.processCreationTime) - 116444736000000000n;
+      if (native.exists && (!native.identity || native.identity.processId !== observed.processId || creation === null))
+        return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: [native], reason: 'NATIVE_ADOPTION_PROCESS_IDENTITY_UNPROVABLE' };
+      if (native.exists && creation === recorded)
+        return { kind: 'LIVE_OR_CONFLICTING', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: [native], reason: 'EXACT_NATIVE_PROCESS_PRESENT' };
+    }
     return { kind: 'SAFE_NO_EFFECT', guard, evidence: emptyEvidence(), exactNativeExitProven: true, conflicts: [], reason: 'NATIVE_ADOPTION_COMPATIBILITY_ONLY' };
   }
   let evidence: NativeEvidence;

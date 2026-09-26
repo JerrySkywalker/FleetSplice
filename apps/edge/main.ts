@@ -45,23 +45,43 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   requireThat(canonical(identity) === canonical(config.identity), 'EDGE_LOCAL_IDENTITY_CHANGED');
   requireThat((config.workspaces ?? []).some(binding => binding.valid && binding.root.toLowerCase() === identity.root.toLowerCase() && binding.rootIdentity === identity.rootIdentity && canonical(binding.target) === canonical(config.target)), 'WORKSPACE_BINDING_UNPROVABLE');
   const hcp = resolveEdgeHcpEndpoint(config);
-  const local = await nativeAdoptionEdge(identity.root, config.stateDirectory,
-    { custody: config.nativeServerCustody, executable: config.executable, environment: process.env });
+  let local: Awaited<ReturnType<typeof nativeAdoptionEdge>> | null = null;
   const enrollment = config.enrollment;
-  const socket = new WebSocket(hcp.url, 'fleetsplice.hcp.v1', {
-    ...hcp.options,
-    headers: enrollment ? {} : { Authorization: `Bearer ${config.hcpToken}` },
-  });
+  let socket: WebSocket;
   const kernel = { connected: false, quarantine: () => { kernel.connected = false; } };
   const send = (message: Hcp) => {
     requireThat(socket.readyState === WebSocket.OPEN && socket.bufferedAmount < 262144, 'HCP_BACKPRESSURE_OR_DISCONNECTED');
     socket.send(canonical(message));
   };
   const envelope = { v: 1 as const, target: config.target, connectionId: config.target.connectionId };
-  const endpoint = agentAdoptionEndpoint({ kind: 'NATIVE_ADOPTION', target: config.target, port: local.adapter, send });
+  let endpoint: ReturnType<typeof agentAdoptionEndpoint> | null = null;
   let sharing = config.runtimeSharing;
+  const startLocal = async () => {
+    if (local) return;
+    const started = await nativeAdoptionEdge(identity.root, config.stateDirectory,
+      { custody: config.nativeServerCustody, executable: config.executable, environment: process.env });
+    local = started;
+    endpoint = agentAdoptionEndpoint({ kind: 'NATIVE_ADOPTION', target: config.target, port: started.adapter, send });
+  };
+  if (sharing && mayShareWorkspace(sharing, identity.root)) await startLocal();
+  else {
+    // Keep an inspectable Edge admission journal while native sharing is off.
+    // No Codex process or endpoint is created until the Owner resumes sharing.
+    const journal = new Journal(path.join(config.stateDirectory, 'native-edge.sqlite'));
+    journal.append('NATIVE_STARTUP_DEFERRED', config.target.edgeRuntimeId,
+      { custody: config.nativeServerCustody, reason: 'SHARING_DISABLED' });
+    journal.close();
+  }
+  // Register every HCP listener in the same turn that creates the socket.
+  // Native qualification above can yield long enough for a loopback handshake
+  // to finish; constructing the socket before it loses the `open` event.
+  socket = new WebSocket(hcp.url, 'fleetsplice.hcp.v1', {
+    ...hcp.options,
+    headers: enrollment ? {} : { Authorization: `Bearer ${config.hcpToken}` },
+  });
   const observeRuntime = async () => {
     if (!sharing || !mayShareWorkspace(sharing, identity.root)) return { status: 'unavailable' as const, discoveredSessions: 0, evidence: 'Codex is installed but unshared by Agent policy.' };
+    if (!local) return { status: 'unavailable' as const, discoveredSessions: 0, evidence: 'Native server has not been started.' };
     try {
       const snapshot = await local.adapter.snapshot({ discover: true });
       return { status: snapshot.observationFailure ? 'degraded' as const : 'healthy' as const, discoveredSessions: snapshot.threads.length, evidence: snapshot.observationFailure?.code ?? 'Native inventory, thread cwd, exact root proof and Workspace binding observed.' };
@@ -80,7 +100,7 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
         kernel.connected = true;
         const observation = await observeRuntime();
         process.send?.({ kind: 'runtimeObservation', ...observation });
-        if (sharing && mayShareWorkspace(sharing, identity.root)) endpoint.startRealtimePush();
+        if (sharing && mayShareWorkspace(sharing, identity.root)) endpoint?.startRealtimePush();
         process.send?.({ kind: 'edgeReady' });
       } else {
         // A paused sharing policy rejects this typed request without tearing
@@ -92,24 +112,28 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
             ok: false, code: 'RUNTIME_UNSHARED', body: null });
           return;
         }
+        requireThat(!!endpoint, 'NATIVE_SERVER_NOT_STARTED');
         await acceptAgentAdoptionHcp(endpoint, config.target, message);
       }
     } catch (error) {
       kernel.connected = false; socket.close(); process.send?.({ kind: 'error', code: error instanceof Fault ? error.code : 'EDGE_ADMISSION_CLOSED' });
     }
   });
-  socket.on('close', () => { kernel.connected = false; endpoint.stop(); process.send?.({ kind: 'edgeDisconnected' }); });
+  socket.on('close', () => { kernel.connected = false; endpoint?.stop(); process.send?.({ kind: 'edgeDisconnected' }); });
   socket.on('error', () => { kernel.connected = false; });
   return {
     kernel,
     setRuntimeSharing: async (next: RuntimeSharing) => {
-      const wasShared = !!sharing && mayShareWorkspace(sharing, identity.root); sharing = next;
-      const isShared = mayShareWorkspace(sharing, identity.root);
-      if (wasShared && !isShared) endpoint.stop();
-      if (!wasShared && isShared) endpoint.startRealtimePush();
+      const wasShared = !!sharing && mayShareWorkspace(sharing, identity.root);
+      const isShared = mayShareWorkspace(next, identity.root);
+      if (!wasShared && isShared) await startLocal();
+      requireThat(kernel.connected, 'EDGE_DISCONNECTED');
+      sharing = next;
+      if (wasShared && !isShared) endpoint?.stop();
+      if (!wasShared && isShared) endpoint?.startRealtimePush();
       const observation = await observeRuntime(); process.send?.({ kind: 'runtimeObservation', ...observation }); return observation;
     },
-    close: async () => { endpoint.stop(); socket.close(); await local.close(); return true; },
+    close: async () => { endpoint?.stop(); socket.close(); await local?.close(); return true; },
   };
 }
 

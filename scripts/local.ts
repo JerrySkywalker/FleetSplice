@@ -136,7 +136,7 @@ export async function launch(root: string, executable: string, port = 43155, opt
   };
   const setRuntimeSharing = async (sharing: RuntimeSharing) => await new Promise<{ status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string }>((resolve, reject) => {
     if (!edge?.connected) { reject(new Error('RUNTIME_SHARING_UNAVAILABLE')); return; }
-    const id = randomUUID(); const timer = setTimeout(() => { edge?.off('message', handler); reject(new Error('RUNTIME_SHARING_TIMEOUT')); }, 10000);
+    const id = randomUUID(); const timer = setTimeout(() => { edge?.off('message', handler); reject(new Error('RUNTIME_SHARING_TIMEOUT')); }, 120000);
     const handler = (message: unknown) => {
       const response = message as { id?: string; result?: { status: 'healthy' | 'degraded' | 'unavailable'; discoveredSessions: number; evidence: string }; error?: string };
       if (response.id !== id) return;

@@ -61,6 +61,14 @@ test('production values cannot override the resolved first live Edge', () => {
   assert.ok(report.findings.some(f => f.field === 'FIRST_LIVE_EDGE' && f.code === 'UNKNOWN_ADMISSION_FIELD'));
 });
 
+test('OIDC callback must use the route served by the Hub', () => {
+  const draft = complete();
+  draft.values.OIDC_CALLBACK_URL = 'https://hub.fleet-owner.org/other/callback';
+  const report = validateGateSAdmission(draft);
+  assert.equal(report.category, 'INVALID_CONFIGURATION');
+  assert.ok(report.findings.some(f => f.field === 'OIDC_CALLBACK_URL' && f.code === 'OIDC_CALLBACK_INVALID'));
+});
+
 test('missing fields and raw secret keys fail closed', () => {
   const draft = complete() as any;
   delete draft.values.BACKUP_POLICY;

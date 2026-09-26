@@ -3,7 +3,7 @@
 Use the [current contract](acceptance-contract.md) and
 [G04A amendment](../architecture/amendments/g04a-visible-mvp-simplification.md).
 The immutable G03 and accepted G04A citations are both required for future
-implementation receipts. Current acceptance is in [G04A-status](../train/G04A-status.md).
+implementation receipts. Current readiness is in [current status](../train/current-status.md).
 
 ## Evidence vocabulary
 
@@ -14,7 +14,7 @@ implementation receipts. Current acceptance is in [G04A-status](../train/G04A-st
 | SYNTHETIC_BROWSER | UI/rendering/auth/cursor behavior in automation; not real phone/network dogfood. |
 | FAULT_INJECTION | Specified crash, loss, replay, race or recovery scenario actually exercised. |
 | LIVE_SINGLE_HOST | Real native Codex path on SKYFORGE under its exact environment. |
-| LIVE_REMOTE_BROWSER | Actual external/mobile-network browser -> Tencent -> SKYFORGE real Codex. |
+| LIVE_REMOTE_BROWSER | Actual external/mobile-network browser -> Tencent -> ZenBook14 real Codex. |
 | LIVE_TWO_HOST | Real selected Codex path on both required distinct Hosts. |
 | OWNER_ATTENDED_LIVE | Exact authorized enrollment, recovery, lifecycle or Owner dogfood operation. |
 | INDEPENDENT_EXACT_HEAD_REVIEW | Fresh separate read-only process examines literal SHA/tree and primary evidence. |
@@ -29,7 +29,7 @@ review only; product/hosted/live tests are NOT_RUN.
 | First goal | Required checks |
 | --- | --- |
 | G05 | Closed FleetCommand/plan/EdgeCommand contracts; Hub admission commit before delivery; Edge attempt flush before native write/spawn; duplicate/changed-ID/idempotency conflict; lost response before/after native start; native identity capture/unknown handling; exact Host/Environment/Workspace/runtime and lane fences; one local Edge/native writer; wrong principal/elevated token/root escape fail closed; local auth/Origin; visible ambiguity and blocked conflicting new IDs. Real prompt/stream is mandatory. |
-| G06 | Strict TLS/Host enrollment/challenge and stale-key rejection; browser passkey/cookie/Origin/CSRF/recovery; unauthorized event/output denial; exact harmless Allow Once and Deny; target interrupt/terminal race/delivery-loss no re-emission; reconnect cursor gap/deduplication; expiry/fence; actual remote path and narrow/fold/keyboard layouts; quiesced local-to-cloud Hub cutover and cold-start admission. |
+| G06 | Strict TLS/Host enrollment/challenge and stale-key rejection; generic OIDC/cookie/Origin/CSRF/recovery; unauthorized event/output denial; exact harmless Allow Once and Deny; target interrupt/terminal race/delivery-loss no re-emission; reconnect cursor gap/deduplication; expiry/fence; actual remote path and narrow/fold/keyboard layouts; quiesced local-to-cloud Hub cutover and cold-start admission. |
 | G07 | Both actual Hosts/Workspaces, selection-versus-admitted-target invariance, stale generation/runtime reconnect, controller CAS/takeover/fence race, rotation/revocation including disconnected predecessor and independent credentials. |
 | G08 | Browser/Hub/Edge/native restart, Hub-only/Edge-only/combined restore, response loss with and without native IDs, history/cursor/checkpoint/segment restoration, storage reopen/integrity/blob publication, frozen attempt markers, no replay effect and append-only ambiguity resolution. |
 | G09 | Actual candidate qualification and exact confirmed target; source quiescence/reconciliation, stale proposal/changed capability rejection, new segment/continuity labeling; verified NO_QUALIFIED_TARGET when none qualifies. |

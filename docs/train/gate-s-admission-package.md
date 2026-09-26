@@ -96,9 +96,11 @@ secret. `CORS_ORIGINS` is an array of exact HTTPS origins. The offline command
 is `npm run preflight -- <path-to-admission-v2.json>`. It prints JSON findings
 and a short human summary; exit status 0 means
 `READY_FOR_EXTERNAL_INFRA_VALIDATION`, 1 means `UNRESOLVED_OWNER_INPUT`, and 2
-means `INVALID_CONFIGURATION`. This command reads only the local file. It does
-not resolve DNS, contact an IdP or Edge, issue TLS material, write production
-configuration, or admit Gate S.
+means `INVALID_CONFIGURATION`. The validator reads only the supplied draft and
+writes its report to stdout; the npm command first compiles local TypeScript
+into `test-results/compiled`. It does not mutate the admission draft, resolve
+DNS, contact an IdP or Edge, issue TLS material, write production configuration,
+or admit Gate S.
 
 For local build/test prerequisites, run `npm run development:doctor`. It
 checks the qualified Node/SQLite pair, installed npm closure, Rust/Tauri,

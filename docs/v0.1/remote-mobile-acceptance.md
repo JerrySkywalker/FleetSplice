@@ -24,7 +24,7 @@ record a concrete follow-up; this does not falsify the real remote-browser PASS.
 
 | Step | Observable acceptance |
 | --- | --- |
-| Authenticate | User-verifying passkey at exact origin; no transcript before auth; expired/revoked session and cross-origin requests rejected. Attend the selected backup/recovery rehearsal. |
+| Authenticate | Generic OIDC at the exact registered origin/callback; no transcript before auth; expired/revoked session and cross-origin requests rejected. Verify the selected IdP MFA and recovery policy. |
 | Select | See ZenBook14, windows-user and registered Workspace with distinct durable IDs/generations, freshness and current Agent. Select explicitly. |
 | Session | Create and open a LogicalSession; see selected Lane/NativeSegment and controller/viewer state. Session identity is Fleet-owned. |
 | Prompt | Submit a real harmless prompt; see real native Codex streaming/tool/assistant output and running/terminal state. Correlate command/step/native IDs. |

@@ -87,7 +87,7 @@ export function validateGateSAdmission(input: unknown): GateSPreflightReport {
   const issuer = active('OIDC_ISSUER') === undefined ? null : parseUrl(active('OIDC_ISSUER'), ['https:']);
   if (active('OIDC_ISSUER') !== undefined && (!issuer || reservedHost(issuer.hostname))) add('OIDC_ISSUER', 'OIDC_ISSUER_INVALID');
   const callback = active('OIDC_CALLBACK_URL') === undefined ? null : parseUrl(active('OIDC_CALLBACK_URL'), ['https:']);
-  if (active('OIDC_CALLBACK_URL') !== undefined && (!callback || reservedHost(callback.hostname) || callback.pathname === '/')) add('OIDC_CALLBACK_URL', 'OIDC_CALLBACK_INVALID');
+  if (active('OIDC_CALLBACK_URL') !== undefined && (!callback || reservedHost(callback.hostname) || callback.pathname !== '/auth/oidc/callback')) add('OIDC_CALLBACK_URL', 'OIDC_CALLBACK_INVALID');
   if (callback && origin && callback.origin !== origin.origin) add('OIDC_CALLBACK_URL', 'OIDC_CALLBACK_ORIGIN_MISMATCH');
   if (active('OIDC_CLIENT_TYPE') !== undefined && !['PUBLIC', 'CONFIDENTIAL'].includes(String(active('OIDC_CLIENT_TYPE')))) add('OIDC_CLIENT_TYPE', 'OIDC_CLIENT_TYPE_INVALID');
   if (active('OIDC_CLIENT_ID') !== undefined && !/^[^\s]{1,256}$/.test(String(active('OIDC_CLIENT_ID')))) add('OIDC_CLIENT_ID', 'OIDC_CLIENT_ID_INVALID');

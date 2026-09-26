@@ -1,4 +1,4 @@
-import { GATE_S_FIELDS, type GateSField } from './admission-v2.ts';
+import { GATE_S_FIELDS, GATE_S_OWNER_DECISIONS, type GateSField } from './admission-v2.ts';
 import { isIP } from 'node:net';
 
 export type PreflightCategory = 'READY_FOR_EXTERNAL_INFRA_VALIDATION' | 'UNRESOLVED_OWNER_INPUT' | 'INVALID_CONFIGURATION';
@@ -51,8 +51,8 @@ export function validateGateSAdmission(input: unknown): GateSPreflightReport {
   if (root.schemaVersion !== 2) add('schemaVersion', 'ADMISSION_V2_REQUIRED');
   const decisions = object(root.decisions) ? root.decisions : {};
   for (const key of Object.keys(decisions)) if (!['HUMAN_AUTH_CONTRACT', 'FIRST_LIVE_EDGE'].includes(key)) add(`decisions.${key}`, 'UNKNOWN_DECISION_FIELD');
-  if (decisions.HUMAN_AUTH_CONTRACT !== 'GENERIC_OIDC') add('decisions.HUMAN_AUTH_CONTRACT', 'OWNER_AUTH_DECISION_MISMATCH');
-  if (decisions.FIRST_LIVE_EDGE !== 'SKYFORGE-01') add('decisions.FIRST_LIVE_EDGE', 'OWNER_EDGE_DECISION_MISMATCH');
+  if (decisions.HUMAN_AUTH_CONTRACT !== GATE_S_OWNER_DECISIONS.HUMAN_AUTH_CONTRACT) add('decisions.HUMAN_AUTH_CONTRACT', 'OWNER_AUTH_DECISION_MISMATCH');
+  if (decisions.FIRST_LIVE_EDGE !== GATE_S_OWNER_DECISIONS.FIRST_LIVE_EDGE) add('decisions.FIRST_LIVE_EDGE', 'OWNER_EDGE_DECISION_MISMATCH');
   const values = object(root.values) ? root.values : {};
   if (!object(root.values)) add('values', 'ADMISSION_VALUES_REQUIRED');
   for (const field of GATE_S_FIELDS) {
@@ -93,7 +93,6 @@ export function validateGateSAdmission(input: unknown): GateSPreflightReport {
   if (active('OIDC_CLIENT_ID') !== undefined && !/^[^\s]{1,256}$/.test(String(active('OIDC_CLIENT_ID')))) add('OIDC_CLIENT_ID', 'OIDC_CLIENT_ID_INVALID');
   const custody = active('OIDC_SECRET_CUSTODY_REFERENCE_OR_POLICY');
   if (custody !== undefined && (typeof custody !== 'string' || !/^(?:policy|vault|document):\/\/[A-Za-z0-9/_.:-]+$/.test(custody))) add('OIDC_SECRET_CUSTODY_REFERENCE_OR_POLICY', 'CUSTODY_REFERENCE_REQUIRED');
-  if (active('FIRST_LIVE_EDGE') !== undefined && active('FIRST_LIVE_EDGE') !== 'SKYFORGE-01') add('FIRST_LIVE_EDGE', 'FIRST_LIVE_EDGE_MISMATCH');
   const cors = active('CORS_ORIGINS');
   if (cors !== undefined) {
     if (!Array.isArray(cors) || cors.length === 0 || cors.some(item => typeof item !== 'string' || item === '*' || !parseUrl(item, ['https:'], true))) add('CORS_ORIGINS', 'EXACT_HTTPS_CORS_ORIGINS_REQUIRED');

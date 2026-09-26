@@ -15,7 +15,7 @@ const complete = () => ({
     RESOURCE_LIMITS: 'documented CPU memory disk connection limits', ENROLLMENT_OPERATOR: 'named owner operator',
     REVOCATION_OPERATOR: 'named owner operator', BACKUP_POLICY: 'documented encrypted backup and retention',
     RESTORE_POLICY: 'documented cold restore and readmission', MONITORING_POLICY: 'documented health and expiry monitoring',
-    INCIDENT_OWNER: 'named incident owner', ROLLBACK_OWNER: 'named rollback owner', FIRST_LIVE_EDGE: 'SKYFORGE-01',
+    INCIDENT_OWNER: 'named incident owner', ROLLBACK_OWNER: 'named rollback owner',
     CORS_ORIGINS: ['https://hub.fleet-owner.org'],
   },
 });
@@ -25,7 +25,8 @@ test('v2 draft retains explicit unresolved fields and resolved owner decisions',
   assert.deepEqual(template, createGateSAdmissionDraftV2());
   const report = validateGateSAdmission(createGateSAdmissionDraftV2());
   assert.equal(report.category, 'UNRESOLVED_OWNER_INPUT');
-  assert.equal(report.unresolved.length, 22);
+  assert.equal(report.unresolved.length, 21);
+  assert.equal(Object.hasOwn(template.values, 'FIRST_LIVE_EDGE'), false);
   assert.equal(report.admitted, false);
 });
 
@@ -43,12 +44,20 @@ test('rejects fake hostnames, transport drift, embedded secrets, and owner decis
   draft.values.OIDC_CALLBACK_URL = 'https://other.example.com/callback';
   draft.values.OIDC_SECRET_CUSTODY_REFERENCE_OR_POLICY = 'client_secret=x';
   draft.values.CORS_ORIGINS = ['*'];
-  draft.values.FIRST_LIVE_EDGE = 'OTHER';
+  draft.decisions = { ...draft.decisions, FIRST_LIVE_EDGE: 'OTHER' } as any;
   const report = validateGateSAdmission(draft);
   assert.equal(report.category, 'INVALID_CONFIGURATION');
   for (const code of ['PUBLIC_HOSTNAME_INVALID_OR_EXAMPLE', 'HCP_WSS_ENDPOINT_INVALID', 'OIDC_CALLBACK_ORIGIN_MISMATCH',
-    'EMBEDDED_SECRET_FORBIDDEN', 'EXACT_HTTPS_CORS_ORIGINS_REQUIRED', 'FIRST_LIVE_EDGE_MISMATCH'])
+    'EMBEDDED_SECRET_FORBIDDEN', 'EXACT_HTTPS_CORS_ORIGINS_REQUIRED', 'OWNER_EDGE_DECISION_MISMATCH'])
     assert.ok(report.findings.some(f => f.code === code), code);
+});
+
+test('production values cannot override the resolved first live Edge', () => {
+  const draft = complete() as any;
+  draft.values.FIRST_LIVE_EDGE = 'OTHER';
+  const report = validateGateSAdmission(draft);
+  assert.equal(report.category, 'INVALID_CONFIGURATION');
+  assert.ok(report.findings.some(f => f.field === 'FIRST_LIVE_EDGE' && f.code === 'UNKNOWN_ADMISSION_FIELD'));
 });
 
 test('missing fields and raw secret keys fail closed', () => {

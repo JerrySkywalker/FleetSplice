@@ -76,8 +76,10 @@ does not make production infrastructure ready or authorize deployment.
 
 The active machine-readable draft is
 [Gate S admission v2](gate-s-admission-v2.template.json). Its resolved decision
-metadata records generic OIDC and SKYFORGE-01 while every production value
-remains `UNRESOLVED`. Historical v1 `packages/predeploy/placeholders.ts` remains
+metadata records generic OIDC and SKYFORGE-01. The 21 production infrastructure
+inputs remain `UNRESOLVED`; `FIRST_LIVE_EDGE` exists only in resolved decision
+metadata, and offline preflight rejects attempts to override it under `values`.
+Historical v1 `packages/predeploy/placeholders.ts` remains
 the local predeploy invariant, including its former RP_ID field; it is not the
 active generic OIDC admission requirement. The v2 draft is the authoritative
 machine-readable production input surface for a future Gate S review. This

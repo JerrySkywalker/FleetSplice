@@ -7,11 +7,13 @@ Pre-Gate-S S00-S11 train are complete locally. PR #11 was merged into
 Owner's Gate S decisions at `552843ed36f213b80228457cd6bd0a5bf34e1117`.
 The previous controlling
 handoff `78c6d08bc1feead8496cea85a3ec52b3e2a0d4a1` is historical ancestry,
-not the current implementation head. The [S11 receipt](receipts/PGS-S11-installer-dogfood-closeout.md)
+not the latest merged baseline. The [S11 receipt](receipts/PGS-S11-installer-dogfood-closeout.md)
 and its terminal tokens remain historical evidence, including S11's
 274-pass/3-fail managed-pin debt. Near-term UI/UX remains frozen. The G05C
-freeze below is historical product provenance, not the current implementation
-head.
+freeze below is historical product provenance, not the latest merged baseline.
+`PR13_BASE_MERGE_HEAD` names the exact PR #12 merge into the train branch;
+it does not claim to identify this document's PR candidate or its future merge.
+Candidate and merge SHAs belong in PR and receipt history once established.
 
 ```text
 ARCHITECTURE_0_1_READY=true
@@ -27,7 +29,7 @@ NEXT_DEVELOPMENT_CLASS=FUNCTIONAL_PRODUCT_WORK
 G06_STARTED=true
 G06_PHASE=PREDEPLOY_LOCAL_COMPLETE
 G06_PREDEPLOY_READY=true
-CURRENT_IMPLEMENTATION_HEAD=552843ed36f213b80228457cd6bd0a5bf34e1117
+PR13_BASE_MERGE_HEAD=552843ed36f213b80228457cd6bd0a5bf34e1117
 PR11_MERGED=true
 PR12_MERGED=true
 TENCENT_DEPLOYMENT_GATE=WAITING_SERVER_READY

@@ -25,7 +25,9 @@
     "tokens:generate": "node scripts/tokens/generate.mjs",
     "tokens:check": "node scripts/tokens/check.mjs",
     "perf:local-audit": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/perf/local-audit.js",
-    "perf:soak": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/perf/soak.js"
+    "perf:soak": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/perf/soak.js",
+    "preflight": "node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json && node scripts/with-qualified-node.mjs test-results/compiled/scripts/preflight.js",
+    "development:doctor": "node scripts/development-doctor.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",

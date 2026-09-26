@@ -25,6 +25,7 @@ export type HubPredeployConfig = {
   allowedOrigins: string[];
   requestTimeoutMs: number;
   maxBodyBytes: number;
+  /** Historical v1 local predeploy invariant; Gate S admission uses v2 offline. */
   admission: ProductionAdmissionDraft;
 };
 

@@ -1,7 +1,8 @@
 /**
  * Ingress contract / template only.
  * Does not modify NginxUI or any production ingress.
- * Production host/TLS values stay UNRESOLVED placeholders.
+ * Production host/TLS values stay UNRESOLVED placeholders. Active Gate S
+ * inputs are the v2 admission draft validated offline before external audit.
  */
 
 export type IngressContractTemplate = {

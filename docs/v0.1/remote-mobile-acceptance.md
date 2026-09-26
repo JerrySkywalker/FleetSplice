@@ -8,9 +8,9 @@ It consumes the [Tencent Hub design](tencent-mobile-deployment.md), one
 ## Real path
 
 Use Xiaomi Fold on mobile data, or an ordinary real remote browser outside the
-SKYFORGE local/loopback path until the phone arrives:
+ZenBook14 local/loopback path until the phone arrives:
 
-`browser -> HTTPS Tencent Beijing Hub + WebUI -> authenticated outbound WSS HCP -> SKYFORGE windows-user Edge -> native Codex app-server`.
+`browser -> HTTPS Tencent Beijing Hub + WebUI -> authenticated outbound WSS HCP -> ZenBook14 windows-user Edge -> native Codex app-server`.
 
 Record device/browser, actual remote network class, HTTPS origin, exact
 Hub/Edge/native build and identities, selected Workspace, Fleet command/step
@@ -24,8 +24,8 @@ record a concrete follow-up; this does not falsify the real remote-browser PASS.
 
 | Step | Observable acceptance |
 | --- | --- |
-| Authenticate | User-verifying passkey at exact origin; no transcript before auth; expired/revoked session and cross-origin requests rejected. Attend the selected backup/recovery rehearsal. |
-| Select | See SKYFORGE-01, windows-user and registered Workspace with distinct durable IDs/generations, freshness and current Agent. Select explicitly. |
+| Authenticate | Generic OIDC at the exact registered origin/callback; no transcript before auth; expired/revoked session and cross-origin requests rejected. Verify the selected IdP MFA and recovery policy. |
+| Select | See ZenBook14, windows-user and registered Workspace with distinct durable IDs/generations, freshness and current Agent. Select explicitly. |
 | Session | Create and open a LogicalSession; see selected Lane/NativeSegment and controller/viewer state. Session identity is Fleet-owned. |
 | Prompt | Submit a real harmless prompt; see real native Codex streaming/tool/assistant output and running/terminal state. Correlate command/step/native IDs. |
 | Approval | Exercise both Allow Once and Deny on harmless native approval requests. Show complete target, action, privilege/Environment, offered choices and revision. Each request resolves at most once; stale/changed requests reject. |
@@ -33,7 +33,7 @@ record a concrete follow-up; this does not falsify the real remote-browser PASS.
 | Reconnect | Temporarily interrupt browser/network access and reconnect to the same Hub/Edge incarnation. Resume authorized projection/output from a known cursor or show an explicit gap/resync. Lookup in-flight commandId; never resend as a new turn. |
 | Control | Same authenticated client may resume within grace. A fresh browser is a viewer until it acquires an unowned lane after Edge fence acknowledgement. Active-owner rich takeover is qualified in G07. |
 | Identity | Tamper with selected target/generation, stale grant/epoch or old runtime evidence; observe no-effect rejection and honest UNKNOWN/STALE state on disconnect. |
-| Away-from-computer use | Owner can complete the above without a SKYFORGE port, RDP session or person at its keyboard. Initial enrollment/bootstrap may be attended; routine remote use may not depend on it. |
+| Away-from-computer use | Owner can complete the above without a ZenBook14 inbound port, RDP session or person at its keyboard. Initial enrollment/bootstrap may be attended; routine remote use may not depend on it. |
 
 Basic reconnect does not claim complete server/native restart history recovery;
 that visible increment is G08. G06 server/Edge restart still must fail closed and
@@ -58,7 +58,7 @@ remote path, and actual Fold dogfood when available.
 
 ## Extension and release
 
-G07 repeats the path on both SKYFORGE and ZenBook; switching selection cannot
+G07 repeats the path on ZenBook14 and a separately qualified second Host; switching selection cannot
 retarget admitted commands, and takeover fences the previous controller.
 G08 repeats disconnect/restart and honest history/ambiguity recovery.
 G10 requires two-host/mobile Owner dogfood, longer sessions/history and release

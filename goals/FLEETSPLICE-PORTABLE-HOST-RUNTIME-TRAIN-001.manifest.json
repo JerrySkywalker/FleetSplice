@@ -1,0 +1,30 @@
+{
+  "schema": "fleetsplice-goal-train.v1",
+  "train_id": "FLEETSPLICE-PORTABLE-HOST-RUNTIME-TRAIN-001",
+  "serial": true,
+  "owner_manual_gate": "OWNER_FIRST_ZENBOOK14_EXPERIENCE",
+  "stop_after": "P06",
+  "production_mutation": false,
+  "first_live_g06_edge": "ZENBOOK14",
+  "children": [
+    ["P00", "FLEETSPLICE-PORTABLE-P00-ZENBOOK14-TOPOLOGY-001", "goals/FLEETSPLICE-PORTABLE-P00-ZENBOOK14-TOPOLOGY-001.md"],
+    ["P01", "FLEETSPLICE-PORTABLE-P01-SHARED-SERVER-SPIKE-001", "goals/FLEETSPLICE-PORTABLE-P01-SHARED-SERVER-SPIKE-001.md"],
+    ["P02", "FLEETSPLICE-PORTABLE-P02-AGENT-SUPERVISED-SERVER-001", "goals/FLEETSPLICE-PORTABLE-P02-AGENT-SUPERVISED-SERVER-001.md"],
+    ["P03", "FLEETSPLICE-PORTABLE-P03-NATIVE-CUSTODY-001", "goals/FLEETSPLICE-PORTABLE-P03-NATIVE-CUSTODY-001.md"],
+    ["P04", "FLEETSPLICE-PORTABLE-P04-ZENBOOK14-REAL-E2E-001", "goals/FLEETSPLICE-PORTABLE-P04-ZENBOOK14-REAL-E2E-001.md"],
+    ["P05", "FLEETSPLICE-PORTABLE-P05-INSTALLED-DOGFOOD-001", "goals/FLEETSPLICE-PORTABLE-P05-INSTALLED-DOGFOOD-001.md"],
+    ["P06", "FLEETSPLICE-PORTABLE-P06-OWNER-EXPERIENCE-HANDOFF-001", "goals/FLEETSPLICE-PORTABLE-P06-OWNER-EXPERIENCE-HANDOFF-001.md"]
+  ],
+  "gates": [
+    {
+      "after": "P01",
+      "id": "A",
+      "condition": "official shared app-server path works on ZenBook14 without managed daemon or Job-guard bypass"
+    },
+    {
+      "after": "P04",
+      "id": "B",
+      "condition": "real same-thread TUI/Web Native Adoption path passes on ZenBook14 with restart/reconnect fencing"
+    }
+  ]
+}

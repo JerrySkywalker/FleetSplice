@@ -11,14 +11,14 @@ deployment artifact is authorized by this document.
 
 | Location | Responsibilities / durable state | Secrets that stay here |
 | --- | --- | --- |
-| Tencent Cloud Beijing VPS | Single active Hub, built WebUI/backend, local durable Hub SQLite/journal, authorized transcript/projections, HTTPS/WSS ingress. | TLS key, Hub service/transport identity, server-side browser sessions and passkey public verification records. Provider/Windows credentials never belong here. |
-| SKYFORGE-01 | One windows-user Edge, local Workspace/path/process truth, Codex stdio, local Edge journal/spool, native execution/binding configuration. | Edge private enrollment key, provider credentials/native auth home and local execution state. DPAPI-protected key custody where selected. |
-| Xiaomi Fold / ordinary browser | Responsive Fleet-owned views; clientInstanceId; explicit commands and receipt lookup. | Owner's authenticator/passkey private material and opaque secure session cookie. No provider credential or Host private key. |
-| ZenBook Duo from G07 | Second independent Edge/Workspace/native environment through the same Hub. | Its own independent credentials, never copied from SKYFORGE. |
+| Tencent Cloud Beijing VPS | Single active Hub, built WebUI/backend, local durable Hub SQLite/journal, authorized transcript/projections, HTTPS/WSS ingress. | TLS key, Hub service/transport identity and server-side browser sessions. Provider/Windows credentials never belong here. |
+| ZenBook14 | One windows-user Edge, local Workspace/path/process truth, qualified shared Codex app-server, local Edge journal/spool, native execution/binding configuration. | Edge private enrollment key, provider credentials/native auth home and local execution state. DPAPI-protected key custody where selected. |
+| Xiaomi Fold / ordinary browser | Responsive Fleet-owned views; clientInstanceId; explicit commands and receipt lookup. | Owner's IdP authentication material and opaque secure Fleet session cookie. No provider credential or Host private key. |
+| Separately qualified second Host from G07 | Second independent Edge/Workspace/native environment through the same Hub. | Its own independent credentials, never copied from ZenBook14. |
 
 The phone connects by HTTPS only to the Tencent URL. The Edge opens outbound
-authenticated WSS HCP to that Hub; SKYFORGE exposes no Fleet listening port to
-the phone or Internet. Native Codex app-server stdio is local to Edge.
+authenticated WSS HCP to that Hub; ZenBook14 exposes no Fleet listening port to
+the phone or Internet. Native Codex app-server endpoint remains local to Edge.
 Hub does not launch/supervise native processes on Tencent as a substitute.
 
 ## Remote admission and exposure
@@ -32,7 +32,7 @@ until explicit fencing/reconciliation. Network address and display name are
 never identity. Reconnect repairs snapshot/cursor state before enabling mutation.
 
 The G06 admission records the exact Owner-controlled Tencent instance, region,
-hostname/origin/RP ID, certificate/ingress termination, service principal, data
+hostname/origin/OIDC callback, certificate/ingress termination, service principal, data
 path, resource/disk budget, retention exposure and manual recovery plan.
 Those identifiers are intentionally unselected in G04A; no production probing
 is needed to freeze this topology. A later deployment cannot borrow authority
@@ -42,7 +42,7 @@ The minimal public surface is HTTPS/WSS ingress to the single Owner service.
 Management access stays under the Owner's existing separately authorized
 administration path. No public database, directory listing, native RPC,
 unauthenticated event/blob endpoint or wildcard CORS. Use one exact origin,
-passkey authentication, server-side sessions, CSRF/Origin checks, rate/size
+generic OIDC authentication, server-side sessions, CSRF/Origin checks, rate/size
 limits, safe output rendering, request timeouts and bounded logs. The WebUI
 receives authorized content, never local auth files or credential references
 that can be redeemed outside the target Environment.
@@ -58,7 +58,7 @@ it before exposure. No Docker file is created in G04A.
 
 Before using the cloud Hub, stop new local Hub admission, prove existing native
 turn closure or keep the affected scope blocked, stop the local Hub and retain
-its journals. Enroll SKYFORGE to a fresh cloud authority incarnation explicitly.
+its journals. Enroll ZenBook14 to a fresh cloud authority incarnation explicitly.
 Optionally import verified logical session evidence, but never reuse old grants,
 runtime decisions, cookies or queued commands as live authority. A fresh cloud
 session is enough for G06; full history transfer belongs to G08.
@@ -80,7 +80,7 @@ harmless approval, interrupt and reconnect. Synthetic responsive tests or
 loopback requests cannot establish remote usability.
 
 If the Xiaomi Fold has not arrived, use an actual remote browser outside
-SKYFORGE/local loopback and record device/network/path evidence; phone Owner
+ZenBook14/local loopback and record device/network/path evidence; phone Owner
 dogfood remains a tracked follow-up when available. G10 requires the real
 two-host/mobile Owner path or an explicit Owner change of acceptance; no silent
 substitution at release. An unusable Tencent deployment blocks G06, never G05.

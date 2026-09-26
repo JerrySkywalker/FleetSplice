@@ -1,9 +1,9 @@
 # FleetSplice Full Development Train Roadmap
 
-Current execution is the Owner-approved
-[G05A UX foundation](../../goals/FLEETSPLICE-V0_1-M0_1-OWNER-UX-FOUNDATION-005A.md);
-[current status](../train/G05A-status.md) governs its bounded authorization.
-G05 is accepted. G06 remains unstarted. The historical
+Current bounded execution is the Owner-approved
+[portable-host runtime train](../../goals/FLEETSPLICE-PORTABLE-HOST-RUNTIME-TRAIN-001.md);
+[current status](../train/current-status.md) governs its authorization.
+G06 predeploy local work is complete; live G06 remains unaccepted. The historical
 [root train](../../goals/FLEETSPLICE-FULL-DEVELOPMENT-TRAIN-001.md)
 and [manifest](../../goals/train-manifest.v1.json) retain the pre-insertion
 sequence; the active Owner-approved insertion is G05 -> G05A -> G06 below.
@@ -17,8 +17,8 @@ concrete unavoidable dependency and shortest visible delivery path.
 | Pre-development | G01-G04 + G04A | Accepted architecture plus amended implementation contract; independent audit; stop before product. |
 | Local walking skeleton | G05 | SKYFORGE local browser real Codex create/continue/prompt/stream, minimal W1/W5. |
 | Owner UX foundation | G05A | zh-CN/en-US, system/light/dark/OLED appearance and compact preferences on the same real local Codex path. |
-| Remote mobile MVP | G06 | Phone/real remote browser -> Tencent Hub + WebUI -> outbound WSS SKYFORGE Edge -> real Codex, approval/interrupt/reconnect; v0.1-alpha.1. |
-| Multi-host | G07 | Select/operate SKYFORGE or ZenBook, exact generations and explicit controller takeover. |
+| Remote mobile MVP | G06 | Phone/real remote browser -> Tencent Hub + WebUI -> outbound WSS ZenBook14 Edge -> real Codex, approval/interrupt/reconnect; v0.1-alpha.1. |
+| Multi-host | G07 | Select/operate ZenBook14 and a separately qualified second Host, exact generations and explicit controller takeover. |
 | Durable recovery | G08 | Return after close/restart/disconnect to the same honest session/history/ambiguity. |
 | Provider migration | G09 | Qualified explicit migration or visible NO_QUALIFIED_TARGET. |
 | v0.1 release | G10 | Hardened two-host/mobile Owner dogfood, storage/security/backup/update/long history. |
@@ -32,7 +32,7 @@ concrete unavoidable dependency and shortest visible delivery path.
 G05 -> G05A -> G06-G10 are serial visible slices. One HCP semantic protocol uses same-host
 loopback in G05 and authenticated Edge-initiated WSS from G06.
 Tencent hosts Hub + WebUI and durable Hub state. Provider credentials, Codex and
-Workspace truth stay at SKYFORGE/ZenBook. No separate Relay or public Edge port.
+Workspace truth stays at ZenBook14 for first live G06. No separate Relay or public Edge port.
 
 G05 does not depend on mobile/remote policy, second Host, ACP, Admin/WSL, TUI,
 migration, full history, external AuthorityAnchor, renewable permits or G10

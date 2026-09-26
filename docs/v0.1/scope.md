@@ -15,7 +15,9 @@ by later implementation receipts.
 One Owner-facing URL controls real Codex sessions on a small Fleet, with local
 truth and provider credentials kept at each per-user Edge. The first useful
 remote product is G06: mobile browser -> Tencent Beijing Hub + WebUI ->
-SKYFORGE-01 windows-user Edge -> native Codex. ZenBook Duo follows in G07.
+ZenBook14 windows-user Edge -> native Codex. A separately qualified second
+Host follows in G07. The portable-host runtime train supersedes the historical
+first-live SKYFORGE topology.
 
 `VISIBLE_INCREMENT_RULE=true`. Every major implementation Goal ends in a
 directly operable and observable capability. Infrastructure-only chains delaying
@@ -25,8 +27,8 @@ and the shortest visible delivery path.
 | Goal | Visible increment | Boundary |
 | --- | --- | --- |
 | G05 / M0 | Local SKYFORGE real Codex prompt/stream, choose Workspace, create/continue session. | Minimum W1/W5; same-host loopback HCP; real native session, never fixture-only PASS. |
-| G06 / M1 | Remote mobile MVP, v0.1-alpha.1: secure login, session/prompt/stream, harmless approval, interrupt, basic reconnect and state. | Tencent Hub + WebUI; real mobile-network or equivalent remote browser; no ZenBook dependency. |
-| G07 / M2 | Operate either SKYFORGE or ZenBook from the same browser/mobile UI. | Distinct identities, selected Workspace, no silent retarget, explicit controller/takeover. |
+| G06 / M1 | Remote mobile MVP, v0.1-alpha.1: secure login, session/prompt/stream, harmless approval, interrupt, basic reconnect and state. | Tencent Hub + WebUI; real mobile-network or equivalent remote browser; ZenBook14 is the first live Edge. |
+| G07 / M2 | Operate ZenBook14 and a separately qualified second Host from the same browser/mobile UI. | Distinct identities, selected Workspace, no silent retarget, explicit controller/takeover. |
 | G08 / M3 | Restart/disconnect and return to the same honest Fleet session/history. | Complete recovery journals, checkpoints/cursors, response-loss reconciliation and explicit ambiguity. |
 | G09 / M4 | Confirm qualified migration or see evidence-backed NO_QUALIFIED_TARGET. | No transparent failover or credential copying. |
 | G10 | Hardened two-host/mobile release with usable backup/restore/update/rollback. | No feature expansion except safety/acceptance defects. |

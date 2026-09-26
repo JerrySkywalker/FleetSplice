@@ -3,13 +3,13 @@
 ## Objective
 
 G06 — REMOTE MOBILE MVP, first product/dogfood milestone, v0.1-alpha.1.
-G06_TARGET=PHONE_TENCENT_HUB_SKYFORGE_REAL_CODEX.
+G06_TARGET=PHONE_TENCENT_HUB_ZENBOOK14_REAL_CODEX.
 VISIBLE_INCREMENT_RULE=true.
 
 ```text
 Xiaomi Fold / ordinary real remote browser
  -> HTTPS -> Tencent Cloud Beijing Hub + WebUI + durable Hub state
- <- authenticated outbound WSS HCP <- SKYFORGE-01 windows-user Edge
+ <- authenticated outbound WSS HCP <- ZENBOOK14 windows-user Edge
  -> native Codex app-server (behind Edge)
 ```
 
@@ -24,9 +24,9 @@ changes and Owner-attended enrollment/browser recovery before live work.
 Use cloud Hub + WebUI, one semantic HCP, no separate FleetSplice Relay.
 Explicitly quiesce and retire the local Hub's active authority before cloud
 enrollment; no dual Hub or automatic reuse of old grants/queued effects.
-No phone-to-SKYFORGE listening port; provider credentials remain local.
+No phone-to-ZenBook14 listening port; provider credentials remain local.
 
-Minimum product: secure browser login, SKYFORGE/Workspace visibility,
+Minimum product: secure browser login, ZenBook14/Workspace visibility,
 LogicalSession create/open, real prompt/stream, Allow Once and Deny on harmless
 approvals, exact-turn interrupt, basic authenticated reconnect/resume and
 visible Host/Environment/Agent/turn/controller state. Keep the G05 kernel.
@@ -47,7 +47,7 @@ harmless approval/interrupt response-loss behavior, bounded output replay and
 cold-start admission. Full durable server/native recovery is G08; G06 still
 fails closed on restart and never resurrects authority.
 
-ZenBook, ACP, Admin/WSL, TUI, migration, full history and G10 retention/update
+Second-Host enrollment, ACP, Admin/WSL, TUI, migration, full history and G10 retention/update
 policy do not block G06. Unavailable required Tencent/remote path returns a
 specific blocker rather than PASS.
 

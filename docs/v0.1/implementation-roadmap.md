@@ -52,8 +52,8 @@ G05 local real Codex
 | G05B | Accepted G05A and explicit G05B-only authorization | Safe ordinary-user start/stop/status/doctor, predecessor classification, detached supervisor, clean native closure. | `PASS_M0_2_SAFE_LOCAL_OPERATION` |
 | G05B-R1 | Accepted G05B and bounded correction authorization | Persistent per-user proxy configuration; fresh-shell operation without `syncproxy`; real detached-lifecycle dogfood. | `PASS_G05B_R1_PERSISTENT_PROXY` |
 | G05C | Accepted local native-control train; bounded documentation closeout; UI portability freeze | Workspace and live capability / session permission controls; native TUI adoption, same-thread continuation, source/timing/activity, exact-turn Steer/Interrupt, renewal, inspectable command approvals, viewer isolation, TUI/Web race safety and return to TUI; accepted responsive Web/mobile surface and frozen near-term UI/UX. | `PASS_G05C_FINAL_PROMOTION_READY_FOR_INDEPENDENT_REVIEW` with matching independent acceptance |
-| G06 | Accepted and personally dogfooded G05C plus separate Owner authorization and Tencent deployment admission | Project the already-proven control surface and already-accepted responsive Web/mobile UI to a secure real phone/browser session through Tencent Hub + WebUI and authenticated outbound Edge WSS; validate reconnect, Owner auth and needs-attention behavior on the real remote topology. Do not re-implement mobile UI as a first invention. | `PASS_M1_REMOTE_MOBILE_MVP`; `v0.1-alpha.1` |
-| G07 | G06; ZenBook and O2b/O4b | Real turns on both selected Hosts, exact identity on reconnect, viewer/controller/takeover. | `PASS_M2_MULTI_HOST` |
+| G06 | Accepted and personally dogfooded G05C plus separate Owner authorization and Tencent deployment admission; ZenBook14 portable-host runtime qualification | Project the already-proven control surface and already-accepted responsive Web/mobile UI to a secure real phone/browser session through Tencent Hub + WebUI and authenticated outbound ZenBook14 Edge WSS; validate reconnect, Owner auth and needs-attention behavior on the real remote topology. Do not re-implement mobile UI as a first invention. | `PASS_M1_REMOTE_MOBILE_MVP`; `v0.1-alpha.1` |
+| G07 | G06; separately qualified second Host and O2b/O4b | Real turns on both selected Hosts, exact identity on reconnect, viewer/controller/takeover. | `PASS_M2_MULTI_HOST` |
 | G08 | G07; D1a when recovery/backup first used | Complete durable session/history, journals/cursors/checkpoints and restart/loss reconciliation. | `PASS_M3_DURABLE_SESSION` |
 | G09 | G08; qualified candidate evidence and explicit target confirmation if activating | Actual migration or visibly honest `NO_QUALIFIED_TARGET`. | `PASS_M4_PROVIDER_MIGRATION` |
 | G10 | G09; D1b and all remaining release gates | Hardened two-host/mobile Owner dogfood, storage/security/backup/update/long history. | `PASS_V0_1_RELEASE_ACCEPTED` |
@@ -95,8 +95,10 @@ remote WSS. G06 uses Tencent Hub + WebUI; there is no separate FleetSplice Relay
 service/protocol and no phone-to-development-host inbound listening port. The
 Edge initiates the remote connection and provider credentials remain local by
 default. Target host identity remains `tencent-pek-01` when deployment is later
-authorized. Current gate:
-see [current status](../train/current-status.md) and the Gate S decision package.
+authorized. The completed production-readiness audit is
+`BLOCKED_INFRASTRUCTURE_NOT_READY`. See [current status](../train/current-status.md)
+and the [Gate S decision package](../train/gate-s-admission-package.md) for the
+active v2 admission draft, offline validator and later external gate sequence.
 
 Remote enrollment/auth, ZenBook, full history, ACP, Admin/WSL, TUI, provider
 migration, generic helper breadth, AuthorityAnchor or G10 policy cannot become

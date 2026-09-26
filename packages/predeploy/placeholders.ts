@@ -1,6 +1,7 @@
 /**
- * Production admission placeholders for G06. Values must remain unresolved
- * until Owner fills real production admission/config. Never invent fake
+ * Historical v1 local predeploy placeholders for G06. The active Gate S
+ * admission draft is v2 in admission-v2.ts. Values here remain unresolved;
+ * the Owner supplies production admission separately. Never invent fake
  * production hostnames, origins, TLS material, or custody answers.
  */
 export const PRODUCTION_PLACEHOLDERS = [

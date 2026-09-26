@@ -29,7 +29,7 @@ remains historical evidence only.
 | 8. Backup/restore | `<BACKUP_OPERATOR>`, `<DESTINATION_AND_ENCRYPTION>`, `<RETENTION>`, `<RPO_RTO>`. Stop processes before replacing stores; rehearse a cold, admission-closed restore. Reconcile old native effects and invalidate old authority before explicit re-admission. A copied database, new generation or elapsed timeout cannot prove predecessor closure. |
 | 9. Monitoring/logging | `<MONITORING_OPERATOR_AND_DESTINATION>`; TLS expiry, service health, outbound WSS freshness, admission-closed/recovery state, disk/journal failures and backup alerts. Correlate command/receipt identities without logging tokens, cookies, provider credentials or unrestricted transcripts. Specify redaction, access and retention. |
 | 10. Incident/rollback | `<INCIDENT_OWNER>`, `<CONTACT_PATH>`, `<ROLLBACK_OPERATOR_AND_KNOWN_BUILD>`. Stop new admission, preserve evidence, reconcile unknown effects, stop old components and cold-start fail-closed. Rollback is not replay or automatic recovery; require explicit re-admission. |
-| 11. First live Edge | SKYFORGE-01; `<SKYFORGE_WINDOWS_PRINCIPAL>`, `<REGISTERED_WORKSPACE>`, current native runtime source identity/capabilities, outbound connectivity, power/network policy and attended enrollment remain unverified. Fresh SKYFORGE qualification is required before enrollment/deployment. Decision B below is resolved. |
+| 11. First live Edge | ZenBook14; `<ZENBOOK14_WINDOWS_PRINCIPAL>`, `<REGISTERED_WORKSPACE>`, current native runtime source identity/capabilities, outbound connectivity, power/network policy and attended enrollment remain unverified. Real ZenBook14 qualification is required before enrollment/deployment. Decision B below is resolved. |
 | 12. External/mobile acceptance | `<DEVICE_BROWSER>`, `<EXTERNAL_OR_MOBILE_NETWORK>`, `<OWNER_TEST_WINDOW>`. Real HTTPS Tencent Gateway -> authenticated outbound WSS -> selected real native Edge. Record prompt/stream, Allow Once/Deny, exact-turn interrupt, viewer/controller fencing, same-incarnation reconnect/lookup without replay and away-from-computer operation. Responsive emulation, localhost HTTPS/WSS and LAN-only tests cannot substitute. |
 
 ## Decision A: generic OIDC for first live G06 — resolved
@@ -54,24 +54,69 @@ provider/preset in the local train and is now the Owner-selected production
 candidate; no production application, secret or configuration is established.
 The readiness audit must verify its production capability and policy.
 
-## Decision B: SKYFORGE-01 first live G06 Edge — resolved
+## Decision B: ZenBook14 first live G06 Edge — resolved
 
-The Owner keeps SKYFORGE-01 as the first live G06 Edge and ZenBook14 as the
-primary development machine. The accepted older topology and
-[G06 deployment design](../v0.1/tencent-mobile-deployment.md) already name
-SKYFORGE-01, which has historical S10 native-daemon evidence. ZenBook14
-currently cannot start the Codex managed daemon because of the external
-Windows residual-Job blocker. Selecting SKYFORGE preserves the named live
-acceptance target. Historical SKYFORGE evidence does not qualify the current
-runtime or establish live G06 acceptance. Fresh SKYFORGE native, principal,
-workspace, outbound-network and availability qualification is required before
-enrollment/deployment. Do not copy credentials or authority state between the
-machines. This decision does not start G07 or constitute two-host operation.
+The Owner selects ZenBook14 as both primary development machine and first live
+G06 Edge, superseding the earlier SKYFORGE-01 selection. ZenBook14 cannot
+start the Codex managed daemon because of the external Windows residual-Job
+boundary. The authorized portable-host runtime train must qualify an official
+shared app-server under Agent supervision before real local acceptance. Real
+ZenBook14 native, principal, workspace, outbound-network and availability
+qualification remains required before live enrollment/deployment. SKYFORGE is
+an offline optional future node; historical SKYFORGE S10 evidence remains
+history and fresh SKYFORGE qualification is not a prerequisite. Do not copy
+credentials or authority state between machines. This decision does not start
+G07 or constitute two-host operation.
 
-## Next gate: production-readiness audit
+## Current sequence after the readiness audit
 
-The next action is `FLEETSPLICE-GATE-S-PRODUCTION-READINESS-AUDIT`, not
-deployment. A later bounded audit must independently inspect:
+The Owner reported the completed readiness audit disposition as
+`BLOCKED_INFRASTRUCTURE_NOT_READY`. Local implementation can continue, but this
+does not make production infrastructure ready or authorize deployment.
+
+The active machine-readable draft is
+[Gate S admission v2](gate-s-admission-v2.template.json). Its resolved decision
+metadata records generic OIDC and ZenBook14. The 21 production infrastructure
+inputs remain `UNRESOLVED`; `FIRST_LIVE_EDGE` exists only in resolved decision
+metadata, and offline preflight rejects attempts to override it under `values`.
+Historical v1 `packages/predeploy/placeholders.ts` remains
+the local predeploy invariant, including its former RP_ID field; it is not the
+active generic OIDC admission requirement. The v2 draft is the authoritative
+machine-readable production input surface for a future Gate S review. This
+human-readable package explains the evidence and ownership required for each
+field. The [admission v2 architecture amendment](../architecture/amendments/gate-s-admission-v2-offline-preflight.md)
+records that separation.
+
+Copy the v2 template to a local, untracked draft outside the repository and
+fill only values established by the Owner and later infrastructure audit. Never
+place OIDC client secrets, TLS private keys, bearer tokens or provider
+credentials in the draft. `OIDC_SECRET_CUSTODY_REFERENCE_OR_POLICY` is a
+reference such as `policy://...`, `vault://...` or `document://...`, not a
+secret. `CORS_ORIGINS` contains only the canonical `HTTPS_ORIGIN`. The offline command
+is `npm run preflight -- <path-to-admission-v2.json>`. It prints JSON findings
+and a short human summary; exit status 0 means
+`READY_FOR_EXTERNAL_INFRA_VALIDATION`, 1 means `UNRESOLVED_OWNER_INPUT`, and 2
+means `INVALID_CONFIGURATION`. The validator reads only the supplied draft and
+writes its report to stdout; the npm command first compiles local TypeScript
+into `test-results/compiled`. It does not mutate the admission draft, resolve
+DNS, contact an IdP or Edge, issue TLS material, write production configuration,
+or admit Gate S.
+
+For local build/test prerequisites, run `npm run development:doctor`. It
+checks the qualified Node/SQLite pair, installed npm closure, Rust/Tauri,
+Playwright/Edge and OpenSSL. OpenSSL is required by ephemeral localhost test
+TLS generation only; the doctor does not make it a production FleetSplice
+runtime dependency or install it.
+
+The future sequence is: production admission draft, offline preflight, external
+infrastructure audit with evidence, then explicit Owner authorization for a
+separate deployment Goal. The completed audit's infrastructure blocker must be
+resolved before a later audit can establish production readiness. Fresh
+ZenBook14 qualification and real mobile acceptance remain separate gates.
+
+## Readiness audit checklist (historical request)
+
+The completed audit was requested to inspect:
 
 1. Tencent PEK server readiness.
 2. DNS and production hostname availability.
@@ -80,12 +125,13 @@ deployment. A later bounded audit must independently inspect:
    and recovery policy.
 5. Deployment, service and data paths, including service account and limits.
 6. Backup, monitoring and rollback plan with accountable operators.
-7. Fresh SKYFORGE Edge qualification.
+7. Fresh SKYFORGE Edge qualification (historical request, superseded by the
+   ZenBook14 first-live decision above).
 8. External/mobile acceptance device, network and window readiness.
 
-This package records no audit result or production value. Unresolved fields in
-the admission table remain placeholders until that dedicated audit obtains
-evidence and the Owner admits a later bounded deployment Goal.
+No production value is established by the reported blocked audit. Unresolved
+fields in the admission table remain placeholders until a later authorized
+audit obtains evidence and the Owner admits a bounded deployment Goal.
 
 ## Review and later admission record
 
@@ -100,9 +146,11 @@ field can be filled by a test fixture.
 GATE_S_PACKAGE_READY=OWNER_DECISIONS_RECORDED_PRODUCTION_INPUTS_UNRESOLVED
 DECISION_A=GENERIC_OIDC
 PRODUCTION_IDP=OWNER_SELECTED_CANDIDATE_PENDING_CONFIGURATION:CASDOOR
-DECISION_B=SKYFORGE-01_FIRST_LIVE_G06_EDGE
+DECISION_B=ZENBOOK14_FIRST_LIVE_G06_EDGE
+SKYFORGE_FRESH_QUALIFICATION_REQUIRED=false
 PRODUCTION_VALUES_COMPLETE=false
-NEXT_ACTION=FLEETSPLICE-GATE-S-PRODUCTION-READINESS-AUDIT
+GATE_S_READINESS_AUDIT=BLOCKED_INFRASTRUCTURE_NOT_READY
+NEXT_EXTERNAL_GATE=PRODUCTION_INFRASTRUCTURE_PREPARED_AND_OWNER_REAUTHORIZES_GATE_S
 GATE_S=OWNER_PRODUCTION_DEPLOYMENT_ADMISSION_REQUIRED
 GATE_S_ADMITTED=false
 TENCENT_DEPLOYED=false

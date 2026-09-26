@@ -128,6 +128,9 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       };
       auditRef.current.networkSnapshots.push(row);
       setSnapshot(next);
+      // A successful authoritative read retires only an observation outage.
+      // Command uncertainty still needs explicit receipt lookup and must stay.
+      setError(current => ['RUNTIME_UNSHARED', 'EDGE_DISCONNECTED', 'NATIVE_OBSERVATION_LOST'].includes(current) ? '' : current);
       const history = (next.threads ?? []).flatMap((item: any) => item.history ?? []);
       const activity = (next.threads ?? []).flatMap((item: any) => item.activity ?? []);
       setLiveTimeline(current => retireLiveWhenAuthoritative(current, history, activity));

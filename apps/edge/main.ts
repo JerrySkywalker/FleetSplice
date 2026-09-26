@@ -83,7 +83,15 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
         if (sharing && mayShareWorkspace(sharing, identity.root)) endpoint.startRealtimePush();
         process.send?.({ kind: 'edgeReady' });
       } else {
-        requireThat(!!sharing && mayShareWorkspace(sharing, identity.root), 'RUNTIME_UNSHARED');
+        // A paused sharing policy rejects this typed request without tearing
+        // down HCP. Closing the socket here strands the existing browser after
+        // resume and turns a policy pause into an Edge transport failure.
+        if (!sharing || !mayShareWorkspace(sharing, identity.root)) {
+          requireThat(message.kind === 'adoption.request', 'HCP_UNEXPECTED_MESSAGE');
+          send({ ...envelope, kind: 'adoption.response', requestId: message.requestId,
+            ok: false, code: 'RUNTIME_UNSHARED', body: null });
+          return;
+        }
         await acceptAgentAdoptionHcp(endpoint, config.target, message);
       }
     } catch (error) {

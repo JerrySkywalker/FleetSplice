@@ -77,6 +77,20 @@ test('CORS admits only the canonical public origin', () => {
   assert.ok(report.findings.some(f => f.field === 'CORS_ORIGINS' && f.code === 'PUBLIC_ORIGIN_NOT_ALLOWED'));
 });
 
+test('rejects malformed public DNS labels before external validation', () => {
+  for (const host of ['hub..fleet-owner.org', 'hub-.fleet-owner.org', '-hub.fleet-owner.org', `${'a'.repeat(64)}.fleet-owner.org`]) {
+    const draft = complete();
+    draft.values.PUBLIC_HOSTNAME = host;
+    draft.values.HTTPS_ORIGIN = `https://${host}`;
+    draft.values.HCP_WSS_ENDPOINT = `wss://${host}/hcp/v1/connect`;
+    draft.values.OIDC_CALLBACK_URL = `https://${host}/auth/oidc/callback`;
+    draft.values.CORS_ORIGINS = [`https://${host}`];
+    const report = validateGateSAdmission(draft);
+    assert.equal(report.category, 'INVALID_CONFIGURATION', host);
+    assert.ok(report.findings.some(f => f.field === 'PUBLIC_HOSTNAME' && f.code === 'PUBLIC_HOSTNAME_INVALID_OR_EXAMPLE'), host);
+  }
+});
+
 test('missing fields and raw secret keys fail closed', () => {
   const draft = complete() as any;
   delete draft.values.BACKUP_POLICY;

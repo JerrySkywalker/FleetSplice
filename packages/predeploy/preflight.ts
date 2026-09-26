@@ -33,8 +33,11 @@ function parseUrl(value: unknown, protocols: string[], originOnly = false): URL 
   } catch { return null; }
 }
 
+const validDnsName = (host: string): boolean => host.length <= 253 && host.includes('.')
+  && host.split('.').every(label => label.length > 0 && label.length <= 63
+    && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label));
 const reservedHost = (host: string): boolean =>
-  !host || host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
+  !validDnsName(host) || host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
   || host.endsWith('.localhost') || host.endsWith('.invalid') || host.endsWith('.example')
   || host.endsWith('.test') || host.endsWith('.local') || host.endsWith('.internal')
   || ['example.com', 'example.net', 'example.org'].some(domain => host === domain || host.endsWith(`.${domain}`))
@@ -74,8 +77,7 @@ export function validateGateSAdmission(input: unknown): GateSPreflightReport {
   scan(root, 'root');
   const active = (field: GateSField): unknown => unresolved.includes(field) ? undefined : values[field];
   const hostname = active('PUBLIC_HOSTNAME');
-  if (hostname !== undefined && (typeof hostname !== 'string' || reservedHost(hostname)
-    || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(hostname) || !hostname.includes('.')))
+  if (hostname !== undefined && (typeof hostname !== 'string' || reservedHost(hostname)))
     add('PUBLIC_HOSTNAME', 'PUBLIC_HOSTNAME_INVALID_OR_EXAMPLE');
   const origin = active('HTTPS_ORIGIN') === undefined ? null : parseUrl(active('HTTPS_ORIGIN'), ['https:'], true);
   if (active('HTTPS_ORIGIN') !== undefined && (!origin || reservedHost(origin.hostname))) add('HTTPS_ORIGIN', 'PUBLIC_HTTPS_ORIGIN_INVALID');

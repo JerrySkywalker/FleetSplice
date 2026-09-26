@@ -407,7 +407,7 @@ type LifecycleJournal = { file: string; kind: 'LEGACY_MANAGED' | 'NATIVE_ADOPTIO
  * admitted a FleetSplice native effect.  Anything beyond those exact records
  * stays a recovery boundary.
  */
-function nativeAdoptionObservationIdentity(file: string): { processId: number; processCreationTime: string } | 'DEFERRED' | null {
+function nativeAdoptionObservationIdentity(file: string): { processId: number; processCreationTime: string; custody: 'CODEX_MANAGED_DAEMON' | 'AGENT_SUPERVISED' } | 'DEFERRED' | null {
   try {
     const rows = readEvidence(file);
     if (rows.length === 1 && rows[0]?.kind === 'NATIVE_STARTUP_DEFERRED' &&
@@ -427,7 +427,9 @@ function nativeAdoptionObservationIdentity(file: string): { processId: number; p
       typeof identity?.endpointIdentity !== 'string' || typeof identity?.executablePath !== 'string' ||
       !Number.isSafeInteger(identity?.processId) || identity.processId <= 0 ||
       typeof identity?.processCreationTime !== 'string' || !/^\d+$/.test(identity.processCreationTime)) return null;
-    return { processId: identity.processId, processCreationTime: identity.processCreationTime };
+    const custody = identity.custody ?? (identity.serverIncarnation === null ? 'CODEX_MANAGED_DAEMON' : null);
+    if (custody !== 'CODEX_MANAGED_DAEMON' && custody !== 'AGENT_SUPERVISED') return null;
+    return { processId: identity.processId, processCreationTime: identity.processCreationTime, custody };
   } catch { return null; }
 }
 function lifecycleJournal(base: string, guard: Guard): LifecycleJournal | null {
@@ -540,7 +542,12 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
   if (journal.kind === 'NATIVE_ADOPTION') {
     const observed = nativeAdoptionObservationIdentity(journal.file);
     if (!observed) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_EFFECT_EVIDENCE_UNPROVABLE' };
-    if (observed !== 'DEFERRED') {
+    let declared: unknown;
+    try { declared = safeJson<{ nativeServerCustody?: unknown }>(path.join(base, guard.runId, 'admission.json')).nativeServerCustody; }
+    catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_ADMISSION_UNREADABLE' }; }
+    if (declared !== undefined && declared !== (observed === 'DEFERRED' ? 'AGENT_SUPERVISED' : observed.custody))
+      return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_CUSTODY_MISMATCH' };
+    if (observed !== 'DEFERRED' && observed.custody === 'AGENT_SUPERVISED') {
       const native = process(observed.processId);
       const creation = native.identity && creationTicks(native.identity.creationTime);
       const recorded = BigInt(observed.processCreationTime) - 116444736000000000n;

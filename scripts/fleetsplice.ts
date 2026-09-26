@@ -34,12 +34,12 @@ function currentGuard(): Guard | null {
   const file = guardPath(base());
   try { return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as Guard : null; } catch { return null; }
 }
-async function control(command: AgentIpcCommand, body?: Record<string, unknown>): Promise<any> {
+async function control(command: AgentIpcCommand, body?: Record<string, unknown>, timeoutMs = 12000): Promise<any> {
   const guard = currentGuard(); requireThat(guard?.state === 'RUNNING' && typeof guard.runId === 'string', 'SUPERVISOR_UNAVAILABLE');
   const file = path.join(base(), guard.runId, 'control.json'); requireThat(existsSync(file), 'SUPERVISOR_UNAVAILABLE');
   const detail = JSON.parse(readFileSync(file, 'utf8')) as ControlFile;
   return await new Promise((resolve, reject) => {
-    const socket = createConnection(detail.pipe); let received = ''; const timer = setTimeout(() => { socket.destroy(); reject(new Error('SUPERVISOR_TIMEOUT')); }, 12000);
+    const socket = createConnection(detail.pipe); let received = ''; const timer = setTimeout(() => { socket.destroy(); reject(new Error('SUPERVISOR_TIMEOUT')); }, timeoutMs);
     socket.setEncoding('utf8'); socket.once('error', reject); socket.on('data', value => { received += value; if (received.length > 16384) socket.destroy(); });
     socket.on('end', () => { clearTimeout(timer); try { resolve(JSON.parse(received)); } catch { reject(new Error('SUPERVISOR_RESPONSE_INVALID')); } });
     socket.on('connect', () => socket.write(`${code({ v: AGENT_IPC_VERSION, token: detail.token, command, ...(body === undefined ? {} : { body }) })}\n`));
@@ -286,8 +286,8 @@ export async function fleetspliceEntrypoint() {
       if (operation === 'config' && args[2] === 'get' && args.length === 3) { output(code(await control('config.get'))); return; }
       if (operation === 'config' && args[2] === 'set' && args.length === 4) { output(code(await control('config.set', { gatewayUrl: args[3] === 'none' ? null : args[3] }))); return; }
       if (operation === 'runtimes' && args.length === 2) { output(code(await control('runtime.list'))); return; }
-      if (operation === 'runtimes' && ['pause', 'resume'].includes(args[2] ?? '') && args.length === 3) { output(code(await control('runtime.setSharing', { action: args[2] }))); return; }
-      if (operation === 'runtimes' && args[2] === 'sharing' && args.length === 4) { output(code(await control('runtime.setSharing', JSON.parse(args[3]!)))); return; }
+      if (operation === 'runtimes' && ['pause', 'resume'].includes(args[2] ?? '') && args.length === 3) { output(code(await control('runtime.setSharing', { action: args[2] }, 130000))); return; }
+      if (operation === 'runtimes' && args[2] === 'sharing' && args.length === 4) { output(code(await control('runtime.setSharing', JSON.parse(args[3]!), 130000))); return; }
       if (operation === 'diagnostics' && args.length === 2) { output(code(await control('diagnostics'))); return; }
       if (operation === 'drain' && args.length === 2) { output(code(await control('drain'))); return; }
     } catch { error('AGENT_IPC_UNAVAILABLE'); return; }

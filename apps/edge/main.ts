@@ -56,13 +56,17 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   const envelope = { v: 1 as const, target: config.target, connectionId: config.target.connectionId };
   let endpoint: ReturnType<typeof agentAdoptionEndpoint> | null = null;
   let sharing = config.runtimeSharing;
+  let startingLocal: Promise<void> | null = null;
   const startLocal = async () => {
     if (local) return;
-    const started = await nativeAdoptionEdge(identity.root, config.stateDirectory,
-      { custody: config.nativeServerCustody, executable: config.executable, environment: process.env,
-        onNativeClose: () => process.send?.({ kind: 'runtimeObservation', status: 'unavailable', discoveredSessions: 0, evidence: 'NATIVE_CONNECTION_LOST' }) });
-    local = started;
-    endpoint = agentAdoptionEndpoint({ kind: 'NATIVE_ADOPTION', target: config.target, port: started.adapter, send });
+    if (!startingLocal) startingLocal = (async () => {
+      const started = await nativeAdoptionEdge(identity.root, config.stateDirectory,
+        { custody: config.nativeServerCustody, executable: config.executable, environment: process.env,
+          onNativeClose: () => process.send?.({ kind: 'runtimeObservation', status: 'unavailable', discoveredSessions: 0, evidence: 'NATIVE_CONNECTION_LOST' }) });
+      local = started;
+      endpoint = agentAdoptionEndpoint({ kind: 'NATIVE_ADOPTION', target: config.target, port: started.adapter, send });
+    })();
+    try { await startingLocal; } finally { startingLocal = null; }
   };
   if (sharing && mayShareWorkspace(sharing, identity.root)) await startLocal();
   else {
@@ -127,7 +131,15 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
     setRuntimeSharing: async (next: RuntimeSharing) => {
       const wasShared = !!sharing && mayShareWorkspace(sharing, identity.root);
       const isShared = mayShareWorkspace(next, identity.root);
-      if (!wasShared && isShared) await startLocal();
+      if (!wasShared && isShared) {
+        requireThat(kernel.connected, 'EDGE_DISCONNECTED');
+        const startedNow = local === null;
+        await startLocal();
+        if (!kernel.connected) {
+          if (startedNow && local) { endpoint?.stop(); await local.close(); local = null; endpoint = null; }
+          throw new Fault('EDGE_DISCONNECTED');
+        }
+      }
       requireThat(kernel.connected, 'EDGE_DISCONNECTED');
       sharing = next;
       if (wasShared && !isShared) endpoint?.stop();

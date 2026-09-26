@@ -73,6 +73,7 @@ export async function supervisorEntrypoint() {
       let request: AgentIpcRequest;
       try { request = parseAgentIpcRequest(JSON.parse(received)); } catch { await reply(socket, { code: 'AGENT_IPC_REQUEST_INVALID' }); return; }
       if (request.token !== token) { await reply(socket, { code: 'CONTROL_AUTH_REJECTED' }); return; }
+      if (request.command === 'runtime.setSharing') socket.setTimeout(130000, () => socket.destroy());
       if (request.command === 'status') {
         const health = run?.health();
         let nativeCodex = 'NOT_STARTED';

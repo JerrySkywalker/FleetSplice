@@ -69,6 +69,14 @@ test('OIDC callback must use the route served by the Hub', () => {
   assert.ok(report.findings.some(f => f.field === 'OIDC_CALLBACK_URL' && f.code === 'OIDC_CALLBACK_INVALID'));
 });
 
+test('CORS admits only the canonical public origin', () => {
+  const draft = complete();
+  draft.values.CORS_ORIGINS = ['https://hub.fleet-owner.org', 'https://unrelated.fleet-owner.org'];
+  const report = validateGateSAdmission(draft);
+  assert.equal(report.category, 'INVALID_CONFIGURATION');
+  assert.ok(report.findings.some(f => f.field === 'CORS_ORIGINS' && f.code === 'PUBLIC_ORIGIN_NOT_ALLOWED'));
+});
+
 test('missing fields and raw secret keys fail closed', () => {
   const draft = complete() as any;
   delete draft.values.BACKUP_POLICY;

@@ -96,7 +96,7 @@ export function validateGateSAdmission(input: unknown): GateSPreflightReport {
   const cors = active('CORS_ORIGINS');
   if (cors !== undefined) {
     if (!Array.isArray(cors) || cors.length === 0 || cors.some(item => typeof item !== 'string' || item === '*' || !parseUrl(item, ['https:'], true))) add('CORS_ORIGINS', 'EXACT_HTTPS_CORS_ORIGINS_REQUIRED');
-    else if (origin && !cors.includes(origin.origin)) add('CORS_ORIGINS', 'PUBLIC_ORIGIN_NOT_ALLOWED');
+    else if (origin && (cors.length !== 1 || cors[0] !== origin.origin)) add('CORS_ORIGINS', 'PUBLIC_ORIGIN_NOT_ALLOWED');
   }
   for (const field of ['HUB_DATA_PATH', 'HUB_LOG_PATH'] as const) {
     const value = active(field);

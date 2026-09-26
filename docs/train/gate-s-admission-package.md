@@ -92,7 +92,7 @@ fill only values established by the Owner and later infrastructure audit. Never
 place OIDC client secrets, TLS private keys, bearer tokens or provider
 credentials in the draft. `OIDC_SECRET_CUSTODY_REFERENCE_OR_POLICY` is a
 reference such as `policy://...`, `vault://...` or `document://...`, not a
-secret. `CORS_ORIGINS` is an array of exact HTTPS origins. The offline command
+secret. `CORS_ORIGINS` contains only the canonical `HTTPS_ORIGIN`. The offline command
 is `npm run preflight -- <path-to-admission-v2.json>`. It prints JSON findings
 and a short human summary; exit status 0 means
 `READY_FOR_EXTERNAL_INFRA_VALIDATION`, 1 means `UNRESOLVED_OWNER_INPUT`, and 2

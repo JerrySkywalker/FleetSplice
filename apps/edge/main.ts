@@ -10,11 +10,12 @@ import { verifyWorkspace, verifyWorkspaceNow } from '../../packages/workspaces/i
 import type { WorkspaceBinding } from '../../packages/contracts/index.ts';
 import { permits, readCeiling } from '../../packages/permissions/index.ts';
 import { nativeAdoptionEdge } from './native-adoption.ts';
+import type { NativeServerCustody } from '../../packages/native-adoption/types.ts';
 import { agentAdoptionEndpoint, acceptAgentAdoptionHcp } from '../../packages/product-path/index.ts';
 import { mayShareWorkspace, type RuntimeSharing } from '../../packages/agent-runtime/index.ts';
 import { signEnrollmentChallenge, type HostEnrollmentPrivateMaterial } from '../../packages/remote-enrollment/index.ts';
 
-export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; hcpUrl?: string; /** Explicit S10-only trust injection; production relies on normal OS trust. */ testTlsCaPem?: string; enrollment?: HostEnrollmentPrivateMaterial; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing };
+export type EdgeConfig = { port: number; target: Target; identity: LocalIdentity; stateDirectory: string; executable: string; hcpToken: string; hcpUrl?: string; /** Explicit S10-only trust injection; production relies on normal OS trust. */ testTlsCaPem?: string; enrollment?: HostEnrollmentPrivateMaterial; workspaces?: WorkspaceBinding[]; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing; nativeServerCustody?: NativeServerCustody };
 
 export function resolveEdgeHcpEndpoint(config: Pick<EdgeConfig, 'port' | 'hcpUrl' | 'testTlsCaPem'>) {
   // The product Hub's default loopback origin is 127.0.0.1. Keep the Edge
@@ -43,9 +44,10 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
   const identity = await localIdentity(config.identity.root, config.identity.sid);
   requireThat(canonical(identity) === canonical(config.identity), 'EDGE_LOCAL_IDENTITY_CHANGED');
   requireThat((config.workspaces ?? []).some(binding => binding.valid && binding.root.toLowerCase() === identity.root.toLowerCase() && binding.rootIdentity === identity.rootIdentity && canonical(binding.target) === canonical(config.target)), 'WORKSPACE_BINDING_UNPROVABLE');
-  const local = await nativeAdoptionEdge(identity.root, config.stateDirectory);
-  const enrollment = config.enrollment;
   const hcp = resolveEdgeHcpEndpoint(config);
+  const local = await nativeAdoptionEdge(identity.root, config.stateDirectory,
+    { custody: config.nativeServerCustody, executable: config.executable, environment: process.env });
+  const enrollment = config.enrollment;
   const socket = new WebSocket(hcp.url, 'fleetsplice.hcp.v1', {
     ...hcp.options,
     headers: enrollment ? {} : { Authorization: `Bearer ${config.hcpToken}` },
@@ -99,7 +101,7 @@ async function startNativeAdoptionHcpEdge(config: EdgeConfig) {
       if (!wasShared && isShared) endpoint.startRealtimePush();
       const observation = await observeRuntime(); process.send?.({ kind: 'runtimeObservation', ...observation }); return observation;
     },
-    close: async () => { endpoint.stop(); socket.close(); local.close(); return true; },
+    close: async () => { endpoint.stop(); socket.close(); await local.close(); return true; },
   };
 }
 

@@ -7,6 +7,7 @@ import { localIdentity } from '../apps/edge/identity.ts';
 import { canonical, requireThat, type Target } from '../packages/contracts/index.ts';
 import { assertFreshIncarnation, classifyPredecessor, edgeAdmissionState, guardPath, preserveGuardForRun, type Guard } from '../packages/local-operation/index.ts';
 import type { EdgeConfig } from '../apps/edge/main.ts';
+import type { NativeServerCustody } from '../packages/native-adoption/types.ts';
 import type { HubConfig } from '../apps/hub/server.ts';
 import { workspaceBindings } from '../packages/workspaces/index.ts';
 import { defaultRuntimeSharing, type RuntimeSharing } from '../packages/agent-runtime/index.ts';
@@ -20,7 +21,7 @@ const onceExit = (child: ChildProcess, timeout: number) => new Promise<boolean>(
   child.once('exit', () => { clearTimeout(timer); resolve(true); });
   child.once('error', () => { clearTimeout(timer); resolve(false); });
 });
-export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; runtimeSharing?: RuntimeSharing; hostIdentity?: Pick<Target, 'hostId' | 'hostGeneration' | 'environmentId' | 'environmentGeneration'>; enrollment?: EdgeConfig['enrollment']; /** Deployment carriage is explicit: listener bind never becomes public identity. */ transport?: Pick<HubConfig, 'deployment' | 'listener'> & Pick<EdgeConfig, 'hcpUrl' | 'testTlsCaPem'> };
+export type LaunchOptions = { environment?: NodeJS.ProcessEnv; onGuardCommitted?: (guard: Guard) => Promise<void> | void; productPath?: 'NATIVE_ADOPTION' | 'LEGACY_MANAGED_LOCAL_ONLY'; nativeServerCustody?: NativeServerCustody; runtimeSharing?: RuntimeSharing; hostIdentity?: Pick<Target, 'hostId' | 'hostGeneration' | 'environmentId' | 'environmentGeneration'>; enrollment?: EdgeConfig['enrollment']; /** Deployment carriage is explicit: listener bind never becomes public identity. */ transport?: Pick<HubConfig, 'deployment' | 'listener'> & Pick<EdgeConfig, 'hcpUrl' | 'testTlsCaPem'> };
 
 // Internal lifecycle primitive. G05B starts it only from the detached local
 // supervisor after all no-effect qualification has passed.
@@ -55,7 +56,9 @@ export async function launch(root: string, executable: string, port = 43155, opt
   // Runtime commit point: no native process exists before this durable guard.
   durableWrite(currentGuard, guard);
   durableWrite(path.join(directory, 'admission.json'), { runId, target, identity, workspaces, policy: 'windows-user.read-only', productPath,
-    nativeContinuity: productPath === 'NATIVE_ADOPTION' ? 'shared-daemon-adopted' : 'ephemeral-private-stdio', node: process.version, sqlite: process.versions.sqlite });
+    nativeContinuity: productPath === 'NATIVE_ADOPTION' ? 'shared-native-server-adopted' : 'ephemeral-private-stdio',
+    nativeServerCustody: productPath === 'NATIVE_ADOPTION' ? options.nativeServerCustody ?? 'CODEX_MANAGED_DAEMON' : undefined,
+    node: process.version, sqlite: process.versions.sqlite });
   await options.onGuardCommitted?.(guard);
   const hcpToken = randomBytes(32).toString('hex'); const bootstrapToken = randomBytes(32).toString('hex');
   const env = environment;
@@ -78,6 +81,7 @@ export async function launch(root: string, executable: string, port = 43155, opt
     const child = start(path.join(installation, 'apps/edge/main.js'), env); observeEdge(child);
     const edgeReady = wait(child, 'edgeReady');
     child.send({ port, target, identity, stateDirectory: directory, executable, hcpToken, enrollment, workspaces, productPath, runtimeSharing,
+      nativeServerCustody: options.nativeServerCustody,
       hcpUrl: options.transport?.hcpUrl, testTlsCaPem: options.transport?.testTlsCaPem } satisfies EdgeConfig);
     await edgeReady; return child;
   };

@@ -18,4 +18,6 @@ export function incarnationOf(identity: NativeArtifactIdentity): string {
 }
 export function assertSameIncarnation(before: NativeArtifactIdentity, now: NativeArtifactIdentity): void {
   requireThat(incarnationOf(before) === incarnationOf(now), 'NATIVE_SERVER_INCARCATION_CHANGED');
+  if (before.custody && now.custody)
+    requireThat(before.custody === now.custody, 'NATIVE_SERVER_CUSTODY_CHANGED');
 }

@@ -198,7 +198,7 @@ export class AgentSupervisedNativeServer {
         executablePath: executable, reportedVersion: null, sha256, processId: child.pid!,
         processCreationTime: first.processCreationTime, endpoint,
         endpointIdentity: `${normalized(endpoint)}:${first.endpointCreationTime}`,
-        serverIncarnation: randomUUID(),
+        serverIncarnation: randomUUID(), custody: 'AGENT_SUPERVISED',
       };
       this.pendingIdentity = identity;
       await this.ready(identity, this.options.workspace,

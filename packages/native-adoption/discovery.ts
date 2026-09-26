@@ -52,5 +52,6 @@ if(-not $nativeSocket.Exists -or -not ($nativeSocket.Attributes -band [IO.FileAt
   const endpointIdentity = `${endpoint.toLowerCase()}:${proof.endpointCreated}`;
   return { executablePath: executable, reportedVersion: typeof status.appServerVersion === 'string' ? status.appServerVersion : null,
     sha256: createHash('sha256').update(readFileSync(executable)).digest('hex'), processId: pidState.pid,
-    processCreationTime: proof.created, endpoint, endpointIdentity, serverIncarnation: null };
+    processCreationTime: proof.created, endpoint, endpointIdentity, serverIncarnation: null,
+    custody: 'CODEX_MANAGED_DAEMON' };
 }

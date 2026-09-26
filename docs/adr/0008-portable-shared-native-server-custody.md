@@ -41,3 +41,9 @@ P01 proved one foreground server, one same-user AF_UNIX endpoint, a real remote
 Codex TUI and a FleetSplice native client on the same native thread, and clean
 supervised shutdown. P02 implements lifecycle custody; P03 generalizes Native
 Adoption evidence; P04 performs full real same-thread control acceptance.
+
+P03 records custody on the native artifact identity carried by snapshots and
+receipts. The field is optional when reading historical receipts. The existing
+serialized `daemon` field and `sharedDaemon` capability key remain readable;
+the latter means a proven shared native server for either custody path. The
+same capability probes classify both paths. Custody never selects a profile.

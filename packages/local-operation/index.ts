@@ -401,7 +401,7 @@ function readableFleetSpliceJournal(file: string): boolean {
 }
 type LifecycleJournal = { file: string; kind: 'LEGACY_MANAGED' | 'NATIVE_ADOPTION' };
 /**
- * A native-adoption Edge talks to a shared daemon, so its journal intentionally
+ * A native-adoption Edge talks to a shared native server, so its journal intentionally
  * differs from the historical managed-child journal.  Its compatibility probe
  * is observation-only: it may prove the daemon and protocol, but cannot have
  * admitted a FleetSplice native effect.  Anything beyond those exact records

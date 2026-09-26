@@ -81,7 +81,9 @@ export class NativeAdoptionAdapter {
   }
   async qualify(): Promise<void> {
     this.revalidate();
-    this.capability('sharedDaemon', true, 'Official daemon status, PID FILETIME, owner, endpoint ACL and connected native initialize');
+    // Keep the historical serialized key. It represents a qualified shared
+    // server; custody selects its lifecycle, never compatibility.
+    this.capability('sharedDaemon', true, 'Official shared server: PID FILETIME, owner, endpoint ACL and connected native initialize');
     const list = await this.rpc.call('thread/list', { cwd: this.workspace, limit: 20 });
     requireThat(Array.isArray(list.data), 'NATIVE_THREAD_LIST_UNPROVABLE');
     this.capability('threadList', true, 'Live thread/list response; exact Workspace filter');

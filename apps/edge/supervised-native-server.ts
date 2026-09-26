@@ -1,9 +1,10 @@
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { closeSync, mkdirSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 import { Fault, requireThat } from '../../packages/contracts/json.ts';
 import { OfficialNativeRpc } from '../../packages/native-adoption/transport.ts';
 import type { NativeArtifactIdentity } from '../../packages/native-adoption/types.ts';
@@ -20,6 +21,33 @@ const ps = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
 const normalized = (value: string) => path.win32.normalize(value).toLowerCase();
 const digest = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
+const nativeJobHelper = () => {
+  const module = fileURLToPath(import.meta.url);
+  const bundled = path.resolve(path.dirname(module), '..', '..', '..', 'scripts', 'supervise-native-job.ps1');
+  const sourceTest = path.resolve(process.cwd(), 'scripts', 'supervise-native-job.ps1');
+  const file = module.includes(`${path.sep}test-results${path.sep}`) ? sourceTest : bundled;
+  requireThat(existsSync(file), 'NATIVE_JOB_HELPER_UNAVAILABLE');
+  return file;
+};
+async function helperNativePid(child: ChildProcess): Promise<number> {
+  return await new Promise<number>((resolve, reject) => {
+    let output = '';
+    const cleanup = () => { clearTimeout(timer); child.stdout?.off('data', onData); child.off('exit', onExit); child.off('error', onError); };
+    const fail = (code: string) => { cleanup(); reject(new Fault(code)); };
+    const onExit = () => fail('NATIVE_JOB_HELPER_EXITED');
+    const onError = () => fail('NATIVE_JOB_HELPER_FAILED');
+    const onData = (value: Buffer) => {
+      output += value.toString('utf8');
+      if (output.length > 256) { fail('NATIVE_JOB_HELPER_RESPONSE_INVALID'); return; }
+      const newline = output.indexOf('\n'); if (newline < 0) return;
+      const match = /^PID=(\d+)\r?$/.exec(output.slice(0, newline));
+      if (!match || !Number.isSafeInteger(Number(match[1])) || Number(match[1]) <= 0) { fail('NATIVE_JOB_HELPER_RESPONSE_INVALID'); return; }
+      cleanup(); resolve(Number(match[1]));
+    };
+    const timer = setTimeout(() => fail('NATIVE_JOB_HELPER_TIMEOUT'), 20000);
+    child.stdout?.on('data', onData); child.once('exit', onExit); child.once('error', onError);
+  });
+}
 // Node's existsSync/lstat cannot reliably observe a Windows AF_UNIX reparse
 // point. Ask Windows directly before probing or retiring the exact socket.
 function socketExists(endpoint: string): boolean {
@@ -80,7 +108,7 @@ async function realInitialize(identity: NativeArtifactIdentity, workspace: strin
 }
 
 export type SupervisedServerOptions = {
-  executable: string; workspace: string; directory?: string; environment?: NodeJS.ProcessEnv;
+  executable: string; workspace: string; directory?: string; environment?: NodeJS.ProcessEnv; runId?: string;
   onExit?: () => void;
   /** Test seam for readiness failure; product use always calls the official initialize probe. */
   ready?: Ready;
@@ -91,6 +119,7 @@ export type SupervisedServerOptions = {
 /** Owned by the interactive FleetSplice Agent process, never detached. */
 export class AgentSupervisedNativeServer {
   private child: ChildProcess | null = null;
+  private nativePid: number | null = null;
   private identity: NativeArtifactIdentity | null = null;
   private pendingIdentity: NativeArtifactIdentity | null = null;
   private lockFd: number | null = null;
@@ -127,7 +156,7 @@ export class AgentSupervisedNativeServer {
     try { this.lockFd = openSync(this.lockPath(), 'wx', 0o600); }
     catch { throw new Fault('NATIVE_SUPERVISED_OWNER_CONFLICT'); }
     this.lockOwner = randomUUID();
-    writeFileSync(this.lockFd, JSON.stringify({ owner: this.lockOwner, agentPid: process.pid }));
+    writeFileSync(this.lockFd, JSON.stringify({ owner: this.lockOwner, agentPid: process.pid, runId: this.options.runId ?? null }));
   }
 
   private assertProof(identity: NativeArtifactIdentity, expectedSid: string): EndpointProof {
@@ -147,8 +176,8 @@ export class AgentSupervisedNativeServer {
     requireThat(expected.serverIncarnation === this.identity.serverIncarnation &&
       expected.endpointIdentity === this.identity.endpointIdentity,
     'NATIVE_SUPERVISED_STALE_INCARCATION');
-    requireThat(this.child?.pid === expected.processId &&
-      this.child.exitCode === null && this.child.signalCode === null,
+    requireThat(this.nativePid === expected.processId &&
+      this.child?.exitCode === null && this.child?.signalCode === null,
     'NATIVE_SUPERVISED_NOT_RUNNING');
     const principal = principalProof();
     requireThat(!principal.elevated && principal.sid === this.ownerSid,
@@ -177,27 +206,30 @@ export class AgentSupervisedNativeServer {
       const endpoint = path.join(this.directory, `server-${randomUUID().slice(0, 12)}.sock`);
       requireThat(Buffer.byteLength(endpoint, 'utf8') < 105, 'NATIVE_SUPERVISED_SOCKET_PATH_TOO_LONG');
       this.endpoint = endpoint;
-      const listener = `unix://${endpoint.replaceAll('\\', '/')}`;
-      const child = spawn(executable, ['app-server', '--listen', listener], {
+      const child = spawn(ps, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', nativeJobHelper(),
+        '-Executable', executable, '-Endpoint', endpoint, '-Workspace', this.options.workspace], {
         cwd: this.options.workspace, env: this.options.environment ?? process.env,
-        windowsHide: true, stdio: 'ignore',
+        windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'],
       });
       child.on('error', () => {}); // Start failure is observed below; native stderr is never logged.
+      child.stdin?.on('error', () => {});
       this.child = child;
       child.once('exit', () => this.options.onExit?.());
       requireThat(Number.isSafeInteger(child.pid) && child.pid! > 0, 'NATIVE_SUPERVISED_SPAWN_FAILED');
+      const nativePid = await helperNativePid(child);
+      this.nativePid = nativePid;
       for (let attempt = 0; attempt < 30 && !socketExists(endpoint); attempt++) {
         requireThat(child.exitCode === null && child.signalCode === null,
           'NATIVE_SUPERVISED_CRASH_BEFORE_READY');
         await delay(100);
       }
       requireThat(socketExists(endpoint), 'NATIVE_SUPERVISED_READY_TIMEOUT');
-      const first = this.proof(child.pid!, endpoint, this.directory, principal.sid);
-      requireThat(first.processId === child.pid && normalized(first.executablePath) === normalized(executable) &&
+      const first = this.proof(nativePid, endpoint, this.directory, principal.sid);
+      requireThat(first.processId === nativePid && normalized(first.executablePath) === normalized(executable) &&
         first.ownerSid === principal.sid && /^\d+$/.test(first.processCreationTime) &&
         /^\d+$/.test(first.endpointCreationTime), 'NATIVE_SUPERVISED_IDENTITY_UNPROVABLE');
       const identity: NativeArtifactIdentity = {
-        executablePath: executable, reportedVersion: null, sha256, processId: child.pid!,
+        executablePath: executable, reportedVersion: null, sha256, processId: nativePid,
         processCreationTime: first.processCreationTime, endpoint,
         endpointIdentity: `${normalized(endpoint)}:${first.endpointCreationTime}`,
         serverIncarnation: randomUUID(), custody: 'AGENT_SUPERVISED',
@@ -219,15 +251,21 @@ export class AgentSupervisedNativeServer {
     this.stopping = true;
     try {
       const child = this.child;
-      if (child && child.exitCode === null && child.signalCode === null) child.kill();
+      if (child && child.exitCode === null && child.signalCode === null) child.stdin?.end('STOP\n');
       if (child) {
         for (let attempt = 0; attempt < 100 && child.exitCode === null && child.signalCode === null; attempt++) await delay(100);
         requireThat(child.exitCode !== null || child.signalCode !== null,
           'NATIVE_SUPERVISED_EXIT_UNPROVABLE');
       }
+      const observed = this.identity ?? this.pendingIdentity;
+      if (observed) {
+        const script = `try {$p=Get-Process -Id ${observed.processId} -ErrorAction Stop; $p.StartTime.ToUniversalTime().ToFileTimeUtc().ToString()} catch {if($_.FullyQualifiedErrorId -like 'NoProcessFound*') {'ABSENT'} else {throw}}`;
+        const creation = execFileSync(ps, ['-NoProfile', '-NonInteractive', '-Command', script],
+          { encoding: 'utf8', windowsHide: true, timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+        requireThat(creation !== observed.processCreationTime, 'NATIVE_SUPERVISED_EXIT_UNPROVABLE');
+      }
       if (this.endpoint && socketExists(this.endpoint)) {
         // Only the exact socket observed for this incarnation may be retired.
-        const observed = this.identity ?? this.pendingIdentity;
         if (observed) {
           const socket = this.endpoint;
           const script = `$item=Get-Item -LiteralPath ${quote(socket)} -ErrorAction Stop; $item.CreationTimeUtc.ToFileTimeUtc().ToString()`;
@@ -240,7 +278,7 @@ export class AgentSupervisedNativeServer {
         requireThat(!socketExists(this.endpoint), 'NATIVE_SUPERVISED_SOCKET_EXIT_UNPROVABLE');
       }
       this.releaseLock();
-      this.child = null; this.identity = null; this.pendingIdentity = null;
+      this.child = null; this.nativePid = null; this.identity = null; this.pendingIdentity = null;
       this.endpoint = null; this.ownerSid = null;
       return true;
     } finally { this.stopping = false; }

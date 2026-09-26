@@ -13,8 +13,8 @@ import { managedNativeFixture } from './managed-native-fixture.ts';
 
 const identity = () => ({ root: 'V:\\disposable-fleetsplice', rootIdentity: 'a'.repeat(64), sid: 'S-fixture', principal: 'fixture', sessionId: 1, elevated: false as const });
 const journalSchema = 'CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE evidence (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL); CREATE TABLE records (id TEXT PRIMARY KEY, digest TEXT NOT NULL, value TEXT NOT NULL); CREATE TABLE aliases (alias TEXT PRIMARY KEY, id TEXT NOT NULL, digest TEXT NOT NULL)';
-function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId: string = randomUUID(), eventBeforeResponse = false) {
-  const base = mkdtempSync(path.join(tmpdir(), 'fleetsplice-local-operation-')); const directory = path.join(base, runId); mkdirSync(directory);
+function fixture(kind: 'none' | 'session' | 'terminal' | 'ambiguous' | 'multi' = 'none', runId: string = randomUUID(), eventBeforeResponse = false, parent = tmpdir()) {
+  const base = mkdtempSync(path.join(parent, 'fleetsplice-local-operation-')); const directory = path.join(base, runId); mkdirSync(directory);
   const guard = { state: 'RUNNING', runId, target: target(), identity: identity(), nativeExitObserved: false, quiescent: false };
   writeFileSync(path.join(base, 'environment-guard.json'), JSON.stringify(guard)); writeFileSync(path.join(directory, 'admission.json'), JSON.stringify({ runId, target: guard.target, identity: guard.identity }));
   const hub = new DatabaseSync(path.join(directory, 'hub.sqlite')); hub.exec(journalSchema); hub.close();
@@ -162,6 +162,34 @@ test('native-adoption compatibility-only startup is safe while any effect or mix
   assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
   const mixed = fixture('none'); const native = new DatabaseSync(path.join(mixed.directory, 'native-edge.sqlite')); native.exec(journalSchema); native.close();
   assert.equal(classifyPredecessor(mixed.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+});
+test('native restart history requires every exact Agent process to exit before an archived stale owner lock can close', () => {
+  const parent = mkdtempSync(path.join(tmpdir(), 'fleetsplice-native-history-'));
+  const state = fixture('none', randomUUID(), false, parent); unlinkSync(path.join(state.directory, 'edge.sqlite'));
+  writeFileSync(path.join(state.directory, 'admission.json'), JSON.stringify({ runId: state.guard.runId, target: state.guard.target, identity: state.guard.identity, productPath: 'NATIVE_ADOPTION', nativeServerCustody: 'AGENT_SUPERVISED' }));
+  const adopted = new DatabaseSync(path.join(state.directory, 'native-edge.sqlite')); adopted.exec(journalSchema);
+  const append = (pid: number, creation: string) => adopted.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('NATIVE_COMPATIBILITY', randomUUID(), JSON.stringify({ identity: { endpointIdentity: `fixture:${pid}`, executablePath: 'C:\\fixture\\codex.exe', processId: pid, processCreationTime: creation, serverIncarnation: randomUUID(), custody: 'AGENT_SUPERVISED' }, compatibility: { profile: 'ADOPT_FULL' } }));
+  append(901, '134000000000000000');
+  adopted.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run('NATIVE_STARTUP_DEFERRED', randomUUID(), JSON.stringify({ custody: 'AGENT_SUPERVISED', reason: 'SHARING_DISABLED' }));
+  append(902, '134000000010000000'); adopted.close();
+  // The fixture's FILETIME values are compared to the process probes below.
+  const ticks = (value: string) => new Date(Number((BigInt(value) - 116444736000000000n) / 10000n)).toISOString();
+  const processAt = (pid: number, active: number) => pid === active ? { exists: true, identity: { processId: pid, creationTime: ticks(pid === 901 ? '134000000000000000' : '134000000010000000') } } : { exists: false };
+  assert.equal(classifyPredecessor(state.base, pid => processAt(pid, 901), noConflicts).kind, 'LIVE_OR_CONFLICTING');
+  assert.equal(classifyPredecessor(state.base, pid => processAt(pid, 902), noConflicts).kind, 'LIVE_OR_CONFLICTING');
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'SAFE_NO_EFFECT');
+  const lockDirectory = path.join(parent, 'native-server'); mkdirSync(lockDirectory);
+  const lock = path.join(lockDirectory, 'owner.lock'); const original = JSON.stringify({ owner: randomUUID(), agentPid: 12345, runId: state.guard.runId }); writeFileSync(lock, original);
+  assert.throws(() => closeSafePredecessor(state.base, pid => processAt(pid, 902), noConflicts), /SAFE_PREDECESSOR_CLOSURE_NOT_ADMITTED/);
+  assert.equal(readFileSync(lock, 'utf8'), original);
+  writeFileSync(lock, JSON.stringify({ owner: randomUUID(), agentPid: 12345, runId: randomUUID() }));
+  assert.throws(() => closeSafePredecessor(state.base, absent, noConflicts), /NATIVE_SUPERVISED_LOCK_UNPROVABLE/);
+  writeFileSync(lock, original);
+  writeFileSync(path.join(state.directory, 'native-owner.lock.observed.json'), original, { flag: 'wx' });
+  closeSafePredecessor(state.base, absent, noConflicts);
+  assert.equal(existsSync(lock), false);
+  assert.equal(readFileSync(path.join(state.directory, 'native-owner.lock.observed.json'), 'utf8'), original);
+  assert.equal(JSON.parse(readFileSync(path.join(state.base, 'environment-guard.json'), 'utf8')).state, 'CLOSED');
 });
 test('a sharing-disabled native startup closes without a Codex process', () => {
   const state = fixture('none'); unlinkSync(path.join(state.directory, 'edge.sqlite'));

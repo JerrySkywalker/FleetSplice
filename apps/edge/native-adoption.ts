@@ -28,7 +28,8 @@ export async function nativeAdoptionEdge(workspace: string, stateDirectory: stri
   requireThat(custody === 'CODEX_MANAGED_DAEMON' || custody === 'AGENT_SUPERVISED', 'NATIVE_SERVER_CUSTODY_INVALID');
   if (custody === 'AGENT_SUPERVISED') requireThat(!!options.executable, 'NATIVE_SUPERVISED_EXECUTABLE_REQUIRED');
   const supervisor = custody === 'AGENT_SUPERVISED' ? new AgentSupervisedNativeServer({
-    executable: options.executable!, workspace: root.root, environment: options.environment, onExit: options.onNativeClose,
+    executable: options.executable!, workspace: root.root, environment: options.environment,
+    runId: path.basename(stateDirectory), onExit: options.onNativeClose,
   }) : null;
   let identity;
   try { identity = supervisor ? await supervisor.start() : discoverDaemon(); }

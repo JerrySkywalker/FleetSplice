@@ -407,13 +407,13 @@ type LifecycleJournal = { file: string; kind: 'LEGACY_MANAGED' | 'NATIVE_ADOPTIO
  * admitted a FleetSplice native effect.  Anything beyond those exact records
  * stays a recovery boundary.
  */
-function nativeAdoptionObservationIdentity(file: string): { processId: number; processCreationTime: string; custody: 'CODEX_MANAGED_DAEMON' | 'AGENT_SUPERVISED' } | 'DEFERRED' | null {
+type ObservationIdentity = { processId: number; processCreationTime: string; custody: 'CODEX_MANAGED_DAEMON' | 'AGENT_SUPERVISED' };
+function nativeAdoptionObservationIdentity(file: string): { identities: ObservationIdentity[]; deferred: boolean } | null {
   try {
     const rows = readEvidence(file);
-    if (rows.length === 1 && rows[0]?.kind === 'NATIVE_STARTUP_DEFERRED' &&
-      (rows[0].value as any)?.custody === 'AGENT_SUPERVISED' && (rows[0].value as any)?.reason === 'SHARING_DISABLED') return 'DEFERRED';
     const compatibility = rows.filter(row => row.kind === 'NATIVE_COMPATIBILITY');
-    if (compatibility.length !== 1 || !rows.every(row => {
+    const deferred = rows.some(row => row.kind === 'NATIVE_STARTUP_DEFERRED');
+    if ((!compatibility.length && !deferred) || !rows.every(row => {
       if (row.kind === 'NATIVE_COMPATIBILITY') return true;
       if (row.kind === 'NATIVE_STARTUP_DEFERRED') return (row.value as any)?.custody === 'AGENT_SUPERVISED' && (row.value as any)?.reason === 'SHARING_DISABLED';
       if (row.kind === 'NATIVE_DISCOVERY_NOT_ATTACHABLE') return row.key === (row.value as any)?.threadId &&
@@ -421,15 +421,22 @@ function nativeAdoptionObservationIdentity(file: string): { processId: number; p
       if (row.kind === 'NATIVE_OBSERVATION_FAILURE') return typeof (row.value as any)?.code === 'string';
       return false;
     })) return null;
-    const value = compatibility[0]!.value as any;
-    const identity = value?.identity;
-    if (!value?.compatibility || typeof value.compatibility !== 'object' ||
-      typeof identity?.endpointIdentity !== 'string' || typeof identity?.executablePath !== 'string' ||
-      !Number.isSafeInteger(identity?.processId) || identity.processId <= 0 ||
-      typeof identity?.processCreationTime !== 'string' || !/^\d+$/.test(identity.processCreationTime)) return null;
-    const custody = identity.custody ?? (identity.serverIncarnation === null ? 'CODEX_MANAGED_DAEMON' : null);
-    if (custody !== 'CODEX_MANAGED_DAEMON' && custody !== 'AGENT_SUPERVISED') return null;
-    return { processId: identity.processId, processCreationTime: identity.processCreationTime, custody };
+    const identities: ObservationIdentity[] = [];
+    for (const row of compatibility) {
+      const value = row.value as any;
+      const identity = value?.identity;
+      if (!value?.compatibility || typeof value.compatibility !== 'object' ||
+        typeof identity?.endpointIdentity !== 'string' || typeof identity?.executablePath !== 'string' ||
+        !Number.isSafeInteger(identity?.processId) || identity.processId <= 0 ||
+        typeof identity?.processCreationTime !== 'string' || !/^\d+$/.test(identity.processCreationTime)) return null;
+      const custody = identity.custody ?? (identity.serverIncarnation === null ? 'CODEX_MANAGED_DAEMON' : null);
+      if (custody !== 'CODEX_MANAGED_DAEMON' && custody !== 'AGENT_SUPERVISED') return null;
+      if (custody === 'AGENT_SUPERVISED' && typeof identity.serverIncarnation !== 'string') return null;
+      identities.push({ processId: identity.processId, processCreationTime: identity.processCreationTime, custody });
+    }
+    if (new Set(identities.map(identity => identity.custody)).size > 1 ||
+      (deferred && identities.some(identity => identity.custody !== 'AGENT_SUPERVISED'))) return null;
+    return { identities, deferred };
   } catch { return null; }
 }
 function lifecycleJournal(base: string, guard: Guard): LifecycleJournal | null {
@@ -545,13 +552,14 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
     let declared: unknown;
     try { declared = safeJson<{ nativeServerCustody?: unknown }>(path.join(base, guard.runId, 'admission.json')).nativeServerCustody; }
     catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_ADMISSION_UNREADABLE' }; }
-    if (declared !== undefined && declared !== (observed === 'DEFERRED' ? 'AGENT_SUPERVISED' : observed.custody))
+    const custody = observed.identities[0]?.custody ?? 'AGENT_SUPERVISED';
+    if (declared !== undefined && declared !== custody)
       return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_CUSTODY_MISMATCH' };
-    if (observed !== 'DEFERRED' && observed.custody === 'AGENT_SUPERVISED') {
-      const native = process(observed.processId);
+    for (const identity of observed.identities.filter(value => value.custody === 'AGENT_SUPERVISED')) {
+      const native = process(identity.processId);
       const creation = native.identity && creationTicks(native.identity.creationTime);
-      const recorded = BigInt(observed.processCreationTime) - 116444736000000000n;
-      if (native.exists && (!native.identity || native.identity.processId !== observed.processId || creation === null))
+      const recorded = BigInt(identity.processCreationTime) - 116444736000000000n;
+      if (recorded < 0n || native.exists && (!native.identity || native.identity.processId !== identity.processId || creation === null))
         return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: [native], reason: 'NATIVE_ADOPTION_PROCESS_IDENTITY_UNPROVABLE' };
       if (native.exists && creation === recorded)
         return { kind: 'LIVE_OR_CONFLICTING', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: [native], reason: 'EXACT_NATIVE_PROCESS_PRESENT' };
@@ -606,8 +614,33 @@ export function retireOwnerAuthorizedUnprovable(base = runtimeRoot(), runId = G0
 export function closeSafePredecessor(base = runtimeRoot(), process = probeProcess, conflicts = fleetSpliceProcesses()): Predecessor {
   const predecessor = classifyPredecessor(base, process, conflicts);
   requireThat(predecessor.guard && ['SAFE_NO_EFFECT', 'SAFE_TERMINAL'].includes(predecessor.kind), 'SAFE_PREDECESSOR_CLOSURE_NOT_ADMITTED');
-  preserveGuardForRun(base, predecessor.guard);
-  durable(guardPath(base), { ...predecessor.guard, state: 'CLOSED', nativeExitObserved: true, quiescent: true, closure: predecessor.kind, closureReason: predecessor.reason, closureAt: new Date().toISOString() });
+  const guard = predecessor.guard;
+  const journal = lifecycleJournal(base, guard);
+  if (journal?.kind === 'NATIVE_ADOPTION') {
+    const observed = nativeAdoptionObservationIdentity(journal.file);
+    requireThat(!!observed, 'NATIVE_ADOPTION_EFFECT_EVIDENCE_UNPROVABLE');
+    const lockPath = path.join(path.dirname(base), 'native-server', 'owner.lock');
+    if (existsSync(lockPath)) {
+      requireThat(observed.identities.some(identity => identity.custody === 'AGENT_SUPERVISED'),
+        'NATIVE_SUPERVISED_LOCK_UNPROVABLE');
+      const directory = path.dirname(lockPath);
+      requireThat(lstatSync(directory).isDirectory() && !lstatSync(directory).isSymbolicLink() &&
+        lstatSync(lockPath).isFile() && !lstatSync(lockPath).isSymbolicLink(), 'NATIVE_SUPERVISED_LOCK_UNPROVABLE');
+      const raw = readFileSync(lockPath);
+      let lock: { owner?: unknown; agentPid?: unknown; runId?: unknown };
+      try { lock = JSON.parse(raw.toString('utf8')); } catch { throw new Error('NATIVE_SUPERVISED_LOCK_UNPROVABLE'); }
+      requireThat(typeof lock.owner === 'string' && !!lock.owner && lock.runId === guard.runId &&
+        Number.isSafeInteger(lock.agentPid) && Number(lock.agentPid) > 0 && !process(Number(lock.agentPid)).exists,
+        'NATIVE_SUPERVISED_LOCK_UNPROVABLE');
+      const archive = path.join(base, guard.runId, 'native-owner.lock.observed.json');
+      requireThat(readFileSync(lockPath).equals(raw), 'NATIVE_SUPERVISED_LOCK_UNPROVABLE');
+      if (!existsSync(archive)) copyFileSync(lockPath, archive, 1);
+      requireThat(readFileSync(archive).equals(raw) && readFileSync(lockPath).equals(raw), 'NATIVE_SUPERVISED_LOCK_UNPROVABLE');
+      unlinkSync(lockPath);
+    }
+  }
+  preserveGuardForRun(base, guard);
+  durable(guardPath(base), { ...guard, state: 'CLOSED', nativeExitObserved: true, quiescent: true, closure: predecessor.kind, closureReason: predecessor.reason, closureAt: new Date().toISOString() });
   return predecessor;
 }
 

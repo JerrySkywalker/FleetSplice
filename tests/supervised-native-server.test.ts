@@ -32,8 +32,9 @@ test('real start, readiness, exact identity, conflicting owner, fresh restart an
   const server = new AgentSupervisedNativeServer(options);
   const rival = new AgentSupervisedNativeServer(options);
   let firstPid = 0; let secondPid = 0;
+  let firstCreation = ''; let secondCreation = '';
   try {
-    const first = await server.start(); firstPid = first.processId;
+    const first = await server.start(); firstPid = first.processId; firstCreation = first.processCreationTime;
     assert.equal(server.assertCurrent(first).processId, firstPid);
     assert.match(first.processCreationTime, /^\d+$/);
     assert.match(first.endpointIdentity, /:\d+$/);
@@ -44,17 +45,19 @@ test('real start, readiness, exact identity, conflicting owner, fresh restart an
     const command = execFileSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
       ['-NoProfile', '-NonInteractive', '-Command', `(Get-CimInstance Win32_Process -Filter 'ProcessId=${firstPid}').CommandLine`],
       { encoding: 'utf8', windowsHide: true });
-    assert.match(command, /app-server --listen unix:\/\//);
+    assert.match(command, /app-server --listen "?unix:\/\//);
     assert.doesNotMatch(command, /Bearer|capability-token|P02_PRIVATE_TEST_VALUE|sk-[A-Za-z0-9]/i);
     assert.doesNotMatch(JSON.stringify(first), /P02_PRIVATE_TEST_VALUE/);
-    const second = await server.restart(); secondPid = second.processId;
+    const second = await server.restart(); secondPid = second.processId; secondCreation = second.processCreationTime;
+    if (firstPid === secondPid) assert.notEqual(firstCreation, secondCreation, 'Windows may reuse a retired PID');
     assert.notEqual(first.serverIncarnation, second.serverIncarnation);
     assert.notEqual(first.endpointIdentity, second.endpointIdentity);
     assert.throws(() => server.assertCurrent(first), /NATIVE_SUPERVISED_STALE_INCARCATION/);
     assert.equal(server.assertCurrent(second).processId, secondPid);
   } finally {
     assert.equal(await server.stop(), true);
-    assert.equal(alive(firstPid), false); assert.equal(alive(secondPid), false);
+    if (firstPid) assert.equal(alive(firstPid), false, `first PID ${firstPid}, second PID ${secondPid}`);
+    if (secondPid) assert.equal(alive(secondPid), false, `second PID ${secondPid}`);
     cleanup();
   }
 });

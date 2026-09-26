@@ -47,3 +47,20 @@ receipts. The field is optional when reading historical receipts. The existing
 serialized `daemon` field and `sharedDaemon` capability key remain readable;
 the latter means a proven shared native server for either custody path. The
 same capability probes classify both paths. Custody never selects a profile.
+
+## P06 custody qualification
+
+The Agent's foreground process is held by a FleetSplice-owned Windows Job with
+`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. The helper creates the official Codex
+`app-server` suspended, assigns it to that Job, then resumes it. This closes the
+parent-death window without changing Codex's installed binary or its managed
+daemon guard. The helper closes the Job on Agent stdin closure, native exit, or
+helper exit. Agent shutdown proves the exact native PID and creation time have
+ended before it releases the owner lock.
+
+An observation-only predecessor can contain several native server
+incarnations after sharing pause and cold resume. Automatic safe closure proves
+the exact exit of every Agent-supervised incarnation. A stale owner lock from
+an abruptly ended Agent is archived and retired only when it names the exact
+run, the Agent and native processes have exited, and the previous journals and
+guard classify safe. Unknown or mismatched custody remains a recovery boundary.

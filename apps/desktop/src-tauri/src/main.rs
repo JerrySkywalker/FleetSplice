@@ -9,8 +9,13 @@ fn local_base() -> Result<PathBuf, String> {
 }
 
 fn resource_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  app.path().resource_dir().map_err(|_| "BUNDLED_AGENT_UNAVAILABLE".to_string())
-    .map(|path| path.join("package-resources"))
+  let root = app.path().resource_dir().map_err(|_| "BUNDLED_AGENT_UNAVAILABLE".to_string())?;
+  // Tauri preserves the staged `../package-resources` input below `_up_` in
+  // the NSIS layout. Resolve both supported layouts by the bundled script.
+  for candidate in [root.join("package-resources"), root.join("_up_").join("package-resources")] {
+    if candidate.join("fleetsplice.ps1").is_file() { return Ok(candidate); }
+  }
+  Err("BUNDLED_AGENT_UNAVAILABLE".into())
 }
 
 // The bundled Agent is a local child-only CLI.  It never receives Gateway or

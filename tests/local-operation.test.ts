@@ -191,6 +191,34 @@ test('native restart history requires every exact Agent process to exit before a
   assert.equal(readFileSync(path.join(state.directory, 'native-owner.lock.observed.json'), 'utf8'), original);
   assert.equal(JSON.parse(readFileSync(path.join(state.base, 'environment-guard.json'), 'utf8')).state, 'CLOSED');
 });
+test('completed native attach and Web turn close only with bound receipts, terminal event, drained commands and exact exit', () => {
+  const state = fixture('none'); unlinkSync(path.join(state.directory, 'edge.sqlite'));
+  writeFileSync(path.join(state.directory, 'admission.json'), JSON.stringify({ runId: state.guard.runId, target: state.guard.target, identity: state.guard.identity, productPath: 'NATIVE_ADOPTION', nativeServerCustody: 'AGENT_SUPERVISED' }));
+  const file = path.join(state.directory, 'native-edge.sqlite'); const db = new DatabaseSync(file); db.exec(journalSchema);
+  const add = (kind: string, key: string, value: unknown) => db.prepare('INSERT INTO evidence(kind,key,value) VALUES(?,?,?)').run(kind, key, JSON.stringify(value));
+  const daemon = { endpointIdentity: 'fixture:1', executablePath: 'C:\\fixture\\codex.exe', processId: 901, processCreationTime: '134000000000000000', serverIncarnation: randomUUID(), custody: 'AGENT_SUPERVISED' };
+  const threadId = randomUUID(), turnId = randomUUID(), attachId = randomUUID(), submitId = randomUUID();
+  add('NATIVE_COMPATIBILITY', randomUUID(), { identity: daemon, compatibility: { profile: 'ADOPT_FULL' } });
+  const receipt = (commandId: string, family: string, nativeTurnId: string | null) => ({ commandId, family, status: 'SUCCEEDED', code: 'NATIVE_CONTROL_OBSERVED', daemon, threadId, turnId: nativeTurnId, origin: 'NATIVE_ADOPTED', createdNativeThread: false, processTerminationClaim: false });
+  add('NATIVE_ATTACH_ATTEMPT', attachId, { command: { commandId: attachId, threadId, family: 'native.attach' }, daemon, createdNativeThread: false });
+  add('NATIVE_ADOPTION_RECEIPT', attachId, receipt(attachId, 'native.attach', null));
+  add('NATIVE_EFFECT_ATTEMPT', submitId, { command: { commandId: submitId, threadId, family: 'native.submit' }, daemon, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
+  add('NATIVE_ADOPTED_EVENT', threadId, { method: 'turn/completed', threadId, turnId, status: 'completed' });
+  add('NATIVE_ADOPTION_RECEIPT', submitId, receipt(submitId, 'native.submit', turnId));
+  const commandId = randomUUID(), incarnation = randomUUID();
+  add('NATIVE_COMMAND_EVIDENCE', commandId, { incarnation, threadId, id: commandId, turnId, text: 'harmless', status: 'completed' });
+  db.exec('CREATE TABLE native_commands (incarnation TEXT NOT NULL, thread TEXT NOT NULL, id TEXT NOT NULL, turn TEXT NOT NULL, terminal INTEGER NOT NULL, value TEXT NOT NULL, PRIMARY KEY(incarnation,thread,id))');
+  db.prepare('INSERT INTO native_commands VALUES(?,?,?,?,?,?)').run(incarnation, threadId, commandId, turnId, 1, JSON.stringify({ id: commandId, turnId, text: 'harmless', status: 'completed' })); db.close();
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'SAFE_TERMINAL');
+  assert.equal(classifyPredecessor(state.base, () => ({ exists: true, identity: { processId: 901, creationTime: new Date(Number((134000000000000000n - 116444736000000000n) / 10000n)).toISOString() } }), noConflicts).kind, 'LIVE_OR_CONFLICTING');
+  const corrupt = new DatabaseSync(file);
+  corrupt.prepare('UPDATE native_commands SET terminal=0 WHERE id=?').run(commandId);
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  corrupt.prepare('UPDATE native_commands SET terminal=1 WHERE id=?').run(commandId);
+  corrupt.prepare("UPDATE evidence SET value=? WHERE kind='NATIVE_ADOPTION_RECEIPT' AND key=?").run(JSON.stringify({ ...receipt(submitId, 'native.submit', turnId), status: 'AMBIGUOUS_EFFECT' }), submitId);
+  assert.equal(classifyPredecessor(state.base, absent, noConflicts).kind, 'CORRUPT_OR_UNPROVABLE');
+  corrupt.close();
+});
 test('a sharing-disabled native startup closes without a Codex process', () => {
   const state = fixture('none'); unlinkSync(path.join(state.directory, 'edge.sqlite'));
   writeFileSync(path.join(state.directory, 'admission.json'), JSON.stringify({ runId: state.guard.runId, target: state.guard.target, identity: state.guard.identity, productPath: 'NATIVE_ADOPTION' }));

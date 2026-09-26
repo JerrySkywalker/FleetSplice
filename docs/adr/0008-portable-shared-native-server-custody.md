@@ -64,3 +64,9 @@ the exact exit of every Agent-supervised incarnation. A stale owner lock from
 an abruptly ended Agent is archived and retired only when it names the exact
 run, the Agent and native processes have exited, and the previous journals and
 guard classify safe. Unknown or mismatched custody remains a recovery boundary.
+
+Completed Native Adoption effects may close as `SAFE_TERMINAL` only when each
+attach and effect attempt has a unique bound successful receipt, each effect's
+turn has a terminal native event, durable native command evidence is drained,
+and every Agent-supervised process has exited. Ambiguous or missing evidence
+stays in recovery; no effect is replayed by the successor.

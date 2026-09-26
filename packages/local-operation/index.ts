@@ -262,9 +262,9 @@ export function fleetSpliceProcesses(): ProcessProbe[] {
 }
 
 const emptyEvidence = (): NativeEvidence => ({ process: null, instanceId: null, threadId: null, turnId: null, sessionReady: false, turnAccepted: false, turnStarted: false, turnCompleted: false, hasEffectAttempt: false, hasNativeEvidence: false, turns: {}, unresolvedEffectIds: [], unboundEvidence: false });
-const readEvidence = (file: string): { kind: string; key: string; value: unknown }[] => {
+const readEvidence = (file: string): { seq: number; kind: string; key: string; value: unknown }[] => {
   const db = new DatabaseSync(file, { readOnly: true });
-  try { return db.prepare('SELECT kind,key,value FROM evidence ORDER BY seq').all().map(row => ({ kind: String(row.kind), key: String(row.key), value: JSON.parse(String(row.value)) })); } finally { db.close(); }
+  try { return db.prepare('SELECT seq,kind,key,value FROM evidence ORDER BY seq').all().map(row => ({ seq: Number(row.seq), kind: String(row.kind), key: String(row.key), value: JSON.parse(String(row.value)) })); } finally { db.close(); }
 };
 export function evidenceFromEdge(file: string): NativeEvidence {
   const summary = emptyEvidence();
@@ -407,8 +407,8 @@ type LifecycleJournal = { file: string; kind: 'LEGACY_MANAGED' | 'NATIVE_ADOPTIO
  * admitted a FleetSplice native effect.  Anything beyond those exact records
  * stays a recovery boundary.
  */
-type ObservationIdentity = { processId: number; processCreationTime: string; custody: 'CODEX_MANAGED_DAEMON' | 'AGENT_SUPERVISED' };
-function nativeAdoptionObservationIdentity(file: string): { identities: ObservationIdentity[]; deferred: boolean } | null {
+type ObservationIdentity = { processId: number; processCreationTime: string; custody: 'CODEX_MANAGED_DAEMON' | 'AGENT_SUPERVISED'; artifact: unknown };
+function nativeAdoptionLifecycleEvidence(file: string): { identities: ObservationIdentity[]; hasEffect: boolean } | null {
   try {
     const rows = readEvidence(file);
     const compatibility = rows.filter(row => row.kind === 'NATIVE_COMPATIBILITY');
@@ -419,6 +419,8 @@ function nativeAdoptionObservationIdentity(file: string): { identities: Observat
       if (row.kind === 'NATIVE_DISCOVERY_NOT_ATTACHABLE') return row.key === (row.value as any)?.threadId &&
         typeof (row.value as any)?.reason === 'string' && typeof (row.value as any)?.incarnation === 'string';
       if (row.kind === 'NATIVE_OBSERVATION_FAILURE') return typeof (row.value as any)?.code === 'string';
+      if (['NATIVE_ATTACH_ATTEMPT', 'NATIVE_EFFECT_ATTEMPT', 'NATIVE_ADOPTION_RECEIPT', 'NATIVE_ADOPTED_EVENT',
+        'NATIVE_COMMAND_EVIDENCE', 'NATIVE_CONTROLLER_GRANT_RENEWED'].includes(row.kind)) return true;
       return false;
     })) return null;
     const identities: ObservationIdentity[] = [];
@@ -432,11 +434,86 @@ function nativeAdoptionObservationIdentity(file: string): { identities: Observat
       const custody = identity.custody ?? (identity.serverIncarnation === null ? 'CODEX_MANAGED_DAEMON' : null);
       if (custody !== 'CODEX_MANAGED_DAEMON' && custody !== 'AGENT_SUPERVISED') return null;
       if (custody === 'AGENT_SUPERVISED' && typeof identity.serverIncarnation !== 'string') return null;
-      identities.push({ processId: identity.processId, processCreationTime: identity.processCreationTime, custody });
+      identities.push({ processId: identity.processId, processCreationTime: identity.processCreationTime, custody, artifact: identity });
     }
     if (new Set(identities.map(identity => identity.custody)).size > 1 ||
       (deferred && identities.some(identity => identity.custody !== 'AGENT_SUPERVISED'))) return null;
-    return { identities, deferred };
+    const knownDaemon = (value: unknown) => identities.some(identity => same(identity.artifact, value));
+    const receiptRows = rows.filter(row => row.kind === 'NATIVE_ADOPTION_RECEIPT');
+    const receipts = new Map<string, typeof receiptRows[number]>();
+    const effectFamilies = ['native.submit', 'native.steer', 'native.interrupt', 'native.approval'];
+    for (const row of receiptRows) {
+      const receipt = row.value as any;
+      if (receipts.has(row.key) || receipt?.commandId !== row.key ||
+        !['native.attach', 'native.release', 'native.reviewState', ...effectFamilies].includes(receipt.family) ||
+        !['SUCCEEDED', 'REJECTED', 'AMBIGUOUS_EFFECT'].includes(receipt.status) ||
+        typeof receipt.code !== 'string' || typeof receipt.threadId !== 'string' ||
+        !knownDaemon(receipt.daemon) || receipt.origin !== 'NATIVE_ADOPTED' ||
+        receipt.createdNativeThread !== false || receipt.processTerminationClaim !== false) return null;
+      receipts.set(row.key, row);
+    }
+    const attempts = rows.filter(row => row.kind === 'NATIVE_ATTACH_ATTEMPT' || row.kind === 'NATIVE_EFFECT_ATTEMPT');
+    const attemptedKeys = new Set<string>();
+    const terminalEvents = rows.filter(row => row.kind === 'NATIVE_ADOPTED_EVENT' &&
+      (row.value as any)?.method === 'turn/completed' &&
+      ['completed', 'interrupted', 'failed'].includes((row.value as any)?.status));
+    for (const row of rows.filter(row => row.kind === 'NATIVE_ADOPTED_EVENT')) {
+      const event = row.value as any;
+      if (event?.threadId !== row.key || typeof event.method !== 'string' ||
+        (event.turnId !== null && typeof event.turnId !== 'string') ||
+        (event.method === 'turn/completed' && !['completed', 'interrupted', 'failed'].includes(event.status))) return null;
+    }
+    for (const row of attempts) {
+      const attempt = row.value as any; const command = attempt?.command;
+      const receiptRow = receipts.get(row.key); const receipt = receiptRow?.value as any;
+      if (attemptedKeys.has(row.key) || command?.commandId !== row.key ||
+        typeof command.threadId !== 'string' || !knownDaemon(attempt.daemon) ||
+        attempt.createdNativeThread !== false ||
+        (row.kind === 'NATIVE_ATTACH_ATTEMPT' ? command.family !== 'native.attach' :
+          !effectFamilies.includes(command.family) || attempt.origin !== 'NATIVE_ADOPTED') ||
+        !receiptRow || receiptRow.seq <= row.seq || receipt.status !== 'SUCCEEDED' ||
+        receipt.family !== command.family || receipt.threadId !== command.threadId ||
+        !same(receipt.daemon, attempt.daemon)) return null;
+      if (row.kind === 'NATIVE_EFFECT_ATTEMPT' &&
+        (typeof receipt.turnId !== 'string' || !terminalEvents.some(event => event.seq > row.seq &&
+          (event.value as any).threadId === command.threadId && (event.value as any).turnId === receipt.turnId))) return null;
+      attemptedKeys.add(row.key);
+    }
+    for (const row of receiptRows) {
+      const receipt = row.value as any;
+      if (receipt.status === 'AMBIGUOUS_EFFECT' ||
+        (receipt.status === 'SUCCEEDED' && ['native.attach', ...effectFamilies].includes(receipt.family) && !attemptedKeys.has(row.key)) ||
+        (receipt.status === 'REJECTED' && attemptedKeys.has(row.key))) return null;
+    }
+    const commandEvidence = rows.filter(row => row.kind === 'NATIVE_COMMAND_EVIDENCE');
+    const latestCommands = new Map<string, unknown>();
+    for (const row of commandEvidence) {
+      const value = row.value as any;
+      if (value?.id !== row.key || typeof value.incarnation !== 'string' ||
+        typeof value.threadId !== 'string' || typeof value.turnId !== 'string' ||
+        typeof value.status !== 'string') return null;
+      latestCommands.set(JSON.stringify([value.incarnation, value.threadId, row.key]), value);
+    }
+    const db = new DatabaseSync(file, { readOnly: true });
+    try {
+      const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='native_commands'").get();
+      if (!table && latestCommands.size) return null;
+      const commands = table ? db.prepare('SELECT incarnation,thread,id,turn,terminal,value FROM native_commands').all() : [];
+      if (commands.length !== latestCommands.size) return null;
+      for (const command of commands) {
+        const latest = latestCommands.get(JSON.stringify([command.incarnation, command.thread, command.id])) as any;
+        const value = JSON.parse(String(command.value));
+        if (!latest || command.terminal !== 1 || !['completed', 'failed', 'declined'].includes(value.status) ||
+          command.turn !== latest.turnId || !same(value, { id: latest.id, turnId: latest.turnId, text: latest.text, status: latest.status })) return null;
+      }
+    } finally { db.close(); }
+    for (const row of rows.filter(row => row.kind === 'NATIVE_CONTROLLER_GRANT_RENEWED')) {
+      const value = row.value as any;
+      if (value?.previous?.clientInstanceId !== row.key || value?.next?.clientInstanceId !== row.key ||
+        typeof value.runtimeId !== 'string' || typeof value.incarnation !== 'string' ||
+        !Number.isSafeInteger(value.previousFence) || value.fence !== value.previousFence + 1) return null;
+    }
+    return { identities, hasEffect: attempts.some(row => row.kind === 'NATIVE_EFFECT_ATTEMPT') };
   } catch { return null; }
 }
 function lifecycleJournal(base: string, guard: Guard): LifecycleJournal | null {
@@ -547,7 +624,7 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
   const journal = lifecycleJournal(base, guard);
   if (!journal || !readableFleetSpliceJournal(journal.file)) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_JOURNAL_UNPROVABLE' };
   if (journal.kind === 'NATIVE_ADOPTION') {
-    const observed = nativeAdoptionObservationIdentity(journal.file);
+    const observed = nativeAdoptionLifecycleEvidence(journal.file);
     if (!observed) return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'NATIVE_ADOPTION_EFFECT_EVIDENCE_UNPROVABLE' };
     let declared: unknown;
     try { declared = safeJson<{ nativeServerCustody?: unknown }>(path.join(base, guard.runId, 'admission.json')).nativeServerCustody; }
@@ -564,7 +641,7 @@ export function classifyPredecessor(base = runtimeRoot(), process = probeProcess
       if (native.exists && creation === recorded)
         return { kind: 'LIVE_OR_CONFLICTING', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts: [native], reason: 'EXACT_NATIVE_PROCESS_PRESENT' };
     }
-    return { kind: 'SAFE_NO_EFFECT', guard, evidence: emptyEvidence(), exactNativeExitProven: true, conflicts: [], reason: 'NATIVE_ADOPTION_COMPATIBILITY_ONLY' };
+    return { kind: observed.hasEffect ? 'SAFE_TERMINAL' : 'SAFE_NO_EFFECT', guard, evidence: emptyEvidence(), exactNativeExitProven: true, conflicts: [], reason: observed.hasEffect ? 'NATIVE_ADOPTION_ALL_EFFECTS_TERMINAL' : 'NATIVE_ADOPTION_COMPATIBILITY_ONLY' };
   }
   let evidence: NativeEvidence;
   try { evidence = evidenceFromEdge(journal.file); } catch { return { kind: 'CORRUPT_OR_UNPROVABLE', guard, evidence: emptyEvidence(), exactNativeExitProven: false, conflicts, reason: 'EDGE_EVIDENCE_UNREADABLE' }; }
@@ -617,7 +694,7 @@ export function closeSafePredecessor(base = runtimeRoot(), process = probeProces
   const guard = predecessor.guard;
   const journal = lifecycleJournal(base, guard);
   if (journal?.kind === 'NATIVE_ADOPTION') {
-    const observed = nativeAdoptionObservationIdentity(journal.file);
+    const observed = nativeAdoptionLifecycleEvidence(journal.file);
     requireThat(!!observed, 'NATIVE_ADOPTION_EFFECT_EVIDENCE_UNPROVABLE');
     const lockPath = path.join(path.dirname(base), 'native-server', 'owner.lock');
     if (existsSync(lockPath)) {

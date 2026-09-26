@@ -113,7 +113,9 @@ fn main() {
     .plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)))
     .setup(|app| {
       let handle = app.handle().clone();
-      tauri::async_runtime::spawn(async move { let _ = start_selected_agent(&handle); });
+      tauri::async_runtime::spawn(async move {
+        if let Err(error) = start_selected_agent(&handle) { eprintln!("DESKTOP_AGENT_START_FAILED:{error}"); }
+      });
       let open = MenuItem::with_id(app, "open", "Open FleetSplice / Settings", true, None::<&str>)?;
       let dashboard = MenuItem::with_id(app, "dashboard", "Open Dashboard", true, None::<&str>)?;
       let drain = MenuItem::with_id(app, "drain", "Drain and Exit", true, None::<&str>)?;

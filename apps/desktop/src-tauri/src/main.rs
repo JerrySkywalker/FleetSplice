@@ -25,9 +25,13 @@ fn resource_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 fn bundled_cli(app: &tauri::AppHandle, arguments: &[String]) -> Result<String, String> {
   let script = resource_root(app)?.join("fleetsplice.ps1");
   if !script.is_file() { return Err("BUNDLED_AGENT_UNAVAILABLE".into()); }
+  // Tauri's Windows resource path may be verbatim (\\?\C:\...). Windows
+  // PowerShell 5 accepts it as -File but then leaves $PSScriptRoot empty.
+  let script_path = script.to_string_lossy();
+  let script_path = script_path.strip_prefix(r"\\?\").unwrap_or(&script_path);
   let output = Command::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
     .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"])
-    .arg(script).args(arguments)
+    .arg(script_path).args(arguments)
     .creation_flags(0x08000000)
     .output().map_err(|_| "BUNDLED_AGENT_UNAVAILABLE".to_string())?;
   if !output.status.success() { return Err(String::from_utf8_lossy(&output.stderr).trim().to_string()); }

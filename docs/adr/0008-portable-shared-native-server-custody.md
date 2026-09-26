@@ -1,0 +1,43 @@
+# ADR 0008 — Portable shared native-server custody
+
+Status: Accepted for the bounded portable-host runtime train after real P01
+ZenBook14 evidence in
+[the P01 research record](../research/portable-host-p01-shared-server.md).
+Gate S and live G06 remain unadmitted.
+
+## Context
+
+Codex's managed daemon cannot prove safe detachment from the Windows Job chain
+on ZenBook14. Its guard must remain intact. The Owner has selected ZenBook14 as
+the first live G06 Edge, superseding the fixed SKYFORGE placement in the older
+[ADR 0007](0007-remote-native-adoption-hcp.md). ADR 0007's typed HCP boundary
+remains in force.
+
+## Decision
+
+`NATIVE_ADOPTED` stays the primary Agent origin. Shared native-server custody
+has two lifecycle values: `CODEX_MANAGED_DAEMON` and `AGENT_SUPERVISED`. Custody
+is evidence and lifecycle metadata; native compatibility stays capability
+driven. Artifact version and SHA identify an observed incarnation, never an
+allowlist.
+
+For the portable path, FleetSplice Agent owns one official Codex app-server
+foreground process and its endpoint. Use a same-user Windows AF_UNIX socket in
+an owner-only directory. The Agent must prove process PID and creation time,
+executable path and hash, endpoint and owner, and real initialize readiness
+before publishing it. Stop the exact child on Agent shutdown; a restart creates
+a new incarnation and fences old authority. Provider credentials stay in the
+native Codex environment. No native effect is replayed after uncertainty.
+
+Do not bypass Codex's Job guard, create a generic raw native RPC tunnel, or use
+an unauthenticated non-loopback listener. The existing managed-daemon path
+remains available where it can be qualified. First Owner launch may use the
+official TUI `--remote` attachment; ordinary `codex --yolo` convergence remains
+a separate bounded usability question.
+
+## Evidence and next gate
+
+P01 proved one foreground server, one same-user AF_UNIX endpoint, a real remote
+Codex TUI and a FleetSplice native client on the same native thread, and clean
+supervised shutdown. P02 implements lifecycle custody; P03 generalizes Native
+Adoption evidence; P04 performs full real same-thread control acceptance.

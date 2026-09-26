@@ -34,7 +34,8 @@ test('actual start preflight failure creates no guard before runtime commit', ()
   assert.equal(typeof fleetspliceEntrypoint, 'function');
   const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-cli-preflight-'));
   const cli = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'fleetsplice.js');
-  const child = spawnSync(process.execPath, [cli, 'start'], { cwd: process.cwd(), env: { ...process.env, LOCALAPPDATA: localAppData, HTTPS_PROXY: 'http://127.0.0.1:1', HTTP_PROXY: 'http://127.0.0.1:1', ALL_PROXY: 'http://127.0.0.1:1' }, encoding: 'utf8', windowsHide: true, timeout: 20000 });
+  const child = spawnSync(process.execPath, [cli, 'start'], { cwd: process.cwd(), env: { ...process.env, LOCALAPPDATA: localAppData, HTTPS_PROXY: 'http://127.0.0.1:1', HTTP_PROXY: 'http://127.0.0.1:1', ALL_PROXY: 'http://127.0.0.1:1' }, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  assert.equal(child.error, undefined, 'isolated preflight subprocess must finish within the parallel-suite bound');
   assert.notEqual(child.status, 0); assert.match(`${child.stdout}\n${child.stderr}`, /PRECHECK_FAILED/);
   assert.equal(existsSync(path.join(localAppData, 'FleetSplice', 'G05', 'environment-guard.json')), false);
 });

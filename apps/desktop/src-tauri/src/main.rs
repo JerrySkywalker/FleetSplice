@@ -117,6 +117,11 @@ fn ensure_no_other_running_root(guard: &Value, root: &str) -> Result<(), String>
     "RUNNING" if guarded_root != root => Err("WORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT".into()),
     "RUNNING" => Ok(()),
     "CLOSED" if guard.get("nativeExitObserved").and_then(Value::as_bool) == Some(true) && guard.get("quiescent").and_then(Value::as_bool) == Some(true) => Ok(()),
+    "RETIRED_AMBIGUOUS" | "RETIRED_UNPROVABLE" if guard.get("nativeExitObserved").and_then(Value::as_bool) == Some(true) &&
+      guard.get("oldEffectOutcome").and_then(Value::as_str) == Some("UNKNOWN") &&
+      guard.get("oldAuthorityRuntimeRetired").and_then(Value::as_bool) == Some(true) &&
+      guard.get("freshIncarnationRequired").and_then(Value::as_bool) == Some(true) &&
+      guard.get("retirementReceipt").and_then(Value::as_str).is_some_and(|value| !value.is_empty()) => Ok(()),
     _ => Err("SUPERVISOR_UNAVAILABLE".into()),
   }
 }
@@ -265,6 +270,10 @@ mod tests {
     assert!(ensure_no_other_running_root(&closed, "C:\\new").is_ok());
     closed.as_object_mut().unwrap().remove("target");
     assert_eq!(ensure_no_other_running_root(&closed, "C:\\new").unwrap_err(), "SUPERVISOR_UNAVAILABLE");
+    let mut retired = active.clone(); retired["state"] = json!("RETIRED_UNPROVABLE"); retired["nativeExitObserved"] = json!(true); retired["oldEffectOutcome"] = json!("UNKNOWN"); retired["oldAuthorityRuntimeRetired"] = json!(true); retired["freshIncarnationRequired"] = json!(true); retired["retirementReceipt"] = json!("C:\\receipt.json");
+    assert!(ensure_no_other_running_root(&retired, "C:\\new").is_ok());
+    retired["state"] = json!("RETIRED_AMBIGUOUS");
+    assert!(ensure_no_other_running_root(&retired, "C:\\new").is_ok());
     assert_eq!(ensure_no_other_running_root(&json!({}), "C:\\new").unwrap_err(), "SUPERVISOR_UNAVAILABLE");
     assert_eq!(ensure_no_other_running_root(&json!({ "state": "RUNNING" }), "C:\\new").unwrap_err(), "SUPERVISOR_UNAVAILABLE");
   }

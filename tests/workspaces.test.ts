@@ -4,6 +4,8 @@ import { mkdtempSync, mkdirSync, renameSync, writeFileSync, existsSync, readFile
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { changeRegistry, readRegistry, registeredStartRoot, registryPath, withRegistryLock, workspaceValidity } from '../packages/workspaces/index.ts';
 import { digest, requireThat, type Intent, type WorkspaceBinding } from '../packages/contracts/index.ts';
 import { rootProof, rootProofNow } from '../apps/edge/identity.ts';
@@ -57,12 +59,23 @@ test('CLI start lock serializes workspace selection with process admission', asy
     entered(); await barrier;
   }, env);
   await started;
-  await assert.rejects(changeRegistry(host, 'select', next.entries[1]!.id, undefined, env, noAcl), /EEXIST/);
+  await assert.rejects(changeRegistry(host, 'select', next.entries[1]!.id, undefined, env, noAcl), /WORKSPACE_REGISTRY_BUSY/);
   assert.equal(readRegistry(host, env)!.selectedId, selected.selectedId);
   release(); await admission;
   assert.equal(await registeredStartRoot(host, second, env), next.entries[1]!.root);
   await changeRegistry(host, 'select', next.entries[1]!.id, undefined, env, noAcl);
   assert.equal(await registeredStartRoot(host, undefined, env), next.entries[1]!.root);
+});
+test('workspace admission lock disappears when its owning process exits unexpectedly', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-lock-exit-'));
+  const env = { LOCALAPPDATA: directory }; const root = path.join(directory, 'workspace'); mkdirSync(root);
+  const selected = await changeRegistry(host, 'add', root, 'Root', env, noAcl);
+  const name = createHash('sha256').update(`${registryPath(env).toLowerCase()}\0${host.sid}`).digest('hex').slice(0, 32);
+  const pipe = `\\\\.\\pipe\\fleetsplice-workspace-lock-${name}`;
+  const child = spawnSync(process.execPath, ['-e', 'const {createServer}=require("node:net");createServer(socket=>socket.destroy()).listen(process.argv[1],()=>process.exit(17))', pipe], { windowsHide: true, timeout: 10000 });
+  assert.equal(child.status, 17);
+  assert.equal((await changeRegistry(host, 'select', selected.selectedId!, undefined, env, noAcl)).selectedId, selected.selectedId);
+  assert.equal(existsSync(`${registryPath(env)}.lock`), false);
 });
 test('onboarding selects and starts under one registry lock without committing on a failed precheck', async () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-select-start-'));
@@ -74,17 +87,18 @@ test('onboarding selects and starts under one registry lock without committing o
   const originalBytes = readFileSync(registryPath(env));
   await assert.rejects(changeRegistry(host, 'select', secondId, undefined, env, noAcl, () => { throw Error('RECOVERY_REQUIRED'); }), /RECOVERY_REQUIRED/);
   assert.deepEqual(readFileSync(registryPath(env)), originalBytes);
+  await assert.rejects(changeRegistry(host, 'select', secondId, undefined, env, noAcl, async () => { await Promise.resolve(); throw Error('START_FAILED'); }), /START_FAILED/);
+  assert.deepEqual(readFileSync(registryPath(env)), originalBytes);
   let started = false;
-  await changeRegistry(host, 'select', secondId, undefined, env, noAcl, registry => {
+  await changeRegistry(host, 'select', secondId, undefined, env, noAcl, async registry => {
     assert.equal(registry.selectedId, secondId);
-  }, async registry => {
-    assert.equal(registry.selectedId, secondId);
-    assert.equal(readRegistry(host, env)!.selectedId, secondId);
-    assert.equal(existsSync(`${registryPath(env)}.lock`), true);
-    await assert.rejects(changeRegistry(host, 'select', original.selectedId!, undefined, env, noAcl), /EEXIST/);
+    assert.equal(readRegistry(host, env)!.selectedId, original.selectedId);
+    assert.equal(existsSync(`${registryPath(env)}.lock`), false);
+    await assert.rejects(changeRegistry(host, 'select', original.selectedId!, undefined, env, noAcl), /WORKSPACE_REGISTRY_BUSY/);
     started = true;
   });
   assert.equal(started, true);
+  assert.equal(readRegistry(host, env)!.selectedId, secondId);
   assert.equal(existsSync(`${registryPath(env)}.lock`), false);
 });
 test('Workspace registry registers existing roots, selects explicitly and removes only registration', async () => {
@@ -134,7 +148,7 @@ test('Workspace registry rejects substituted root identity, malformed records an
   assert.equal(await workspaceValidity(entry), false);
   await assert.rejects(changeRegistry(host, 'select', entry.id, undefined, env, noAcl), /MISSING_OR_REPLACED/);
   writeFileSync(`${registryPath(env)}.lock`, 'other writer');
-  await assert.rejects(changeRegistry(host, 'remove', entry.id, undefined, env, noAcl), /EEXIST/);
+  await assert.rejects(changeRegistry(host, 'remove', entry.id, undefined, env, noAcl), /WORKSPACE_REGISTRY_LEGACY_LOCK_RECOVERY_REQUIRED/);
   assert.equal(readFileSync(`${registryPath(env)}.lock`, 'utf8'), 'other writer');
   writeFileSync(registryPath(env), '{"version":1,"version":2}'); assert.throws(() => readRegistry(host, env));
 });

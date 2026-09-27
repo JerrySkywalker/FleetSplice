@@ -1,4 +1,5 @@
-use std::{env, fs::{self, OpenOptions}, io::{Read, Write}, path::PathBuf, process::Command};
+use std::{env, fs::{self, OpenOptions}, io::{Read, Write}, path::{Component, PathBuf}, process::Command, sync::Mutex};
+use std::os::windows::fs::MetadataExt;
 use std::os::windows::process::CommandExt;
 use serde_json::{json, Value};
 use tauri::{menu::{Menu, MenuItem}, tray::TrayIconBuilder, Manager};
@@ -81,6 +82,14 @@ fn local_workspace_root(workspace: &str) -> Result<PathBuf, String> {
   if bytes.len() < 3 || !bytes[0].is_ascii_alphabetic() || bytes[1] != b':' || bytes[2] != b'\\' {
     return Err("LOCAL_ABSOLUTE_ROOT_REQUIRED".into());
   }
+  let entered = PathBuf::from(workspace);
+  if entered.components().any(|component| matches!(component, Component::ParentDir | Component::CurDir)) {
+    return Err("ROOT_IDENTITY_INVALID".into());
+  }
+  for component in entered.ancestors() {
+    let attributes = fs::symlink_metadata(component).map_err(|_| "WORKSPACE_NOT_FOUND".to_string())?.file_attributes();
+    if attributes & 0x400 != 0 { return Err("ROOT_REPARSE_REJECTED".into()); }
+  }
   let canonical = fs::canonicalize(workspace).map_err(|_| "WORKSPACE_NOT_FOUND".to_string())?;
   if !canonical.is_dir() { return Err("WORKSPACE_NOT_FOUND".into()); }
   let displayed = canonical.to_str().ok_or("WORKSPACE_ROOT_INVALID")?;
@@ -91,9 +100,23 @@ fn local_workspace_root(workspace: &str) -> Result<PathBuf, String> {
   }
   Ok(PathBuf::from(ordinary))
 }
+
+fn ensure_no_other_running_root(guard: &Value, root: &str) -> Result<(), String> {
+  if guard.get("state").and_then(Value::as_str) == Some("RUNNING") &&
+    guard.get("identity").and_then(|value| value.get("root")).and_then(Value::as_str) != Some(root) {
+    return Err("WORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT".into());
+  }
+  Ok(())
+}
 #[tauri::command]
-fn onboard_agent(app: tauri::AppHandle, workspace: String) -> Result<Value, String> {
+fn onboard_agent(app: tauri::AppHandle, workspace: String, startup: tauri::State<'_, Mutex<()>>) -> Result<Value, String> {
+  let _startup = startup.lock().map_err(|_| "DESKTOP_STARTUP_UNAVAILABLE")?;
   let root = local_workspace_root(&workspace)?;
+  let ordinary = root.to_str().ok_or("WORKSPACE_ROOT_INVALID")?;
+  if let Ok(guard) = fs::read(local_base()?.join("environment-guard.json")) {
+    let guard: Value = serde_json::from_slice(&guard).map_err(|_| "SUPERVISOR_UNAVAILABLE")?;
+    ensure_no_other_running_root(&guard, ordinary)?;
+  }
   let display = root.file_name().and_then(|value| value.to_str()).filter(|value| !value.is_empty()).unwrap_or("Workspace");
   let listed = bundled_cli(&app, &["workspace".into(), "list".into()])?;
   let mut registry: Value = serde_json::from_str(listed.trim()).map_err(|_| "BUNDLED_AGENT_RESPONSE_INVALID".to_string())?;
@@ -140,11 +163,14 @@ fn show_main(app: &tauri::AppHandle) { if let Some(window) = app.get_webview_win
 
 fn main() {
   tauri::Builder::default()
+    .manage(Mutex::new(()))
     .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
     .plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)))
     .setup(|app| {
       let handle = app.handle().clone();
       tauri::async_runtime::spawn(async move {
+        let startup = handle.state::<Mutex<()>>();
+        let _startup = match startup.lock() { Ok(held) => held, Err(_) => { eprintln!("DESKTOP_STARTUP_UNAVAILABLE"); return; } };
         if let Err(error) = start_selected_agent(&handle, None) { eprintln!("DESKTOP_AGENT_START_FAILED:{error}"); }
       });
       let open = MenuItem::with_id(app, "open", "Open FleetSplice / Settings", true, None::<&str>)?;
@@ -166,8 +192,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-  use super::{bundled_cli_result, local_workspace_root};
+  use super::{bundled_cli_result, ensure_no_other_running_root, local_workspace_root};
   use std::{env, fs, process::Command};
+  use serde_json::json;
 
   #[test]
   fn normal_owner_drive_root_survives_windows_verbatim_canonicalization() {
@@ -190,5 +217,27 @@ mod tests {
     let failure = bundled_cli_result(output).unwrap_err();
     assert!(failure.contains("PRECHECK_FAILED"));
     assert!(failure.contains("LOCAL_ABSOLUTE_ROOT_REQUIRED"));
+  }
+
+  #[test]
+  fn desktop_rejects_junction_before_canonical_registration() {
+    let directory = env::temp_dir().join(format!("fleetsplice-reparse-{}", std::process::id()));
+    let target = directory.join("target");
+    let junction = directory.join("junction");
+    fs::create_dir_all(&target).unwrap();
+    let created = Command::new("cmd.exe").args(["/C", "mklink", "/J"])
+      .arg(&junction).arg(&target).output().unwrap();
+    assert!(created.status.success(), "junction fixture creation failed");
+    assert_eq!(local_workspace_root(junction.to_str().unwrap()).unwrap_err(), "ROOT_REPARSE_REJECTED");
+    fs::remove_dir(&junction).unwrap();
+    fs::remove_dir_all(&directory).unwrap();
+  }
+
+  #[test]
+  fn desktop_never_selects_over_another_running_root() {
+    let active = json!({ "state": "RUNNING", "identity": { "root": "C:\\previous" } });
+    assert_eq!(ensure_no_other_running_root(&active, "C:\\new").unwrap_err(), "WORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT");
+    assert!(ensure_no_other_running_root(&active, "C:\\previous").is_ok());
+    assert!(ensure_no_other_running_root(&json!({ "state": "CLOSED" }), "C:\\new").is_ok());
   }
 }

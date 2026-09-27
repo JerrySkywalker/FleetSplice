@@ -5,9 +5,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync, writeSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { localIdentity } from '../apps/edge/identity.ts';
+import { localIdentity, principalProof, validateLocalPrincipal } from '../apps/edge/identity.ts';
 import { canonical, requireThat } from '../packages/contracts/index.ts';
-import { readRegistry, changeRegistry, workspaceValidity } from '../packages/workspaces/index.ts';
+import { readRegistry, changeRegistry, workspaceValidity, registeredStartRoot, withRegistryLock } from '../packages/workspaces/index.ts';
 import { readCeiling, writeCeiling, PRESETS } from '../packages/permissions/index.ts';
 import type { PermissionPreset } from '../packages/contracts/index.ts';
 import { AGENT_IPC_VERSION, type AgentIpcCommand } from '../packages/agent-ipc/index.ts';
@@ -96,7 +96,7 @@ async function preflight(root: string) {
   if (predecessor.kind !== 'LIVE_OR_CONFLICTING' && predecessor.guard?.state !== 'RUNNING') await verifyLocalEndpointAvailability(identity.sid);
   return { identity, node, codex, configuration, proxy, network, predecessor };
 }
-async function start(root: string) {
+async function start(root: string, reportReady: (message: string) => void = output) {
   let qualified: Awaited<ReturnType<typeof preflight>>;
   try { qualified = await preflight(root); } catch (reason) { error(`PRECHECK_FAILED\n${reason instanceof Error ? reason.message : 'PRECHECK_UNKNOWN'}\nNO_RUNTIME_STATE_MUTATED=true`); return; }
   if (qualified.network.status !== 'PASS') {
@@ -106,8 +106,16 @@ async function start(root: string) {
     }
     error(`PRECHECK_FAILED\n${qualified.network.reason}\nNO_RUNTIME_STATE_MUTATED=true`); return;
   }
-  if (currentGuard()?.state === 'RUNNING') {
-    try { const state = await control('status'); output(`ALREADY_RUNNING\n${code({ runId: state.runId, supervisor: state.supervisor })}`); return; } catch { /* A stale RUNNING guard remains a recovery boundary. */ }
+  const runningGuard = currentGuard();
+  if (runningGuard?.state === 'RUNNING') {
+    if (runningGuard.identity.root !== qualified.identity.root || runningGuard.identity.rootIdentity !== qualified.identity.rootIdentity) {
+      error('PRECHECK_FAILED\nWORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT\nNO_RUNTIME_STATE_MUTATED=true'); return;
+    }
+    try {
+      const state = await control('status');
+      requireThat(state.code === 'RUNNING', 'SUPERVISOR_NOT_READY');
+      reportReady(`ALREADY_RUNNING\n${code({ runId: state.runId, supervisor: state.supervisor })}`); return;
+    } catch { /* A stale or unhealthy RUNNING guard remains a recovery boundary. */ }
   }
   if (qualified.predecessor.kind === 'AMBIGUOUS_TERMINAL' || qualified.predecessor.kind === 'LIVE_OR_CONFLICTING' || qualified.predecessor.kind === 'CORRUPT_OR_UNPROVABLE') { describePredecessor(qualified.predecessor).forEach(output); error('RECOVERY_REQUIRED\nNO_RUNTIME_STATE_MUTATED=true'); return; }
   if (qualified.predecessor.kind === 'SAFE_NO_EFFECT' || qualified.predecessor.kind === 'SAFE_TERMINAL') {
@@ -134,7 +142,7 @@ async function start(root: string) {
     await sleep(250);
     try {
       const state = await control('status');
-      if (state.code === 'RUNNING') { output(`FleetSplice 已启动\nMachine code: RUNNING\nRun: ${state.runId}\nBrowser bootstrap: ${state.url}\nProxy: ${qualified.proxy.display ?? 'direct'}\nProxy source: ${qualified.proxy.source}\nNetwork preflight: PASS\nProvider: PROVIDER_NOT_YET_PROVEN`); return; }
+      if (state.code === 'RUNNING') { reportReady(`FleetSplice 已启动\nMachine code: RUNNING\nRun: ${state.runId}\nBrowser bootstrap: ${state.url}\nProxy: ${qualified.proxy.display ?? 'direct'}\nProxy source: ${qualified.proxy.source}\nNetwork preflight: PASS\nProvider: PROVIDER_NOT_YET_PROVEN`); return; }
     } catch { /* The detached supervisor may still be acquiring the single writer. */ }
   }
   const afterTimeout = classifyPredecessor(base());
@@ -241,7 +249,7 @@ async function configure(args: string[]) {
   } catch (reason) { error(reason instanceof Error ? reason.message : 'FLEETSPLICE_PROXY_CONFIGURATION_FAILED'); }
 }
 export async function fleetspliceEntrypoint() {
-  const args = process.argv.slice(2); const command = args[0]; const workspaceIndex = args.indexOf('--workspace'); const workspace = workspaceIndex >= 0 ? args[workspaceIndex + 1] ?? process.cwd() : process.cwd();
+  const args = process.argv.slice(2); const command = args[0]; const workspaceIndex = args.indexOf('--workspace');
   if (command === 'native-demo' || command === 'adopt') {
     const { isHistoricalNativeDemoRoute, resolveNativeAdoptionWorkspace, startNativeDemo } = await import('./native-demo.ts');
     let demo: Awaited<ReturnType<typeof startNativeDemo>>;
@@ -263,19 +271,46 @@ export async function fleetspliceEntrypoint() {
     writeCeiling(host, args[2] as PermissionPreset); output(code({ maximum: readCeiling(host), authority: 'LOCAL_HOST' })); return;
   }
   if (command === 'workspace') {
-    const identity = await localIdentity(process.cwd()); const host = { principal: identity.principal, sid: identity.sid };
+    const identity = principalProof(); validateLocalPrincipal(identity); const host = { principal: identity.principal, sid: identity.sid };
     if (args[1] === 'list' && args.length === 2) {
       const registry = readRegistry(host); output(code({ registry, observed: await Promise.all((registry?.entries ?? []).map(async e => ({ id: e.id, valid: await workspaceValidity(e), observedAt: new Date().toISOString() }))) })); return;
+    }
+    if (args[1] === 'select-start' && args.length === 4) {
+      const root = await registeredStartRoot(host, args[3]);
+      let startAttempted = false;
+      let readyMessage = '';
+      try {
+        await changeRegistry(host, 'select', args[2]!, undefined, undefined, undefined, async registry => {
+          const entry = registry.entries.find(value => value.id === args[2] && value.root === root);
+          requireThat(entry, 'WORKSPACE_REGISTRATION_UNPROVABLE');
+          const predecessor = classifyPredecessor(base());
+          const safe = ['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind);
+          const sameRunningRoot = predecessor.kind === 'LIVE_OR_CONFLICTING' && predecessor.guard?.state === 'RUNNING' && predecessor.guard.identity.root === root && predecessor.guard.identity.rootIdentity === entry.rootIdentity;
+          requireThat(safe || sameRunningRoot, 'RECOVERY_REQUIRED');
+          startAttempted = true;
+          await start(root, message => { readyMessage = message; });
+          const guard = currentGuard();
+          requireThat(readyMessage.length > 0 && (process.exitCode === undefined || process.exitCode === 0) && guard?.state === 'RUNNING' && guard.identity.root === root && guard.identity.rootIdentity === entry.rootIdentity && (await control('status')).code === 'RUNNING', 'WORKSPACE_START_UNPROVABLE');
+        });
+      } catch (reason) {
+        if (!startAttempted) throw reason;
+        error('RECOVERY_REQUIRED\nWORKSPACE_START_OR_SELECTION_UNPROVABLE\nRUNTIME_STATE_MAY_HAVE_CHANGED=true');
+        return;
+      }
+      output(readyMessage);
+      return;
     }
     requireThat(['add', 'remove', 'select'].includes(args[1] ?? '') && typeof args[2] === 'string' && (args[1] === 'add' ? args.length === 4 : args.length === 3), 'USAGE_WORKSPACE_ADD_ROOT_NAME_OR_LIST_OR_REMOVE_SELECT_ID');
     output(code(await changeRegistry(host, args[1] as 'add' | 'remove' | 'select', args[2]!, args[3]))); return;
   }
   if (command === 'start') {
-    const identity = await localIdentity(workspace); const registry = readRegistry({ principal: identity.principal, sid: identity.sid });
-    const selected = registry?.entries.find(e => e.id === registry.selectedId);
-    if (registry && workspaceIndex < 0) requireThat(selected && await workspaceValidity(selected), 'WORKSPACE_SELECTION_REQUIRED_OR_INVALID');
-    if (registry) requireThat(registry.entries.some(e => e.root.toLowerCase() === (workspaceIndex < 0 ? selected!.root : workspace).toLowerCase()), 'WORKSPACE_NOT_REGISTERED');
-    return await start(workspaceIndex < 0 && selected ? selected.root : workspace);
+    requireThat(workspaceIndex < 0 ? args.length === 1 : workspaceIndex === 1 && args.length === 3 && !!args[2], 'USAGE_START_OPTIONAL_WORKSPACE');
+    const identity = principalProof(); validateLocalPrincipal(identity);
+    const host = { principal: identity.principal, sid: identity.sid };
+    return await withRegistryLock(host, async () => {
+      const root = await registeredStartRoot(host, workspaceIndex < 0 ? undefined : args[2]);
+      await start(root);
+    });
   }
   if (command === 'stop') { try { const result = await control('drain'); output(`FleetSplice stop: ${result.code}\nRun: ${result.runId ?? 'none'}\nNative exit observed: ${result.nativeExitObserved === true}`); if (result.code !== 'CLOSED') process.exitCode = 2; } catch { error('RECOVERY_REQUIRED\nSUPERVISOR_UNAVAILABLE'); } return; }
   if (command === 'status') return await status();
@@ -293,7 +328,7 @@ export async function fleetspliceEntrypoint() {
     } catch { error('AGENT_IPC_UNAVAILABLE'); return; }
     error('USAGE: fleetsplice agent status|config get|config set <gateway-url|none>|runtimes [pause|resume|sharing <json>]|diagnostics|drain'); return;
   }
-  if (command === 'doctor') return await doctor(workspace);
+  if (command === 'doctor') return await doctor(workspaceIndex >= 0 ? args[workspaceIndex + 1] ?? process.cwd() : process.cwd());
   if (command === 'codex') return await codexAttach(args.slice(1));
   if (command === 'retire-stale') return retire(args);
   if (command === 'configure') return await configure(args.slice(1));

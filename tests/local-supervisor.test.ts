@@ -9,6 +9,8 @@ import path from 'node:path';
 import { discoverDaemon } from '../packages/native-adoption/discovery.ts';
 import { AGENT_IPC_VERSION } from '../packages/agent-ipc/index.ts';
 import { fleetspliceEntrypoint } from '../scripts/fleetsplice.ts';
+import { principalProof } from '../apps/edge/identity.ts';
+import { changeRegistry, readRegistry } from '../packages/workspaces/index.ts';
 import { supervisorEntrypoint, supervisorHealthCode } from '../scripts/supervisor.ts';
 
 type ControlFile = { pipe: string; token: string; runId: string };
@@ -38,6 +40,47 @@ test('actual start preflight failure creates no guard before runtime commit', ()
   assert.equal(child.error, undefined, 'isolated preflight subprocess must finish within the parallel-suite bound');
   assert.notEqual(child.status, 0); assert.match(`${child.stdout}\n${child.stderr}`, /PRECHECK_FAILED/);
   assert.equal(existsSync(path.join(localAppData, 'FleetSplice', 'G05', 'environment-guard.json')), false);
+});
+
+test('CLI start without selected registry fails closed before runtime mutation from unrelated launcher cwd', () => {
+  const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-cli-first-use-'));
+  const cli = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'fleetsplice.js');
+  const child = spawnSync(process.execPath, [cli, 'start'], { cwd: tmpdir(), env: { ...process.env, LOCALAPPDATA: localAppData }, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  assert.equal(child.error, undefined);
+  assert.notEqual(child.status, 0);
+  assert.match(`${child.stdout}\n${child.stderr}`, /PRECHECK_FAILED\s+WORKSPACE_SELECTION_REQUIRED_OR_INVALID\s+NO_RUNTIME_STATE_MUTATED=true/);
+  assert.equal(existsSync(path.join(localAppData, 'FleetSplice', 'G05', 'environment-guard.json')), false);
+  assert.equal(existsSync(path.join(localAppData, 'FleetSplice', 'workspaces.json')), false);
+});
+
+test('CLI ordinary start uses selected same-user root instead of packaged-launch cwd', async () => {
+  const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-selected-start-'));
+  const root = path.join(localAppData, 'workspace'); mkdirSync(root);
+  const principal = principalProof();
+  await changeRegistry({ principal: principal.principal, sid: principal.sid }, 'add', root, 'Selected', { LOCALAPPDATA: localAppData }, () => {});
+  const cli = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'fleetsplice.js');
+  const child = spawnSync(process.execPath, [cli, 'start'], { cwd: tmpdir(), env: { ...process.env, LOCALAPPDATA: localAppData }, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  assert.equal(child.error, undefined);
+  assert.notEqual(child.status, 0);
+  assert.match(`${child.stdout}\n${child.stderr}`, /PRECHECK_FAILED\s+ENOENT:.*codex-installation\.json/);
+  assert.doesNotMatch(`${child.stdout}\n${child.stderr}`, /LOCAL_ABSOLUTE_ROOT_REQUIRED/);
+  assert.equal(existsSync(path.join(localAppData, 'FleetSplice', 'G05', 'environment-guard.json')), false);
+});
+
+test('Desktop atomic select-start preserves prior selection when preflight fails', async () => {
+  const localAppData = mkdtempSync(path.join(tmpdir(), 'fleetsplice-onboard-preflight-'));
+  const first = path.join(localAppData, 'first'); const second = path.join(localAppData, 'second'); mkdirSync(first); mkdirSync(second);
+  const principal = principalProof(); const host = { principal: principal.principal, sid: principal.sid }; const env = { LOCALAPPDATA: localAppData };
+  const original = await changeRegistry(host, 'add', first, 'Original', env, () => {});
+  const added = await changeRegistry(host, 'add', second, 'New', env, () => {});
+  const cli = path.join(process.cwd(), 'test-results', 'compiled', 'scripts', 'fleetsplice.js');
+  const child = spawnSync(process.execPath, [cli, 'workspace', 'select-start', added.entries[1]!.id, second], { cwd: tmpdir(), env: { ...process.env, LOCALAPPDATA: localAppData }, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+  assert.equal(child.error, undefined);
+  assert.notEqual(child.status, 0);
+  assert.match(`${child.stdout}\n${child.stderr}`, /PRECHECK_FAILED/);
+  assert.equal(readRegistry(host, env)!.selectedId, original.selectedId);
+  assert.equal(existsSync(path.join(localAppData, 'FleetSplice', 'G05', 'environment-guard.json')), false);
+  assert.equal(existsSync(path.join(localAppData, 'FleetSplice', 'workspaces.json.lock')), false);
 });
 
 test('supervisor health refuses a live but quarantined Edge or unproven native process', () => {

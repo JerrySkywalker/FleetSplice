@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, renameSync, writeFileSync, existsSync, readFile
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { changeRegistry, readRegistry, registeredStartRoot, registryPath, workspaceValidity } from '../packages/workspaces/index.ts';
+import { changeRegistry, readRegistry, registeredStartRoot, registryPath, withRegistryLock, workspaceValidity } from '../packages/workspaces/index.ts';
 import { digest, requireThat, type Intent, type WorkspaceBinding } from '../packages/contracts/index.ts';
 import { rootProof, rootProofNow } from '../apps/edge/identity.ts';
 import { rig } from './helpers.ts';
@@ -41,6 +41,51 @@ test('selected or explicit workspace replacement cannot admit a different root',
   await assert.rejects(registeredStartRoot(host, root, env), /WORKSPACE_NOT_REGISTERED_OR_REPLACED/);
   assert.equal(readRegistry(host, env)!.selectedId, selected.id);
   assert.equal(existsSync(path.join(directory, 'FleetSplice', 'G05', 'environment-guard.json')), false);
+});
+test('CLI start lock serializes workspace selection with process admission', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-start-lock-'));
+  const env = { LOCALAPPDATA: directory };
+  const first = path.join(directory, 'first'); const second = path.join(directory, 'second'); mkdirSync(first); mkdirSync(second);
+  const selected = await changeRegistry(host, 'add', first, 'First', env, noAcl);
+  const next = await changeRegistry(host, 'add', second, 'Second', env, noAcl);
+  let release!: () => void;
+  const barrier = new Promise<void>(resolve => { release = resolve; });
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const admission = withRegistryLock(host, async () => {
+    assert.equal(await registeredStartRoot(host, undefined, env), selected.entries[0]!.root);
+    entered(); await barrier;
+  }, env);
+  await started;
+  await assert.rejects(changeRegistry(host, 'select', next.entries[1]!.id, undefined, env, noAcl), /EEXIST/);
+  assert.equal(readRegistry(host, env)!.selectedId, selected.selectedId);
+  release(); await admission;
+  assert.equal(await registeredStartRoot(host, second, env), next.entries[1]!.root);
+  await changeRegistry(host, 'select', next.entries[1]!.id, undefined, env, noAcl);
+  assert.equal(await registeredStartRoot(host, undefined, env), next.entries[1]!.root);
+});
+test('onboarding selects and starts under one registry lock without committing on a failed precheck', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-select-start-'));
+  const env = { LOCALAPPDATA: directory };
+  const first = path.join(directory, 'first'); const second = path.join(directory, 'second'); mkdirSync(first); mkdirSync(second);
+  const original = await changeRegistry(host, 'add', first, 'First', env, noAcl);
+  const added = await changeRegistry(host, 'add', second, 'Second', env, noAcl);
+  const secondId = added.entries[1]!.id;
+  const originalBytes = readFileSync(registryPath(env));
+  await assert.rejects(changeRegistry(host, 'select', secondId, undefined, env, noAcl, () => { throw Error('RECOVERY_REQUIRED'); }), /RECOVERY_REQUIRED/);
+  assert.deepEqual(readFileSync(registryPath(env)), originalBytes);
+  let started = false;
+  await changeRegistry(host, 'select', secondId, undefined, env, noAcl, registry => {
+    assert.equal(registry.selectedId, secondId);
+  }, async registry => {
+    assert.equal(registry.selectedId, secondId);
+    assert.equal(readRegistry(host, env)!.selectedId, secondId);
+    assert.equal(existsSync(`${registryPath(env)}.lock`), true);
+    await assert.rejects(changeRegistry(host, 'select', original.selectedId!, undefined, env, noAcl), /EEXIST/);
+    started = true;
+  });
+  assert.equal(started, true);
+  assert.equal(existsSync(`${registryPath(env)}.lock`), false);
 });
 test('Workspace registry registers existing roots, selects explicitly and removes only registration', async () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-registry-')); const env = { LOCALAPPDATA: directory };

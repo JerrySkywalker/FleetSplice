@@ -43,10 +43,8 @@ fn bundled_cli_result(output: std::process::Output) -> Result<String, String> {
   String::from_utf8(output.stdout).map_err(|_| "BUNDLED_AGENT_RESPONSE_INVALID".into())
 }
 
-fn start_selected_agent(app: &tauri::AppHandle, root: Option<&str>) -> Result<(), String> {
-  let mut arguments = vec!["start".into()];
-  if let Some(root) = root { arguments.extend(["--workspace".into(), root.into()]); }
-  bundled_cli(app, &arguments).map(|_| ())
+fn start_selected_agent(app: &tauri::AppHandle) -> Result<(), String> {
+  bundled_cli(app, &["start".into()]).map(|_| ())
 }
 
 // The Desktop is a local IPC client.  It has neither a Gateway credential nor
@@ -102,11 +100,25 @@ fn local_workspace_root(workspace: &str) -> Result<PathBuf, String> {
 }
 
 fn ensure_no_other_running_root(guard: &Value, root: &str) -> Result<(), String> {
-  if guard.get("state").and_then(Value::as_str) == Some("RUNNING") &&
-    guard.get("identity").and_then(|value| value.get("root")).and_then(Value::as_str) != Some(root) {
-    return Err("WORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT".into());
+  let state = guard.get("state").and_then(Value::as_str).ok_or("SUPERVISOR_UNAVAILABLE")?;
+  let identity = guard.get("identity").ok_or("SUPERVISOR_UNAVAILABLE")?;
+  let guarded_root = identity.get("root").and_then(Value::as_str).filter(|value| value.len() >= 3 && value.as_bytes()[0].is_ascii_alphabetic() && value.as_bytes()[1] == b':' && value.as_bytes()[2] == b'\\').ok_or("SUPERVISOR_UNAVAILABLE")?;
+  let root_identity = identity.get("rootIdentity").and_then(Value::as_str).ok_or("SUPERVISOR_UNAVAILABLE")?;
+  let run_id = guard.get("runId").and_then(Value::as_str).ok_or("SUPERVISOR_UNAVAILABLE")?;
+  if run_id.len() != 36 || run_id.bytes().enumerate().any(|(index, byte)| if [8, 13, 18, 23].contains(&index) { byte != b'-' } else { !byte.is_ascii_hexdigit() }) ||
+    root_identity.len() != 64 || !root_identity.bytes().all(|byte| byte.is_ascii_hexdigit()) ||
+    guard.get("target").and_then(|value| value.get("rootIdentity")).and_then(Value::as_str) != Some(root_identity) ||
+    !identity.get("principal").and_then(Value::as_str).is_some_and(|value| !value.is_empty()) ||
+    !identity.get("sid").and_then(Value::as_str).is_some_and(|value| value.starts_with("S-1-")) ||
+    identity.get("elevated").and_then(Value::as_bool) != Some(false) {
+    return Err("SUPERVISOR_UNAVAILABLE".into());
   }
-  Ok(())
+  match state {
+    "RUNNING" if guarded_root != root => Err("WORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT".into()),
+    "RUNNING" => Ok(()),
+    "CLOSED" if guard.get("nativeExitObserved").and_then(Value::as_bool) == Some(true) && guard.get("quiescent").and_then(Value::as_bool) == Some(true) => Ok(()),
+    _ => Err("SUPERVISOR_UNAVAILABLE".into()),
+  }
 }
 fn read_guard_for_onboarding(base: &PathBuf) -> Result<Option<Value>, String> {
   match fs::read(base.join("environment-guard.json")) {
@@ -132,8 +144,7 @@ fn onboard_agent_inner(app: tauri::AppHandle, workspace: String, startup: Arc<Mu
     registry = serde_json::from_str(added.trim()).map_err(|_| "BUNDLED_AGENT_RESPONSE_INVALID".to_string())?;
   }
   let id = registry.get("registry").and_then(|value| value.get("entries")).or_else(|| registry.get("entries")).and_then(Value::as_array).and_then(|entries| entries.iter().find(|entry| entry.get("root").and_then(Value::as_str).map(|value| value.eq_ignore_ascii_case(&root.to_string_lossy())).unwrap_or(false))).and_then(|entry| entry.get("id")).and_then(Value::as_str).ok_or("WORKSPACE_REGISTRATION_UNPROVABLE")?;
-  bundled_cli(&app, &["workspace".into(), "select".into(), id.into()])?;
-  start_selected_agent(&app, root.to_str())?;
+  bundled_cli(&app, &["workspace".into(), "select-start".into(), id.into(), ordinary.into()])?;
   agent_status()
 }
 #[tauri::command]
@@ -183,7 +194,7 @@ fn main() {
       tauri::async_runtime::spawn_blocking(move || {
         let startup = handle.state::<Arc<Mutex<()>>>();
         let _startup = match startup.lock() { Ok(held) => held, Err(_) => { eprintln!("DESKTOP_STARTUP_UNAVAILABLE"); return; } };
-        if let Err(error) = start_selected_agent(&handle, None) { eprintln!("DESKTOP_AGENT_START_FAILED:{error}"); }
+        if let Err(error) = start_selected_agent(&handle) { eprintln!("DESKTOP_AGENT_START_FAILED:{error}"); }
       });
       let open = MenuItem::with_id(app, "open", "Open FleetSplice / Settings", true, None::<&str>)?;
       let dashboard = MenuItem::with_id(app, "dashboard", "Open Dashboard", true, None::<&str>)?;
@@ -247,10 +258,15 @@ mod tests {
 
   #[test]
   fn desktop_never_selects_over_another_running_root() {
-    let active = json!({ "state": "RUNNING", "identity": { "root": "C:\\previous" } });
+    let active = json!({ "state": "RUNNING", "runId": "11111111-1111-1111-1111-111111111111", "target": { "rootIdentity": "a".repeat(64) }, "identity": { "root": "C:\\previous", "rootIdentity": "a".repeat(64), "principal": "host\\owner", "sid": "S-1-5-21-1", "elevated": false } });
     assert_eq!(ensure_no_other_running_root(&active, "C:\\new").unwrap_err(), "WORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT");
     assert!(ensure_no_other_running_root(&active, "C:\\previous").is_ok());
-    assert!(ensure_no_other_running_root(&json!({ "state": "CLOSED" }), "C:\\new").is_ok());
+    let mut closed = active.clone(); closed["state"] = json!("CLOSED"); closed["nativeExitObserved"] = json!(true); closed["quiescent"] = json!(true);
+    assert!(ensure_no_other_running_root(&closed, "C:\\new").is_ok());
+    closed.as_object_mut().unwrap().remove("target");
+    assert_eq!(ensure_no_other_running_root(&closed, "C:\\new").unwrap_err(), "SUPERVISOR_UNAVAILABLE");
+    assert_eq!(ensure_no_other_running_root(&json!({}), "C:\\new").unwrap_err(), "SUPERVISOR_UNAVAILABLE");
+    assert_eq!(ensure_no_other_running_root(&json!({ "state": "RUNNING" }), "C:\\new").unwrap_err(), "SUPERVISOR_UNAVAILABLE");
   }
 
   #[test]

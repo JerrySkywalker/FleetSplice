@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localIdentity, principalProof, validateLocalPrincipal } from '../apps/edge/identity.ts';
 import { canonical, requireThat } from '../packages/contracts/index.ts';
-import { readRegistry, changeRegistry, workspaceValidity, registeredStartRoot } from '../packages/workspaces/index.ts';
+import { readRegistry, changeRegistry, workspaceValidity, registeredStartRoot, withRegistryLock } from '../packages/workspaces/index.ts';
 import { readCeiling, writeCeiling, PRESETS } from '../packages/permissions/index.ts';
 import type { PermissionPreset } from '../packages/contracts/index.ts';
 import { AGENT_IPC_VERSION, type AgentIpcCommand } from '../packages/agent-ipc/index.ts';
@@ -271,14 +271,29 @@ export async function fleetspliceEntrypoint() {
     if (args[1] === 'list' && args.length === 2) {
       const registry = readRegistry(host); output(code({ registry, observed: await Promise.all((registry?.entries ?? []).map(async e => ({ id: e.id, valid: await workspaceValidity(e), observedAt: new Date().toISOString() }))) })); return;
     }
+    if (args[1] === 'select-start' && args.length === 4) {
+      const root = await registeredStartRoot(host, args[3]);
+      await changeRegistry(host, 'select', args[2]!, undefined, undefined, undefined, registry => {
+        const entry = registry.entries.find(value => value.id === args[2] && value.root === root);
+        requireThat(entry, 'WORKSPACE_REGISTRATION_UNPROVABLE');
+        const predecessor = classifyPredecessor(base());
+        const safe = ['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind);
+        const sameRunningRoot = predecessor.kind === 'LIVE_OR_CONFLICTING' && predecessor.guard?.state === 'RUNNING' && predecessor.guard.identity.root === root && predecessor.guard.identity.rootIdentity === entry.rootIdentity;
+        requireThat(safe || sameRunningRoot, 'RECOVERY_REQUIRED');
+      }, async () => { await start(root); });
+      return;
+    }
     requireThat(['add', 'remove', 'select'].includes(args[1] ?? '') && typeof args[2] === 'string' && (args[1] === 'add' ? args.length === 4 : args.length === 3), 'USAGE_WORKSPACE_ADD_ROOT_NAME_OR_LIST_OR_REMOVE_SELECT_ID');
     output(code(await changeRegistry(host, args[1] as 'add' | 'remove' | 'select', args[2]!, args[3]))); return;
   }
   if (command === 'start') {
     requireThat(workspaceIndex < 0 ? args.length === 1 : workspaceIndex === 1 && args.length === 3 && !!args[2], 'USAGE_START_OPTIONAL_WORKSPACE');
     const identity = principalProof(); validateLocalPrincipal(identity);
-    const root = await registeredStartRoot({ principal: identity.principal, sid: identity.sid }, workspaceIndex < 0 ? undefined : args[2]);
-    return await start(root);
+    const host = { principal: identity.principal, sid: identity.sid };
+    return await withRegistryLock(host, async () => {
+      const root = await registeredStartRoot(host, workspaceIndex < 0 ? undefined : args[2]);
+      await start(root);
+    });
   }
   if (command === 'stop') { try { const result = await control('drain'); output(`FleetSplice stop: ${result.code}\nRun: ${result.runId ?? 'none'}\nNative exit observed: ${result.nativeExitObserved === true}`); if (result.code !== 'CLOSED') process.exitCode = 2; } catch { error('RECOVERY_REQUIRED\nSUPERVISOR_UNAVAILABLE'); } return; }
   if (command === 'status') return await status();

@@ -42,7 +42,13 @@ export async function registeredStartRoot(host: WorkspaceHost, explicit?: string
   requireThat(selected && await workspaceValidity(selected), 'WORKSPACE_SELECTION_REQUIRED_OR_INVALID');
   return selected.root;
 }
-export async function changeRegistry(host: WorkspaceHost, operation: 'add' | 'remove' | 'select', value: string, displayName?: string, env: NodeJS.ProcessEnv = process.env, acl = applyPrivateUserAcl): Promise<WorkspaceRegistry> {
+export async function withRegistryLock<T>(host: WorkspaceHost, action: () => Promise<T>, env: NodeJS.ProcessEnv = process.env): Promise<T> {
+  requireThat(readRegistry(host, env), 'WORKSPACE_SELECTION_REQUIRED_OR_INVALID');
+  const file = registryPath(env), lock = `${file}.lock`;
+  const fd = openSync(lock, 'wx');
+  try { return await action(); } finally { closeSync(fd); unlinkSync(lock); }
+}
+export async function changeRegistry(host: WorkspaceHost, operation: 'add' | 'remove' | 'select', value: string, displayName?: string, env: NodeJS.ProcessEnv = process.env, acl = applyPrivateUserAcl, beforeCommit?: (registry: WorkspaceRegistry) => void, afterCommit?: (registry: WorkspaceRegistry) => Promise<void>): Promise<WorkspaceRegistry> {
   const file = registryPath(env), directory = path.dirname(file); mkdirSync(directory, { recursive: true });
   requireThat(!lstatSync(directory).isSymbolicLink(), 'WORKSPACE_REGISTRY_INVALID'); acl(directory, host.sid, true);
   const lock = `${file}.lock`; const fd = openSync(lock, 'wx');
@@ -62,8 +68,11 @@ export async function changeRegistry(host: WorkspaceHost, operation: 'add' | 're
       if (operation === 'select') { requireThat(await workspaceValidity(entry), 'WORKSPACE_MISSING_OR_REPLACED'); registry.selectedId = entry.id; }
       else { registry.entries = registry.entries.filter(e => e.id !== entry.id); if (registry.selectedId === entry.id) registry.selectedId = null; }
     }
+    beforeCommit?.(registry);
     const out = openSync(temporary, 'wx', 0o600); try { writeSync(out, canonical(registry)); fsyncSync(out); } finally { closeSync(out); }
-    acl(temporary, host.sid, false); renameSync(temporary, file); return registry;
+    acl(temporary, host.sid, false); renameSync(temporary, file);
+    if (afterCommit) await afterCommit(registry);
+    return registry;
   } finally { closeSync(fd); unlinkSync(lock); if (existsSync(temporary)) unlinkSync(temporary); }
 }
 export async function workspaceBindings(root: string, host: WorkspaceHost, target: Target, env: NodeJS.ProcessEnv = process.env): Promise<WorkspaceBinding[]> {

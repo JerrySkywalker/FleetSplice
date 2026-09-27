@@ -34,12 +34,18 @@ fn bundled_cli(app: &tauri::AppHandle, arguments: &[String]) -> Result<String, S
     .arg(script_path).args(arguments)
     .creation_flags(0x08000000)
     .output().map_err(|_| "BUNDLED_AGENT_UNAVAILABLE".to_string())?;
+  bundled_cli_result(output)
+}
+
+fn bundled_cli_result(output: std::process::Output) -> Result<String, String> {
   if !output.status.success() { return Err(String::from_utf8_lossy(&output.stderr).trim().to_string()); }
   String::from_utf8(output.stdout).map_err(|_| "BUNDLED_AGENT_RESPONSE_INVALID".into())
 }
 
-fn start_selected_agent(app: &tauri::AppHandle) -> Result<(), String> {
-  bundled_cli(app, &["start".into()]).map(|_| ())
+fn start_selected_agent(app: &tauri::AppHandle, root: Option<&str>) -> Result<(), String> {
+  let mut arguments = vec!["start".into()];
+  if let Some(root) = root { arguments.extend(["--workspace".into(), root.into()]); }
+  bundled_cli(app, &arguments).map(|_| ())
 }
 
 // The Desktop is a local IPC client.  It has neither a Gateway credential nor
@@ -62,11 +68,32 @@ fn agent_control(command: &str, body: Option<Value>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-fn agent_status() -> Result<Value, String> { agent_control("status", None) }
+fn agent_status() -> Result<Value, String> {
+  let mut state = agent_control("status", None)?;
+  let guard: Value = serde_json::from_slice(&fs::read(local_base()?.join("environment-guard.json")).map_err(|_| "SUPERVISOR_UNAVAILABLE")?).map_err(|_| "SUPERVISOR_UNAVAILABLE")?;
+  if guard.get("runId") != state.get("runId") { return Err("SUPERVISOR_UNAVAILABLE".into()); }
+  state["workspaceRoot"] = guard["identity"]["root"].clone();
+  Ok(state)
+}
+
+fn local_workspace_root(workspace: &str) -> Result<PathBuf, String> {
+  let bytes = workspace.as_bytes();
+  if bytes.len() < 3 || !bytes[0].is_ascii_alphabetic() || bytes[1] != b':' || bytes[2] != b'\\' {
+    return Err("LOCAL_ABSOLUTE_ROOT_REQUIRED".into());
+  }
+  let canonical = fs::canonicalize(workspace).map_err(|_| "WORKSPACE_NOT_FOUND".to_string())?;
+  if !canonical.is_dir() { return Err("WORKSPACE_NOT_FOUND".into()); }
+  let displayed = canonical.to_str().ok_or("WORKSPACE_ROOT_INVALID")?;
+  let ordinary = displayed.strip_prefix(r"\\?\").unwrap_or(displayed);
+  let bytes = ordinary.as_bytes();
+  if bytes.len() < 3 || !bytes[0].is_ascii_alphabetic() || bytes[1] != b':' || bytes[2] != b'\\' {
+    return Err("LOCAL_ABSOLUTE_ROOT_REQUIRED".into());
+  }
+  Ok(PathBuf::from(ordinary))
+}
 #[tauri::command]
 fn onboard_agent(app: tauri::AppHandle, workspace: String) -> Result<Value, String> {
-  let root = fs::canonicalize(&workspace).map_err(|_| "WORKSPACE_NOT_FOUND".to_string())?;
-  if !root.is_dir() { return Err("WORKSPACE_NOT_FOUND".into()); }
+  let root = local_workspace_root(&workspace)?;
   let display = root.file_name().and_then(|value| value.to_str()).filter(|value| !value.is_empty()).unwrap_or("Workspace");
   let listed = bundled_cli(&app, &["workspace".into(), "list".into()])?;
   let mut registry: Value = serde_json::from_str(listed.trim()).map_err(|_| "BUNDLED_AGENT_RESPONSE_INVALID".to_string())?;
@@ -77,7 +104,7 @@ fn onboard_agent(app: tauri::AppHandle, workspace: String) -> Result<Value, Stri
   }
   let id = registry.get("registry").and_then(|value| value.get("entries")).or_else(|| registry.get("entries")).and_then(Value::as_array).and_then(|entries| entries.iter().find(|entry| entry.get("root").and_then(Value::as_str).map(|value| value.eq_ignore_ascii_case(&root.to_string_lossy())).unwrap_or(false))).and_then(|entry| entry.get("id")).and_then(Value::as_str).ok_or("WORKSPACE_REGISTRATION_UNPROVABLE")?;
   bundled_cli(&app, &["workspace".into(), "select".into(), id.into()])?;
-  start_selected_agent(&app)?;
+  start_selected_agent(&app, root.to_str())?;
   agent_status()
 }
 #[tauri::command]
@@ -118,7 +145,7 @@ fn main() {
     .setup(|app| {
       let handle = app.handle().clone();
       tauri::async_runtime::spawn(async move {
-        if let Err(error) = start_selected_agent(&handle) { eprintln!("DESKTOP_AGENT_START_FAILED:{error}"); }
+        if let Err(error) = start_selected_agent(&handle, None) { eprintln!("DESKTOP_AGENT_START_FAILED:{error}"); }
       });
       let open = MenuItem::with_id(app, "open", "Open FleetSplice / Settings", true, None::<&str>)?;
       let dashboard = MenuItem::with_id(app, "dashboard", "Open Dashboard", true, None::<&str>)?;
@@ -135,4 +162,33 @@ fn main() {
     .invoke_handler(tauri::generate_handler![agent_status, onboard_agent, agent_runtimes, set_runtime_sharing, drain_agent, request_pairing, autostart_enabled, set_autostart, open_dashboard, open_logs])
     .run(tauri::generate_context!())
     .expect("FleetSplice Desktop failed to run");
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{bundled_cli_result, local_workspace_root};
+  use std::{env, fs, process::Command};
+
+  #[test]
+  fn normal_owner_drive_root_survives_windows_verbatim_canonicalization() {
+    let workspace = env::temp_dir().join(format!("fleetsplice-desktop-{}", std::process::id()));
+    fs::create_dir_all(&workspace).unwrap();
+    let ordinary = workspace.to_str().unwrap();
+    let result = local_workspace_root(ordinary).unwrap();
+    assert_eq!(result.to_str().unwrap().to_lowercase(), ordinary.to_lowercase());
+    assert!(!result.to_str().unwrap().starts_with(r"\\?\"));
+    assert_eq!(local_workspace_root("relative").unwrap_err(), "LOCAL_ABSOLUTE_ROOT_REQUIRED");
+    assert_eq!(local_workspace_root(r"\\server\share").unwrap_err(), "LOCAL_ABSOLUTE_ROOT_REQUIRED");
+    fs::remove_dir(&workspace).unwrap();
+  }
+
+  #[test]
+  fn desktop_preserves_bundled_precheck_machine_code() {
+    let output = Command::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
+      .args(["-NoProfile", "-NonInteractive", "-Command", "[Console]::Error.WriteLine('PRECHECK_FAILED'); [Console]::Error.WriteLine('LOCAL_ABSOLUTE_ROOT_REQUIRED'); exit 2"])
+      .output().unwrap();
+    let failure = bundled_cli_result(output).unwrap_err();
+    assert!(failure.contains("PRECHECK_FAILED"));
+    assert!(failure.contains("LOCAL_ABSOLUTE_ROOT_REQUIRED"));
+  }
 }

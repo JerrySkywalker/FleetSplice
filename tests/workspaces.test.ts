@@ -4,13 +4,44 @@ import { mkdtempSync, mkdirSync, renameSync, writeFileSync, existsSync, readFile
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { changeRegistry, readRegistry, registryPath, workspaceValidity } from '../packages/workspaces/index.ts';
+import { changeRegistry, readRegistry, registeredStartRoot, registryPath, workspaceValidity } from '../packages/workspaces/index.ts';
 import { digest, requireThat, type Intent, type WorkspaceBinding } from '../packages/contracts/index.ts';
 import { rootProof, rootProofNow } from '../apps/edge/identity.ts';
 import { rig } from './helpers.ts';
 
 const host = { principal: 'fixture-host\\fixture-user', sid: 'S-1-5-21-1' };
 const noAcl = () => {};
+test('first-use Desktop-equivalent add, select and start bind the registered root independent of launcher cwd', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-first-use-'));
+  const env = { LOCALAPPDATA: directory };
+  const root = path.join(directory, 'workspace'); mkdirSync(root);
+  assert.equal(readRegistry(host, env), null);
+  await assert.rejects(registeredStartRoot(host, undefined, env), /WORKSPACE_SELECTION_REQUIRED_OR_INVALID/);
+  assert.equal(existsSync(registryPath(env)), false);
+  const added = await changeRegistry(host, 'add', root, 'First use', env, noAcl);
+  await changeRegistry(host, 'select', added.entries[0]!.id, undefined, env, noAcl);
+  const initialCwd = process.cwd();
+  try {
+    process.chdir(tmpdir());
+    assert.equal(await registeredStartRoot(host, undefined, env), (await rootProof(root)).root);
+    assert.equal(await registeredStartRoot(host, root, env), (await rootProof(root)).root);
+  } finally { process.chdir(initialCwd); }
+  await assert.rejects(registeredStartRoot(host, directory, env), /WORKSPACE_NOT_REGISTERED_OR_REPLACED/);
+  await assert.rejects(registeredStartRoot(host, `\\\\?\\${root}`, env), /LOCAL_ABSOLUTE_ROOT_REQUIRED/);
+  await assert.rejects(registeredStartRoot(host, 'relative', env), /LOCAL_ABSOLUTE_ROOT_REQUIRED/);
+  assert.equal(readRegistry(host, env)!.selectedId, added.entries[0]!.id);
+});
+test('selected or explicit workspace replacement cannot admit a different root', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-start-identity-'));
+  const env = { LOCALAPPDATA: directory };
+  const root = path.join(directory, 'workspace'); mkdirSync(root);
+  const selected = (await changeRegistry(host, 'add', root, 'Selected', env, noAcl)).entries[0]!;
+  renameSync(root, `${root}-old`); mkdirSync(root);
+  await assert.rejects(registeredStartRoot(host, undefined, env), /WORKSPACE_SELECTION_REQUIRED_OR_INVALID/);
+  await assert.rejects(registeredStartRoot(host, root, env), /WORKSPACE_NOT_REGISTERED_OR_REPLACED/);
+  assert.equal(readRegistry(host, env)!.selectedId, selected.id);
+  assert.equal(existsSync(path.join(directory, 'FleetSplice', 'G05', 'environment-guard.json')), false);
+});
 test('Workspace registry registers existing roots, selects explicitly and removes only registration', async () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-registry-')); const env = { LOCALAPPDATA: directory };
   const root = path.join(directory, 'workspace'); mkdirSync(root); writeFileSync(path.join(root, 'marker.txt'), 'preserve');

@@ -29,6 +29,19 @@ export function readRegistry(host: WorkspaceHost, env: NodeJS.ProcessEnv = proce
 export async function workspaceValidity(entry: Pick<WorkspaceEntry, 'root' | 'rootIdentity'>): Promise<boolean> {
   try { const proof = await rootProof(entry.root); return proof.root === entry.root && proof.rootIdentity === entry.rootIdentity; } catch { return false; }
 }
+export async function registeredStartRoot(host: WorkspaceHost, explicit?: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+  const registry = readRegistry(host, env);
+  requireThat(registry, 'WORKSPACE_SELECTION_REQUIRED_OR_INVALID');
+  if (explicit !== undefined) {
+    const proof = await rootProof(explicit);
+    const entry = registry.entries.find(value => value.root === proof.root && value.rootIdentity === proof.rootIdentity && value.root.toLowerCase() === explicit.toLowerCase());
+    requireThat(entry && await workspaceValidity(entry), 'WORKSPACE_NOT_REGISTERED_OR_REPLACED');
+    return entry.root;
+  }
+  const selected = registry.entries.find(value => value.id === registry.selectedId);
+  requireThat(selected && await workspaceValidity(selected), 'WORKSPACE_SELECTION_REQUIRED_OR_INVALID');
+  return selected.root;
+}
 export async function changeRegistry(host: WorkspaceHost, operation: 'add' | 'remove' | 'select', value: string, displayName?: string, env: NodeJS.ProcessEnv = process.env, acl = applyPrivateUserAcl): Promise<WorkspaceRegistry> {
   const file = registryPath(env), directory = path.dirname(file); mkdirSync(directory, { recursive: true });
   requireThat(!lstatSync(directory).isSymbolicLink(), 'WORKSPACE_REGISTRY_INVALID'); acl(directory, host.sid, true);

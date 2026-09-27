@@ -96,7 +96,7 @@ async function preflight(root: string) {
   if (predecessor.kind !== 'LIVE_OR_CONFLICTING' && predecessor.guard?.state !== 'RUNNING') await verifyLocalEndpointAvailability(identity.sid);
   return { identity, node, codex, configuration, proxy, network, predecessor };
 }
-async function start(root: string) {
+async function start(root: string, reportReady: (message: string) => void = output) {
   let qualified: Awaited<ReturnType<typeof preflight>>;
   try { qualified = await preflight(root); } catch (reason) { error(`PRECHECK_FAILED\n${reason instanceof Error ? reason.message : 'PRECHECK_UNKNOWN'}\nNO_RUNTIME_STATE_MUTATED=true`); return; }
   if (qualified.network.status !== 'PASS') {
@@ -111,7 +111,11 @@ async function start(root: string) {
     if (runningGuard.identity.root !== qualified.identity.root || runningGuard.identity.rootIdentity !== qualified.identity.rootIdentity) {
       error('PRECHECK_FAILED\nWORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT\nNO_RUNTIME_STATE_MUTATED=true'); return;
     }
-    try { const state = await control('status'); output(`ALREADY_RUNNING\n${code({ runId: state.runId, supervisor: state.supervisor })}`); return; } catch { /* A stale RUNNING guard remains a recovery boundary. */ }
+    try {
+      const state = await control('status');
+      requireThat(state.code === 'RUNNING', 'SUPERVISOR_NOT_READY');
+      reportReady(`ALREADY_RUNNING\n${code({ runId: state.runId, supervisor: state.supervisor })}`); return;
+    } catch { /* A stale or unhealthy RUNNING guard remains a recovery boundary. */ }
   }
   if (qualified.predecessor.kind === 'AMBIGUOUS_TERMINAL' || qualified.predecessor.kind === 'LIVE_OR_CONFLICTING' || qualified.predecessor.kind === 'CORRUPT_OR_UNPROVABLE') { describePredecessor(qualified.predecessor).forEach(output); error('RECOVERY_REQUIRED\nNO_RUNTIME_STATE_MUTATED=true'); return; }
   if (qualified.predecessor.kind === 'SAFE_NO_EFFECT' || qualified.predecessor.kind === 'SAFE_TERMINAL') {
@@ -138,7 +142,7 @@ async function start(root: string) {
     await sleep(250);
     try {
       const state = await control('status');
-      if (state.code === 'RUNNING') { output(`FleetSplice 已启动\nMachine code: RUNNING\nRun: ${state.runId}\nBrowser bootstrap: ${state.url}\nProxy: ${qualified.proxy.display ?? 'direct'}\nProxy source: ${qualified.proxy.source}\nNetwork preflight: PASS\nProvider: PROVIDER_NOT_YET_PROVEN`); return; }
+      if (state.code === 'RUNNING') { reportReady(`FleetSplice 已启动\nMachine code: RUNNING\nRun: ${state.runId}\nBrowser bootstrap: ${state.url}\nProxy: ${qualified.proxy.display ?? 'direct'}\nProxy source: ${qualified.proxy.source}\nNetwork preflight: PASS\nProvider: PROVIDER_NOT_YET_PROVEN`); return; }
     } catch { /* The detached supervisor may still be acquiring the single writer. */ }
   }
   const afterTimeout = classifyPredecessor(base());
@@ -274,6 +278,7 @@ export async function fleetspliceEntrypoint() {
     if (args[1] === 'select-start' && args.length === 4) {
       const root = await registeredStartRoot(host, args[3]);
       let startAttempted = false;
+      let readyMessage = '';
       try {
         await changeRegistry(host, 'select', args[2]!, undefined, undefined, undefined, async registry => {
           const entry = registry.entries.find(value => value.id === args[2] && value.root === root);
@@ -283,14 +288,16 @@ export async function fleetspliceEntrypoint() {
           const sameRunningRoot = predecessor.kind === 'LIVE_OR_CONFLICTING' && predecessor.guard?.state === 'RUNNING' && predecessor.guard.identity.root === root && predecessor.guard.identity.rootIdentity === entry.rootIdentity;
           requireThat(safe || sameRunningRoot, 'RECOVERY_REQUIRED');
           startAttempted = true;
-          await start(root);
+          await start(root, message => { readyMessage = message; });
           const guard = currentGuard();
-          requireThat((process.exitCode === undefined || process.exitCode === 0) && guard?.state === 'RUNNING' && guard.identity.root === root && guard.identity.rootIdentity === entry.rootIdentity, 'WORKSPACE_START_UNPROVABLE');
+          requireThat(readyMessage.length > 0 && (process.exitCode === undefined || process.exitCode === 0) && guard?.state === 'RUNNING' && guard.identity.root === root && guard.identity.rootIdentity === entry.rootIdentity && (await control('status')).code === 'RUNNING', 'WORKSPACE_START_UNPROVABLE');
         });
       } catch (reason) {
         if (!startAttempted) throw reason;
         error('RECOVERY_REQUIRED\nWORKSPACE_START_OR_SELECTION_UNPROVABLE\nRUNTIME_STATE_MAY_HAVE_CHANGED=true');
+        return;
       }
+      output(readyMessage);
       return;
     }
     requireThat(['add', 'remove', 'select'].includes(args[1] ?? '') && typeof args[2] === 'string' && (args[1] === 'add' ? args.length === 4 : args.length === 3), 'USAGE_WORKSPACE_ADD_ROOT_NAME_OR_LIST_OR_REMOVE_SELECT_ID');

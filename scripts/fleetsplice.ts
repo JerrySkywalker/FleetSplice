@@ -273,17 +273,24 @@ export async function fleetspliceEntrypoint() {
     }
     if (args[1] === 'select-start' && args.length === 4) {
       const root = await registeredStartRoot(host, args[3]);
-      await changeRegistry(host, 'select', args[2]!, undefined, undefined, undefined, async registry => {
-        const entry = registry.entries.find(value => value.id === args[2] && value.root === root);
-        requireThat(entry, 'WORKSPACE_REGISTRATION_UNPROVABLE');
-        const predecessor = classifyPredecessor(base());
-        const safe = ['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind);
-        const sameRunningRoot = predecessor.kind === 'LIVE_OR_CONFLICTING' && predecessor.guard?.state === 'RUNNING' && predecessor.guard.identity.root === root && predecessor.guard.identity.rootIdentity === entry.rootIdentity;
-        requireThat(safe || sameRunningRoot, 'RECOVERY_REQUIRED');
-        await start(root);
-        const guard = currentGuard();
-        requireThat((process.exitCode === undefined || process.exitCode === 0) && guard?.state === 'RUNNING' && guard.identity.root === root && guard.identity.rootIdentity === entry.rootIdentity, 'WORKSPACE_START_UNPROVABLE');
-      });
+      let startAttempted = false;
+      try {
+        await changeRegistry(host, 'select', args[2]!, undefined, undefined, undefined, async registry => {
+          const entry = registry.entries.find(value => value.id === args[2] && value.root === root);
+          requireThat(entry, 'WORKSPACE_REGISTRATION_UNPROVABLE');
+          const predecessor = classifyPredecessor(base());
+          const safe = ['NO_PREDECESSOR', 'SAFE_NO_EFFECT', 'SAFE_TERMINAL', 'RETIRED_AMBIGUOUS', 'RETIRED_UNPROVABLE'].includes(predecessor.kind);
+          const sameRunningRoot = predecessor.kind === 'LIVE_OR_CONFLICTING' && predecessor.guard?.state === 'RUNNING' && predecessor.guard.identity.root === root && predecessor.guard.identity.rootIdentity === entry.rootIdentity;
+          requireThat(safe || sameRunningRoot, 'RECOVERY_REQUIRED');
+          startAttempted = true;
+          await start(root);
+          const guard = currentGuard();
+          requireThat((process.exitCode === undefined || process.exitCode === 0) && guard?.state === 'RUNNING' && guard.identity.root === root && guard.identity.rootIdentity === entry.rootIdentity, 'WORKSPACE_START_UNPROVABLE');
+        });
+      } catch (reason) {
+        if (!startAttempted) throw reason;
+        error('RECOVERY_REQUIRED\nWORKSPACE_START_OR_SELECTION_UNPROVABLE\nRUNTIME_STATE_MAY_HAVE_CHANGED=true');
+      }
       return;
     }
     requireThat(['add', 'remove', 'select'].includes(args[1] ?? '') && typeof args[2] === 'string' && (args[1] === 'add' ? args.length === 4 : args.length === 3), 'USAGE_WORKSPACE_ADD_ROOT_NAME_OR_LIST_OR_REMOVE_SELECT_ID');

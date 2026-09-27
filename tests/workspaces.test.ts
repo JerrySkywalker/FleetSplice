@@ -77,6 +77,21 @@ test('workspace admission lock disappears when its owning process exits unexpect
   assert.equal((await changeRegistry(host, 'select', selected.selectedId!, undefined, env, noAcl)).selectedId, selected.selectedId);
   assert.equal(existsSync(`${registryPath(env)}.lock`), false);
 });
+test('post-start registry publish failure preserves the prior selection for explicit recovery', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-publish-failure-'));
+  const env = { LOCALAPPDATA: directory };
+  const first = path.join(directory, 'first'); const second = path.join(directory, 'second'); mkdirSync(first); mkdirSync(second);
+  const initial = await changeRegistry(host, 'add', first, 'First', env, noAcl);
+  const next = await changeRegistry(host, 'add', second, 'Second', env, noAcl);
+  const bytes = readFileSync(registryPath(env));
+  let started = false;
+  await assert.rejects(changeRegistry(host, 'select', next.entries[1]!.id, undefined, env, (file, _sid, directoryEntry) => {
+    if (!directoryEntry) throw new Error('PUBLISH_FAILED');
+  }, () => { started = true; }), /PUBLISH_FAILED/);
+  assert.equal(started, true);
+  assert.deepEqual(readFileSync(registryPath(env)), bytes);
+  assert.equal(readRegistry(host, env)!.selectedId, initial.selectedId);
+});
 test('onboarding selects and starts under one registry lock without committing on a failed precheck', async () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-select-start-'));
   const env = { LOCALAPPDATA: directory };

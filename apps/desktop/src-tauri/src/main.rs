@@ -1,4 +1,4 @@
-use std::{env, fs::{self, OpenOptions}, io::{Read, Write}, path::{Component, PathBuf}, process::Command, sync::Mutex};
+use std::{env, fs::{self, OpenOptions}, io::{Read, Write}, path::{Component, PathBuf}, process::Command, sync::{Arc, Mutex}};
 use std::os::windows::fs::MetadataExt;
 use std::os::windows::process::CommandExt;
 use serde_json::{json, Value};
@@ -108,13 +108,19 @@ fn ensure_no_other_running_root(guard: &Value, root: &str) -> Result<(), String>
   }
   Ok(())
 }
-#[tauri::command]
-fn onboard_agent(app: tauri::AppHandle, workspace: String, startup: tauri::State<'_, Mutex<()>>) -> Result<Value, String> {
+fn read_guard_for_onboarding(base: &PathBuf) -> Result<Option<Value>, String> {
+  match fs::read(base.join("environment-guard.json")) {
+    Ok(bytes) => serde_json::from_slice(&bytes).map(Some).map_err(|_| "SUPERVISOR_UNAVAILABLE".into()),
+    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+    Err(_) => Err("SUPERVISOR_UNAVAILABLE".into()),
+  }
+}
+
+fn onboard_agent_inner(app: tauri::AppHandle, workspace: String, startup: Arc<Mutex<()>>) -> Result<Value, String> {
   let _startup = startup.lock().map_err(|_| "DESKTOP_STARTUP_UNAVAILABLE")?;
   let root = local_workspace_root(&workspace)?;
   let ordinary = root.to_str().ok_or("WORKSPACE_ROOT_INVALID")?;
-  if let Ok(guard) = fs::read(local_base()?.join("environment-guard.json")) {
-    let guard: Value = serde_json::from_slice(&guard).map_err(|_| "SUPERVISOR_UNAVAILABLE")?;
+  if let Some(guard) = read_guard_for_onboarding(&local_base()?)? {
     ensure_no_other_running_root(&guard, ordinary)?;
   }
   let display = root.file_name().and_then(|value| value.to_str()).filter(|value| !value.is_empty()).unwrap_or("Workspace");
@@ -129,6 +135,12 @@ fn onboard_agent(app: tauri::AppHandle, workspace: String, startup: tauri::State
   bundled_cli(&app, &["workspace".into(), "select".into(), id.into()])?;
   start_selected_agent(&app, root.to_str())?;
   agent_status()
+}
+#[tauri::command]
+async fn onboard_agent(app: tauri::AppHandle, workspace: String, startup: tauri::State<'_, Arc<Mutex<()>>>) -> Result<Value, String> {
+  let startup = startup.inner().clone();
+  tauri::async_runtime::spawn_blocking(move || onboard_agent_inner(app, workspace, startup))
+    .await.map_err(|_| "DESKTOP_STARTUP_UNAVAILABLE".to_string())?
 }
 #[tauri::command]
 fn agent_runtimes() -> Result<Value, String> {
@@ -163,13 +175,13 @@ fn show_main(app: &tauri::AppHandle) { if let Some(window) = app.get_webview_win
 
 fn main() {
   tauri::Builder::default()
-    .manage(Mutex::new(()))
+    .manage(Arc::new(Mutex::new(())))
     .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
     .plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)))
     .setup(|app| {
       let handle = app.handle().clone();
-      tauri::async_runtime::spawn(async move {
-        let startup = handle.state::<Mutex<()>>();
+      tauri::async_runtime::spawn_blocking(move || {
+        let startup = handle.state::<Arc<Mutex<()>>>();
         let _startup = match startup.lock() { Ok(held) => held, Err(_) => { eprintln!("DESKTOP_STARTUP_UNAVAILABLE"); return; } };
         if let Err(error) = start_selected_agent(&handle, None) { eprintln!("DESKTOP_AGENT_START_FAILED:{error}"); }
       });
@@ -192,7 +204,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-  use super::{bundled_cli_result, ensure_no_other_running_root, local_workspace_root};
+  use super::{bundled_cli_result, ensure_no_other_running_root, local_workspace_root, read_guard_for_onboarding};
   use std::{env, fs, process::Command};
   use serde_json::json;
 
@@ -239,5 +251,17 @@ mod tests {
     assert_eq!(ensure_no_other_running_root(&active, "C:\\new").unwrap_err(), "WORKSPACE_ALREADY_RUNNING_DIFFERENT_ROOT");
     assert!(ensure_no_other_running_root(&active, "C:\\previous").is_ok());
     assert!(ensure_no_other_running_root(&json!({ "state": "CLOSED" }), "C:\\new").is_ok());
+  }
+
+  #[test]
+  fn unreadable_guard_fails_closed_before_workspace_selection() {
+    let directory = env::temp_dir().join(format!("fleetsplice-guard-read-{}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    assert!(read_guard_for_onboarding(&directory).unwrap().is_none());
+    let guard = directory.join("environment-guard.json");
+    fs::create_dir(&guard).unwrap();
+    assert_eq!(read_guard_for_onboarding(&directory).unwrap_err(), "SUPERVISOR_UNAVAILABLE");
+    fs::remove_dir(&guard).unwrap();
+    fs::remove_dir(&directory).unwrap();
   }
 }

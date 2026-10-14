@@ -1,0 +1,76 @@
+{
+  "schema": "fleetsplice-research-goal-train.v1",
+  "train_id": "FLEETSPLICE-PERFORMANCE-AND-AUTHORITY-TRADEOFF-RESEARCH-TRAIN-001",
+  "kind": "architecture-and-performance-research",
+  "mode": "RESEARCH_ONLY",
+  "status": "OWNER_REVIEW_PENDING",
+  "plan_branch": "docs/fs-performance-ownership-tradeoff-train-20261015",
+  "plan_base": "docs/fs-performance-positioning-review-20261015",
+  "product_reference_branch": "train/pre-gate-s-development-001",
+  "product_reference_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+  "main_reference_sha": "2c0073ff3ddf260418be0b78b63fe65b8e541a43",
+  "research_execution_branch": "research/fs-perf-authority-tradeoff-001",
+  "artifact_root": "C:\\Dev\\artifacts\\fleetsplice\\FLEETSPLICE-PERFORMANCE-AND-AUTHORITY-TRADEOFF-RESEARCH-TRAIN-001",
+  "source_archive": "docs/research/strategic-reassessment/README.md",
+  "report_root": "docs/research/strategic-reassessment/tradeoff-report",
+  "serial": true,
+  "timebox_hours": 8,
+  "children": [
+    {
+      "id": "R00",
+      "goal": "Identity/evidence freeze",
+      "deliverable": "01-EVIDENCE-AND-SCOPE.md",
+      "gate": "PINNED_EVIDENCE_SCOPE"
+    },
+    {
+      "id": "R01",
+      "goal": "Reconstruct HAPI/Orca/FS original design choice",
+      "deliverable": "02-HISTORICAL-ARCHITECTURE-CHOICES.md",
+      "gate": "HISTORICAL_FACTS_SEPARATED"
+    },
+    {
+      "id": "R02",
+      "goal": "Inspect current Paseo architecture",
+      "deliverable": "03-PASEO-CURRENT-ARCHITECTURE.md",
+      "gate": "CONTEMPORARY_SOURCE_PINNED"
+    },
+    {
+      "id": "R03",
+      "goal": "Authority and fault matrix",
+      "deliverable": "04-AUTHORITY-FAULT-MATRIX.md",
+      "gate": "NO_BLIND_REPLAY_PRESERVED"
+    },
+    {
+      "id": "R04",
+      "goal": "Performance and fair benchmark contract",
+      "deliverable": "05-PERFORMANCE-AND-BENCHMARK-CONTRACT.md",
+      "gate": "NO_UNMEASURED_COMPARISON"
+    },
+    {
+      "id": "R05",
+      "goal": "Technical tradeoff and Owner decision pack",
+      "deliverables": [
+        "06-TECHNICAL-TRADEOFF-REPORT.md",
+        "07-OWNER-DECISION-PACK.md"
+      ],
+      "gate": "OPTIONS_CONDITIONAL_AND_EVIDENCE_BACKED"
+    },
+    {
+      "id": "R06",
+      "goal": "Bounded evidence review, Draft results PR and Owner handoff",
+      "deliverables": [
+        "FINAL-RECEIPT.json",
+        "OWNER-HANDOFF.md"
+      ],
+      "gate": "STOP_FOR_OWNER_TRADEOFF_DECISION"
+    }
+  ],
+  "research_only": true,
+  "benchmark_execution_authorized": false,
+  "product_code_changes_authorized": false,
+  "production_changes_authorized": false,
+  "main_merge_authorized": false,
+  "results_pr_base": "docs/fs-performance-ownership-tradeoff-train-20261015",
+  "requires_owner_decision_before_product_work": true,
+  "terminal_disposition": "STOP_FOR_OWNER_TRADEOFF_DECISION"
+}

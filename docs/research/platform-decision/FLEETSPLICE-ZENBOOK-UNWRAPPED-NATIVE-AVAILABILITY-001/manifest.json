@@ -1,0 +1,124 @@
+{
+  "schema": "fleetsplice.goal-train.native-availability-study.v1",
+  "goal_id": "FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
+  "purpose": "Resolve one native/OS prerequisite: can ordinary unwrapped codex --yolo on ZenBook 14 be connected by a second nonowning client without losing original process/thread or native Writer integrity?",
+  "status": "OWNER_REQUESTED_FOLLOW_UP_RESEARCH; NO_RUNTIME_TEST_COMPLETED",
+  "authorization": "DOCUMENTATION_AND_OWNER_ATTENDED_DISPOSABLE_LOCAL_PROBE_ONLY",
+  "base_branch": "train/pre-gate-s-development-001",
+  "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+  "head_branch": "docs/fs-zenbook-unwrapped-native-availability-20261015",
+  "study_root": "docs/research/platform-decision/FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
+  "operator_checkout": "C:\\Dev\\src\\FleetSplice",
+  "worktree_parent": "C:\\Dev\\worktrees",
+  "artifacts_root": "C:\\Dev\\artifacts\\fleetsplice\\FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
+  "pinned_previous_report": {
+    "pr": 19,
+    "head_sha": "25f2bae8b39eb6222c7d2e0b8237227f53504acc",
+    "draft_unmerged": true
+  },
+  "source_guides": [
+    {
+      "repo": "openai/codex",
+      "commit": "6fbd7be1518d259e30e6fef48f05f433d2461a20",
+      "path": "codex-rs/app-server-daemon/README.md"
+    },
+    {
+      "repo": "JerrySkywalker/FleetSplice",
+      "commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "path": "docs/architecture/native-adoption-d0.md"
+    },
+    {
+      "repo": "JerrySkywalker/FleetSplice",
+      "commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "path": "docs/adr/0008-portable-shared-native-server-custody.md"
+    }
+  ],
+  "initial_native_cli": "codex --yolo",
+  "strict_actual_invocation": true,
+  "different_modes_are_not_equivalent": [
+    "codex --no-daemon --yolo",
+    "codex --remote <endpoint>",
+    "fleetsplice codex",
+    "hapi codex",
+    "paseo run"
+  ],
+  "phases": [
+    {
+      "id": "R00",
+      "title": "Readonly effective CLI/principal/process preflight",
+      "human_required": false,
+      "output": "01-PREFLIGHT-AND-RUNTIME-IDENTITY.md"
+    },
+    {
+      "id": "R01",
+      "title": "Owner physical launch of ordinary unwrapped disposable TUI",
+      "human_required": true,
+      "output": "02-UNWRAPPED-TUI-OBSERVATION.md"
+    },
+    {
+      "id": "R02",
+      "title": "Official native shared endpoint and Writer/identity proof",
+      "human_required": false,
+      "output": "03-SHARED-ENDPOINT-AND-WRITER.md"
+    },
+    {
+      "id": "R03",
+      "title": "Conditional second read-only connection; separately admitted one harmless effect",
+      "human_required": true,
+      "conditional": true,
+      "output": "04-SECOND-CLIENT-AND-RETURN-TO-TUI.md"
+    },
+    {
+      "id": "R04",
+      "title": "Compare immutable native process/thread/Writer evidence and classify",
+      "human_required": false,
+      "output": "05-QUALIFICATION-AND-ROUTE-IMPLICATION.md"
+    },
+    {
+      "id": "R05",
+      "title": "Same Draft PR evidence; Owner handoff; no product implementation",
+      "human_required": false,
+      "output": "06-OWNER-DECISION-PACK.md"
+    }
+  ],
+  "native_results": [
+    "SHARED_NATIVE_AVAILABLE",
+    "READ_ONLY_PROOF_ONLY",
+    "NO_REACHABLE_SHARED_ENDPOINT",
+    "UNWRAPPED_LAUNCH_IS_EMBEDDED",
+    "NATIVE_WRITER_BLOCKED",
+    "OWNER_ACTION_REQUIRED",
+    "AMBIGUOUS_STOP"
+  ],
+  "rules": [
+    "never claim full P0 mobile PASS from a local read",
+    "Owner physically launches exactly codex --yolo in separate Windows Terminal",
+    "if effective command wraps --no-daemon, document actual behavior, never change dotfiles to pass",
+    "only inspect fresh disposable native thread, never existing user sessions",
+    "second client never starts competing app-server/Writer",
+    "no native mutex or lock deletion",
+    "no unauthorized daemon start/bootstrap/update/restart/stop or system settings",
+    "no extra new model turns without exact test-specific Owner consent",
+    "never blind-retry uncertain effect",
+    "never expose native tokens, private home, process environment or full transcript in PR",
+    "do not merge Draft PR, change main, advance G08/Gate S or modify FS product source"
+  ],
+  "max_test_owned_authenticated_native_effects": 1,
+  "phone_pairing_allowed": false,
+  "test_existing_live_sessions_allowed": false,
+  "product_code_modified": false,
+  "raw_artifact_directories": [
+    "workspace",
+    "evidence",
+    "scratch"
+  ],
+  "required_local_receipts": [
+    "FINAL-RECEIPT.json",
+    "OWNER-HANDOFF.md"
+  ],
+  "pr_update": "FAST_FORWARD_ONLY_SAME_DRAFT_PR",
+  "terminal": "STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
+  "source_vs_measurement_separate": true,
+  "no_auto_product_route": true,
+  "no_auto_merge": true
+}

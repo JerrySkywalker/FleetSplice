@@ -1,0 +1,215 @@
+{
+  "schema": "fleetsplice.goal-train.research-decision.v1",
+  "goal_id": "FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001",
+  "title": "FleetSplice × Paseo build-or-reuse necessity and G08 scalability decision",
+  "study_approved_date": "2026-10-15",
+  "mode": "SOURCE_PINNED_RESEARCH_WITH_CONDITIONAL_ISOLATED_PILOTS",
+  "approval_scope": "RESEARCH_ONLY",
+  "review_state": "OWNER_APPROVED_STUDY; ROUTE_NOT_SELECTED",
+  "repo": "JerrySkywalker/FleetSplice",
+  "plan_branch": "docs/fs-paseo-build-or-reuse-decision-20261015",
+  "base_branch": "train/pre-gate-s-development-001",
+  "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+  "main_sha": "2c0073ff3ddf260418be0b78b63fe65b8e541a43",
+  "study_root": "docs/research/platform-decision/FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001",
+  "artifacts_root": "C:\\Dev\\artifacts\\fleetsplice\\FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001",
+  "operator_checkout": "C:\\Dev\\src\\FleetSplice",
+  "worktree_parent": "C:\\Dev\\worktrees",
+  "local_study_branch_preferred": "research/fs-paseo-build-or-reuse-decision-001",
+  "outputs_to_same_draft_pr": true,
+  "historical_prs": [
+    16,
+    17,
+    18
+  ],
+  "pinned_prior_report_head": "a12f4b82b89b4fa2fe7b6435b343ce35fd95bb3e",
+  "decision_routes": [
+    {
+      "id": "A",
+      "label": "ADOPT_PASEO",
+      "mode": "unmodified released Paseo"
+    },
+    {
+      "id": "B2",
+      "label": "BUILD_PASEO_PLUGIN",
+      "mode": "documented supported plugin only"
+    },
+    {
+      "id": "B3",
+      "label": "CONTRIBUTE_UPSTREAM",
+      "mode": "bounded upstream core delta"
+    },
+    {
+      "id": "B4",
+      "label": "LONG_LIVED_FORK",
+      "mode": "cost against independent FS; not presumed cheap"
+    },
+    {
+      "id": "C",
+      "label": "CONTINUE_FLEETSPLICE",
+      "mode": "independent FS product, evidence conditional"
+    },
+    {
+      "id": "UNKNOWN",
+      "label": "INSUFFICIENT_EVIDENCE",
+      "mode": "one smallest decisive gap"
+    }
+  ],
+  "hard_requirements": [
+    "P0-NATIVE",
+    "P0-HISTORY",
+    "P0-CORRECTNESS",
+    "P0-EXISTING-ENV"
+  ],
+  "child_order": [
+    "R00",
+    "R01",
+    "R02",
+    "R03",
+    "R04",
+    "R05",
+    "R06",
+    "R07"
+  ],
+  "children": [
+    {
+      "id": "R00",
+      "purpose": "Freeze Goal thesis, pinned sources, current versions and decisive user requirements",
+      "deliverables": [
+        "SOURCE-REGISTER.md",
+        "01-REQUIREMENTS-AND-DECISION-GATES.md"
+      ],
+      "required": true
+    },
+    {
+      "id": "R01",
+      "purpose": "Unmodified Paseo substitution assessment and user workflow equivalence",
+      "deliverables": [
+        "02-PASEO-AS-IS-SUBSTITUTION.md"
+      ],
+      "required": true
+    },
+    {
+      "id": "R02",
+      "purpose": "Paseo plugin SDK, upstream delta and permanent fork boundary",
+      "deliverables": [
+        "03-PASEO-PLUGIN-AND-UPSTREAM-BOUNDARY.md"
+      ],
+      "required": true
+    },
+    {
+      "id": "R03",
+      "purpose": "Long-history G08 scalability and HAPI/Orca/Paseo anti-pattern analysis",
+      "deliverables": [
+        "04-G08-LONG-HISTORY-TRADEOFF.md"
+      ],
+      "required": true
+    },
+    {
+      "id": "R04",
+      "purpose": "Smallest safe and isolated benchmark/native Writer experiments to decide route",
+      "deliverables": [
+        "05-ISOLATED-PILOT-RESULTS.md"
+      ],
+      "required": false,
+      "conditional": true,
+      "allowed_disposition": [
+        "EXECUTED_WITH_LIMITS",
+        "NOT_RUN_WITH_REASON",
+        "BLOCKED_WITH_REASON"
+      ]
+    },
+    {
+      "id": "R05",
+      "purpose": "Optional plugin public-contract Spike only when decisive",
+      "deliverables": [
+        "03-PASEO-PLUGIN-AND-UPSTREAM-BOUNDARY.md",
+        "05-ISOLATED-PILOT-RESULTS.md"
+      ],
+      "required": false,
+      "conditional": true,
+      "allowed_disposition": [
+        "SPIKE_DONE",
+        "SKIPPED_SOURCE_DECISIVE",
+        "PLUGIN_API_INSUFFICIENT",
+        "PILOT_NEEDS_OWNER_ADMISSION"
+      ]
+    },
+    {
+      "id": "R06",
+      "purpose": "Complete A/B/C cost, maintenance, CL/JIF and model resource overlap study",
+      "deliverables": [
+        "06-THREE-ROUTE-DEVELOPMENT-COST.md"
+      ],
+      "required": true
+    },
+    {
+      "id": "R07",
+      "purpose": "Select primary route or exact insufficiency and prepare Owner handoff",
+      "deliverables": [
+        "07-FINAL-DECISION-REPORT.md",
+        "08-OWNER-DECISION-PACK.md"
+      ],
+      "required": true,
+      "terminal": "STOP_FOR_OWNER_ROUTE_DECISION"
+    }
+  ],
+  "upstream_references": [
+    {
+      "repo": "getpaseo/paseo",
+      "plan_head": "0708b8295c102d1d5ea5acbfa512691c7d0e19ba",
+      "role": "A/B"
+    },
+    {
+      "repo": "openai/codex",
+      "plan_head": "6fbd7be1518d259e30e6fef48f05f433d2461a20",
+      "role": "native Writer sharing gate"
+    },
+    {
+      "repo": "tiann/hapi",
+      "plan_head": "5847b034e5cb84f2617766945c994b7905c5c03e",
+      "role": "historical shared Codex and history failure comparison only"
+    },
+    {
+      "repo": "stablyai/orca",
+      "plan_head": "02356732b0a4b8fa46aefead303f6f092611c18d",
+      "role": "historical failure comparison only"
+    }
+  ],
+  "strict_prohibitions": [
+    "fs_product_source_edit",
+    "fs_main_merge",
+    "g06_g07_g08_g09_implementation",
+    "gate_s_admission",
+    "production_deployment",
+    "global_codex_install_change",
+    "credential_or_user_transcript_access",
+    "global_path_profile_config_mutation",
+    "live_real_agent_writer_takeover",
+    "vendor_code_import",
+    "wide_ci",
+    "unapproved_external_phone_pairing"
+  ],
+  "artifact_only": [
+    "runs",
+    "logs",
+    "perf",
+    "fixtures",
+    "profiles",
+    "scratch",
+    "FINAL-RECEIPT.json",
+    "OWNER-HANDOFF.md"
+  ],
+  "verification": [
+    "exact_ref_and_clean_worktree",
+    "only_study_directory_changed",
+    "manifest_json_valid",
+    "links_checked",
+    "git_diff_check",
+    "same_pr_fast_forward",
+    "draft_not_merged"
+  ],
+  "stop_disposition": "STOP_FOR_OWNER_ROUTE_DECISION",
+  "auto_merge": false,
+  "auto_implementation": false
+}

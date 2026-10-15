@@ -5,7 +5,7 @@
   "study_approved_date": "2026-10-15",
   "mode": "SOURCE_PINNED_RESEARCH_WITH_CONDITIONAL_ISOLATED_PILOTS",
   "approval_scope": "RESEARCH_ONLY",
-  "review_state": "OWNER_APPROVED_STUDY; ROUTE_NOT_SELECTED",
+  "review_state": "RESEARCH_EXECUTED; OWNER_ROUTE_DECISION_PENDING",
   "repo": "JerrySkywalker/FleetSplice",
   "plan_branch": "docs/fs-paseo-build-or-reuse-decision-20261015",
   "base_branch": "train/pre-gate-s-development-001",

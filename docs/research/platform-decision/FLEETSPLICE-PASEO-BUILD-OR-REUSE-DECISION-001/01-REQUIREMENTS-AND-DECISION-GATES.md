@@ -23,6 +23,19 @@ Disallow false binary reasoning: failure of A or B does **not** prove C, because
 
 These are **route classification gates**, not current acceptance claims. E.g., Codex `--no-daemon` / elevated user / Admin/WSL must be tested as a **distinct** native shared-server availability class; a negative result is an upstream capability limit until proven otherwise.
 
+## R00 observed classification (2026-10-15)
+
+The acceptance oracles above remain unchanged. `SOURCE_VERIFIED` means code or a dated accepted receipt was examined; `MEASURED` is reserved for that receipt's named host/fixture; `UNKNOWN` is not a PASS.
+
+| Gate | Evidence scope and current status |
+| --- | --- |
+| P0-NATIVE | `SOURCE_VERIFIED`: Paseo v0.11.2/HEAD Codex adapter starts a separate stdio app-server for managed/import sessions; no source path here proves late sharing of an externally started ordinary TUI. `MEASURED_HISTORICAL`: FS G05C prior host unwrapped TUI/local Web; ZenBook P04/P05 Agent-supervised server and `fleetsplice codex` are a changed launch. `UNKNOWN`: ZenBook14 ordinary unwrapped `codex --yolo` with live reachable shared daemon and phone. |
+| P0-HISTORY | `SOURCE_VERIFIED`: Paseo pages fetch but retains all projected rows per live agent in `InMemoryAgentTimelineStore`; FS candidate projects ≤48 messages/12 turns and has no G08 complete-history implementation. No functionally equivalent 10k-item measurement; bounded-memory and complete retrieval are unproven on every route. |
+| P0-CORRECTNESS | `MEASURED_HISTORICAL`: FS local G05C/P04 receipts include fenced commands and explicit uncertainty. `SOURCE_VERIFIED`: Paseo has cursor/epoch catch-up and native interrupt handling. `UNKNOWN`: cross-device disconnect and real phone/daemon-restart effect exactly-once semantics under the Owner workflow. |
+| P0-EXISTING-ENV | `SOURCE_VERIFIED`: Paseo managed launch/import and FS ZenBook supervised path alter initiation; FS G05C prior local path did not. No route may count a wrapper or replacement terminal as an unwrapped PASS. |
+
+`--no-daemon` forces Codex's embedded app-server; elevated Windows launches also select embedded mode in current Codex source. An inaccessible shared endpoint is a native upstream/OS block for all consumers, including FS. Distinguish one TUI PID from the shared app-server PID and one Native Thread ID from a Paseo/FS logical Agent ID.
+
 ## 3. P1 and P2 — cost and usefulness
 
 | ID | Priority | Functional need | Check before custom code |

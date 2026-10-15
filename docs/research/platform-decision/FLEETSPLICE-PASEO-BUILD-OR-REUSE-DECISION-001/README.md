@@ -1,7 +1,7 @@
 # FS × Paseo: Build-or-Reuse Decision (2026-10-15)
 
 **Goal:** `FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001`  
-**Status:** `RESEARCH_PLAN_APPROVED; EXECUTION_NOT_YET_COMPLETE`  
+**Status:** `RESEARCH_EXECUTED; OWNER_ROUTE_DECISION_PENDING`
 **Type:** research and product-necessity decision, **not** an implementation roadmap authorization.
 
 ## Decision to make
@@ -24,15 +24,15 @@ Existing HAPI and Orca are **failure-mode/reference architectures only**, not ad
 - [Source register](SOURCE-REGISTER.md)
 - [Experiment and data-safety boundary](EXPERIMENT-SAFETY.md)
 
-## Deliverables from local research (not present until R00–R07 execute)
+## Deliverables from local research (R00–R07 executed)
 
-- `02-PASEO-AS-IS-SUBSTITUTION.md` — supported product replacement vs Owner requirements.
-- `03-PASEO-PLUGIN-AND-UPSTREAM-BOUNDARY.md` — config/plugin/upstream/fork classification, source proof.
-- `04-G08-LONG-HISTORY-TRADEOFF.md` — unbounded-memory, scanning, replay and UI failure mechanisms; A/B/C mitigation costs.
-- `05-ISOLATED-PILOT-RESULTS.md` — bounded actual measurements or explicit `NOT_RUN` / `BLOCKED`.
-- `06-THREE-ROUTE-DEVELOPMENT-COST.md` — lifetime ownership/maintenance and CL/JIF/local inference boundaries.
-- `07-FINAL-DECISION-REPORT.md` — ranked recommendation, rejection reasons and evidence confidence.
-- `08-OWNER-DECISION-PACK.md` — decisions, proof gaps, first milestone candidate, abort/exit criteria.
+- [Paseo as-is substitution](02-PASEO-AS-IS-SUBSTITUTION.md) — released product vs unchanged Owner P0/P1.
+- [Plugin and upstream boundary](03-PASEO-PLUGIN-AND-UPSTREAM-BOUNDARY.md) — B1/B2/B3/B4 and R05 source-decisive skip.
+- [G08 tradeoff](04-G08-LONG-HISTORY-TRADEOFF.md) — dataflow, complexity and correctness costs.
+- [Conditional pilot disposition](05-ISOLATED-PILOT-RESULTS.md) — R04 NOT_RUN/BLOCKED, no invented benchmark.
+- [Three-route lifetime cost](06-THREE-ROUTE-DEVELOPMENT-COST.md) — upgrades, operations and CL/JIF/inference boundaries.
+- [Final decision report](07-FINAL-DECISION-REPORT.md) — `INSUFFICIENT_EVIDENCE` with conditional ranking.
+- [Owner decision pack](08-OWNER-DECISION-PACK.md) — one bounded next Goal candidate and stop conditions.
 
 Do not commit raw traces, transcripts, credential/config copies, external source archives, cloned competitor repositories, huge fixtures, process dumps or heap profiles. The research may add/modify **only this study directory** on the isolated study branch.
 

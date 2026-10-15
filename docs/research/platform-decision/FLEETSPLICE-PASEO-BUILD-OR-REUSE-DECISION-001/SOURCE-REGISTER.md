@@ -6,12 +6,12 @@
 
 - `FS-main@2c0073ff3ddf260418be0b78b63fe65b8e541a43` — architecture 0.0; **no promoted product source**.
 - `FS-train/pre-gate-s-development-001@ee98a6282c7733ca1658547022ab55c3b61c0e1f` — product candidate, not production/release.
-- [Owner Thesis](../../../../product/owner-thesis.md): ordinary `codex --yolo` in Windows Terminal, no wrapper, late native adoption and return to original TUI.
-- [Session Model](../../../../architecture/session-model.md): LogicalSession/Lane/NativeSegment/NativeSession identity and fail-closed effect recovery.
-- [History & Handoff](../../../../architecture/history-and-handoff.md): accepted separate Hub/Edge single-writer SQLite + content-addressed blobs, hot/warm/cold and native-truth distinction.
-- [Realtime Two Stream](../../../../architecture/realtime-two-stream.md) and [G05C static performance audit](../../../../performance/g05c-performance-static-audit.md): bounded live/authority snapshot and rendering paths.
-- [Measured freeze](../../../../performance/measured-decision-freeze.md) and [Gate P](../../../../performance/t03-perf-closeout-gate-p.md): local 74→18 discovery RPC, 56→0 metadata read, 2→1 pre-effect read (post-effect read 1 retained), local soak; **not cross-product comparisons**.
-- [v0.1 Roadmap](../../../../v0.1/implementation-roadmap.md): G08 officially follows G07 and separate Owner admission. This research does not change the train.
+- [Owner Thesis](../../../product/owner-thesis.md): ordinary `codex --yolo` in Windows Terminal, no wrapper, late native adoption and return to original TUI.
+- [Session Model](../../../architecture/session-model.md): LogicalSession/Lane/NativeSegment/NativeSession identity and fail-closed effect recovery.
+- [History & Handoff](../../../architecture/history-and-handoff.md): accepted separate Hub/Edge single-writer SQLite + content-addressed blobs, hot/warm/cold and native-truth distinction.
+- [Realtime Two Stream](../../../architecture/realtime-two-stream.md) and [G05C static performance audit](../../../performance/g05c-performance-static-audit.md): bounded live/authority snapshot and rendering paths.
+- [Measured freeze](../../../performance/measured-decision-freeze.md) and [Gate P](../../../performance/t03-perf-closeout-gate-p.md): local 74→18 discovery RPC, 56→0 metadata read, 2→1 pre-effect read (post-effect read 1 retained), local soak; **not cross-product comparisons**.
+- [v0.1 Roadmap](../../../v0.1/implementation-roadmap.md): G08 officially follows G07 and separate Owner admission. This research does not change the train.
 - Earlier docs-only studies: FS Draft PRs [#16](https://github.com/JerrySkywalker/FleetSplice/pull/16), [#17](https://github.com/JerrySkywalker/FleetSplice/pull/17) and [#18](https://github.com/JerrySkywalker/FleetSplice/pull/18). PR #18 source head: `a12f4b82b89b4fa2fe7b6435b343ce35fd95bb3e`. They are **not merged** to the controlling train; read as pinned independent studies.
 
 ## Upstream primary-source snapshots at plan creation
@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | `getpaseo/paseo` | `0708b8295c102d1d5ea5acbfa512691c7d0e19ba` | [Product](https://github.com/getpaseo/paseo/blob/main/docs/product.md), [Architecture](https://github.com/getpaseo/paseo/blob/main/docs/architecture.md), [Plugin Provider contract](https://github.com/getpaseo/paseo/blob/main/packages/plugin/src/server/provider.ts), [Direct-provider example](https://github.com/getpaseo/paseo/tree/main/plugin-examples/provider-direct), [TimelineStore](https://github.com/getpaseo/paseo/blob/main/packages/server/src/server/agent/agent-timeline-store.ts), [Timeline Sync](https://github.com/getpaseo/paseo/blob/main/docs/timeline-sync.md), [Agent lifecycle](https://github.com/getpaseo/paseo/blob/main/docs/agent-lifecycle.md), [Streaming Performance](https://github.com/getpaseo/paseo/blob/main/docs/agent-stream-performance.md), [Plugins](https://github.com/getpaseo/paseo/blob/main/docs/plugins.md) |
 | `tiann/hapi` | `5847b034e5cb84f2617766945c994b7905c5c03e` | [Codex Shared Sessions](https://github.com/tiann/hapi/blob/main/docs/guide/codex-shared-sessions.md). It implements startup-managed shared TUI/Web app-server. The command `hapi codex` does **not** by itself meet unwrapped late-adoption P0 |
-| `stablyai/orca` | `02356732b0a4b8fa46aefead303f6f092611c18d` | [Orca long-session lessons](../../../../performance/orca-long-session-lessons.md); upstream terminal/native chat/history mechanisms for **failure-mode analysis only** |
+| `stablyai/orca` | `02356732b0a4b8fa46aefead303f6f092611c18d` | [Orca long-session lessons](../../../performance/orca-long-session-lessons.md); upstream terminal/native chat/history mechanisms for **failure-mode analysis only** |
 | `openai/codex` | `6fbd7be1518d259e30e6fef48f05f433d2461a20` | [TUI startup/daemon policy](https://github.com/openai/codex/blob/main/codex-rs/tui/src/daemon_startup.rs), [remote app-server client](https://github.com/openai/codex/blob/main/codex-rs/app-server-client/src/remote.rs), [writer lock](https://github.com/openai/codex/blob/main/codex-rs/rollout/src/writer_lock.rs) |
 
 **Pin exact SHA URLs in final source register.** A plan-creation branch HEAD is not evidence that all cited lines were examined at that commit. Verify code against the exact commit and actual released Paseo version used by isolated pilot. Do not assume repository HEAD equals stable release.

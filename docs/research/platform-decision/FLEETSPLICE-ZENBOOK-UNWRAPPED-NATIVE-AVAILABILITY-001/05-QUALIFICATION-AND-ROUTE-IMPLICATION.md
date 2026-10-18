@@ -1,48 +1,42 @@
-# R04 — Qualification and ambiguity classification
+# R04 — Read-only qualification and remaining effect gate
 
-Continuation: `20261018-r01-continuation`, same Goal.
+Continuation: `20261018-r02-thread-verification`, same Goal.
 
-Status: **COMPLETE_CLASSIFICATION_ONLY; native continuity incomplete**.
-
-NATIVE_RESULT: **AMBIGUOUS_STOP**
+NATIVE_RESULT: **READ_ONLY_PROOF_ONLY**
 
 DISPOSITION: **STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW**
 
-The Owner now reports the physical exact launch and open TUI with no prompt.
-A measured Windows Terminal chain leads to TUI candidate PID 18004, created
-20:28:47.239692 +08:00. The official daemon is reachable, with same-user socket
-ACL and a separately matched official PID record. The earlier pre-launch
-connection refusal is not the current endpoint status.
+The Owner clarified the Native Thread ID, and fresh official responses bind that
+exact thread to the disposable workspace and daemon 33120's loaded state.
+Windows' supported socket peer query bound the observer endpoint to that daemon.
+The Owner confirmed original-TUI interactivity and unchanged Thread ID after
+disconnect; OS snapshots show candidate TUI 18004/daemon 33120 creation times
+unchanged. This supersedes the preceding identity-ambiguity checkpoint.
 
-During inspection the daemon changed from 18768/0.162.1 to 33120/0.163.0.
-The TUI candidate's PID/creation time remained unchanged. Process survival is
-not thread continuity or visible interactive return.
-The supplied “Shell PID” is a UUID; its origin and original-TUI binding remain
-unconfirmed. No supported protocol proof binds the exact Native Thread/Writer
-to the current server.
-
-| Claim layer | Result |
+| Required layer | Evidence and practical limit |
 | --- | --- |
-| Exact physical launch; normal user; original TUI open | OWNER_REPORTED |
-| Candidate PID/creation, executable, flags and same-user owner | MEASURED_LOCAL |
-| Official reachability, same-user socket ACL, PID-record metadata | MEASURED_LOCAL; separate surfaces |
-| Exact original-TUI binding, Native Thread, peer PID, Writer cooperation | UNKNOWN |
-| Independent read, admitted effect, same-TUI interactive return | NOT_RUN / UNKNOWN |
+| Ordinary physical launch / non-elevated Console B | OWNER_REPORTED; candidate flags/owner corroborate |
+| TUI candidate PID + creation continuity | MEASURED_LOCAL; no native response directly maps PID 18004 to Thread |
+| Endpoint → server PID/incarnation | MEASURED_LOCAL peer PID + official PID record + OS time/hash/owner |
+| Exact Native Thread/workspace/current loaded membership | MEASURED_LOCAL official metadata/list; Owner-confirmed target |
+| Writer/control | Loaded, idle, direct-input eligible; existing-runtime route SOURCE_SUPPORTED; lock holder/control effect untested |
+| Second-client read | MEASURED_LOCAL, correlated request IDs; no new Writer |
+| Original TUI return | OWNER_REPORTED same-ID interactive return; candidate OS identity unchanged |
+| Remote native effect and same-TUI acknowledgement | NOT_RUN; no authorization, count 0 |
 
-AMBIGUOUS_STOP supersedes the launch-pending classification. It does not mean
-embedded launch, no endpoint, Writer conflict, or native sharing PASS.
-No competing Writer or native effect was attempted.
+The PID-to-thread relation uses Owner UI plus workspace/startup correlation,
+not a fabricated native PID field. Stored source=vscode and cliVersion=0.162.1
+are preserved, separate from the live 0.163.0 runtime. The observer close used
+abort/dispose after an unspecified close exception; it is not a clean handshake
+result. These limits prevent promotion to SHARED_NATIVE_AVAILABLE.
 
-[PR #19's pinned report](https://github.com/JerrySkywalker/FleetSplice/blob/25f2bae8b39eb6222c7d2e0b8237227f53504acc/docs/research/platform-decision/FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001/07-FINAL-DECISION-REPORT.md)
-remains INSUFFICIENT_EVIDENCE. Its Paseo 0.11.2 separate stdio runtime and
-complete-history residency findings are prior source review, not new measurements
-of current Paseo. FS's supervised historical ZenBook proof cannot substitute
-for ordinary-TUI qualification. No comparison, route or G08 admission follows.
+[PR #19's pinned decision](https://github.com/JerrySkywalker/FleetSplice/blob/25f2bae8b39eb6222c7d2e0b8237227f53504acc/docs/research/platform-decision/FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001/08-OWNER-DECISION-PACK.md)
+remains INSUFFICIENT_EVIDENCE for product choice. The local read removes one
+availability uncertainty but does not demonstrate cooperative effects, phone P0,
+G08 complete bounded history, multi-Host operation or comparative maintenance
+cost. No automatic FS/Paseo choice, product code, G08, Gate S or merge follows.
 
-**One next step:** Owner confirms the intended still-open original Console B,
-the supplied UUID's origin, whether Codex was exited/reopened, and whether the
-original UI remains interactive after the server change. Send no prompt or
-relaunch. Then re-establish identity for the current incarnation with official
-read-only surfaces before R03. Any effect needs new exact-thread authorization
-after Writer qualification. Phone P0, multi-Host, Gate S and product work remain
-outside this audit.
+**One next step:** Owner reviews whether to separately authorize one harmless
+exact-thread ACK turn through the same existing server/runtime. The proposed
+action and guards are in [06](06-OWNER-DECISION-PACK.md). No turn is authorized by
+a successful read or by the Owner's UI-return confirmation.

@@ -1,110 +1,126 @@
-# Owner decision pack — Post-launch native identity audit
+# Owner decision pack — Exact native read verified
 
 GOAL_ID: `FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001`
 
-Continuation: `20261018-r01-continuation`, Asia/Shanghai.
+Continuation: `20261018-r02-thread-verification`, Asia/Shanghai.
 
 DISPOSITION: **STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW**
 
-NATIVE_RESULT: **AMBIGUOUS_STOP**
+NATIVE_RESULT: **READ_ONLY_PROOF_ONLY**
 
-## Question, provenance and authority
+## Purpose, provenance and unchanged boundaries
 
-Can ordinary `codex --yolo`, physically started in Windows Terminal, later
-share an official native endpoint while preserving the original TUI process,
-Native Thread and native Writer? A replacement/resumed TUI is a different oracle.
+Can an ordinary `codex --yolo` in the Owner's Windows Terminal be adopted later
+by another client while preserving the original TUI, Native Thread and native
+Writer? Replacing/resuming the TUI or launching a different native runtime is a
+different workflow.
 
-[Draft PR #20](https://github.com/JerrySkywalker/FleetSplice/pull/20) uses
-`docs/fs-zenbook-unwrapped-native-availability-20261015`, based on
+This remains the same Goal and [Draft PR #20](https://github.com/JerrySkywalker/FleetSplice/pull/20),
+branch `docs/fs-zenbook-unwrapped-native-availability-20261015`, based on
 `train/pre-gate-s-development-001@ee98a6282c7733ca1658547022ab55c3b61c0e1f`.
-This continuation rechecked starting head
-`a78897f7bed6b50778bc8abf9174e6873934123d` and reused its clean isolated
-worktree. Exact final published SHA belongs in the local receipt and PR history.
-No new Goal, implementation, merge or route selection is admitted.
+The freshly verified continuation starting head was
+`9638ba3936e5e9740b10d44aea9811171c462f44`.
+Exact final publication SHA is in the local receipt and PR history.
+The same isolated worktree was reused; canonical main and historical dirty
+worktree remain preserved. No new Goal, feature, large CI, merge or route is admitted.
 
-The driver is ChatGPT desktop Codex local on ZENBOOKS14. It replaces planned
-Console A only; Desktop PID/server/thread never count as Console B.
+The driver is Desktop Codex **local** on ZENBOOKS14, replacing planned Console A
+only. Desktop processes/server/thread remain excluded as Console B.
 
-## Actual result and remaining uncertainty
+## What is now proved
 
-At the earlier 17:43 R00 checkpoint, CLI was 0.162.1 and the pre-launch daemon
-probe was refused. Later the Owner reported an independent Windows Terminal,
-exact `codex --yolo`, normal user, original TUI open and **no model prompt**.
-The supplied “Shell PID” is a UUID, not a Windows PID; it was not assumed to be
-a Native Thread or read as a session.
+The Owner clarified that the earlier UUID is the **Native Thread ID**, not a
+shell PID. The exact value stays private; public name **T18** has SHA-256
+`243106043D8B029720F5E075B9AB7465C03EFE8E17073A98EE3A935038BA6D76`.
 
-The measured chain is Windows Terminal **34928** → PowerShell **3944** →
-Node **34404** → TUI candidate **18004**, created
-**2026-10-18 20:28:47.239692 +08:00**. Owner queries return the current user;
-flag-only inspection finds yolo and no no-daemon/remote/profile/resume.
-The executable reports **0.163.0**, SHA-256
-`2692C8C7BB2CF8B0AEFE638741FC90236F4B824C59578CE84994F9DE58200993`.
-Its intended-original-TUI binding awaits Owner clarification.
+At 20:48:56 +08:00 a bounded independent observer connected to the verified
+official same-user AF_UNIX endpoint. Windows' native peer-PID query returned
+**33120**, matching the current official daemon PID record and OS creation time
+**20:32:11.867961 +08:00**, version 0.163.0.
 
-Official daemon status succeeded. Same-user socket ownership/ACL and a 65-byte
-AF_UNIX address were measured separately from process identity.
-Initial daemon **18768**, created **20:26:42.254344**, was 0.162.1.
-It and its updater disappeared during inspection. The later official record
-names daemon **33120**, created **20:32:11.867961**, version 0.163.0;
-record creation FILETIME matches OS metadata. A new-incarnation status succeeded.
-The TUI candidate remained alive with unchanged PID/creation time.
-Research requested no installation or daemon lifecycle mutation.
-Autonomous update is consistent with source/timing, **not a proved cause**.
+Official initialize response 2001, exact metadata response 2002 and loaded-list
+response 2003 proved **that exact T18** is loaded and idle in daemon 33120, matches
+the disposable workspace and is direct-input-eligible. No turns were included;
+returned turn count was zero. No transcript, unrelated thread ID or private
+native session-file path was retained.
 
-These facts do not prove the exact native thread, Writer cooperation or visible
-interactive return in the original TUI. Direct socket peer-PID attribution was
-not performed. No thread claim was carried across the incarnation change.
-No native database, rollout, transcript or old private session was inspected.
+TUI candidate **18004**, created **20:28:47.239692**, and daemon **33120** remained
+alive with unchanged creation times after observer disconnect. The Owner then
+confirmed the **original Console B remained interactive with the same Thread ID**.
+Thread creation is **20:28:48**, within one second of the candidate startup.
+This corroborates PID/thread association; the protocol does not directly return
+TUI PID 18004. Stored metadata source=vscode and CLI version=0.162.1 are not
+rewritten as codex-tui/current 0.163.0 binary identity.
 
-## Phase record
+The earlier daemon 18768/0.162.1 → 33120/0.163.0 change remains historical.
+These are fresh current-incarnation reads, not carried-over proof.
+Research issued no daemon lifecycle, install, config or auth mutation.
 
-| Phase | Actual execution |
+## Writer, transport and acceptance limits
+
+The observer sent only initialize/initialized, metadata read and one bounded
+loaded-list query. It created/resumed no thread, started no server, acquired no
+native Writer and sent **zero effects**. Live status is loaded/idle and
+canAcceptDirectInput=true. Version-matched source supports dispatch to the same
+existing loaded runtime; it does not imply an observed OS lock-handle owner or a
+successful control effect. No native lock or conflict was probed or bypassed.
+
+Two transport attempts failed before initialize because of the helper's
+returned-length assumption. Native WSAIoctl then returned success and correct PID
+with bytesReturned=0. The successful third connection made the only thread read.
+No effect was replayed. The graceful close attempt threw, so only the observer
+was aborted/disposed. Precise close cause was not recorded; an incorrect timeout
+label is corrected in a separate private receipt. This is not a clean close test.
+
+| Phase | Actual status |
 | --- | --- |
-| R00 | COMPLETE; retained earlier checkpoint and revalidated drift |
-| R01 | PARTIAL; Owner launch plus measured candidate; exact binding/thread UNKNOWN |
-| R02 | PARTIAL_READ_ONLY; reachable daemon and same-user metadata; full chain incomplete |
-| R03 | NOT_RUN / BLOCKED; no exact-thread read/subscription or effect |
-| R04 | COMPLETE_CLASSIFICATION_ONLY; native continuity incomplete |
-| R05 | Updated reports/README/manifest, lightweight checks and same Draft PR; publication outcome in local receipt |
+| R00 | COMPLETE; retained/revalidated version/runtime history |
+| R01 | Owner target clarified, OS candidate continuity measured, UI return confirmed; direct PID/thread field absent |
+| R02 | Endpoint/server/exact loaded thread verified for read; Writer effect untested |
+| R03 | Independent read completed; effect NOT_RUN |
+| R04 | READ_ONLY_PROOF_ONLY classification |
+| R05 | Current reports/manifest/README, checks and same Draft PR; exact publication in local receipt |
 
-Physical test executed: **true, OWNER_REPORTED**.
-Authenticated native effects: **0**. Phone test: **false**.
-Native daemon status initialize/close is not SECOND_CLIENT_READ.
-No Writer conflict was tested, inferred or bypassed.
-October 15 historical R02 evidence remains no current PASS.
+Physical test=true, OWNER_REPORTED; model/native effects=0; phone test=false.
+No SHARED_NATIVE_AVAILABLE, SAME_TUI_REMOTE_EFFECT or full remote P0 claim.
 
-## Route decision and sole next step
+## One review decision: authorize one harmless effect or retain read-only proof
 
-[PR #19](https://github.com/JerrySkywalker/FleetSplice/pull/19), pinned at
-`25f2bae8b39eb6222c7d2e0b8237227f53504acc`, concluded
-[INSUFFICIENT_EVIDENCE](https://github.com/JerrySkywalker/FleetSplice/blob/25f2bae8b39eb6222c7d2e0b8237227f53504acc/docs/research/platform-decision/FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001/08-OWNER-DECISION-PACK.md).
-Vanilla Paseo's separate native runtime/history gaps, conditional provider/core
-changes, and FS's G08/maintenance costs remain unresolved comparison inputs.
-A reachable daemon chooses neither FS nor a Paseo change. A future local sharing
-PASS would still not qualify phone P0, multi-Host or G08.
+The only suggested next step is an **Owner decision**, not automatic dispatch:
+whether to separately authorize one ACK-only turn on **T18**, through daemon
+33120's existing loaded runtime. Proposed input:
 
-**Owner clarifies the still-open original Console B's identity:** confirm whether
-PID 18004 is the intended candidate, where the supplied UUID came from, whether
-Codex was exited/reopened, and whether the original visible UI remains interactive
-after the server change. No model prompt, restart, resume or settings change.
+> Reply exactly FS_NATIVE_20261018_ACK_01. Do not call tools, run commands, read or write files, change settings, or start additional turns.
 
-After clarification, establish a fresh current-incarnation/Thread/Writer chain
-through official safe read-only surfaces before R03. Stop if it cannot be proved.
-One harmless effect needs **new explicit authorization naming the proved
-disposable thread**, after cooperation is established; never retry an unknown
-effect. Effect authorization is not requested while that gate is missing.
+Before any admitted dispatch, revalidate server/TUI incarnations, exact thread,
+idle/direct-input state and existing-runtime route. Any changed identity,
+Writer conflict or ambiguous authority means stop. Do not create/resume a thread
+or change permission/settings to make it work. Submit at most once; no retry
+after uncertain acceptance. Collect only the test receipt/turn ID/ACK and obtain
+Owner confirmation in the same original TUI. A no-tools prompt is an instruction,
+not evidence of tool-free execution; receipt/tool-event checks must verify it.
 
-## Custody and independent continuation
+The Owner's Thread-ID clarification and UI-return confirmation authorize neither
+this turn nor any other native effect. No such authorization has been received.
+Declining retains READ_ONLY_PROOF_ONLY without implying native control failure.
 
-Private evidence is in `evidence/20261018-r01-continuation/` under this Goal's
-Owner-designated artifact root; fetched source is in
-`scratch/20261018-r01-continuation/`. Prior receipt/handoff were archived there
-before root FINAL-RECEIPT.json and OWNER-HANDOFF.md update.
-No credentials, tokens, exact user-home paths or native transcripts enter Git.
-Canonical main and the older dirty research worktree remain preserved.
+## Consequence for the product route and custody
 
-[README](README.md) is the entry. [01](01-PREFLIGHT-AND-RUNTIME-IDENTITY.md)
-retains preflight history; [02](02-UNWRAPPED-TUI-OBSERVATION.md) covers identity;
-[03](03-SHARED-ENDPOINT-AND-WRITER.md) separates endpoint/PID/Writer;
-[04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md) records the gated observer;
-[05](05-QUALIFICATION-AND-ROUTE-IMPLICATION.md) gives classification.
+[PR #19's pinned decision](https://github.com/JerrySkywalker/FleetSplice/blob/25f2bae8b39eb6222c7d2e0b8237227f53504acc/docs/research/platform-decision/FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001/08-OWNER-DECISION-PACK.md)
+remains INSUFFICIENT_EVIDENCE. A same-host read does not choose FS or a Paseo
+provider/core change, establish bounded complete history/G08, or qualify phone
+and multi-Host behavior. No implementation or merge follows even from a later
+local effect proof without Owner route review.
+
+Private evidence/helper source is under this Goal's designated artifact root:
+`evidence/20261018-r02-thread-verification/` and
+`scratch/20261018-r02-thread-verification/`. The prior receipt/handoff were
+archived there; root FINAL-RECEIPT.json and OWNER-HANDOFF.md track current
+publication and the pending Owner decision.
+
+[README](README.md) is the current entry.
+[01](01-PREFLIGHT-AND-RUNTIME-IDENTITY.md) retains the checkpoints;
+[02](02-UNWRAPPED-TUI-OBSERVATION.md) separates UI/OS/native identity;
+[03](03-SHARED-ENDPOINT-AND-WRITER.md) qualifies endpoint/thread and Writer limits;
+[04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md) records read/close/return evidence;
+[05](05-QUALIFICATION-AND-ROUTE-IMPLICATION.md) gives the claim boundaries.

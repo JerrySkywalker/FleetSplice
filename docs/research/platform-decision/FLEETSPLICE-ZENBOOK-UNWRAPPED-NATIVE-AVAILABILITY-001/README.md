@@ -1,7 +1,7 @@
 # ZenBook 14 — Unwrapped Native Codex Availability
 
 Goal: `FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001`
-Status: **Owner launch reported; R01/R02 partial; native identity chain unresolved**
+Status: **Exact-thread read verified; original TUI return Owner-confirmed; effect pending separate authorization**
 Host: Owner's ZenBook 14; Windows PowerShell / Windows Terminal; exact native Codex binary, launch mode and version to be observed, not assumed.
 
 ## Why this one Goal exists
@@ -34,66 +34,69 @@ Source repository study branch is independent and **not stacked** on PR #19 or p
 
 ## Latest audit — 2026-10-18, Desktop Codex local
 
-Continuation: `20261018-r01-continuation`, same Goal. Fresh PR API and remote-ref
-checks returned starting head `a78897f7bed6b50778bc8abf9174e6873934123d`, still
-Draft/unmerged on the unchanged base. The clean isolated research worktree was
-reused. Canonical main and October 15 dirty research evidence remain preserved.
+Continuation: `20261018-r02-thread-verification`, same Goal. Fresh PR/remote
+checks returned starting head `9638ba3936e5e9740b10d44aea9811171c462f44`, still
+Draft/unmerged on the unchanged base. The same isolated worktree was reused.
+Canonical main and October 15 dirty research evidence remain preserved.
 
-**NATIVE_RESULT=AMBIGUOUS_STOP**
+**NATIVE_RESULT=READ_ONLY_PROOF_ONLY**
 
 **DISPOSITION=STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW**
 
-The Owner now reports exact physical `codex --yolo` in independent Windows
-Terminal, normal user, TUI open and no model prompt. The supplied “Shell PID”
-is a UUID, not an OS PID; its origin and intended original-TUI binding remain
-unconfirmed. A measured candidate is PowerShell 3944 → Node 34404 → TUI 18004,
-created 20:28:47.239692 +08:00, now running Codex 0.163.0.
+The Owner clarified the supplied UUID is the **Native Thread ID**, not a shell
+PID. A bounded independent observer verified the official socket's kernel peer
+PID as daemon **33120**, created **20:32:11.867961 +08:00**, version 0.163.0.
+Official initialize, exact-thread metadata read and bounded loaded-list query
+proved that exact thread is loaded/idle in that daemon, matches the disposable
+workspace and reports direct-input eligibility. No turns were read.
 
-The official daemon endpoint is now reachable, with same-user socket owner/ACL.
-During inspection its incarnation changed from PID 18768 / 0.162.1 to PID 33120 /
-0.163.0, created 20:32:11.867961 +08:00. The official PID record matches current
-OS creation metadata; direct socket peer-PID attribution was not performed.
-The candidate TUI's PID/creation time remained unchanged, which alone does not
-prove native-thread continuity, Writer cooperation or visible interactive return.
-Research issued no installation/update or daemon lifecycle command.
+After observer disconnect, TUI candidate **18004** (created **20:28:47.239692**)
+and daemon **33120** retained their OS identities. The Owner confirmed the
+**original TUI remains interactive with the same Thread ID**. This corroborates
+the PID/thread relation; the protocol itself does not return the TUI PID.
+Stored metadata source=vscode / CLI 0.162.1 is preserved as reported, separate
+from the current 0.163.0 executable. Exact test UUID stays in private artifacts;
+[02](02-UNWRAPPED-TUI-OBSERVATION.md) publishes a digest.
 
 | Phase | Actual execution |
 | --- | --- |
-| R00 | COMPLETE; earlier checkpoint retained and version/runtime drift revalidated |
-| R01 | PARTIAL: Owner launch report and candidate process identity; exact binding/thread UNKNOWN |
-| R02 | PARTIAL_READ_ONLY: reachable daemon/same-user metadata; current exact-thread/Writer chain incomplete |
-| R03 | NOT_RUN / BLOCKED; no exact-thread read, subscription or effect |
-| R04 | COMPLETE_CLASSIFICATION_ONLY; native continuity incomplete |
-| R05 | Reports, validation, local receipts and same Draft PR; exact publication in local receipt |
+| R00 | COMPLETE; earlier runtime history retained/revalidated |
+| R01 | Owner thread clarified, candidate OS continuity measured, same-ID UI return confirmed |
+| R02 | Official endpoint/server/exact loaded thread verified for reads; Writer control untested |
+| R03 | Independent read completed; effect NOT_RUN |
+| R04 | READ_ONLY_PROOF_ONLY classification; no full native/phone P0 PASS |
+| R05 | Reports, checks, local receipts and same Draft PR; exact SHA/outcome in local receipt |
 
-Physical test executed: **true, OWNER_REPORTED**. Authenticated native effects:
-**0**. No native transcript/database or unconfirmed UUID session was read.
-Official daemon status probes are not independent exact-thread observation.
-No READ_ONLY_PROOF_ONLY or SHARED_NATIVE_AVAILABLE claim is earned.
+Physical test: **true, OWNER_REPORTED**. Authenticated native effects: **0**.
+No competing Writer, create/resume, lock acquisition, transcript read, install
+or daemon lifecycle mutation. The current same-runtime input route is supported
+by source and live capability metadata; lock-handle custody and a cooperative
+control effect have not been independently observed.
 
-Evidence is MEASURED_LOCAL for process/status/security metadata, OWNER_REPORTED
-for physical action, SOURCE_ONLY for protocol behavior, and UNKNOWN for the
-missing identity/Writer/return links. Historical October 15 R02 remains no
-current PASS. The earlier pre-launch refusal is preserved in 01 as a past cut.
+Two transport diagnostics stopped before initialize due to the observer's
+returned-length assumption; the third connection made the only read/list calls.
+Its graceful close attempt threw, so only the observer was aborted/disposed.
+The precise close cause is unknown; this is not a clean close-handshake PASS.
+Historical October 15 R02 and the earlier daemon incarnation are not reused as
+current proof.
 
-**Only next step:** Owner clarifies the still-open original Console B's identity,
-the supplied UUID's origin, whether Codex was exited/reopened, and current UI
-interactivity. Do not send a prompt or relaunch. Details are in [06](06-OWNER-DECISION-PACK.md).
-Further read-only protocol work requires a fresh current identity chain;
-any native effect still needs separate exact-thread authorization after Writer
-qualification. No automatic FS/Paseo route or G08 admission follows.
+**Only next step:** Owner decides whether to separately authorize the one
+exact-thread ACK-only turn described in [06](06-OWNER-DECISION-PACK.md).
+The default remains no effect. New identity/authority ambiguity or a Writer
+conflict means stop; no retry of uncertain dispatch. No automatic FS/Paseo
+route, G08, Gate S or merge follows.
 
-The Desktop local research interface continues to replace planned Console A only.
-Desktop PID/server/thread never count as Console B; all original gates remain.
+The Desktop local driver replaces planned Console A only. Desktop's own
+PID/server/thread never count as Console B; the original acceptance gates remain.
 
 ### Audit documents
 
-- [01 — Preflight history and runtime revalidation](01-PREFLIGHT-AND-RUNTIME-IDENTITY.md)
-- [02 — Owner launch and candidate TUI identity: PARTIAL](02-UNWRAPPED-TUI-OBSERVATION.md)
-- [03 — Reachable daemon, incarnation change, Writer: PARTIAL](03-SHARED-ENDPOINT-AND-WRITER.md)
-- [04 — Independent observer and original TUI return: NOT_RUN / BLOCKED](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md)
-- [05 — Qualification and route implications](05-QUALIFICATION-AND-ROUTE-IMPLICATION.md)
-- [06 — Standalone Owner decision pack](06-OWNER-DECISION-PACK.md)
+- [01 — Preflight and continuation history](01-PREFLIGHT-AND-RUNTIME-IDENTITY.md)
+- [02 — Confirmed thread and corroborated original TUI](02-UNWRAPPED-TUI-OBSERVATION.md)
+- [03 — Verified endpoint/thread and separate Writer limits](03-SHARED-ENDPOINT-AND-WRITER.md)
+- [04 — Independent read, observer close and original TUI return](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md)
+- [05 — Read-only qualification and route implications](05-QUALIFICATION-AND-ROUTE-IMPLICATION.md)
+- [06 — Standalone Owner decision pack / optional ACK proposal](06-OWNER-DECISION-PACK.md)
 
 ## Decisive distinction
 

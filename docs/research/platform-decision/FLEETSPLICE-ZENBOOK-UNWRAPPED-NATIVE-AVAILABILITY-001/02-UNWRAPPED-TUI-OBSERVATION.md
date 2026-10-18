@@ -1,50 +1,45 @@
-# R01 — Owner launch report and candidate identity
+# R01 — Confirmed test thread and corroborated original TUI
 
-Continuation: `20261018-r01-continuation`, same Goal, 2026-10-18 (+08:00).
+Continuation: `20261018-r02-thread-verification`, same Goal, 2026-10-18 (+08:00).
 
-Status: **PARTIAL — original-TUI binding and Native Thread UNKNOWN**.
+Status: **OWNER_THREAD_CONFIRMED; TUI association corroborated; OS continuity measured**.
 
-The Owner reports independent Windows Terminal launch using exactly
-`codex --yolo`, non-administrator operation, the original TUI still open, and
-**no model prompt**. This supersedes the earlier launch-pending checkpoint.
-Physical test executed is now true, with **OWNER_REPORTED** provenance.
+The Owner clarified that the earlier UUID is the disposable **Native Thread ID**,
+not a shell PID. After the read-only observer disconnected, the Owner checked the
+original Console B and reported **still interactive, same Thread ID**.
+No model prompt or effect was authorized or sent.
 
-The supplied “Shell PID” is a UUID, not an integer Windows PID. It has not been
-reinterpreted as a Native Thread ID. Its source, the intended candidate and whether
-Codex was exited/reopened remain pending clarification. The raw identifier is
-retained only in the private Owner-report artifact.
+To keep public evidence minimal, the test thread is called **T18**.
+SHA-256 of its canonical lowercase UUID:
+`243106043D8B029720F5E075B9AB7465C03EFE8E17073A98EE3A935038BA6D76`.
+The exact UUID and native response IDs are in the private receipt/evidence.
 
-## Measured candidate
-
-The 20:29 inventory found this chain, separate from Desktop processes.
-Creation times are 2026-10-18 with +08:00 offset.
-
-| Process | PID | Parent | Creation time |
+| Process | PID | Parent | Creation time, 2026-10-18 +08:00 |
 | --- | ---: | ---: | --- |
 | Windows Terminal | 34928 | 16520 | 20:26:23.824921 |
 | PowerShell | 3944 | 34928 | 20:26:24.286346 |
 | Node launcher | 34404 | 3944 | 20:28:47.187212 |
 | Native TUI candidate | 18004 | 34404 | 20:28:47.239692 |
 
-Windows' read-only process-owner queries returned the research user's SID for
-these processes. Full arguments were not printed or retained. Flag-only
-inspection found `--yolo` in Node/TUI and no `--no-daemon`, `--remote`,
-profile or resume argument. The TUI's npm-package executable reports 0.163.0;
-SHA-256: `2692C8C7BB2CF8B0AEFE638741FC90236F4B824C59578CE84994F9DE58200993`.
+These are the previously measured non-Desktop same-user processes. TUI candidate
+18004 still has its original creation time and parent after observer disconnect.
+Earlier flag-only inspection found yolo and no no-daemon/remote/profile/resume.
+The npm executable is 0.163.0, SHA-256
+`2692C8C7BB2CF8B0AEFE638741FC90236F4B824C59578CE84994F9DE58200993`.
 
-The candidate PID, creation time and Node parent remained unchanged in later
-snapshots, including after the daemon changed. This is OS candidate continuity,
-not Owner binding or visible interactive return. Console B non-elevation is
-Owner-reported; same-user ownership alone does not establish token elevation.
+The official read returned **T18**, creation **20:28:48 +08:00**, matching the
+disposable workspace and the candidate's startup within one second.
+This, the measured parent chain and Owner's original-TUI status corroborate
+the association. **The protocol response itself does not contain TUI PID 18004**;
+that PID-to-thread edge remains corroboration, not a direct native PID field.
 
-| Required claim | Current result |
-| --- | --- |
-| Exact ordinary launch | OWNER_REPORTED; candidate flags support it |
-| Original TUI PID + creation time bound to that launch | Candidate measured; binding UNKNOWN |
-| Native Thread ID and exact test workspace through native interface | UNKNOWN |
-| Same original TUI visible/interactive after daemon change | UNKNOWN |
-| Authenticated model turn/effect | NOT_RUN; count 0 |
+Stored metadata says `source=vscode`, `cliVersion=0.162.1`.
+These labels are reported faithfully: they do not identify the current
+0.163.0 TUI binary or independently prove `codex-tui` origin.
+Current loaded membership was proved separately against daemon 33120.
 
-No native database, rollout/transcript or old session was inspected. No surrogate
-TUI/server was started. Identity clarification was requested; no reply is not
-permission to inspect an unconfirmed session.
+Exact ordinary launch and non-elevation remain Owner-reported; same-user OS owner
+queries are measured independently. Original-TUI visible return is Owner-reported
+after the observer, while PID/creation continuity is measured locally.
+No replacement, private transcript/database read, file/tool task or native effect
+was used to strengthen these claims.

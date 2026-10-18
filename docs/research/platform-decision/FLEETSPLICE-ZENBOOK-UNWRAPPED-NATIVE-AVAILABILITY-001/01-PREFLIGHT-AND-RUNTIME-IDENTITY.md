@@ -139,3 +139,26 @@ The old R00 refusal and the newly reachable endpoint are different time cuts.
 See [02](02-UNWRAPPED-TUI-OBSERVATION.md) for candidate identity,
 [03](03-SHARED-ENDPOINT-AND-WRITER.md) for the incarnation change, and
 [06](06-OWNER-DECISION-PACK.md) for the current handoff.
+
+## Exact-thread continuation — 20:48–20:53 +08:00
+
+The Owner clarified that the supplied UUID is the disposable Native Thread ID.
+Continuation `20261018-r02-thread-verification` started from freshly verified
+PR head `9638ba3936e5e9740b10d44aea9811171c462f44`, still Draft/unmerged.
+No new Goal or replacement TUI/server was started.
+
+The current TUI candidate 18004 and daemon 33120 retained their creation times.
+A bounded API-compatible observer connected only to the verified canonical
+socket. Windows' supported read-only peer-PID query returned daemon 33120;
+official initialize, exact-thread metadata read and loaded-membership listing
+succeeded. No turns were read. The Owner then confirmed the original TUI remained
+interactive with the same Thread ID after observer disconnect.
+This advances the result to **READ_ONLY_PROOF_ONLY**, not an effect PASS.
+
+The local observer's first two attempts stopped before initialize because its
+managed peer-PID helper assumed a four-byte returned-length value. Direct native
+WSAIoctl returned success and peer PID 33120, while bytesReturned was zero.
+The third transport attempt made the only thread read/list requests.
+No model effect was sent or retried. Details, close-path limitation and evidence
+projections are in [03](03-SHARED-ENDPOINT-AND-WRITER.md) and
+[04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md).

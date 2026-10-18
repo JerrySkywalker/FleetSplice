@@ -1,58 +1,63 @@
-# R02 — Official daemon reachable; exact-thread/Writer proof missing
+# R02 — Exact endpoint and live thread; separate Writer limits
 
-Continuation: `20261018-r01-continuation`.
+Continuation: `20261018-r02-thread-verification`.
 
-Status: **PARTIAL_READ_ONLY — target identity and server continuity unresolved**.
+Status: **READ_ONLY_ENDPOINT_AND_THREAD_VERIFIED; control effect NOT_TESTED**.
 
-## Distinct server incarnations
+## Current incarnation and endpoint identity
 
-The first post-launch `codex app-server daemon version` succeeded:
-running, pid backend, CLI 0.163.0 and managed/app-server version 0.162.1.
-Version returned no PID; the official PID record was checked separately against
-Windows process metadata.
+The current daemon is **PID 33120**, created
+**2026-10-18 20:32:11.867961 +08:00**, version 0.163.0; its official PID-record
+creation FILETIME matches OS metadata. Before and after this observer, that
+incarnation and TUI candidate 18004 retained their creation times.
+Both executable hashes are
+`2692C8C7BB2CF8B0AEFE638741FC90236F4B824C59578CE84994F9DE58200993`.
 
-| Incarnation | PID and local creation time, 2026-10-18 | Version / SHA-256 |
-| --- | --- | --- |
-| Initial daemon candidate | 18768; 20:26:42.254344 +08:00; same user | 0.162.1 / `DD13BDB162A184FA04039488B234A8258EF9B76F84E926C505D5742B19249A6A` |
-| Later daemon candidate | 33120; 20:32:11.867961 +08:00; same user | 0.163.0 / `2692C8C7BB2CF8B0AEFE638741FC90236F4B824C59578CE84994F9DE58200993` |
+Socket owner/ACL was revalidated as the same user. The observer used only the
+official canonical AF_UNIX socket, not a new listener, proxy or server.
+The [Microsoft SDK peer-PID query](https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/shared/afunix.h)
+returned **success (0), peer PID 33120**. The caller-supplied expected PID was
+compared with the kernel-written output before any JSON-RPC request.
+The endpoint is thus bound to the independently measured daemon incarnation.
 
-At 20:33:20, PID 18768 and its distinct updater PID 36412 were absent. The current
-official daemon record named 33120. Its creation FILETIME converts to
-12:32:11.8679613 UTC, matching Windows process creation to exposed precision.
-A new-incarnation status check succeeded with managed/CLI/app-server 0.163.0.
-Matching executable hashes do not prove shared thread membership.
+Official `initialize` returned the server identity; exact
+`thread/read(includeTurns=false)` returned Owner-confirmed **T18**, and a bounded
+`thread/loaded/list` page contained the same UUID, with no further page.
+Only target metadata/counts were retained; unrelated IDs, previews, paths to
+native session files, and transcript content were not retained.
 
-Research issued no install/update/start/bootstrap/restart/stop. The
-[daemon guide](https://github.com/openai/codex/blob/092d3acd6bec3e3a14bdc7e7a2810ab628ab759d/codex-rs/app-server-daemon/README.md)
-describes eligible updater behavior after five minutes. Timing/version change
-are consistent with that explanation; **cause is not directly proved**.
-The documented settings-file location was absent at the inspected cut; no
-settings were created or changed, and defaults were not called measured values.
-
-## Separate endpoint and process evidence
-
-The [official status probe](https://github.com/openai/codex/blob/092d3acd6bec3e3a14bdc7e7a2810ab628ab759d/codex-rs/app-server-daemon/src/client.rs#L44)
-uses initialize/initialized on the canonical AF_UNIX endpoint, then closes.
-Successful status is stronger than a socket file alone.
-
-Socket owner SID matched the research user; the observed ACL grants that SID
-full access. Its address is 65 bytes including terminator, within the documented
-108-byte Windows bound. Exact path/SID/SDDL remain private. This does not prove
-Windows Job policy or identify the peer process of the original TUI connection.
-The official PID record matched a live same-user PID and creation time;
-**direct socket peer-PID attribution was not performed**.
-
-| Required proof | Current result |
+| Target metadata | Observed value |
 | --- | --- |
-| Official daemon reachable at observed cuts | MEASURED_LOCAL, yes |
-| Same-user socket owner/ACL | MEASURED_LOCAL, yes |
-| Official PID record matched to live process/creation time | MEASURED_LOCAL, yes |
-| Socket peer PID and original TUI server connection | UNKNOWN |
-| Exact Owner Native Thread loaded in current incarnation | UNKNOWN |
-| Native Writer holder and supported cooperation | UNKNOWN |
-| Original TUI visible/interactive after server change | UNKNOWN |
+| ID/session ID | Exact Owner-confirmed T18 |
+| Workspace | Exact disposable test directory |
+| Created | 20:28:48 +08:00, one second after TUI candidate creation |
+| Live status | idle |
+| Loaded membership | Exact ID present in daemon 33120 |
+| Direct-input capability | canAcceptDirectInput=true |
+| Stored source / CLI version | vscode / 0.162.1; not substituted for current binary identity |
+| Included turns | false; returned turns count 0 |
 
-No thread or Writer claim crosses the incarnation boundary. No competing
-Writer, resume, thread/start, turn/start, lock inspection/acquisition or deletion
-was attempted. The source-only exclusive Writer contract is not a measured
-lock-holder/cooperation result. R02 is incomplete; R03 is gated.
+T18's exact ID is local-only; [02](02-UNWRAPPED-TUI-OBSERVATION.md) publishes its
+digest. The earlier 18768/0.162.1 → 33120/0.163.0 daemon change remains historical;
+**no proof is carried across that boundary**. These are fresh current-incarnation
+native responses. Research performed no lifecycle/config/install change.
+
+## Writer evidence, without promotion
+
+The observer sent no create/resume/turn or lock operation, so it acquired no
+native thread Writer. The
+[read/list handlers](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server/src/request_processors/thread_processor.rs#L858)
+read existing state. The
+[thread manager](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/thread_manager.rs#L1740)
+returns an existing loaded Arc. The
+[supported turn path](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server/src/request_processors/turn_processor.rs#L377)
+uses that loaded handle, checks direct-input eligibility, and submits input on
+the same runtime. This is **source support for cooperative use of the existing
+runtime**, not a new independent Writer launch.
+
+Measured status is loaded/idle/direct-input-eligible. Direct OS lock-handle custody,
+a successful remote turn and its original-TUI acknowledgement are **unobserved**.
+The exclusive Writer implementation is a source contract, not an independently
+measured lock holder. No conflict was tested or bypassed.
+Any contemplated effect must recheck current identity/status and obtain new
+exact-thread Owner authorization first; refusal or ambiguity means stop.

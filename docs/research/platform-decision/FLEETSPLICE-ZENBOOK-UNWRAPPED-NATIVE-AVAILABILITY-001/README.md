@@ -1,7 +1,7 @@
 # ZenBook 14 — Unwrapped Native Codex Availability
 
 Goal: `FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001`
-Status: **Exact-thread read verified; original TUI return Owner-confirmed; effect pending separate authorization**
+Status: **One separately authorized native ACK completed; post-effect original-TUI acknowledgement pending**
 Host: Owner's ZenBook 14; Windows PowerShell / Windows Terminal; exact native Codex binary, launch mode and version to be observed, not assumed.
 
 ## Why this one Goal exists
@@ -34,69 +34,67 @@ Source repository study branch is independent and **not stacked** on PR #19 or p
 
 ## Latest audit — 2026-10-18, Desktop Codex local
 
-Continuation: `20261018-r02-thread-verification`, same Goal. Fresh PR/remote
-checks returned starting head `9638ba3936e5e9740b10d44aea9811171c462f44`, still
-Draft/unmerged on the unchanged base. The same isolated worktree was reused.
-Canonical main and October 15 dirty research evidence remain preserved.
+Continuation: `20261018-r03-authorized-ack`, same Goal. Fresh PR/remote checks
+returned starting head `d6e0633ca1c58cf2f15eaf4d7bfcc682f36332fd`, still Draft /
+unmerged on the unchanged base. The same isolated worktree was reused; canonical
+main and historical dirty research evidence are preserved.
 
 **NATIVE_RESULT=READ_ONLY_PROOF_ONLY**
 
 **DISPOSITION=STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW**
 
-The Owner clarified the supplied UUID is the **Native Thread ID**, not a shell
-PID. A bounded independent observer verified the official socket's kernel peer
-PID as daemon **33120**, created **20:32:11.867961 +08:00**, version 0.163.0.
-Official initialize, exact-thread metadata read and bounded loaded-list query
-proved that exact thread is loaded/idle in that daemon, matches the disposable
-workspace and reports direct-input eligibility. No turns were read.
+The Owner separately authorized the exact one-turn ACK proposal. Fresh OS and
+native gates revalidated TUI **18004** (created **20:28:47.239692 +08:00**), daemon
+**33120** (created **20:32:11.867961**), same-user socket/kernel peer PID, exact
+T18/workspace, loaded membership and idle/direct-input state. The supported path
+uses the existing loaded runtime; no new thread/server/Writer or resume.
 
-After observer disconnect, TUI candidate **18004** (created **20:28:47.239692**)
-and daemon **33120** retained their OS identities. The Owner confirmed the
-**original TUI remains interactive with the same Thread ID**. This corroborates
-the PID/thread relation; the protocol itself does not return the TUI PID.
-Stored metadata source=vscode / CLI 0.162.1 is preserved as reported, separate
-from the current 0.163.0 executable. Exact test UUID stays in private artifacts;
-[02](02-UNWRAPPED-TUI-OBSERVATION.md) publishes a digest.
+At **21:53:02–21:53:08 +08:00**, exactly **one** turn/start completed with a new
+native Turn ID. Its complete exact-turn items page contains the approved input
+and exact `FS_NATIVE_20261018_ACK_01`, once each; zero tool/unknown items.
+A create-new write-through ledger was persisted before send. The one-effect
+allowance is consumed: **attempts=1, native effects=1, remaining=0, no replay**.
+No permission/settings override, install, lifecycle or production action was sent.
+
+The observer closed output and disposed only its own connection without error;
+full peer close handshake was not tested. Post-effect OS snapshots retained both
+process identities. The Owner's earlier UI confirmation followed the **read-only**
+observer; the new **post-effect visible ACK/same-thread/interactivity confirmation
+is pending**. That is why the restricted result remains despite one executed
+effect; no SHARED_NATIVE_AVAILABLE claim is made from a native ACK alone.
 
 | Phase | Actual execution |
 | --- | --- |
-| R00 | COMPLETE; earlier runtime history retained/revalidated |
-| R01 | Owner thread clarified, candidate OS continuity measured, same-ID UI return confirmed |
-| R02 | Official endpoint/server/exact loaded thread verified for reads; Writer control untested |
-| R03 | Independent read completed; effect NOT_RUN |
-| R04 | READ_ONLY_PROOF_ONLY classification; no full native/phone P0 PASS |
-| R05 | Reports, checks, local receipts and same Draft PR; exact SHA/outcome in local receipt |
+| R00 | COMPLETE; runtime history retained and current identities revalidated |
+| R01 | Owner-confirmed thread, measured candidate OS continuity; PID/thread relation corroborated |
+| R02 | Endpoint/current exact thread and cooperative existing-runtime native turn verified |
+| R03 | One admitted native effect completed; original-TUI visible acknowledgement pending |
+| R04 | Restricted classification pending post-effect visible return |
+| R05 | Reports/checks/receipts and same Draft PR; publication SHA/outcome in local receipt |
 
-Physical test: **true, OWNER_REPORTED**. Authenticated native effects: **0**.
-No competing Writer, create/resume, lock acquisition, transcript read, install
-or daemon lifecycle mutation. The current same-runtime input route is supported
-by source and live capability metadata; lock-handle custody and a cooperative
-control effect have not been independently observed.
+Public thread/turn identifiers use digests; exact IDs, Owner authorization,
+no-replay ledger and native receipts remain private. Native response PID field
+for the TUI and direct OS lock-handle custody remain unobserved; these limits are
+not replaced by text equality. The current cooperative effect is independently
+bound by native Turn ID and complete exact-turn items, not a caller idempotency
+claim. Historical October 15 and prior daemon incarnation evidence are not reused.
 
-Two transport diagnostics stopped before initialize due to the observer's
-returned-length assumption; the third connection made the only read/list calls.
-Its graceful close attempt threw, so only the observer was aborted/disposed.
-The precise close cause is unknown; this is not a clean close-handshake PASS.
-Historical October 15 R02 and the earlier daemon incarnation are not reused as
-current proof.
+**Only next step:** Owner views the still-open **original Console B** and confirms
+the ACK, unchanged Thread ID and interactivity. No new prompt, exit, restart or
+resume. No second effect. See [06](06-OWNER-DECISION-PACK.md) for independent context.
+No automatic FS/Paseo route, G08, Gate S, product change or merge follows.
 
-**Only next step:** Owner decides whether to separately authorize the one
-exact-thread ACK-only turn described in [06](06-OWNER-DECISION-PACK.md).
-The default remains no effect. New identity/authority ambiguity or a Writer
-conflict means stop; no retry of uncertain dispatch. No automatic FS/Paseo
-route, G08, Gate S or merge follows.
-
-The Desktop local driver replaces planned Console A only. Desktop's own
-PID/server/thread never count as Console B; the original acceptance gates remain.
+The Desktop local driver replaces planned Console A only. Desktop PID/server /
+thread never count as Console B; the original acceptance gates remain.
 
 ### Audit documents
 
 - [01 — Preflight and continuation history](01-PREFLIGHT-AND-RUNTIME-IDENTITY.md)
-- [02 — Confirmed thread and corroborated original TUI](02-UNWRAPPED-TUI-OBSERVATION.md)
-- [03 — Verified endpoint/thread and separate Writer limits](03-SHARED-ENDPOINT-AND-WRITER.md)
-- [04 — Independent read, observer close and original TUI return](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md)
-- [05 — Read-only qualification and route implications](05-QUALIFICATION-AND-ROUTE-IMPLICATION.md)
-- [06 — Standalone Owner decision pack / optional ACK proposal](06-OWNER-DECISION-PACK.md)
+- [02 — Native/OS/Owner identity and original TUI](02-UNWRAPPED-TUI-OBSERVATION.md)
+- [03 — Endpoint/thread and cooperative native Writer evidence](03-SHARED-ENDPOINT-AND-WRITER.md)
+- [04 — One authorized ACK, receipts and pending visible return](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md)
+- [05 — Current classification and route implications](05-QUALIFICATION-AND-ROUTE-IMPLICATION.md)
+- [06 — Standalone Owner decision pack](06-OWNER-DECISION-PACK.md)
 
 ## Decisive distinction
 

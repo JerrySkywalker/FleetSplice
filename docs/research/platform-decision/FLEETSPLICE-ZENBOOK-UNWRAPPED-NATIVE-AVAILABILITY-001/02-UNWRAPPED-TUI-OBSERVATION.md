@@ -7,7 +7,7 @@ Status: **OWNER_THREAD_CONFIRMED; TUI association corroborated; OS continuity me
 The Owner clarified that the earlier UUID is the disposable **Native Thread ID**,
 not a shell PID. After the read-only observer disconnected, the Owner checked the
 original Console B and reported **still interactive, same Thread ID**.
-No model prompt or effect was authorized or sent.
+At that read-only checkpoint no model effect had been authorized or sent. The subsequent separately authorized one-turn ACK is recorded in 04.
 
 To keep public evidence minimal, the test thread is called **T18**.
 SHA-256 of its canonical lowercase UUID:
@@ -43,3 +43,12 @@ queries are measured independently. Original-TUI visible return is Owner-reporte
 after the observer, while PID/creation continuity is measured locally.
 No replacement, private transcript/database read, file/tool task or native effect
 was used to strengthen these claims.
+
+## One-effect process continuity
+
+Fresh pre-dispatch gates and post-disconnect OS snapshots for the separately
+admitted ACK retained TUI 18004 creation 20:28:47.239692 and daemon 33120 creation
+20:32:11.867961 (+08:00). Native receipt proves one completed exact-thread effect.
+The earlier Owner UI report was after the read-only observer; **post-effect**
+visible ACK, same-ID and interactivity confirmation is pending at this cut.
+No replacement TUI or resume was used. See [04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md).

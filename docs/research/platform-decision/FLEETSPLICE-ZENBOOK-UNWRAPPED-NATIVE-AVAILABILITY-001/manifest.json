@@ -2,7 +2,7 @@
   "schema": "fleetsplice.goal-train.native-availability-study.v1",
   "goal_id": "FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
   "purpose": "Resolve one native/OS prerequisite: can ordinary unwrapped codex --yolo on ZenBook 14 be connected by a second nonowning client without losing original process/thread or native Writer integrity?",
-  "status": "R00_COMPLETE; R01_CORROBORATED; R02_READ_ENDPOINT_THREAD_VERIFIED; R03_READ_ONLY_COMPLETE_EFFECT_NOT_RUN; R04_READ_ONLY_PROOF_ONLY; R05_HANDOFF",
+  "status": "R00_COMPLETE; R01_CORROBORATED; R02_COOPERATIVE_NATIVE_TURN_VERIFIED; R03_ONE_EFFECT_COMPLETE_UI_PENDING; R04_RESTRICTED; R05_HANDOFF",
   "authorization": "DOCUMENTATION_AND_OWNER_ATTENDED_DISPOSABLE_LOCAL_PROBE_ONLY",
   "base_branch": "train/pre-gate-s-development-001",
   "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
@@ -55,14 +55,14 @@
       "title": "Owner physical launch of ordinary unwrapped disposable TUI",
       "human_required": true,
       "output": "02-UNWRAPPED-TUI-OBSERVATION.md",
-      "execution_status": "OWNER_THREAD_CONFIRMED_OS_CONTINUITY_MEASURED_TUI_BINDING_CORROBORATED"
+      "execution_status": "THREAD_CONFIRMED_OS_CONTINUITY_MEASURED; POST_EFFECT_UI_PENDING"
     },
     {
       "id": "R02",
       "title": "Official native shared endpoint and Writer/identity proof",
       "human_required": false,
       "output": "03-SHARED-ENDPOINT-AND-WRITER.md",
-      "execution_status": "READ_ENDPOINT_SERVER_THREAD_VERIFIED_CONTROL_UNTESTED"
+      "execution_status": "ENDPOINT_THREAD_AND_COOPERATIVE_NATIVE_TURN_VERIFIED"
     },
     {
       "id": "R03",
@@ -70,14 +70,14 @@
       "human_required": true,
       "conditional": true,
       "output": "04-SECOND-CLIENT-AND-RETURN-TO-TUI.md",
-      "execution_status": "READ_ONLY_COMPLETED_EFFECT_NOT_RUN"
+      "execution_status": "ONE_AUTHORIZED_EFFECT_COMPLETED_OWNER_VISIBLE_ACK_PENDING"
     },
     {
       "id": "R04",
       "title": "Compare immutable native process/thread/Writer evidence and classify",
       "human_required": false,
       "output": "05-QUALIFICATION-AND-ROUTE-IMPLICATION.md",
-      "execution_status": "COMPLETE_READ_ONLY_PROOF_ONLY"
+      "execution_status": "READ_ONLY_PROOF_ONLY_PENDING_SAME_TUI_EFFECT_ACK"
     },
     {
       "id": "R05",
@@ -128,11 +128,11 @@
   "no_auto_product_route": true,
   "no_auto_merge": true,
   "current_audit": {
-    "audit_run": "20261018-r02-thread-verification",
-    "previous_audit_run": "20261018-r01-continuation",
+    "audit_run": "20261018-r03-authorized-ack",
+    "previous_audit_run": "20261018-r02-thread-verification",
     "audit_date": "2026-10-18",
     "timezone": "Asia/Shanghai",
-    "starting_pr_head": "9638ba3936e5e9740b10d44aea9811171c462f44",
+    "starting_pr_head": "d6e0633ca1c58cf2f15eaf4d7bfcc682f36332fd",
     "starting_base_head": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
     "research_driver": "CHATGPT_DESKTOP_CODEX_LOCAL_SESSION",
     "original_planned_driver": "CONSOLE_A_CODEX_CLI",
@@ -141,10 +141,10 @@
     "native_result": "READ_ONLY_PROOF_ONLY",
     "disposition": "STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
     "evidence_confidence": "MEASURED_LOCAL",
-    "evidence_scope": "Exact endpoint peer/server/native-thread reads measured; TUI association corroborated; same-ID UI return Owner-reported; control effect untested",
+    "evidence_scope": "Exact native effect/ACK/zero-tools and process continuity measured; post-effect original-TUI visible ACK pending",
     "physical_test_executed": true,
     "physical_test_evidence": "OWNER_REPORTED",
-    "authenticated_native_effect_executed": 0,
+    "authenticated_native_effect_executed": 1,
     "exact_owner_invocation": true,
     "exact_owner_invocation_status": "OWNER_REPORTED; candidate flags/parent/owner measured",
     "owner_identifier_clarification": "NATIVE_THREAD_ID_CONFIRMED_NOT_SHELL_PID",
@@ -175,31 +175,37 @@
     "native_thread_loaded": true,
     "native_thread_status": "idle",
     "can_accept_direct_input": true,
-    "writer_status": "EXISTING_LOADED_RUNTIME; cooperative path SOURCE_SUPPORTED; direct lock holder/effect UNOBSERVED",
+    "writer_status": "COOPERATIVE_TURN_VERIFIED_ON_EXISTING_LOADED_RUNTIME; direct OS lock holder UNOBSERVED",
     "writer_lock_holder_directly_observed": false,
     "second_client_observation": "EXACT_THREAD_METADATA_AND_LOADED_MEMBERSHIP_VERIFIED",
     "observer_protocol_response_ids": [
-      2001,
-      2002,
-      2003
+      3001,
+      3002,
+      3003,
+      3004,
+      3005,
+      3100,
+      3200,
+      3201,
+      3202,
+      3203,
+      3204,
+      3300
     ],
-    "transport_attempts": 3,
-    "attempts_before_initialize_failure": 2,
-    "native_read_requests": 1,
+    "transport_attempts": 1,
+    "attempts_before_initialize_failure": 0,
+    "native_read_requests": 2,
     "native_loaded_list_requests": 1,
     "include_turns": false,
-    "returned_turn_count": 0,
-    "observer_close": "ABORT_DISPOSE_AFTER_UNSPECIFIED_CLOSE_EXCEPTION; clean handshake NOT_PROVEN",
-    "owner_same_id_interactive_return_confirmed": true,
-    "owner_ui_return_evidence": "OWNER_REPORTED_AFTER_OBSERVER_DISCONNECT",
-    "native_effect_authorized": false,
-    "effect_result": "NOT_RUN",
-    "proposed_optional_marker": "FS_NATIVE_20261018_ACK_01",
+    "observer_close": "CLOSE_OUTPUT_THEN_DISPOSE_WITHOUT_ERROR; full peer handshake NOT_TESTED",
+    "owner_ui_return_evidence": "PREVIOUS_READONLY_CONFIRMATION_ONLY; post-effect visible ACK PENDING",
+    "native_effect_authorized": true,
+    "effect_result": "NATIVE_COMPLETED_EXACT_ACK_ZERO_TOOLS; OWNER_VISIBLE_ACK_PENDING",
     "historical_r02_is_current_pass": false,
     "historical_dirty_worktree_preserved": true,
     "r05_publication": "Exact SHA/push outcome in private FINAL-RECEIPT.json",
     "local_receipt_schema": 1,
-    "next_step": "Owner decides whether separately to authorize one exact-thread ACK-only turn, subject to fresh identity and existing-runtime checks",
+    "next_step": "Owner views original still-open Console B: ACK, same Thread ID and interactivity; no new prompt/restart",
     "source_refs": [
       {
         "version": "0.162.1",
@@ -209,6 +215,31 @@
         "version": "0.163.0",
         "sha": "83086188ae0614bd882818ff1aa23f3194962012"
       }
-    ]
+    ],
+    "effect_submission_attempts": 1,
+    "effect_turn_id_sha256": "BB94D3E1610E78EE8CD6ED267CC685A003BC20E0F06A1EADBD0AF9DE6062BE72",
+    "effect_turn_response_id": 3100,
+    "effect_completion_response_id": 3204,
+    "effect_items_response_id": 3300,
+    "effect_reported_duration_ms": 5633,
+    "effect_exact_ack_count": 1,
+    "effect_exact_user_prompt_count": 1,
+    "effect_tool_or_unknown_item_count": 0,
+    "effect_item_page_complete": true,
+    "effect_receipt_verified": true,
+    "remaining_authorized_effects": 0,
+    "durable_no_replay_ledger_present": true,
+    "replay_allowed": false,
+    "owner_post_effect_visible_ack": "PENDING",
+    "owner_post_effect_same_id": "UNKNOWN",
+    "owner_post_effect_interactive": "UNKNOWN",
+    "owner_prior_readonly_ui_return_confirmed": true,
+    "post_effect_process_identity_unchanged": true,
+    "native_effect_authorization_state": "CONSUMED",
+    "authorized_ack_marker": "FS_NATIVE_20261018_ACK_01",
+    "exact_effect_item_type_counts": {
+      "userMessage": 1,
+      "agentMessage": 1
+    }
   }
 }

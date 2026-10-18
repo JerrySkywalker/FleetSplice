@@ -1,42 +1,40 @@
-# R04 — Read-only qualification and remaining effect gate
+# R04 — Native effect verified; original-TUI acknowledgement pending
 
-Continuation: `20261018-r02-thread-verification`, same Goal.
+Continuation: `20261018-r03-authorized-ack`.
 
 NATIVE_RESULT: **READ_ONLY_PROOF_ONLY**
 
 DISPOSITION: **STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW**
 
-The Owner clarified the Native Thread ID, and fresh official responses bind that
-exact thread to the disposable workspace and daemon 33120's loaded state.
-Windows' supported socket peer query bound the observer endpoint to that daemon.
-The Owner confirmed original-TUI interactivity and unchanged Thread ID after
-disconnect; OS snapshots show candidate TUI 18004/daemon 33120 creation times
-unchanged. This supersedes the preceding identity-ambiguity checkpoint.
+The one separately authorized native turn completed with its own native Turn ID,
+exact approved ACK, complete exact-turn items page and zero tool/unknown items.
+Fresh gates and post-effect snapshots retained TUI 18004/daemon 33120 identities.
+The existing loaded native runtime handled the effect; no competing server/Writer,
+create/resume, settings override or lock manipulation was introduced.
 
-| Required layer | Evidence and practical limit |
+| Layer | Evidence and limit |
 | --- | --- |
-| Ordinary physical launch / non-elevated Console B | OWNER_REPORTED; candidate flags/owner corroborate |
-| TUI candidate PID + creation continuity | MEASURED_LOCAL; no native response directly maps PID 18004 to Thread |
-| Endpoint → server PID/incarnation | MEASURED_LOCAL peer PID + official PID record + OS time/hash/owner |
-| Exact Native Thread/workspace/current loaded membership | MEASURED_LOCAL official metadata/list; Owner-confirmed target |
-| Writer/control | Loaded, idle, direct-input eligible; existing-runtime route SOURCE_SUPPORTED; lock holder/control effect untested |
-| Second-client read | MEASURED_LOCAL, correlated request IDs; no new Writer |
-| Original TUI return | OWNER_REPORTED same-ID interactive return; candidate OS identity unchanged |
-| Remote native effect and same-TUI acknowledgement | NOT_RUN; no authorization, count 0 |
+| Physical ordinary launch / non-elevation | OWNER_REPORTED, OS candidate flags/owner corroborate |
+| Native Thread / endpoint / server incarnation | MEASURED_LOCAL exact reads and kernel peer PID |
+| Existing-runtime Writer cooperation | SOURCE_SUPPORTED path plus MEASURED_LOCAL accepted/completed native turn |
+| Direct OS lock-handle owner | UNOBSERVED; no lock operation attempted |
+| Candidate TUI PID/creation continuity | MEASURED_LOCAL before/after; PID/thread relation corroborated rather than a direct native PID field |
+| One authorized effect | MEASURED_LOCAL native receipt, exact-turn complete items, approved ACK; attempts=1 |
+| Tool behavior | MEASURED_LOCAL complete turn items: zero tool/unknown items |
+| Post-effect original-TUI visible ACK, same ID and interactivity | PENDING_OWNER; earlier read-only confirmation is insufficient |
 
-The PID-to-thread relation uses Owner UI plus workspace/startup correlation,
-not a fabricated native PID field. Stored source=vscode and cliVersion=0.162.1
-are preserved, separate from the live 0.163.0 runtime. The observer close used
-abort/dispose after an unspecified close exception; it is not a clean handshake
-result. These limits prevent promotion to SHARED_NATIVE_AVAILABLE.
+The contractual READ_ONLY_PROOF_ONLY result is retained **because same-original-TUI
+control is not yet visibly proved**, not because this continuation was read-only.
+Executed authenticated native effects is **1**, and the allowance is exhausted.
+No native sharing PASS or phone P0 is inferred from the native ACK alone.
 
-[PR #19's pinned decision](https://github.com/JerrySkywalker/FleetSplice/blob/25f2bae8b39eb6222c7d2e0b8237227f53504acc/docs/research/platform-decision/FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001/08-OWNER-DECISION-PACK.md)
-remains INSUFFICIENT_EVIDENCE for product choice. The local read removes one
-availability uncertainty but does not demonstrate cooperative effects, phone P0,
-G08 complete bounded history, multi-Host operation or comparative maintenance
-cost. No automatic FS/Paseo choice, product code, G08, Gate S or merge follows.
+The one next step is **Owner confirmation of the ACK in the still-open original
+Console B, same Thread ID and interactivity**, with no new prompt or relaunch.
+The one-shot ledger forbids a second effect or uncertain replay.
 
-**One next step:** Owner reviews whether to separately authorize one harmless
-exact-thread ACK turn through the same existing server/runtime. The proposed
-action and guards are in [06](06-OWNER-DECISION-PACK.md). No turn is authorized by
-a successful read or by the Owner's UI-return confirmation.
+[PR #19's pinned report](https://github.com/JerrySkywalker/FleetSplice/blob/25f2bae8b39eb6222c7d2e0b8237227f53504acc/docs/research/platform-decision/FLEETSPLICE-PASEO-BUILD-OR-REUSE-DECISION-001/07-FINAL-DECISION-REPORT.md)
+remains INSUFFICIENT_EVIDENCE for product selection. A native effect would at most
+close this local prerequisite once original-TUI acknowledgement is confirmed.
+It does not qualify phone control, multi-Host, bounded complete history/G08 or
+comparative maintenance cost. No FS/Paseo route, product implementation, large CI,
+Gate S or merge is selected.

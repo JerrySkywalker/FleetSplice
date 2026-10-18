@@ -2,7 +2,7 @@
 
 Continuation: `20261018-r02-thread-verification`.
 
-Status: **READ_ONLY_ENDPOINT_AND_THREAD_VERIFIED; control effect NOT_TESTED**.
+Status: **ENDPOINT/THREAD_VERIFIED; one separately authorized cooperative turn VERIFIED**.
 
 ## Current incarnation and endpoint identity
 
@@ -55,9 +55,25 @@ uses that loaded handle, checks direct-input eligibility, and submits input on
 the same runtime. This is **source support for cooperative use of the existing
 runtime**, not a new independent Writer launch.
 
-Measured status is loaded/idle/direct-input-eligible. Direct OS lock-handle custody,
-a successful remote turn and its original-TUI acknowledgement are **unobserved**.
+At the read-only checkpoint, status was loaded/idle/direct-input-eligible. Direct OS lock-handle custody,
+a successful remote turn and its original-TUI acknowledgement were then **unobserved**.
 The exclusive Writer implementation is a source contract, not an independently
 measured lock holder. No conflict was tested or bypassed.
 Any contemplated effect must recheck current identity/status and obtain new
 exact-thread Owner authorization first; refusal or ambiguity means stop.
+
+## Authorized control on the same current incarnation — 21:53 +08:00
+
+The Owner subsequently authorized one exact-thread ACK-only turn. New gates
+verified daemon peer PID 33120, original process creation times, exact T18/workspace,
+loaded membership and idle/direct-input state. The latest preexisting turn was
+completed, and the newly accepted turn had a different native Turn ID.
+
+Exactly one turn/start on the existing loaded handle completed. Native receipts
+and an exact-turn complete items page contain the approved user input and exact
+ACK, with zero tool/unknown items. No create/resume, competing server/Writer,
+permission/config override, lock manipulation or lifecycle operation was sent.
+This is **measured cooperative use of the existing native runtime**, separate
+from the unobserved direct OS lock-handle holder. See [04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md)
+for admission, response IDs, one-shot ledger and visible-return status.
+The allowance is consumed; do not infer authority for another turn.

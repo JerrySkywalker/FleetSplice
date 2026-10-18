@@ -162,3 +162,20 @@ The third transport attempt made the only thread read/list requests.
 No model effect was sent or retried. Details, close-path limitation and evidence
 projections are in [03](03-SHARED-ENDPOINT-AND-WRITER.md) and
 [04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md).
+
+## Separately authorized ACK continuation — 21:53 +08:00
+
+The Owner explicitly authorized the one exact-thread ACK proposal.
+Continuation `20261018-r03-authorized-ack` freshly verified PR head
+`d6e0633ca1c58cf2f15eaf4d7bfcc682f36332fd`, still Draft/unmerged.
+The original TUI candidate 18004 and daemon 33120 retained their recorded
+creation times, same-user ownership and executable hash.
+
+Fresh protocol gates confirmed exact peer PID, exact disposable thread/workspace,
+loaded membership and idle/direct-input state. The supported effect path uses
+the existing loaded thread handle; no server/thread create or resume was sent.
+A durable create-new ledger was flushed before the only turn/start submission.
+The native turn completed with the exact ACK and zero tool/unknown items.
+The one-effect allowance is now consumed. No dispatch retry or second effect
+is authorized. Full native receipt and visible-return status are recorded in
+[04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md); the R00 checkpoint remains historical.

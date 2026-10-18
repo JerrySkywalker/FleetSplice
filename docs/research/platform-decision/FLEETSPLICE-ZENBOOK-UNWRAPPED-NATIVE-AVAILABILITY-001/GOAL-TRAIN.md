@@ -31,6 +31,13 @@ Only markdown/json *under this study directory* may be committed. No product cod
 
 ## R00 — Local readonly compatibility and process baseline
 
+**2026-10-18 execution-interface amendment (Owner instruction):** the research
+driver is the current ChatGPT desktop Codex local session on ZenBook 14, replacing
+the planned Console A CLI. Console B remains the independently Owner-launched,
+ordinary Windows Terminal TUI. Desktop PID/server/thread never count as Console B.
+All original PID + creation time, Native Thread, Writer and shared-endpoint gates
+remain mandatory. See [latest audit](README.md#latest-audit--2026-10-18-desktop-codex-local).
+
 - Observe current host and normal vs elevated principal; whether PowerShell `codex` resolves to a Function/Alias/Application/Script and any extra flags it injects. Read `Get-Command codex -All`, exact binary path/hash/version `codex --version`, and `codex --help` only. **Do not run an upgrade, installer, `codex login`, profile reset, daemon bootstrap/start/stop/update/restart, or native code patch.**
 - Inspect current source for official shared daemon availability, Windows Job/AF_UNIX 108-byte endpoint restrictions, `CODEX_EXEC_SERVER_URL` overrides, `--no-daemon`/`--remote` exclusions, same-user socket proof, Native Writer and OS process identity.
 - Inventory preexisting Codex/FS/Paseo processes only enough to avoid touching them. Do not inspect full arguments/environment if they may contain tokens. Record *aggregate or redacted baseline* and exclude all older sessions.

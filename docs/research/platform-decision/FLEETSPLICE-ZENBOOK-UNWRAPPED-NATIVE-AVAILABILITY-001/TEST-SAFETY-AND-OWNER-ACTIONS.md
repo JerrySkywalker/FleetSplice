@@ -17,7 +17,13 @@ The Owner requested a follow-up study using local Codex CLI. That **does not** a
 
 ## Physical console sequence
 
-**Console A — research Codex CLI**: The Owner starts `codex --yolo` from the normal FS checkout and gives the research prompt. This is the research driver only and must never be counted as the disposable target.
+**Research driver — Desktop Codex local session (2026-10-18 Owner amendment)**:
+The current ChatGPT desktop Codex local session replaces the originally planned
+Console A Codex CLI. It may run the authorized local research tools and write
+sanitized study documents in an isolated worktree. This changes only the research
+interface: Desktop's own processes, server and thread are excluded from Console B.
+The original PID + creation time, Native Thread, native Writer, same-user endpoint
+and same-TUI return requirements are unchanged.
 
 **Console B — disposable original TUI**: After Console A's R00 preflight and explicit cue, the Owner opens **another actual Windows Terminal PowerShell tab/window**, verifies it is the expected normal non-elevated user and runs from the disposable workspace directory created by the research driver:
 

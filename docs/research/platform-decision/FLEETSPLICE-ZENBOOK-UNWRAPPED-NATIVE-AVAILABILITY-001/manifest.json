@@ -2,7 +2,7 @@
   "schema": "fleetsplice.goal-train.native-availability-study.v1",
   "goal_id": "FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
   "purpose": "Resolve one native/OS prerequisite: can ordinary unwrapped codex --yolo on ZenBook 14 be connected by a second nonowning client without losing original process/thread or native Writer integrity?",
-  "status": "OWNER_REQUESTED_FOLLOW_UP_RESEARCH; NO_RUNTIME_TEST_COMPLETED",
+  "status": "R00_COMPLETE; R01_OWNER_ACTION_REQUIRED; R02_R03_NOT_RUN; R04_CLASSIFICATION_ONLY; R05_LOCAL_HANDOFF",
   "authorization": "DOCUMENTATION_AND_OWNER_ATTENDED_DISPOSABLE_LOCAL_PROBE_ONLY",
   "base_branch": "train/pre-gate-s-development-001",
   "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
@@ -47,38 +47,44 @@
       "id": "R00",
       "title": "Readonly effective CLI/principal/process preflight",
       "human_required": false,
-      "output": "01-PREFLIGHT-AND-RUNTIME-IDENTITY.md"
+      "output": "01-PREFLIGHT-AND-RUNTIME-IDENTITY.md",
+      "execution_status": "COMPLETE"
     },
     {
       "id": "R01",
       "title": "Owner physical launch of ordinary unwrapped disposable TUI",
       "human_required": true,
-      "output": "02-UNWRAPPED-TUI-OBSERVATION.md"
+      "output": "02-UNWRAPPED-TUI-OBSERVATION.md",
+      "execution_status": "NOT_RUN_OWNER_ACTION_REQUIRED"
     },
     {
       "id": "R02",
       "title": "Official native shared endpoint and Writer/identity proof",
       "human_required": false,
-      "output": "03-SHARED-ENDPOINT-AND-WRITER.md"
+      "output": "03-SHARED-ENDPOINT-AND-WRITER.md",
+      "execution_status": "NOT_RUN_BLOCKED_BY_R01"
     },
     {
       "id": "R03",
       "title": "Conditional second read-only connection; separately admitted one harmless effect",
       "human_required": true,
       "conditional": true,
-      "output": "04-SECOND-CLIENT-AND-RETURN-TO-TUI.md"
+      "output": "04-SECOND-CLIENT-AND-RETURN-TO-TUI.md",
+      "execution_status": "NOT_RUN_BLOCKED_BY_R01_AND_R02"
     },
     {
       "id": "R04",
       "title": "Compare immutable native process/thread/Writer evidence and classify",
       "human_required": false,
-      "output": "05-QUALIFICATION-AND-ROUTE-IMPLICATION.md"
+      "output": "05-QUALIFICATION-AND-ROUTE-IMPLICATION.md",
+      "execution_status": "COMPLETE_CLASSIFICATION_ONLY_NATIVE_CHECKS_NOT_RUN"
     },
     {
       "id": "R05",
       "title": "Same Draft PR evidence; Owner handoff; no product implementation",
       "human_required": false,
-      "output": "06-OWNER-DECISION-PACK.md"
+      "output": "06-OWNER-DECISION-PACK.md",
+      "execution_status": "COMPLETE_LOCAL_DOCUMENTATION_AND_HANDOFF_PUBLICATION_IN_RECEIPT"
     }
   ],
   "native_results": [
@@ -120,5 +126,41 @@
   "terminal": "STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
   "source_vs_measurement_separate": true,
   "no_auto_product_route": true,
-  "no_auto_merge": true
+  "no_auto_merge": true,
+  "current_audit": {
+    "audit_run": "20261018-desktop-local",
+    "audit_date": "2026-10-18",
+    "timezone": "Asia/Shanghai",
+    "starting_pr_head": "206679a56b81a3c5c485863084381b73d01e2493",
+    "starting_base_head": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+    "research_driver": "CHATGPT_DESKTOP_CODEX_LOCAL_SESSION",
+    "original_planned_driver": "CONSOLE_A_CODEX_CLI",
+    "interface_change_authority": "Owner instruction in current local chat",
+    "console_b_requirements_unchanged": true,
+    "desktop_pid_server_thread_excluded": true,
+    "native_result": "OWNER_ACTION_REQUIRED",
+    "disposition": "STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
+    "evidence_confidence": "MEASURED_LOCAL",
+    "evidence_scope": "R00 preflight only; fresh native availability UNKNOWN",
+    "physical_test_executed": false,
+    "authenticated_native_effect_executed": 0,
+    "exact_owner_invocation": null,
+    "exact_owner_invocation_status": "NOT_OBSERVED",
+    "test_tui_pid": null,
+    "test_server_pid": null,
+    "native_thread_id": null,
+    "writer_cooperation": "UNKNOWN",
+    "second_client_observation": "NOT_RUN",
+    "daemon_prelaunch_probe": {
+      "os_error": 10061,
+      "scope": "PRELAUNCH_ONLY",
+      "command": "codex app-server daemon version",
+      "retries": 0,
+      "exit_code": 1
+    },
+    "historical_r02_is_current_pass": false,
+    "historical_dirty_worktree_preserved": true,
+    "r05_publication": "Exact final SHA and push outcome recorded in private FINAL-RECEIPT.json",
+    "local_receipt_schema": 1
+  }
 }

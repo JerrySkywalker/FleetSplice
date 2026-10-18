@@ -2,7 +2,7 @@
   "schema": "fleetsplice.goal-train.native-availability-study.v1",
   "goal_id": "FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
   "purpose": "Resolve one native/OS prerequisite: can ordinary unwrapped codex --yolo on ZenBook 14 be connected by a second nonowning client without losing original process/thread or native Writer integrity?",
-  "status": "R00_COMPLETE; R01_OWNER_ACTION_REQUIRED; R02_R03_NOT_RUN; R04_CLASSIFICATION_ONLY; R05_LOCAL_HANDOFF",
+  "status": "R00_COMPLETE_REVALIDATED; R01_R02_PARTIAL; R03_BLOCKED; R04_AMBIGUOUS_STOP; R05_HANDOFF",
   "authorization": "DOCUMENTATION_AND_OWNER_ATTENDED_DISPOSABLE_LOCAL_PROBE_ONLY",
   "base_branch": "train/pre-gate-s-development-001",
   "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
@@ -48,21 +48,21 @@
       "title": "Readonly effective CLI/principal/process preflight",
       "human_required": false,
       "output": "01-PREFLIGHT-AND-RUNTIME-IDENTITY.md",
-      "execution_status": "COMPLETE"
+      "execution_status": "COMPLETE_REVALIDATED_DRIFT"
     },
     {
       "id": "R01",
       "title": "Owner physical launch of ordinary unwrapped disposable TUI",
       "human_required": true,
       "output": "02-UNWRAPPED-TUI-OBSERVATION.md",
-      "execution_status": "NOT_RUN_OWNER_ACTION_REQUIRED"
+      "execution_status": "PARTIAL_OWNER_REPORT_CANDIDATE_BINDING_UNKNOWN"
     },
     {
       "id": "R02",
       "title": "Official native shared endpoint and Writer/identity proof",
       "human_required": false,
       "output": "03-SHARED-ENDPOINT-AND-WRITER.md",
-      "execution_status": "NOT_RUN_BLOCKED_BY_R01"
+      "execution_status": "PARTIAL_READ_ONLY_IDENTITY_WRITER_INCOMPLETE"
     },
     {
       "id": "R03",
@@ -70,21 +70,21 @@
       "human_required": true,
       "conditional": true,
       "output": "04-SECOND-CLIENT-AND-RETURN-TO-TUI.md",
-      "execution_status": "NOT_RUN_BLOCKED_BY_R01_AND_R02"
+      "execution_status": "NOT_RUN_BLOCKED_BY_R01_R02"
     },
     {
       "id": "R04",
       "title": "Compare immutable native process/thread/Writer evidence and classify",
       "human_required": false,
       "output": "05-QUALIFICATION-AND-ROUTE-IMPLICATION.md",
-      "execution_status": "COMPLETE_CLASSIFICATION_ONLY_NATIVE_CHECKS_NOT_RUN"
+      "execution_status": "COMPLETE_CLASSIFICATION_ONLY_NATIVE_CONTINUITY_INCOMPLETE"
     },
     {
       "id": "R05",
       "title": "Same Draft PR evidence; Owner handoff; no product implementation",
       "human_required": false,
       "output": "06-OWNER-DECISION-PACK.md",
-      "execution_status": "COMPLETE_LOCAL_DOCUMENTATION_AND_HANDOFF_PUBLICATION_IN_RECEIPT"
+      "execution_status": "LOCAL_DOCUMENTATION_AND_HANDOFF_PUBLICATION_IN_RECEIPT"
     }
   ],
   "native_results": [
@@ -128,39 +128,68 @@
   "no_auto_product_route": true,
   "no_auto_merge": true,
   "current_audit": {
-    "audit_run": "20261018-desktop-local",
+    "audit_run": "20261018-r01-continuation",
+    "previous_audit_run": "20261018-desktop-local",
     "audit_date": "2026-10-18",
     "timezone": "Asia/Shanghai",
-    "starting_pr_head": "206679a56b81a3c5c485863084381b73d01e2493",
+    "starting_pr_head": "a78897f7bed6b50778bc8abf9174e6873934123d",
     "starting_base_head": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
     "research_driver": "CHATGPT_DESKTOP_CODEX_LOCAL_SESSION",
     "original_planned_driver": "CONSOLE_A_CODEX_CLI",
     "interface_change_authority": "Owner instruction in current local chat",
     "console_b_requirements_unchanged": true,
     "desktop_pid_server_thread_excluded": true,
-    "native_result": "OWNER_ACTION_REQUIRED",
+    "native_result": "AMBIGUOUS_STOP",
     "disposition": "STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
     "evidence_confidence": "MEASURED_LOCAL",
-    "evidence_scope": "R00 preflight only; fresh native availability UNKNOWN",
-    "physical_test_executed": false,
+    "evidence_scope": "Candidate process/status/ACL metadata measured; physical launch Owner-reported; exact native identity/Writer unknown",
+    "physical_test_executed": true,
+    "physical_test_evidence": "OWNER_REPORTED",
     "authenticated_native_effect_executed": 0,
-    "exact_owner_invocation": null,
-    "exact_owner_invocation_status": "NOT_OBSERVED",
+    "exact_owner_invocation": true,
+    "exact_owner_invocation_status": "OWNER_REPORTED; candidate flags measured; exact original-TUI binding unconfirmed",
+    "reported_shell_identifier_format": "UUID_NOT_WINDOWS_PID",
+    "candidate_shell_pid": 3944,
+    "candidate_tui_pid": 18004,
+    "candidate_tui_created": "2026-10-18T20:28:47.239692+08:00",
+    "candidate_tui_version": "0.163.0",
+    "candidate_owner_binding": "UNKNOWN",
     "test_tui_pid": null,
     "test_server_pid": null,
     "native_thread_id": null,
+    "official_daemon_reachable": true,
+    "socket_owner_matches_current_user": true,
+    "socket_peer_pid_proven": false,
+    "initial_daemon_candidate": {
+      "pid": 18768,
+      "version": "0.162.1",
+      "created": "2026-10-18T20:26:42.254344+08:00",
+      "later_present": false
+    },
+    "current_daemon_candidate": {
+      "pid": 33120,
+      "version": "0.163.0",
+      "created": "2026-10-18T20:32:11.867961+08:00",
+      "pid_record_creation_matches_os": true
+    },
+    "daemon_incarnation_changed": true,
+    "change_cause": "UNKNOWN; autonomous updater consistent with source/timing",
     "writer_cooperation": "UNKNOWN",
     "second_client_observation": "NOT_RUN",
-    "daemon_prelaunch_probe": {
-      "os_error": 10061,
-      "scope": "PRELAUNCH_ONLY",
-      "command": "codex app-server daemon version",
-      "retries": 0,
-      "exit_code": 1
-    },
     "historical_r02_is_current_pass": false,
     "historical_dirty_worktree_preserved": true,
-    "r05_publication": "Exact final SHA and push outcome recorded in private FINAL-RECEIPT.json",
-    "local_receipt_schema": 1
+    "r05_publication": "Exact SHA/push outcome in private FINAL-RECEIPT.json",
+    "local_receipt_schema": 1,
+    "next_step": "Owner clarifies still-open original TUI and UUID origin without prompt/relaunch",
+    "source_refs": [
+      {
+        "version": "0.162.1",
+        "sha": "092d3acd6bec3e3a14bdc7e7a2810ab628ab759d"
+      },
+      {
+        "version": "0.163.0",
+        "sha": "83086188ae0614bd882818ff1aa23f3194962012"
+      }
+    ]
   }
 }

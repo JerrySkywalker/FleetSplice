@@ -109,3 +109,33 @@ do not share credentials, private full arguments or transcripts.
 The Owner must perform this physical step under [R01](GOAL-TRAIN.md).
 Any harmless native effect needs **new, specific authorization after** exact
 thread identity and Writer cooperation are qualified. No such effect is admitted here.
+
+## Continuation revalidation — Owner launch reported later on October 18
+
+This R00 record remains the **17:43 pre-launch checkpoint**. It is not the current
+CLI version or a claim that the Owner still needs to launch a new TUI.
+The Owner subsequently reported physical Console B launch, no model prompt,
+normal user, and a still-open original TUI. Continuation
+`20261018-r01-continuation` began with fresh PR/remote checks at
+`a78897f7bed6b50778bc8abf9174e6873934123d`, still Draft/unmerged and on the
+same base. The same clean isolated worktree was reused; no new Goal was created.
+
+The candidate TUI executable now reports **0.163.0**, SHA-256
+`2692C8C7BB2CF8B0AEFE638741FC90236F4B824C59578CE84994F9DE58200993`.
+This is measured installation drift since R00, not an agent-requested upgrade.
+The first post-launch official daemon status reported CLI 0.163.0 and daemon
+0.162.1. A later new server incarnation reported daemon 0.163.0.
+No installation, daemon lifecycle, settings, Profile, PATH or auth mutation was
+requested by the research driver.
+
+The version-matched [0.163.0 source](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-daemon/src/lib.rs#L389)
+retains Version's early read-only dispatch and passive probe, separate from the
+mutating lifecycle branch. Two successful status observations were made in this
+continuation, separated by an independently observed server incarnation change;
+neither was an effect retry. Exact evidence is under
+`evidence/20261018-r01-continuation/` outside Git.
+The old R00 refusal and the newly reachable endpoint are different time cuts.
+
+See [02](02-UNWRAPPED-TUI-OBSERVATION.md) for candidate identity,
+[03](03-SHARED-ENDPOINT-AND-WRITER.md) for the incarnation change, and
+[06](06-OWNER-DECISION-PACK.md) for the current handoff.

@@ -1,25 +1,30 @@
-# R03 — Second client and return to original TUI
+# R03 — Independent observer and return remain gated
 
-Audit run: `20261018-desktop-local`
-Execution: **NOT_RUN — BLOCKED_BY_R01_AND_R02**.
+Continuation: `20261018-r01-continuation`.
 
-No observer was connected, no initialize/thread/list/read/subscription was issued
-for a target session, and no second server or competing Writer was started.
-R00's passive daemon version check is not an R03 observer result.
+Status: **NOT_RUN — unconfirmed target and incomplete R02**.
+
+Only official daemon status probes were made. Their internal initialize/close is
+not an independent exact-thread read, subscription, Writer-cooperation result or
+same-TUI return test.
+
+The 0.163.0 source exposes
+[loaded-thread listing and metadata-only read](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server/src/request_processors/thread_processor.rs#L858)
+with [typed request/response definitions](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L1659).
+These were inspected as possible read-only surfaces; **neither was issued**.
+The supplied UUID is not yet a confirmed disposable Native Thread ID.
 
 | Acceptance item | Result |
 | --- | --- |
-| Qualified official endpoint and native Writer semantics | UNKNOWN |
-| Second non-owning client reads exact native thread | NOT_RUN |
-| Matched response/event/turn IDs and server incarnation | NOT_RUN |
-| Observer disconnect while original TUI remains interactive | NOT_RUN |
-| Separate Owner authorization for one exact-thread effect | NOT_REQUESTED |
-| Effect dispatch / native receipt / visible original-TUI acknowledgement | NOT_RUN |
-| Original TUI PID, creation time and thread unchanged after return | NOT_RUN |
+| Exact endpoint/server/thread/Writer chain qualified | UNKNOWN |
+| Independent non-owning exact-thread observation | NOT_RUN |
+| Matched read events/turn receipts | NOT_RUN |
+| Observer disconnect and visible original-TUI return | NOT_RUN |
+| Separate exact-thread effect authorization | NOT_REQUESTED |
+| Authenticated native effect | NOT_RUN; count 0 |
 
-Authenticated native effects executed: **0**. No effect will be sent or retried
-automatically. A future request must name the proven disposable thread and one
-harmless action after the read-only gate and Writer cooperation pass.
-The earlier Owner marker from October 15 is not a second-client effect.
-
-Neither READ_ONLY_PROOF_ONLY nor SHARED_NATIVE_AVAILABLE has been earned.
+No second server or Writer, native thread, resume, prompt, approval or tool action
+was initiated by research. The Owner reports no model prompt in Console B.
+No effect exists to retry. Successful status or matching binary hashes do not
+earn READ_ONLY_PROOF_ONLY or SHARED_NATIVE_AVAILABLE.
+Preserve the original TUI; do not relaunch it to repair the evidence gap.

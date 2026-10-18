@@ -1,7 +1,7 @@
 # ZenBook 14 — Unwrapped Native Codex Availability
 
 Goal: `FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001`
-Status: **2026-10-18 local R00 complete; fresh Console B pending Owner action**
+Status: **Owner launch reported; R01/R02 partial; native identity chain unresolved**
 Host: Owner's ZenBook 14; Windows PowerShell / Windows Terminal; exact native Codex binary, launch mode and version to be observed, not assumed.
 
 ## Why this one Goal exists
@@ -34,46 +34,64 @@ Source repository study branch is independent and **not stacked** on PR #19 or p
 
 ## Latest audit — 2026-10-18, Desktop Codex local
 
-Audit run: `20261018-desktop-local`. Fresh PR API and remote-ref checks returned
-starting head `206679a56b81a3c5c485863084381b73d01e2493`; PR #20 remains
-Draft/unmerged. A new isolated worktree was created from that head.
-The older dirty research worktree and October 15 evidence were preserved.
-Its uncommitted R02 claim is historical, not this run's PASS.
+Continuation: `20261018-r01-continuation`, same Goal. Fresh PR API and remote-ref
+checks returned starting head `a78897f7bed6b50778bc8abf9174e6873934123d`, still
+Draft/unmerged on the unchanged base. The clean isolated research worktree was
+reused. Canonical main and October 15 dirty research evidence remain preserved.
 
-**NATIVE_RESULT=OWNER_ACTION_REQUIRED**
+**NATIVE_RESULT=AMBIGUOUS_STOP**
+
 **DISPOSITION=STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW**
 
-The research driver is this ChatGPT desktop Codex local session, replacing planned
-Console A CLI only. Console B must still be a fresh, Owner-launched original TUI
-in another real Windows Terminal. No PID, thread, Writer or endpoint requirement
-is relaxed.
+The Owner now reports exact physical `codex --yolo` in independent Windows
+Terminal, normal user, TUI open and no model prompt. The supplied “Shell PID”
+is a UUID, not an OS PID; its origin and intended original-TUI binding remain
+unconfirmed. A measured candidate is PowerShell 3944 → Node 34404 → TUI 18004,
+created 20:28:47.239692 +08:00, now running Codex 0.163.0.
 
-R00 measured the actual npm launcher, Codex 0.162.1 binary/hash, ordinary principal
-and process baseline on ZENBOOKS14. One source-verified passive daemon version
-probe was refused with OS error 10061 before Console B existed.
-R01–R03 are NOT_RUN behind the physical-launch gate.
-R04 classifies missing evidence only; native continuity checks are NOT_RUN.
-R05 records this audit and publishes sanitized documents to the same Draft PR;
-the local final receipt records the exact publication outcome.
-Physical test executed: false; authenticated native effects: 0.
+The official daemon endpoint is now reachable, with same-user socket owner/ACL.
+During inspection its incarnation changed from PID 18768 / 0.162.1 to PID 33120 /
+0.163.0, created 20:32:11.867961 +08:00. The official PID record matches current
+OS creation metadata; direct socket peer-PID attribution was not performed.
+The candidate TUI's PID/creation time remained unchanged, which alone does not
+prove native-thread continuity, Writer cooperation or visible interactive return.
+Research issued no installation/update or daemon lifecycle command.
 
-Evidence scope: **MEASURED_LOCAL preflight**, **SOURCE_ONLY daemon conditions**,
-**HISTORICAL_ONLY October 15 notes**. No fresh original TUI/server
-identity, same-user reachable endpoint, native Thread, Writer cooperation,
-second-client observation or original-TUI return is proven.
-The pre-launch refusal is not a diagnosis of a future ordinary launch.
+| Phase | Actual execution |
+| --- | --- |
+| R00 | COMPLETE; earlier checkpoint retained and version/runtime drift revalidated |
+| R01 | PARTIAL: Owner launch report and candidate process identity; exact binding/thread UNKNOWN |
+| R02 | PARTIAL_READ_ONLY: reachable daemon/same-user metadata; current exact-thread/Writer chain incomplete |
+| R03 | NOT_RUN / BLOCKED; no exact-thread read, subscription or effect |
+| R04 | COMPLETE_CLASSIFICATION_ONLY; native continuity incomplete |
+| R05 | Reports, validation, local receipts and same Draft PR; exact publication in local receipt |
 
-The only suggested next step is the Owner's physical Console B launch using
-the [01 instruction card](01-PREFLIGHT-AND-RUNTIME-IDENTITY.md).
-Any optional effect needs separate, exact-thread authorization after identity
-and Writer gates. No automatic FS/Paseo choice or G08 admission follows.
+Physical test executed: **true, OWNER_REPORTED**. Authenticated native effects:
+**0**. No native transcript/database or unconfirmed UUID session was read.
+Official daemon status probes are not independent exact-thread observation.
+No READ_ONLY_PROOF_ONLY or SHARED_NATIVE_AVAILABLE claim is earned.
+
+Evidence is MEASURED_LOCAL for process/status/security metadata, OWNER_REPORTED
+for physical action, SOURCE_ONLY for protocol behavior, and UNKNOWN for the
+missing identity/Writer/return links. Historical October 15 R02 remains no
+current PASS. The earlier pre-launch refusal is preserved in 01 as a past cut.
+
+**Only next step:** Owner clarifies the still-open original Console B's identity,
+the supplied UUID's origin, whether Codex was exited/reopened, and current UI
+interactivity. Do not send a prompt or relaunch. Details are in [06](06-OWNER-DECISION-PACK.md).
+Further read-only protocol work requires a fresh current identity chain;
+any native effect still needs separate exact-thread authorization after Writer
+qualification. No automatic FS/Paseo route or G08 admission follows.
+
+The Desktop local research interface continues to replace planned Console A only.
+Desktop PID/server/thread never count as Console B; all original gates remain.
 
 ### Audit documents
 
-- [01 — Preflight and runtime identity / Owner instruction card](01-PREFLIGHT-AND-RUNTIME-IDENTITY.md)
-- [02 — Original unwrapped TUI: NOT_RUN](02-UNWRAPPED-TUI-OBSERVATION.md)
-- [03 — Shared endpoint and Writer: NOT_RUN / BLOCKED](03-SHARED-ENDPOINT-AND-WRITER.md)
-- [04 — Second client and original TUI return: NOT_RUN / BLOCKED](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md)
+- [01 — Preflight history and runtime revalidation](01-PREFLIGHT-AND-RUNTIME-IDENTITY.md)
+- [02 — Owner launch and candidate TUI identity: PARTIAL](02-UNWRAPPED-TUI-OBSERVATION.md)
+- [03 — Reachable daemon, incarnation change, Writer: PARTIAL](03-SHARED-ENDPOINT-AND-WRITER.md)
+- [04 — Independent observer and original TUI return: NOT_RUN / BLOCKED](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md)
 - [05 — Qualification and route implications](05-QUALIFICATION-AND-ROUTE-IMPLICATION.md)
 - [06 — Standalone Owner decision pack](06-OWNER-DECISION-PACK.md)
 

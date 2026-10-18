@@ -1,8 +1,8 @@
-# R03 — One authorized native ACK; visible return pending
+# R03 — One authorized native ACK and original-TUI return verified
 
 Continuation: `20261018-r03-authorized-ack`, same Goal.
 
-Status: **ONE_EFFECT_NATIVE_VERIFIED; OWNER_VISIBLE_ACK_PENDING**.
+Status: **COMPLETE; ONE_EFFECT_AND_ORIGINAL_TUI_RETURN_VERIFIED**.
 
 ## Exact admission and fresh gates
 
@@ -51,14 +51,28 @@ The observer sent a close output and disposed only its own connection without
 error. A full peer close handshake was not tested. The older read-only helper's
 close limitation remains historical; neither operation shut down the daemon/TUI.
 
-## Remaining visible-return gate
+## Final visible return — Owner confirmation recorded 2026-10-19
 
-The Owner previously confirmed same-ID interactive return **after the read-only
-observer**. A new post-effect request asks the Owner to view the ACK in the
-**same original Console B**, confirm unchanged Native Thread and interactivity,
-without any new prompt, exit, restart or resume. That confirmation is pending
-at this cut; the earlier confirmation cannot substitute for it.
+The Owner answered the specific post-effect question: **the original TUI displays
+the ACK, has the same Native Thread ID, and remains interactive**. The question
+named the exact marker and test thread and required no prompt, exit, restart or
+resume. This trusted chat reply is **OWNER_REPORTED** evidence, separate from the
+earlier read-only UI report. Its original message timestamp is not exposed;
+the final continuation records receipt on October 19.
+
+At **00:24:30 +08:00**, a fresh OS-only check measured TUI 18004 and daemon 33120
+with unchanged exact creation times, same-user owners and executable hashes.
+The sealed native receipt hash and one-attempt ledger also remained unchanged.
+No native connection, prompt or effect was repeated for closeout.
+
+Native receipts prove the one exact-thread completed effect; the Owner proves
+its visibility and same-thread interactivity in original Console B; OS snapshots
+prove process-incarnation continuity. Together with the identity chain in
+[02](02-UNWRAPPED-TUI-OBSERVATION.md), these meet SAME_TUI_REMOTE_EFFECT and the
+local **SHARED_NATIVE_AVAILABLE** contract. The native protocol does not supply
+a direct TUI PID field; that relationship is corroborated by the combined chain.
+No direct OS lock-handle owner or full peer close handshake is claimed.
 
 Native effects executed: **1**. Submission attempts: **1**. Remaining: **0**.
-Until post-effect visible acknowledgement is confirmed, no
-SAME_TUI_REMOTE_EFFECT / SHARED_NATIVE_AVAILABLE claim is made.
+No replay or second effect is authorized. Phone handoff remains NOT_RUN.
+The fixed disposition is STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW.

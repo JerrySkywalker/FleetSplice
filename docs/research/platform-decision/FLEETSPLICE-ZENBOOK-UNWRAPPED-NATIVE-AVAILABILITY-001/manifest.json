@@ -2,7 +2,7 @@
   "schema": "fleetsplice.goal-train.native-availability-study.v1",
   "goal_id": "FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
   "purpose": "Resolve one native/OS prerequisite: can ordinary unwrapped codex --yolo on ZenBook 14 be connected by a second nonowning client without losing original process/thread or native Writer integrity?",
-  "status": "R00_COMPLETE; R01_CORROBORATED; R02_COOPERATIVE_NATIVE_TURN_VERIFIED; R03_ONE_EFFECT_COMPLETE_UI_PENDING; R04_RESTRICTED; R05_HANDOFF",
+  "status": "R00_R05_COMPLETE; LOCAL_SHARED_NATIVE_AVAILABLE; STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
   "authorization": "DOCUMENTATION_AND_OWNER_ATTENDED_DISPOSABLE_LOCAL_PROBE_ONLY",
   "base_branch": "train/pre-gate-s-development-001",
   "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
@@ -55,14 +55,14 @@
       "title": "Owner physical launch of ordinary unwrapped disposable TUI",
       "human_required": true,
       "output": "02-UNWRAPPED-TUI-OBSERVATION.md",
-      "execution_status": "THREAD_CONFIRMED_OS_CONTINUITY_MEASURED; POST_EFFECT_UI_PENDING"
+      "execution_status": "COMPLETE_COMBINED_OS_NATIVE_OWNER_IDENTITY"
     },
     {
       "id": "R02",
       "title": "Official native shared endpoint and Writer/identity proof",
       "human_required": false,
       "output": "03-SHARED-ENDPOINT-AND-WRITER.md",
-      "execution_status": "ENDPOINT_THREAD_AND_COOPERATIVE_NATIVE_TURN_VERIFIED"
+      "execution_status": "COMPLETE_ENDPOINT_THREAD_COOPERATIVE_WRITER_VERIFIED"
     },
     {
       "id": "R03",
@@ -70,21 +70,21 @@
       "human_required": true,
       "conditional": true,
       "output": "04-SECOND-CLIENT-AND-RETURN-TO-TUI.md",
-      "execution_status": "ONE_AUTHORIZED_EFFECT_COMPLETED_OWNER_VISIBLE_ACK_PENDING"
+      "execution_status": "COMPLETE_ONE_EFFECT_AND_ORIGINAL_TUI_RETURN"
     },
     {
       "id": "R04",
       "title": "Compare immutable native process/thread/Writer evidence and classify",
       "human_required": false,
       "output": "05-QUALIFICATION-AND-ROUTE-IMPLICATION.md",
-      "execution_status": "READ_ONLY_PROOF_ONLY_PENDING_SAME_TUI_EFFECT_ACK"
+      "execution_status": "COMPLETE_LOCAL_SHARED_NATIVE_AVAILABLE"
     },
     {
       "id": "R05",
       "title": "Same Draft PR evidence; Owner handoff; no product implementation",
       "human_required": false,
       "output": "06-OWNER-DECISION-PACK.md",
-      "execution_status": "LOCAL_DOCUMENTATION_HANDOFF_PUBLICATION_IN_RECEIPT"
+      "execution_status": "COMPLETE_DOCUMENTS_RECEIPTS_HANDOFF; PUBLICATION_IN_LOCAL_RECEIPT"
     }
   ],
   "native_results": [
@@ -128,20 +128,20 @@
   "no_auto_product_route": true,
   "no_auto_merge": true,
   "current_audit": {
-    "audit_run": "20261018-r03-authorized-ack",
-    "previous_audit_run": "20261018-r02-thread-verification",
-    "audit_date": "2026-10-18",
+    "audit_run": "20261019-owner-native-return",
+    "previous_audit_run": "20261018-r03-authorized-ack",
+    "audit_date": "2026-10-19",
     "timezone": "Asia/Shanghai",
-    "starting_pr_head": "d6e0633ca1c58cf2f15eaf4d7bfcc682f36332fd",
+    "starting_pr_head": "2f1341bcd7889845fe25b4f49f5bf55522e2792c",
     "starting_base_head": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
     "research_driver": "CHATGPT_DESKTOP_CODEX_LOCAL_SESSION",
     "original_planned_driver": "CONSOLE_A_CODEX_CLI",
     "console_b_requirements_unchanged": true,
     "desktop_pid_server_thread_excluded": true,
-    "native_result": "READ_ONLY_PROOF_ONLY",
+    "native_result": "SHARED_NATIVE_AVAILABLE",
     "disposition": "STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
     "evidence_confidence": "MEASURED_LOCAL",
-    "evidence_scope": "Exact native effect/ACK/zero-tools and process continuity measured; post-effect original-TUI visible ACK pending",
+    "evidence_scope": "OS/native receipts measured; physical launch/non-elevation and post-effect original-TUI ACK/same-ID/interactivity Owner-reported; local prerequisite only",
     "physical_test_executed": true,
     "physical_test_evidence": "OWNER_REPORTED",
     "authenticated_native_effect_executed": 1,
@@ -153,7 +153,7 @@
     "candidate_tui_created": "2026-10-18T20:28:47.239692+08:00",
     "candidate_tui_version": "0.163.0",
     "candidate_tui_process_continuity_measured": true,
-    "tui_pid_to_native_thread_binding": "CORROBORATED_BY_OWNER_UI_WORKSPACE_AND_STARTUP_TIME; no direct native PID field",
+    "tui_pid_to_native_thread_binding": "ESTABLISHED_BY_COMBINED_OS_NATIVE_OWNER_CHAIN; no direct native PID field",
     "native_thread_id": "PRIVATE_LOCAL_RECEIPT",
     "native_thread_id_sha256": "243106043D8B029720F5E075B9AB7465C03EFE8E17073A98EE3A935038BA6D76",
     "native_thread_id_proven": true,
@@ -198,14 +198,14 @@
     "native_loaded_list_requests": 1,
     "include_turns": false,
     "observer_close": "CLOSE_OUTPUT_THEN_DISPOSE_WITHOUT_ERROR; full peer handshake NOT_TESTED",
-    "owner_ui_return_evidence": "PREVIOUS_READONLY_CONFIRMATION_ONLY; post-effect visible ACK PENDING",
+    "owner_ui_return_evidence": "OWNER_REPORTED_POST_EFFECT_EXACT_ACK_SAME_ID_INTERACTIVE; OS_INCARNATIONS_UNCHANGED",
     "native_effect_authorized": true,
-    "effect_result": "NATIVE_COMPLETED_EXACT_ACK_ZERO_TOOLS; OWNER_VISIBLE_ACK_PENDING",
+    "effect_result": "NATIVE_COMPLETED_EXACT_ACK_ZERO_TOOLS; ORIGINAL_TUI_RETURN_CONFIRMED",
     "historical_r02_is_current_pass": false,
     "historical_dirty_worktree_preserved": true,
     "r05_publication": "Exact SHA/push outcome in private FINAL-RECEIPT.json",
     "local_receipt_schema": 1,
-    "next_step": "Owner views original still-open Console B: ACK, same Thread ID and interactivity; no new prompt/restart",
+    "next_step": "Owner reviews 06 and decides whether to separately admit one small Paseo B2 external-native provider vs existing FS Native Adoption comparison; no automatic route or G08",
     "source_refs": [
       {
         "version": "0.162.1",
@@ -230,9 +230,9 @@
     "remaining_authorized_effects": 0,
     "durable_no_replay_ledger_present": true,
     "replay_allowed": false,
-    "owner_post_effect_visible_ack": "PENDING",
-    "owner_post_effect_same_id": "UNKNOWN",
-    "owner_post_effect_interactive": "UNKNOWN",
+    "owner_post_effect_visible_ack": true,
+    "owner_post_effect_same_id": true,
+    "owner_post_effect_interactive": true,
     "owner_prior_readonly_ui_return_confirmed": true,
     "post_effect_process_identity_unchanged": true,
     "native_effect_authorization_state": "CONSUMED",
@@ -240,6 +240,19 @@
     "exact_effect_item_type_counts": {
       "userMessage": 1,
       "agentMessage": 1
-    }
+    },
+    "owner_post_effect_evidence_class": "OWNER_REPORTED",
+    "owner_post_effect_recorded_date": "2026-10-19",
+    "original_tui_pid_proven": true,
+    "original_tui_return_proven": true,
+    "final_os_recheck_at": "2026-10-19T00:24:30.6774707+08:00",
+    "closeout_native_calls": 0,
+    "remaining_local_qualification_blockers": [],
+    "remaining_product_qualifications": [
+      "phone transport/authentication",
+      "multi-Host",
+      "G08 bounded complete history",
+      "integration/maintenance comparison"
+    ]
   }
 }

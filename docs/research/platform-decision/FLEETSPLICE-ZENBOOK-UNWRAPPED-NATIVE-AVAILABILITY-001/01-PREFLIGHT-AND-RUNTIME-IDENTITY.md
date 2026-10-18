@@ -179,3 +179,26 @@ The native turn completed with the exact ACK and zero tool/unknown items.
 The one-effect allowance is now consumed. No dispatch retry or second effect
 is authorized. Full native receipt and visible-return status are recorded in
 [04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md); the R00 checkpoint remains historical.
+
+## Final Owner return and read-only closeout — 2026-10-19
+
+Continuation `20261019-owner-native-return` freshly verified PR #20 at
+`2f1341bcd7889845fe25b4f49f5bf55522e2792c`, OPEN Draft and unmerged, with the
+same base. The Owner answered the outstanding post-effect question: the original
+TUI displays the ACK, has the same Native Thread ID, and remains interactive.
+This is new **OWNER_REPORTED** visible-return evidence, distinct from the earlier
+read-only confirmation and the measured native receipt.
+
+At **00:24:30 +08:00**, OS-only revalidation retained TUI 18004 and daemon 33120,
+their exact Process.StartTime values, same-user owners and executable hashes.
+CIM creation time truncates to microseconds; the collector initially stopped on
+that precision mismatch, then compared exact Process.StartTime with the sealed
+receipt and retained both values. No process incarnation changed. The native
+receipt hash and one-attempt ledger were independently checked without another
+socket request or effect. Remaining effects=0; no replay.
+
+The combined native/OS/Owner chain now meets the local SHARED_NATIVE_AVAILABLE
+contract. It does not add a native PID-to-thread field or direct lock-handle
+observation. Historical checkpoints above remain historical. Final acceptance,
+limits and the sole Owner review step are in [05](05-QUALIFICATION-AND-ROUTE-IMPLICATION.md)
+and [06](06-OWNER-DECISION-PACK.md).

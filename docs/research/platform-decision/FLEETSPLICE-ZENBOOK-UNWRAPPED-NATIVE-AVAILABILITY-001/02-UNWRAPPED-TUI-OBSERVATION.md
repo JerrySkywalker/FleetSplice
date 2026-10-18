@@ -2,7 +2,7 @@
 
 Continuation: `20261018-r02-thread-verification`, same Goal, 2026-10-18 (+08:00).
 
-Status: **OWNER_THREAD_CONFIRMED; TUI association corroborated; OS continuity measured**.
+Status: **COMPLETE; original-TUI identity established by combined OS/native/Owner evidence; post-effect return Owner-confirmed**.
 
 The Owner clarified that the earlier UUID is the disposable **Native Thread ID**,
 not a shell PID. After the read-only observer disconnected, the Owner checked the
@@ -41,14 +41,25 @@ Current loaded membership was proved separately against daemon 33120.
 Exact ordinary launch and non-elevation remain Owner-reported; same-user OS owner
 queries are measured independently. Original-TUI visible return is Owner-reported
 after the observer, while PID/creation continuity is measured locally.
-No replacement, private transcript/database read, file/tool task or native effect
-was used to strengthen these claims.
+At this read-only checkpoint no replacement, private transcript/database read,
+file/tool task or native effect was used to strengthen these claims.
 
 ## One-effect process continuity
 
 Fresh pre-dispatch gates and post-disconnect OS snapshots for the separately
 admitted ACK retained TUI 18004 creation 20:28:47.239692 and daemon 33120 creation
 20:32:11.867961 (+08:00). Native receipt proves one completed exact-thread effect.
-The earlier Owner UI report was after the read-only observer; **post-effect**
-visible ACK, same-ID and interactivity confirmation is pending at this cut.
-No replacement TUI or resume was used. See [04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md).
+The earlier UI report followed the read-only observer. In the final continuation,
+recorded on **2026-10-19**, the Owner separately confirmed the **post-effect** ACK
+in the still-open original TUI, same Thread ID and continued interactivity.
+At 00:24:30 +08:00, an OS-only recheck retained both exact Process.StartTime
+values, parent PIDs, same-user ownership and executable hashes.
+
+The original-TUI PID and return gates are therefore **true by combined evidence**:
+the measured independent Terminal/PowerShell/Node/TUI chain, workspace/startup
+correlation, exact native thread/turn receipt, Owner's original-TUI identity and
+visible ACK, and unchanged OS incarnation before/after. The PID/thread edge
+remains corroborated; no direct native PID field was observed or invented.
+The visual layer is Owner-reported, not a screenshot or automated UI observation.
+No replacement TUI, resume or second effect was used.
+See [04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md).

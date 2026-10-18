@@ -42,7 +42,7 @@ digest. The earlier 18768/0.162.1 → 33120/0.163.0 daemon change remains histor
 **no proof is carried across that boundary**. These are fresh current-incarnation
 native responses. Research performed no lifecycle/config/install change.
 
-## Writer evidence, without promotion
+## Writer evidence at the read-only checkpoint
 
 The observer sent no create/resume/turn or lock operation, so it acquired no
 native thread Writer. The
@@ -77,3 +77,14 @@ This is **measured cooperative use of the existing native runtime**, separate
 from the unobserved direct OS lock-handle holder. See [04](04-SECOND-CLIENT-AND-RETURN-TO-TUI.md)
 for admission, response IDs, one-shot ledger and visible-return status.
 The allowance is consumed; do not infer authority for another turn.
+## Final return corroboration — recorded 2026-10-19
+
+The Owner has now confirmed the post-effect ACK in the same original, interactive
+Console B with the same Native Thread ID. Final OS-only revalidation retained
+TUI 18004 and daemon 33120's exact creation times, same-user ownership and binary
+hashes. The sealed native receipt remains unchanged; no new native request was
+sent during closeout. This completes the local shared-control acceptance chain.
+Direct OS lock-handle custody remains unobserved: the measured claim is cooperative
+use of the existing loaded runtime, with native receipt and original-TUI return.
+No competing Writer was started, no lock bypass was attempted, and the consumed
+one-effect authorization cannot be reused.

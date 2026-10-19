@@ -1,0 +1,103 @@
+{
+  "schema": "fleetsplice.goal-train.foundation.v1",
+  "goal_id": "FLEETSPLICE-DEVELOPMENT-FOUNDATION-12H-001",
+  "status": "PLAN_READY_NOT_STARTED",
+  "authorized_scope": "LOCAL_ENV_REPRODUCTION_READONLY_SOURCE_COMPARISON_SYNTHETIC_FIXTURES_DOCS_ONLY",
+  "max_elapsed_minutes": 720,
+  "host": "ZENBOOK14",
+  "repository": "JerrySkywalker/FleetSplice",
+  "base_branch": "train/pre-gate-s-development-001",
+  "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+  "study_branch": "docs/fs-12h-development-foundation-20261020",
+  "study_root": "docs/roadmap/FLEETSPLICE-DEVELOPMENT-FOUNDATION-12H-001",
+  "canonical_checkout": "C:\\Dev\\src\\FleetSplice",
+  "worktree_root": "C:\\Dev\\worktrees",
+  "artifacts_root": "C:\\Dev\\artifacts\\fleetsplice\\FLEETSPLICE-DEVELOPMENT-FOUNDATION-12H-001",
+  "required_prereferences": [
+    {
+      "pr": 20,
+      "sha": "8fd8b8d9130a6eb33d5f5831c24ac2ae45c7e791",
+      "scope": "local shared-native proof only"
+    },
+    {
+      "pr": 19,
+      "sha": "25f2bae8b39eb6222c7d2e0b8237227f53504acc",
+      "scope": "initial build-vs-reuse unresolved"
+    },
+    {
+      "pr": 18,
+      "sha": "a12f4b82b89b4fa2fe7b6435b343ce35fd95bb3e",
+      "scope": "historical tradeoff evidence"
+    }
+  ],
+  "phases": [
+    {
+      "id": "F00",
+      "name": "Source freeze/worktree",
+      "target_hours": 1
+    },
+    {
+      "id": "F01",
+      "name": "Toolchain readiness",
+      "target_hours": 2
+    },
+    {
+      "id": "F02",
+      "name": "Build and test baseline",
+      "target_hours": 2
+    },
+    {
+      "id": "F03",
+      "name": "B2/B3/C static and mock feasibility",
+      "target_hours": 3
+    },
+    {
+      "id": "F04",
+      "name": "Next Goal DAG and checklists",
+      "target_hours": 2
+    },
+    {
+      "id": "F05",
+      "name": "Docs publication and private receipt",
+      "target_hours": 1.5
+    },
+    {
+      "id": "F06",
+      "name": "Bounded final stop",
+      "target_hours": 0.5
+    }
+  ],
+  "outputs_in_repository": [
+    "01-SOURCE-AND-HOST-BASELINE.md",
+    "02-DEVELOPMENT-DOCTOR-AND-BUILD.md",
+    "03-PASEO-B2-VS-FS-FEASIBILITY.md",
+    "04-FUTURE-TRAIN-DAG-AND-ESTIMATES.md",
+    "05-OWNER-HANDOFF.md"
+  ],
+  "private_outputs": [
+    "FINAL-RECEIPT.json",
+    "raw redacted local test logs and mock fixtures"
+  ],
+  "terminal_dispositions": [
+    "READY_FOR_OWNER_ROUTE_REVIEW",
+    "PARTIAL_WITH_SPECIFIC_BLOCKERS",
+    "BLOCKED_WITH_EXACT_CAUSE"
+  ],
+  "native_effect_count_allowed": 0,
+  "product_code_modified_allowed": false,
+  "global_toolchain_mutation_allowed": false,
+  "other_repository_write_allowed": false,
+  "new_cloud_resources_allowed": false,
+  "main_merge_allowed": false,
+  "pr_merge_allowed": false,
+  "production_deployment_allowed": false,
+  "gate_s_admitted": false,
+  "route_selection_authorized": false,
+  "conditions": [
+    "document actual source and runtime versions",
+    "no changes to Codex daemon lifecycle or native Writer locks",
+    "no retries of uncertain effects",
+    "avoid large CI and soak",
+    "do not auto-admit G08 or existing G06–G10"
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "schema": "fleetsplice.goal-train.foundation.v1",
   "goal_id": "FLEETSPLICE-DEVELOPMENT-FOUNDATION-12H-001",
-  "status": "PLAN_READY_NOT_STARTED",
+  "status": "READY_FOR_OWNER_ROUTE_REVIEW",
   "authorized_scope": "LOCAL_ENV_REPRODUCTION_READONLY_SOURCE_COMPARISON_SYNTHETIC_FIXTURES_DOCS_ONLY",
   "max_elapsed_minutes": 720,
   "host": "ZENBOOK14",
@@ -34,37 +34,44 @@
     {
       "id": "F00",
       "name": "Source freeze/worktree",
-      "target_hours": 1
+      "target_hours": 1,
+      "execution_status": "COMPLETE_SOURCE_FREEZE_WORKTREE"
     },
     {
       "id": "F01",
       "name": "Toolchain readiness",
-      "target_hours": 2
+      "target_hours": 2,
+      "execution_status": "COMPLETE_SCOPED_DEV_READINESS"
     },
     {
       "id": "F02",
       "name": "Build and test baseline",
-      "target_hours": 2
+      "target_hours": 2,
+      "execution_status": "COMPLETE_FOCUSED_BASELINE_PASS"
     },
     {
       "id": "F03",
       "name": "B2/B3/C static and mock feasibility",
-      "target_hours": 3
+      "target_hours": 3,
+      "execution_status": "COMPLETE_SOURCE_AND_MOCK_ONLY"
     },
     {
       "id": "F04",
       "name": "Next Goal DAG and checklists",
-      "target_hours": 2
+      "target_hours": 2,
+      "execution_status": "COMPLETE_FUTURE_PLAN_ONLY"
     },
     {
       "id": "F05",
       "name": "Docs publication and private receipt",
-      "target_hours": 1.5
+      "target_hours": 1.5,
+      "execution_status": "DOCUMENTS_AND_VALIDATION; PUBLICATION_IN_PRIVATE_RECEIPT"
     },
     {
       "id": "F06",
       "name": "Bounded final stop",
-      "target_hours": 0.5
+      "target_hours": 0.5,
+      "execution_status": "BOUNDED_STOP; FINAL_END_IN_PRIVATE_RECEIPT"
     }
   ],
   "outputs_in_repository": [
@@ -99,5 +106,64 @@
     "no retries of uncertain effects",
     "avoid large CI and soak",
     "do not auto-admit G08 or existing G06–G10"
-  ]
+  ],
+  "run": {
+    "started_at_utc": "2026-10-19T17:47:22Z",
+    "started_at_local": "2026-10-20T01:47:22+08:00",
+    "deadline_utc": "2026-10-20T05:47:22Z",
+    "timezone": "Asia/Shanghai",
+    "report_prepared_at_utc": "2026-10-19T18:03:28.6174600+00:00",
+    "elapsed_minutes_at_report": 16.11,
+    "max_elapsed_minutes": 720,
+    "starting_pr_head": "3762199f5d3b675c680bb285f38fe0f500f4b427",
+    "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+    "research_driver": "CHATGPT_DESKTOP_CODEX_LOCAL",
+    "worktree": "C:\\Dev\\worktrees\\FleetSplice-development-foundation-12h-20261020",
+    "disposition": "READY_FOR_OWNER_ROUTE_REVIEW",
+    "env_ready": "READY_FOR_SCOPED_NODE_DEV_AND_MOCK_BROWSER",
+    "route_decision": "NOT_SELECTED",
+    "qualified_node": "24.20.0",
+    "qualified_sqlite": "3.53.4",
+    "path_node": "24.5.0",
+    "npm": "11.5.1",
+    "dependency_restore_exit": 0,
+    "dependency_lifecycle_scripts_run": false,
+    "doctor_before_exit": 1,
+    "doctor_after_exit": 0,
+    "rust_msvc_link_exit": 0,
+    "full_desktop_package": "NOT_RUN_UNQUALIFIED",
+    "existing_tests_passed": 22,
+    "existing_tests_failed": 0,
+    "mock_source_checks_passed": 12,
+    "actual_paseo_plugin_load": "NOT_RUN",
+    "full_ci": "NOT_RUN",
+    "native_connection_count": 0,
+    "native_effect_count": 0,
+    "phone_test": "NOT_RUN",
+    "g08_started": false,
+    "product_code_modified": false,
+    "main_merged": false,
+    "production_deployed": false,
+    "source_sha": {
+      "fleetsplice": "3762199f5d3b675c680bb285f38fe0f500f4b427",
+      "paseo_main": "eda3e4318f4e06cbe1e1dee8639725d6d95240fc",
+      "paseo_release": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "paseo_release_tag": "v0.12.0",
+      "codex": "83086188ae0614bd882818ff1aa23f3194962012"
+    },
+    "pr19_head": "25f2bae8b39eb6222c7d2e0b8237227f53504acc",
+    "pr20_head": "8fd8b8d9130a6eb33d5f5831c24ac2ae45c7e791",
+    "pr19_pr20_state": "OPEN_DRAFT_UNMERGED",
+    "current_goal_blockers": [],
+    "out_of_scope_owner_gates": [
+      "real native qualification/effect",
+      "production Gate S and phone/second Host",
+      "selected-route product work",
+      "G08 after G07"
+    ],
+    "next_candidate_goal": "FLEETSPLICE-B2-C-CONTRACT-PARITY-PILOT-001",
+    "next_goal_started": false,
+    "owner_decision": "Approve one no-effect actual-SDK B2/C parity pilot before choosing route, or retain hold",
+    "final_head_and_end_time": "Private FINAL-RECEIPT.json and OWNER-HANDOFF.md; no self-referential commit SHA in public manifest"
+  }
 }

@@ -74,10 +74,18 @@ Prefer quick source+contract checks, one targeted test per changed surface and o
 - Do not advance to route-specific product implementation, open more Goal trains, or automatically merge any PR.
 
 ## Acceptance checklist
-- [ ] A clean isolated Goal worktree, exact source versions and no touched foreign trees
-- [ ] Development doctor executed; full prerequisites truthfully classified
-- [ ] Scoped dependency/build smoke performed or exact blockers and commands recorded
-- [ ] Source-level B2/B3/C matrix with evidence confidence and no false unwrapped-native equivalence
-- [ ] Route-conditional next Goal DAG and comprehensive checklist kept inside FS
-- [ ] Private final receipt and sanitized report files created
-- [ ] Draft PR HEAD verified, changes pushed fast-forward if possible, unmerged, no real native effect
+- [x] A clean isolated Goal worktree, exact source versions and no touched foreign trees
+- [x] Development doctor executed; full prerequisites truthfully classified
+- [x] Scoped dependency/build smoke performed or exact blockers and commands recorded
+- [x] Source-level B2/B3/C matrix with evidence confidence and no false unwrapped-native equivalence
+- [x] Route-conditional next Goal DAG and comprehensive checklist kept inside FS
+- [x] Private final receipt and sanitized report files created
+- Publication acceptance: final Draft PR HEAD, non-force fast-forward outcome, unmerged state and zero native effects are recorded in private FINAL-RECEIPT.json after push.
+
+## Execution receipt pointer — 2026-10-20
+
+F00–F04 evidence and plans are in reports 01–04; Owner review is in 05.
+Publication acceptance is finalized only after the same Draft PR push
+and exact remote HEAD checks; private FINAL-RECEIPT.json is authoritative for
+publication/end time. Scoped environment ready; no real native effect or future
+product Goal was run. Public planning targets are not claimed elapsed durations.

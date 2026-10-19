@@ -5,7 +5,7 @@ This is a *planning* milestone view, subordinate to `docs/v0.1/implementation-ro
 ## Dependencies
 
 `PR #20 local shared-native proof` -> `M0 Development Foundation (12h max)` -> `M1 compare Paseo B2/B3 vs FS C (route decision)`
--> `M2 chosen-route native adoption/control seam` -> `M3–M5 acceptance/implementation` -> `Owner-authorized release`.
+-> `M2 chosen-route native adoption/control seam` -> `M4 (G06 mobile, G07 two-host)` -> `M3 (G08 durable history)` -> `M5 (G09/G10)` -> `Owner-authorized release`.
 
 Preserve normative product ordering after authorization: `G06 mobile` -> `G07 two-host` -> `G08 durable history` -> `G09 migration/no-qualified-target` -> `G10 hardened release`. It is fine to *design mock G08 fixtures* during M1, but not to assert G08 implementation started or reorder accepted production gates.
 
@@ -14,25 +14,25 @@ Preserve normative product ordering after authorization: `G06 mobile` -> `G07 tw
 | Milestone | Planning effort | Actual work and exit |
 | --- | --- | --- |
 | M0 FOUNDATION | Up to 12h elapsed local run | One clean worktree; toolchain doctor/build receipt; pinned B2/B3/C source comparison; next Goal DAG and sanitized Draft PR |
-| M1 ROUTE DECISION | ~1–3 engineering days | Compare supported Paseo plugin API vs FS Native Adoption on the **same qualified local contract**; compile/mock where safe; credible workload+maintenance model; Owner selects route or exact blocker |
-| M2 NATIVE INTEGRATION | ~3–8 engineering days, highly conditional | On selected path, real original-TUI discovery/identity and cooperative Writer, honest reconnect/ambiguity, smoke with separately approved native effect, no global Codex wrapper |
+| M1 ROUTE DECISION | ~2–4 engineering days for proposed next pilot | Compare actual supported Paseo SDK vs FS Native Adoption on the **same mock contract** before separately admitted native qualification; Owner selects route or exact blocker |
+| M2 NATIVE INTEGRATION | C ~2–5 / B2 ~5–10 / B3 ~8–20 days, alternatives | On selected path, real original-TUI discovery/identity and cooperative Writer, honest reconnect/ambiguity, smoke with separately approved native effect, no global Codex wrapper |
 | M3 DURABLE HISTORY DESIGN/DELIVERY | ~5–15 engineering days after proper gate | Stable IDs, complete pagination/seek, durable payload blobs, bounded hot state, recovery/cursors, 10k+ equivalent workload and process-tree measurements; align with accepted G08 entry dependency |
-| M4 MOBILE / MULTI-HOST QUALIFICATION | ~5–15 engineering days plus external readiness | Existing mobile UI reuse, authenticated outbound Edge, real phone reconnect, same original TUI, multi-host authority; no assumed Tencent/Gate S admission |
-| M5 RELEASE CLOSEOUT | ~3–10 engineering days plus Owner checks | Accepted visible product route, realistic dogfood, install/update/rollback and security checks, truthful G09 outcome and G10/v0.1 release |
+| M4 MOBILE / MULTI-HOST QUALIFICATION | ~6–15 engineering days plus external readiness | Existing mobile UI reuse, authenticated outbound Edge, real phone reconnect, same original TUI, multi-host authority; no assumed Tencent/Gate S admission |
+| M5 RELEASE CLOSEOUT | ~5–12 engineering days plus Owner checks | Accepted visible product route, realistic dogfood, install/update/rollback and security checks, truthful G09 outcome and G10/v0.1 release |
 
 These estimates overlap with the *technical substance* of the accepted G06–G10 goals; they must not be added as duplicate new projects. Production admission and real infrastructure dependency can dominate elapsed time. The 12h M0 timebox only starts when the Owner locally starts the agent.
 
-## M0: do now (unattended-safe)
-- [ ] Protect canonical `C:\Dev\src\FleetSplice` and preexisting worktrees, record status/head
-- [ ] Create isolated Goal worktree from this Draft study PR without stacking unmerged PR #20
-- [ ] Confirm Windows account/process isolation and pinned native Codex baseline without touching existing sessions
-- [ ] Qualify exact Node `v24.20.0` / SQLite `3.53.4`, npm lock closure, Rust/Tauri, Edge/Playwright, OpenSSL, and build outputs
-- [ ] Install only project-local npm dependencies if safe, no silent machine/global installs
-- [ ] Run only proportional baseline smoke, classify failures without speculative fixes
-- [ ] Read official current Paseo source/API license/version and existing FS Native Adoption contracts
-- [ ] Produce source-pinned B2/B3/C feature, authority, history, operation and long-term maintenance matrix
-- [ ] Draft one route-decision Owner pack and stage-by-stage later Goal execution contracts
-- [ ] Commit/push sanitized docs to this Draft PR, leave product code and main unchanged
+## M0: executed foundation checklist — 2026-10-20
+- [x] Protect canonical `C:\Dev\src\FleetSplice` and preexisting worktrees, record status/head
+- [x] Create isolated Goal worktree from this Draft study PR without stacking unmerged PR #20
+- [x] Confirm Windows account/process isolation and pinned native Codex baseline without touching existing sessions
+- [x] Qualify Node `v24.20.0` / SQLite `3.53.4`, npm closure, Edge/Playwright and Web build; inventory Rust/Tauri/SDK and pass minimum MSVC link; full desktop package remains NOT_RUN
+- [x] Restore project-local npm dependencies with scripts disabled and C:\Dev cache; no machine/global installs
+- [x] Run only proportional baseline smoke, classify failures without speculative fixes
+- [x] Read official current Paseo source/API license/version and existing FS Native Adoption contracts
+- [x] Produce source-pinned B2/B3/C feature, authority, history, operation and long-term maintenance matrix
+- [x] Draft one route-decision Owner pack and stage-by-stage later Goal execution contracts
+- [x] Prepare sanitized docs for this same Draft PR; exact commit/push outcome is recorded in private FINAL-RECEIPT.json after publication
 
 ## M1: route decision after M0
 - [ ] Keep P0 unchanged: unwrapped original TUI, live remote observation/control, unchanged original PID+thread return
@@ -80,3 +80,18 @@ Prefer reuse of proven Codex native capabilities and existing Paseo interface su
 The old ZenBook14 managed-daemon limitation in `docs/train/current-status.md` is a historic recorded test condition. Later PR #20 evidence narrows it under a distinct Codex version/process incarnation. Reconcile source/status in future dedicated review, not by retroactively editing accepted receipts.
 
 No signed-off product build-vs-reuse choice exists as of this planning train. Treat the M1 decision as a real gate.
+
+## Execution reconciliation
+
+The M0 checkmarks record the bounded environment/source/mock work, not a product
+route or release PASS. F03 has 12 no-effect design/source checks; the actual SDK
+plugin was not loaded. F02 has 22 existing tests, not complete CI. Full Tauri/NSIS
+package, native effects, phone, second Host and G08 are NOT_RUN here.
+
+M3 and M4 are thematic labels: **M4/G06–G07 precedes M3/G08**. Do not execute them
+in numerical-label order. M1's remaining proposed actual-SDK parity pilot and
+all conditional Goal packets, visible exits, ownership, bounded tests, entry
+gates and engineering-day ranges are specified in
+[04-FUTURE-TRAIN-DAG-AND-ESTIMATES.md](04-FUTURE-TRAIN-DAG-AND-ESTIMATES.md).
+No future packet is admitted by these checkboxes. Issues #2–#8 remain later AI4S
+and positioning work, distinct from current client/native adoption.

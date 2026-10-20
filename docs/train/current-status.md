@@ -1,5 +1,17 @@
 # Current FleetSplice development status
 
+## Owner amendment — 2026-10-21 Fast Product + UX Track
+
+`FPX_OWNER_ROADMAP=APPROVED`  
+`NEAR_TERM_UI_UX_DEVELOPMENT=THAWED_FOR_SCOPED_LOCAL_SOURCE_ONLY`  
+`FULL_C_PRODUCT_ROUTE=CONDITIONAL_NOT_YET_PRODUCTION_ADOPTED`  
+`GATE_S_ADMITTED=false`  
+`G06_LIVE_ACCEPTANCE=false`  
+
+This later Owner decision **supersedes only the earlier near-term UI freeze for newly scoped local UI source work**. Historical frozen flags and receipts below describe earlier baselines and remain preserved, **not** a current prohibition on the newly authorized local UX work. See [Fast Product+UX Train](../roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/README.md) and its [development contract](../roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/02-FAST-DEVELOPMENT-CONTRACT.md). Native C compatibility PR #23 remains a separate stacked Draft, not accepted; PRs #19–#22 have not been implicitly merged. The product order `G06→G07→G08→G09→G10` and their first-use Owner / Gate S constraints remain normative. This amendment authorizes bounded local UX/fixture development and goal documentation, not real native effects, cross-host enrollment, cloud deployment or automated publication to `main`.
+
+---
+
 Architecture 0.1 is accepted. G06 predeploy local implementation and the
 Pre-Gate-S S00-S11 train are complete locally. PR #11 was merged into
 `train/pre-gate-s-development-001` at

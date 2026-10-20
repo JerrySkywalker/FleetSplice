@@ -1,5 +1,8 @@
 # FleetSplice repository rules
 
+> **2026-10-21 Owner additive update:** The historical `NEAR_TERM_UI_UX_DEVELOPMENT=FROZEN` statements below are superseded **for scoped local UI/UX source work** by [Fast Product+UX Train](docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/README.md). Read its [Fast Development Contract](docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/02-FAST-DEVELOPMENT-CONTRACT.md) and [H0–H4 Gate contract](docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/03-HUMAN-EXPERIENCE-GATES.md) before any new Goal. User approved local source Goals without per-phase confirmations; **not** real Codex effects, Gate S, G06 live deployment, G07–G10 acceptance, merging old research PRs or `main`. Identity/fencing/unknown-effect safety is mandatory. Historical text remains evidence of its time.
+
+
 FleetSplice Architecture 0.1 is accepted. `ARCHITECTURE_0_1_READY=true`.
 The canonical local G05C product implementation baseline is
 `017a89472436702a9f6228bf680a3674bb0a2d32`, tree

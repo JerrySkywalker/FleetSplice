@@ -1,5 +1,8 @@
 # FleetSplice Full Development Train Roadmap
 
+> **Additive Owner decision (2026-10-21):** The [Fast Product+UX Train](FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/README.md) inserts a parallel *local source* UI quality lane and H0/H1 before G06 while preserving accepted G06→G07→G08→G09→G10 gates. H2/H3/H4 are Owner first-use gates at G06/G07/G10. Later UI authorization replaces the old near-term presentation freeze only for newly scoped source changes; no production or native effect admission follows.
+
+
 Current bounded execution is the Owner-approved
 [portable-host runtime train](../../goals/FLEETSPLICE-PORTABLE-HOST-RUNTIME-TRAIN-001.md);
 [current status](../train/current-status.md) governs its authorization.

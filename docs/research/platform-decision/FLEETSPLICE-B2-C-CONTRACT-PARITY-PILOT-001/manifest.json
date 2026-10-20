@@ -1,7 +1,7 @@
 {
   "schema": "fleetsplice.goal-train.b2-c-parity.v1",
   "goal_id": "FLEETSPLICE-B2-C-CONTRACT-PARITY-PILOT-001",
-  "status": "PLAN_READY_NOT_STARTED",
+  "status": "READY_FOR_OWNER_ROUTE_DECISION",
   "authorization": "BOUNDED_REAL_PASEO_SDK_SANDBOX_VS_FS_ADAPTER_MOCK_PARITY_ONLY",
   "max_wall_minutes": 720,
   "host": "ZENBOOK14",
@@ -45,42 +45,50 @@
     {
       "id": "P00",
       "label": "Source/authority freeze",
-      "budget_minutes": 30
+      "budget_minutes": 30,
+      "actual_status": "COMPLETE"
     },
     {
       "id": "P01",
       "label": "Actual SDK compile/import",
-      "budget_minutes": 120
+      "budget_minutes": 120,
+      "actual_status": "COMPLETE"
     },
     {
       "id": "P02",
       "label": "B2 provider lifecycle in isolated real SDK context",
-      "budget_minutes": 150
+      "budget_minutes": 150,
+      "actual_status": "COMPLETE"
     },
     {
       "id": "P03",
       "label": "FS adapter against same synthetic native fixtures",
-      "budget_minutes": 120
+      "budget_minutes": 120,
+      "actual_status": "COMPLETE"
     },
     {
       "id": "P04",
       "label": "Matched parity suite and evidence",
-      "budget_minutes": 120
+      "budget_minutes": 120,
+      "actual_status": "COMPLETE"
     },
     {
       "id": "P05",
       "label": "Engineering cost/maintenance alternatives",
-      "budget_minutes": 60
+      "budget_minutes": 60,
+      "actual_status": "COMPLETE"
     },
     {
       "id": "P06",
       "label": "Owner route decision pack",
-      "budget_minutes": 60
+      "budget_minutes": 60,
+      "actual_status": "COMPLETE"
     },
     {
       "id": "P07",
       "label": "Sanitized repo publication/stop",
-      "budget_minutes": 60
+      "budget_minutes": 60,
+      "actual_status": "COMPLETE"
     }
   ],
   "expected_study_reports": [
@@ -134,5 +142,47 @@
     "NATIVE_EFFECT_COUNT_ZERO",
     "EXACT_DRAFT_PR_HEAD",
     "ELAPSED_TIME"
-  ]
+  ],
+  "execution": {
+    "initial_pr_head": "935665778af703ce4b37bb2edeabc5d37d1ea428",
+    "node": "24.20.0",
+    "publication": "same Draft PR22; final SHA and elapsed in private receipt",
+    "loader_host": "SYNTHETIC_APP_SESSION_WIRE",
+    "sdk_import": "PASS",
+    "sdk_compile": "PASS",
+    "deadline_utc": "2026-10-20T16:20:55Z",
+    "loader": "REAL_SDK_LOADED_SANDBOX",
+    "live_native": "NOT_RUN",
+    "native_connections": 0,
+    "paseo_main": "ab6cdb7c896f6e79aaae1ce68b59ca44b1a9c19c",
+    "next_candidate": "FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001",
+    "route_recommendation": "C_LOWER_CHANGE_BUT_NATIVE_COMPAT_PENDING",
+    "product_route": "NOT_SELECTED",
+    "focused_test_groups_pass": 18,
+    "sqlite": "3.53.4",
+    "native_port": "SYNTHETIC_NATIVE_PORT",
+    "future_goal_started": false,
+    "sdk_git_head": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+    "private_receipt": "FINAL-RECEIPT.json and OWNER-HANDOFF.md",
+    "pilot_typescript": "5.9.3",
+    "sdk_version": "0.12.0",
+    "case_results": {
+      "B2": {
+        "blocked": 6,
+        "pass": 11,
+        "not_run": 1
+      },
+      "C": {
+        "blocked": 7,
+        "pass": 9,
+        "not_run": 2
+      }
+    },
+    "started_utc": "2026-10-20T04:20:55Z",
+    "native_source": "83086188ae0614bd882818ff1aa23f3194962012",
+    "started_local": "2026-10-20T12:20:55+08:00",
+    "runner_up": "B2_REQUIRES_CUSTOM_CONTROL_OR_B3",
+    "native_effects": 0,
+    "actual_computer_name": "ZENBOOKS14"
+  }
 }

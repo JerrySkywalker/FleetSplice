@@ -1,0 +1,93 @@
+{
+  "schema": "fleetsplice.synthetic-native-contract.v1",
+  "native_version": "0.163-shaped source fixture; no native execution",
+  "native_connections": 0,
+  "native_effects": 0,
+  "cases": [
+    {
+      "id": "CP01",
+      "contract": "Actual SDK compile and exports"
+    },
+    {
+      "id": "CP02",
+      "contract": "Registration, version and capabilities"
+    },
+    {
+      "id": "CP03",
+      "contract": "Existing TUI and Writer conservation"
+    },
+    {
+      "id": "CP04",
+      "contract": "Legacy and modern PID layouts"
+    },
+    {
+      "id": "CP05",
+      "contract": "Incarnation and Windows security proof"
+    },
+    {
+      "id": "CP06",
+      "contract": "Stale identity and workspace"
+    },
+    {
+      "id": "CP07",
+      "contract": "Exact loaded thread without resume"
+    },
+    {
+      "id": "CP08",
+      "contract": "Native event IDs, duplicates and cursor order"
+    },
+    {
+      "id": "CP09",
+      "contract": "Adopted configuration injection"
+    },
+    {
+      "id": "CP10",
+      "contract": "Idle submit and completed native turn"
+    },
+    {
+      "id": "CP11",
+      "contract": "No echoed caller ID"
+    },
+    {
+      "id": "CP12",
+      "contract": "Duplicate, conflict and response loss"
+    },
+    {
+      "id": "CP13",
+      "contract": "Stale expected turn before steer"
+    },
+    {
+      "id": "CP14",
+      "contract": "Untargeted interrupt and approval"
+    },
+    {
+      "id": "CP15",
+      "contract": "Observer close and recovery"
+    },
+    {
+      "id": "CP16",
+      "contract": "Missing daemon or methods"
+    },
+    {
+      "id": "CP17",
+      "contract": "Complete durable history"
+    },
+    {
+      "id": "CP18",
+      "contract": "Public SDK vs custom control boundary"
+    }
+  ],
+  "shared": {
+    "thread": "fixture-thread-1",
+    "workspace": "C:\\synthetic-fleetsplice-pilot\\workspace",
+    "prompt": "Synthetic ACK",
+    "turn_id": "fixture-native-turn-1",
+    "caller_echo_variants": [
+      true,
+      false
+    ],
+    "lost_response": "accepted then reply lost",
+    "duplicate_event_id": "fixture-event-1",
+    "expected_stale_turn": "fixture-stale-turn"
+  }
+}

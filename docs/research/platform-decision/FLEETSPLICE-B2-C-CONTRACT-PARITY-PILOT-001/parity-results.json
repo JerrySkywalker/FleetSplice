@@ -1,0 +1,739 @@
+{
+  "schema": "fleetsplice.parity.results.v1",
+  "fixtureSHA256": "57bb839882143cb86087a94fb64e694fd7f29f35964fa670d2346c18fbfedb55",
+  "native_connections": 0,
+  "native_effects": 0,
+  "product_route": "NOT_SELECTED",
+  "records": [
+    {
+      "case_id": "CP01",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": "",
+      "evidence_level": "REAL_SDK_COMPILED",
+      "artifact_ref": "P04-parity.json#CP01-B2",
+      "observations": "Actual published SDK imports; strict original TS compiled."
+    },
+    {
+      "case_id": "CP01",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "pinned source inspection",
+      "result": "not_run",
+      "grade": "NOT_RUN",
+      "hard_gap": null,
+      "evidence_level": "SOURCE_REVIEWED",
+      "artifact_ref": "P04-parity.json#CP01-C",
+      "observations": "Not an SDK plugin; FS tsc build passed."
+    },
+    {
+      "case_id": "CP02",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "REAL_SDK_LOADED_SANDBOX",
+      "artifact_ref": "P04-parity.json#CP02-B2",
+      "observations": "Official loader lifecycle, protocol 1; incompatible version rejected."
+    },
+    {
+      "case_id": "CP02",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP02-C",
+      "observations": "Unchanged qualify classified the shared fixture ADOPT_FULL; mock missing-target probes only."
+    },
+    {
+      "case_id": "CP03",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Fixture conservation only; real original-TUI binding and Writer custody NOT_MEASURED.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP03-B2",
+      "observations": {
+        "processStarts": 0,
+        "writerCount": 1,
+        "tuiPid": 101,
+        "serverPid": 202
+      }
+    },
+    {
+      "case_id": "CP03",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Fixture conservation only; real original-TUI binding and Writer custody NOT_MEASURED.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP03-C",
+      "observations": {
+        "processStarts": 0,
+        "writerCount": 1,
+        "tuiPid": 101,
+        "serverPid": 202
+      }
+    },
+    {
+      "case_id": "CP04",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Product reads only legacy app-server.pid; modern daemon.pid not supported.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP04-C",
+      "observations": {
+        "legacy": "pass",
+        "daemon": "blocked",
+        "error": "Error: ENOENT synthetic PID layout"
+      }
+    },
+    {
+      "case_id": "CP04",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "No B2 Windows discovery implementation; layout not qualified.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP04-B2",
+      "observations": "Provider receives an already supplied synthetic port."
+    },
+    {
+      "case_id": "CP05",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "No real Windows principal/ACL/kernel peer/PID measurement permitted in this run.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP05-B2",
+      "observations": {
+        "incarnation": "synthetic",
+        "principal": "fixture-owner",
+        "acl": "NOT_MEASURED",
+        "kernelPeer": "NOT_MEASURED",
+        "TUI": "NOT_MEASURED"
+      }
+    },
+    {
+      "case_id": "CP05",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "No real Windows principal/ACL/kernel peer/PID measurement permitted in this run.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP05-C",
+      "observations": {
+        "incarnation": "synthetic",
+        "principal": "fixture-owner",
+        "acl": "NOT_MEASURED",
+        "kernelPeer": "NOT_MEASURED",
+        "TUI": "NOT_MEASURED"
+      }
+    },
+    {
+      "case_id": "CP06",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": "ACL/owner mutation is SOURCE_ONLY; C metadata comparator also does not compare binary hash.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP06-B2",
+      "observations": [
+        {
+          "variation": "serverPid",
+          "code": "IDENTITY_serverPid",
+          "attempts": 0
+        },
+        {
+          "variation": "serverBirth",
+          "code": "IDENTITY_serverBirth",
+          "attempts": 0
+        },
+        {
+          "variation": "workspace",
+          "code": "EXACT_LOADED_THREAD_REQUIRED",
+          "attempts": 0
+        }
+      ]
+    },
+    {
+      "case_id": "CP06",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": "ACL/owner mutation is SOURCE_ONLY; C metadata comparator also does not compare binary hash.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP06-C",
+      "observations": [
+        {
+          "variation": "serverPid",
+          "code": "NATIVE_SERVER_INCARCATION_CHANGED",
+          "attempts": 0
+        },
+        {
+          "variation": "serverBirth",
+          "code": "NATIVE_SERVER_INCARCATION_CHANGED",
+          "attempts": 0
+        },
+        {
+          "variation": "workspace",
+          "code": "NATIVE_WORKSPACE_IDENTITY_CHANGED",
+          "attempts": 0
+        }
+      ]
+    },
+    {
+      "case_id": "CP07",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP07-B2",
+      "observations": {
+        "exactThread": "fixture-thread-1",
+        "resumeCalls": 0
+      }
+    },
+    {
+      "case_id": "CP07",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Attach calls thread/resume even for a loaded thread; fails the no-resume contract.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP07-C",
+      "observations": {
+        "exactThread": "fixture-thread-1",
+        "resumeCalls": 1
+      }
+    },
+    {
+      "case_id": "CP08",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Fixture-only event-ID dedupe, no replay cursor/order recovery; SDK item lacks native turn field.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP08-B2",
+      "observations": {
+        "duplicateInputFrames": 2,
+        "projectedDeltas": 1,
+        "nativeCursor": "not supplied"
+      }
+    },
+    {
+      "case_id": "CP08",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Mapper generates local event IDs; identical native frames project twice; local bus revision is not a native cursor.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP08-C",
+      "observations": {
+        "duplicateInputFrames": 2,
+        "projectedDeltas": 2,
+        "nativeCursor": "not supplied"
+      }
+    },
+    {
+      "case_id": "CP09",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP09-B2",
+      "observations": "Configuration injection refused before any mocked dispatch."
+    },
+    {
+      "case_id": "CP09",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP09-C",
+      "observations": "Configuration injection refused before any mocked dispatch."
+    },
+    {
+      "case_id": "CP10",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP10-B2",
+      "observations": {
+        "attempts": 1,
+        "nativeTurnId": "fixture-native-turn-1",
+        "status": "completed",
+        "nativeEffects": 0
+      }
+    },
+    {
+      "case_id": "CP10",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP10-C",
+      "observations": {
+        "attempts": 1,
+        "nativeTurnId": "fixture-native-turn-1",
+        "status": "completed",
+        "nativeEffects": 0
+      }
+    },
+    {
+      "case_id": "CP11",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP11-B2",
+      "observations": {
+        "receipt": [
+          {
+            "type": "timeline.item",
+            "sessionId": "fixture-session",
+            "item": {
+              "type": "user_message",
+              "id": "fixture-native-item-1",
+              "text": "Synthetic ACK",
+              "clientMessageId": "fixture-command"
+            }
+          },
+          {
+            "type": "session.prompt_result",
+            "sessionId": "fixture-session",
+            "clientMessageId": "fixture-command",
+            "result": {
+              "type": "turn",
+              "turnId": "fixture-native-turn-1"
+            }
+          },
+          {
+            "type": "session.turn",
+            "sessionId": "fixture-session",
+            "turnId": "fixture-native-turn-1",
+            "state": "started"
+          },
+          {
+            "type": "session.turn",
+            "sessionId": "fixture-session",
+            "turnId": "fixture-native-turn-1",
+            "state": "completed"
+          }
+        ],
+        "attempts": 1,
+        "nativeCompleted": "completed"
+      }
+    },
+    {
+      "case_id": "CP11",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Own user item is classified external when caller ID is absent; completed turn becomes ambiguous and control closes.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP11-C",
+      "observations": {
+        "receipt": {
+          "commandId": "fixture-command",
+          "family": "native.submit",
+          "status": "AMBIGUOUS_EFFECT",
+          "code": "NATIVE_STATE_ADVANCED_EXTERNALLY",
+          "daemon": {
+            "executablePath": "C:\\synthetic-fleetsplice-pilot\\codex.exe",
+            "reportedVersion": "codex-cli 0.163.0 (fixture)",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "processId": 202,
+            "processCreationTime": "2020001",
+            "endpoint": "C:\\synthetic-fleetsplice-pilot\\control.sock",
+            "endpointIdentity": "fixture-endpoint-birth",
+            "serverIncarnation": null,
+            "custody": "CODEX_MANAGED_DAEMON"
+          },
+          "threadId": "fixture-thread-1",
+          "turnId": "fixture-native-turn-1",
+          "origin": "NATIVE_ADOPTED",
+          "createdNativeThread": false,
+          "processTerminationClaim": false
+        },
+        "attempts": 1,
+        "nativeCompleted": "completed"
+      }
+    },
+    {
+      "case_id": "CP12",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": "Connection/runtime-scoped safety only; no production restart or cross-client durable dispatch ledger proved.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP12-B2",
+      "observations": {
+        "attempts": 1,
+        "duplicate": "cached",
+        "changedPayload": "rejected",
+        "lostReply": "DELIVERY_UNKNOWN",
+        "newID": "AMBIGUOUS_NO_REPLAY"
+      }
+    },
+    {
+      "case_id": "CP12",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": "Connection/runtime-scoped safety only; no production restart or cross-client durable dispatch ledger proved.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP12-C",
+      "observations": {
+        "attempts": 1,
+        "duplicate": "cached",
+        "changedPayload": "rejected",
+        "lostReply": "NATIVE_OPERATION_UNPROVABLE",
+        "newID": "NATIVE_EFFECT_UNKNOWN_NO_REPLAY"
+      }
+    },
+    {
+      "case_id": "CP13",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": "Public ProviderPrompt has no expected native Turn ID; pilot disables steer.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP13-B2",
+      "observations": {
+        "attempts": 0,
+        "advertised": false
+      }
+    },
+    {
+      "case_id": "CP13",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP13-C",
+      "observations": {
+        "attempts": 0,
+        "code": "NATIVE_STATE_ADVANCED_EXTERNALLY"
+      }
+    },
+    {
+      "case_id": "CP14",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": "Generic interrupt has no expected native turn; permission disabled, no full exact-target UX.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP14-B2",
+      "observations": "Targetless controls rejected; zero mock effects."
+    },
+    {
+      "case_id": "CP14",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP14-C",
+      "observations": "Targetless controls rejected; zero mock effects."
+    },
+    {
+      "case_id": "CP15",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Fresh provider connection / bare FS adapter forgets uncertain delivery and dispatches again. C detects correlation conflict only after that dispatch. Outer Hub durable admission is outside this adapter-only test; no native recovery cursor proved.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP15-B2",
+      "observations": {
+        "writerCount": 1,
+        "processStarts": 0,
+        "reconnectAfterUnknownAttempts": 2,
+        "replayReceipt": [
+          {
+            "type": "timeline.item",
+            "sessionId": "fixture-session",
+            "item": {
+              "type": "user_message",
+              "id": "fixture-native-item-2",
+              "text": "Synthetic ACK",
+              "clientMessageId": "fixture-reconnect-command"
+            }
+          },
+          {
+            "type": "session.prompt_result",
+            "sessionId": "fixture-session",
+            "clientMessageId": "fixture-reconnect-command",
+            "result": {
+              "type": "turn",
+              "turnId": "fixture-native-turn-2"
+            }
+          },
+          {
+            "type": "session.turn",
+            "sessionId": "fixture-session",
+            "turnId": "fixture-native-turn-2",
+            "state": "started"
+          },
+          {
+            "type": "session.turn",
+            "sessionId": "fixture-session",
+            "turnId": "fixture-native-turn-2",
+            "state": "completed"
+          }
+        ],
+        "officialB2Refresh": true
+      }
+    },
+    {
+      "case_id": "CP15",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Fresh provider connection / bare FS adapter forgets uncertain delivery and dispatches again. C detects correlation conflict only after that dispatch. Outer Hub durable admission is outside this adapter-only test; no native recovery cursor proved.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP15-C",
+      "observations": {
+        "writerCount": 1,
+        "processStarts": 0,
+        "reconnectAfterUnknownAttempts": 2,
+        "replayReceipt": {
+          "commandId": "fixture-reconnect-command",
+          "family": "native.submit",
+          "status": "AMBIGUOUS_EFFECT",
+          "code": "NATIVE_OWN_INPUT_CORRELATION_MISMATCH",
+          "daemon": {
+            "executablePath": "C:\\synthetic-fleetsplice-pilot\\codex.exe",
+            "reportedVersion": "codex-cli 0.163.0 (fixture)",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "processId": 202,
+            "processCreationTime": "2020001",
+            "endpoint": "C:\\synthetic-fleetsplice-pilot\\control.sock",
+            "endpointIdentity": "fixture-endpoint-birth",
+            "serverIncarnation": null,
+            "custody": "CODEX_MANAGED_DAEMON"
+          },
+          "threadId": "fixture-thread-1",
+          "turnId": "fixture-native-turn-2",
+          "origin": "NATIVE_ADOPTED",
+          "createdNativeThread": false,
+          "processTerminationClaim": false
+        },
+        "officialB2Refresh": "not applicable"
+      }
+    },
+    {
+      "case_id": "CP16",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": "B2 discovers missing method on attempted mock submit and conservatively holds unknown; no preflight compatibility profile.",
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP16-B2",
+      "observations": "No daemon refused; missing turn/start never dispatches. No managed substitution."
+    },
+    {
+      "case_id": "CP16",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "in-memory native / isolated sandbox",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SYNTHETIC_NATIVE_PORT",
+      "artifact_ref": "P04-parity.json#CP16-C",
+      "observations": "No daemon refused; missing turn/start never dispatches. No managed substitution."
+    },
+    {
+      "case_id": "CP17",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "pinned source inspection",
+      "result": "not_run",
+      "grade": "NOT_RUN",
+      "hard_gap": "Neither plugin timeline nor 12-turn/48-message cache is complete durable history.",
+      "evidence_level": "SOURCE_REVIEWED",
+      "artifact_ref": "P04-parity.json#CP17-B2",
+      "observations": "G08 NOT_IMPLEMENTED / DEFERRED."
+    },
+    {
+      "case_id": "CP17",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "pinned source inspection",
+      "result": "not_run",
+      "grade": "NOT_RUN",
+      "hard_gap": "Neither plugin timeline nor 12-turn/48-message cache is complete durable history.",
+      "evidence_level": "SOURCE_REVIEWED",
+      "artifact_ref": "P04-parity.json#CP17-C",
+      "observations": "G08 NOT_IMPLEMENTED / DEFERRED."
+    },
+    {
+      "case_id": "CP18",
+      "source_commit": "cafe4b01c8522ff39560241c5deb01427dc8dc5b",
+      "package_version": "@getpaseo/plugin@0.12.0",
+      "route": "B2",
+      "test_command": "npm test",
+      "execution_scope": "pinned source inspection",
+      "result": "blocked",
+      "grade": "CONTRACT_BLOCKED",
+      "hard_gap": "Unsupported extra expectedTurnId rejected by actual strict schema; cannot repair core callers with provider alone.",
+      "evidence_level": "SOURCE_REVIEWED",
+      "artifact_ref": "P04-parity.json#CP18-B2",
+      "observations": "PUBLIC_B2: narrow message/list/persistence works. CUSTOM_RPC_B2 or UPSTREAM_B3 needed for full targeted controls."
+    },
+    {
+      "case_id": "CP18",
+      "source_commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "package_version": "FS unchanged source at base",
+      "route": "C",
+      "test_command": "npm test",
+      "execution_scope": "pinned source inspection",
+      "result": "pass",
+      "grade": "PASS_MOCK_ONLY",
+      "hard_gap": null,
+      "evidence_level": "SOURCE_REVIEWED",
+      "artifact_ref": "P04-parity.json#CP18-C",
+      "observations": "FS_C already carries activeTurnId/fence; native compatibility corrections still required."
+    }
+  ]
+}

@@ -1,8 +1,46 @@
 # B2/C actual-SDK contract parity pilot
 
-**GOAL_ID:** `FLEETSPLICE-B2-C-CONTRACT-PARITY-PILOT-001`  
-**Status:** `PLAN_READY_NOT_STARTED` — no SDK test, build or local runtime action has yet been performed for this Goal.  
+**GOAL_ID:** `FLEETSPLICE-B2-C-CONTRACT-PARITY-PILOT-001`
+**Status:** `READY_FOR_OWNER_ROUTE_DECISION` — P00–P07 executed locally; route `NOT_SELECTED`.
 **Execution budget:** at most 12 actual elapsed hours from local launch. Early exit is encouraged once acceptance evidence is sufficient.
+
+## Latest audit — October 20 local Desktop execution
+
+Started **12:20:55 +08:00 / 04:20:55 UTC**, deadline October 21 00:20:55 +08:00.
+Finished early; actual end/elapsed minutes and final publication SHA are in private
+FINAL-RECEIPT.json and OWNER-HANDOFF.md. [Draft PR #22](https://github.com/JerrySkywalker/FleetSplice/pull/22)
+is the sole publication target, kept Draft/unmerged.
+
+Genuine **Paseo SDK 0.12.0** compiled and loaded through the published official
+PluginRuntime/worker/context in an isolated in-process sandbox. Catalog, exact
+synthetic thread open, mock completion, observer close/reconnect and plugin refresh
+passed: **REAL_SDK_LOADED_SANDBOX**. Its app-session wire and native transport are
+synthetic. **Real native connections=0; native effects=0; LIVE_NATIVE=NOT_RUN.**
+
+**18 assertion groups pass / 36 case receipts**, including assertions of known
+blockers. B2: **11 pass / 6 blocked / 1 not_run**; C: **9 / 7 / 2**. Clean project-only
+restore and the one-command runner pass. Only the two admitted research trees
+change; product/upstream/global environment and prior worktrees are preserved.
+
+Conditional recommendation: **C_LOWER_CHANGE_BUT_NATIVE_COMPAT_PENDING**;
+runner-up **B2_REQUIRES_CUSTOM_CONTROL_OR_B3**. C has modern PID-layout, no-resume
+attach and no-echo correlation gaps. Public B2 lacks expected native Turn input.
+Both demonstrate fresh-connection uncertain-delivery replay in this bare-adapter
+scope; event recovery, real Windows/TUI/Writer proof, phone and G08 remain open.
+
+- [01 — actual source/SDK/build/loader](01-SOURCE-SDK-AND-BUILD.md)
+- [02 — matched execution and evidence ceilings](02-PARITY-EXECUTION-AND-TESTS.md)
+- [03 — cost and conditional route recommendation](03-ENGINEERING-COST-AND-DECISION.md)
+- [04 — self-contained Owner handoff and single decision](04-OWNER-HANDOFF.md)
+- [Sanitized case receipts](parity-results.json)
+
+**One Owner decision:** approve the conditional C recommendation and separately
+admit `FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001` as one no-effect correction
+Goal, or retain route-pending status? No future Goal/product patch is admitted
+automatically. G06 → G07 → G08 → G09 → G10 remains unchanged; G08 is DEFERRED.
+
+The following scope and starting-evidence sections preserve the original plan;
+the measured reports above supersede its unexecuted expectations.
 
 ## Owner-authorized decision scope
 
@@ -34,7 +72,7 @@ Foundation pinned Paseo main `eda3e4318f4e06cbe1e1dee8639725d6d95240fc` (package
 - [Pilot harness README](../../../../research/pilots/fleetsplice-b2-c-contract-parity-001/README.md) — test-only implementation and runnable parity fixtures.
 - Canonical harness path: `research/pilots/fleetsplice-b2-c-contract-parity-001/`.
 
-## Required completion artifacts
+## Completion artifact locations
 
 Within this research-doc folder: `01-SOURCE-SDK-AND-BUILD.md`, `02-PARITY-EXECUTION-AND-TESTS.md`, `03-ENGINEERING-COST-AND-DECISION.md`, `04-OWNER-HANDOFF.md`; update this README's actual status and evidence links.
 

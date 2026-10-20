@@ -24,7 +24,8 @@
 - [Technology, reference-source decisions and scope](01-OWNER-TECHNOLOGY-DECISION.md)
 - [Fast development and no-duplicate-CI contract](02-FAST-DEVELOPMENT-CONTRACT.md)
 - [Owner human experience H0–H4](03-HUMAN-EXPERIENCE-GATES.md)
-- Forthcoming in the companion documentation PR: `04-MASTER-DAG-AND-PR-PLAN.md`, `05-COMPLETE-DELIVERY-CHECKLIST.md`, `06-AUTONOMOUS-EXECUTION-RUNBOOK.md`, `manifest.json`, dedicated Goal Train files under `goals/fpx/`.
+- [Master 17-Goal DAG / PR plan](04-MASTER-DAG-AND-PR-PLAN.md), [full product checklist](05-COMPLETE-DELIVERY-CHECKLIST.md), [autonomous runbook](06-AUTONOMOUS-EXECUTION-RUNBOOK.md), [UI acceptance matrix](07-UI-ACCEPTANCE-MATRIX.md), [manifest.json](manifest.json), and [17 individual Goal files](../../../goals/fpx/README.md).
+- [Offline goal verifier and private state tool](08-TOOLING-AND-STATE-CONTRACT.md) at `scripts/fpx-train.mjs`.
 
 The companion PR(s) must merge only after exact-head validation. Existing acceptance/receipt evidence is immutable.
 

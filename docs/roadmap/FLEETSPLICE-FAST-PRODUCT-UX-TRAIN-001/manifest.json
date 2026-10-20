@@ -1,0 +1,418 @@
+{
+  "schema": "fleetsplice.fpx-train.v1",
+  "program_id": "FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001",
+  "status": "APPROVED_SOURCE_PLAN_UNEXECUTED",
+  "date": "2026-10-21",
+  "root_branch": "train/pre-gate-s-development-001",
+  "worktree_root": "C:\\Dev\\worktrees",
+  "artifact_root": "C:\\Dev\\artifacts\\fleetsplice\\FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001",
+  "qualified_tools": "Node 24.20.0 / SQLite 3.53.4 last measured, verify locally; React/Vite/Tauri existing stack",
+  "max_hours_per_codex_session": 12,
+  "authorization": {
+    "local_source": true,
+    "docs": true,
+    "synthetic_fixtures": true,
+    "goal_pr_creation": true,
+    "source_only_ui_development_train_merge": "only after exact-head independent review and targeted tests",
+    "main_merge": false,
+    "old_pr19_23_merge": false,
+    "real_native_effect": false,
+    "real_daemon_mutation": false,
+    "GateS_promotion": false,
+    "production_deployment": false,
+    "release_publish": false,
+    "automatic_human_gate_pass": false
+  },
+  "reference_prs": {
+    "PR20": "8fd8b8d9130a6eb33d5f5831c24ac2ae45c7e791",
+    "PR21": "8da2f2d51997b829dd4796032f021bef04b6d6fa",
+    "PR22": "d6c34e12311e590611e4186efbf766d773eacc7b",
+    "PR23": "2bf6cdf5cddce330e4b26d66a266dee87ce4f7fe"
+  },
+  "gates": [
+    {
+      "id": "H0",
+      "status": "OWNER_ACTION_REQUIRED",
+      "description": "Human local UI first-use, mock allowed"
+    },
+    {
+      "id": "H1",
+      "status": "OWNER_ACTION_REQUIRED",
+      "description": "Corrected FS original TUI real identity and separately authorized effect"
+    },
+    {
+      "id": "GATE_S",
+      "status": "NOT_ADMITTED",
+      "description": "Production infrastructure/operator auth/Tencent/Casdoor"
+    },
+    {
+      "id": "H2",
+      "status": "OWNER_ACTION_REQUIRED",
+      "description": "Real cellular phone G06"
+    },
+    {
+      "id": "G06_ACCEPTED",
+      "status": "NOT_ACCEPTED",
+      "description": "Canonical G06 live acceptance"
+    },
+    {
+      "id": "H3",
+      "status": "OWNER_ACTION_REQUIRED",
+      "description": "Two real Host G07"
+    },
+    {
+      "id": "G07_ACCEPTED",
+      "status": "NOT_ACCEPTED",
+      "description": "Canonical G07 live acceptance"
+    },
+    {
+      "id": "G08_ACCEPTED",
+      "status": "NOT_ACCEPTED",
+      "description": "G08 complete durable history acceptance"
+    },
+    {
+      "id": "G09_ACCEPTED",
+      "status": "NOT_ACCEPTED",
+      "description": "G09 explicit migration or NO_QUALIFIED_TARGET"
+    },
+    {
+      "id": "H4",
+      "status": "OWNER_ACTION_REQUIRED",
+      "description": "Owner release/long history/installed Desktop v0.1"
+    }
+  ],
+  "goals": [
+    {
+      "id": "FLEETSPLICE-FPX-S00-001",
+      "short_id": "S00",
+      "title": "Exact-baseline and PR graph",
+      "track": "COORD",
+      "mode": "LOCAL",
+      "deps": [],
+      "gates": [],
+      "estimated_effort": "0.5–1",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-S00-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 0
+    },
+    {
+      "id": "FLEETSPLICE-FPX-N00-001",
+      "short_id": "N00",
+      "title": "C Native compatibility continuation",
+      "track": "CORE",
+      "mode": "LOCAL",
+      "deps": [
+        "FLEETSPLICE-FPX-S00-001"
+      ],
+      "gates": [],
+      "estimated_effort": "1–3",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-N00-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 1
+    },
+    {
+      "id": "FLEETSPLICE-FPX-N01-001",
+      "short_id": "N01",
+      "title": "Corrected-native H1 handoff",
+      "track": "CORE",
+      "mode": "OWNER_PREP",
+      "deps": [
+        "FLEETSPLICE-FPX-N00-001"
+      ],
+      "gates": [
+        "H1"
+      ],
+      "estimated_effort": "0.5–1",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-N01-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 2
+    },
+    {
+      "id": "FLEETSPLICE-FPX-UX00-001",
+      "short_id": "UX00",
+      "title": "Paseo-inspired UI contract and visual direction",
+      "track": "UX",
+      "mode": "LOCAL",
+      "deps": [
+        "FLEETSPLICE-FPX-S00-001"
+      ],
+      "gates": [],
+      "estimated_effort": "0.5–1",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-UX00-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 3
+    },
+    {
+      "id": "FLEETSPLICE-FPX-UX01-001",
+      "short_id": "UX01",
+      "title": "Fleet shell, session nav and quick switch",
+      "track": "UX",
+      "mode": "LOCAL",
+      "deps": [
+        "FLEETSPLICE-FPX-UX00-001"
+      ],
+      "gates": [],
+      "estimated_effort": "1–2",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-UX01-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 4
+    },
+    {
+      "id": "FLEETSPLICE-FPX-UX02-001",
+      "short_id": "UX02",
+      "title": "Conversation, tool activity and composer",
+      "track": "UX",
+      "mode": "LOCAL",
+      "deps": [
+        "FLEETSPLICE-FPX-UX01-001"
+      ],
+      "gates": [],
+      "estimated_effort": "1–3",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-UX02-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 5
+    },
+    {
+      "id": "FLEETSPLICE-FPX-UX03-001",
+      "short_id": "UX03",
+      "title": "Attention, ownership, approval and review",
+      "track": "UX",
+      "mode": "LOCAL",
+      "deps": [
+        "FLEETSPLICE-FPX-UX02-001"
+      ],
+      "gates": [],
+      "estimated_effort": "1–2",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-UX03-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 6
+    },
+    {
+      "id": "FLEETSPLICE-FPX-UX04-001",
+      "short_id": "UX04",
+      "title": "Mobile, foldable, keyboard and PWA",
+      "track": "UX",
+      "mode": "LOCAL",
+      "deps": [
+        "FLEETSPLICE-FPX-UX03-001"
+      ],
+      "gates": [],
+      "estimated_effort": "1–2",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-UX04-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 7
+    },
+    {
+      "id": "FLEETSPLICE-FPX-UX05-001",
+      "short_id": "UX05",
+      "title": "Tauri Desktop Workspace and Agent Manager",
+      "track": "UX",
+      "mode": "LOCAL",
+      "deps": [
+        "FLEETSPLICE-FPX-UX02-001"
+      ],
+      "gates": [],
+      "estimated_effort": "1–2",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-UX05-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 8
+    },
+    {
+      "id": "FLEETSPLICE-FPX-UX06-001",
+      "short_id": "UX06",
+      "title": "H0 visible prototype, Owner feedback pack",
+      "track": "UX",
+      "mode": "OWNER_PREP",
+      "deps": [
+        "FLEETSPLICE-FPX-UX04-001",
+        "FLEETSPLICE-FPX-UX05-001"
+      ],
+      "gates": [
+        "H0"
+      ],
+      "estimated_effort": "0.5–1",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-UX06-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 9
+    },
+    {
+      "id": "FLEETSPLICE-FPX-G06-001",
+      "short_id": "G06",
+      "title": "Remote phone MVP and H2",
+      "track": "REMOTE",
+      "mode": "SOURCE_THEN_GATE",
+      "deps": [
+        "FLEETSPLICE-FPX-N00-001",
+        "FLEETSPLICE-FPX-UX04-001"
+      ],
+      "gates": [
+        "H0",
+        "H1",
+        "GATE_S",
+        "H2"
+      ],
+      "estimated_effort": "2–5 + infrastructure",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-G06-001.md",
+      "can_run_local_source_before_gates": true,
+      "optional": false,
+      "sequence": 10
+    },
+    {
+      "id": "FLEETSPLICE-FPX-G07-001",
+      "short_id": "G07",
+      "title": "Two-host control and H3",
+      "track": "REMOTE",
+      "mode": "GATED",
+      "deps": [
+        "FLEETSPLICE-FPX-G06-001"
+      ],
+      "gates": [
+        "H2",
+        "G06_ACCEPTED",
+        "H3"
+      ],
+      "estimated_effort": "2–4 + host readiness",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-G07-001.md",
+      "can_run_local_source_before_gates": false,
+      "optional": false,
+      "sequence": 11
+    },
+    {
+      "id": "FLEETSPLICE-FPX-G08-001",
+      "short_id": "G08",
+      "title": "Complete history, recovery and history UI",
+      "track": "CORE",
+      "mode": "GATED",
+      "deps": [
+        "FLEETSPLICE-FPX-G07-001"
+      ],
+      "gates": [
+        "H3",
+        "G07_ACCEPTED"
+      ],
+      "estimated_effort": "4–8 optimistic",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-G08-001.md",
+      "can_run_local_source_before_gates": false,
+      "optional": false,
+      "sequence": 12
+    },
+    {
+      "id": "FLEETSPLICE-FPX-G09-001",
+      "short_id": "G09",
+      "title": "Provider migration or NO_QUALIFIED_TARGET",
+      "track": "CORE",
+      "mode": "GATED",
+      "deps": [
+        "FLEETSPLICE-FPX-G08-001"
+      ],
+      "gates": [
+        "G08_ACCEPTED"
+      ],
+      "estimated_effort": "1–3",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-G09-001.md",
+      "can_run_local_source_before_gates": false,
+      "optional": false,
+      "sequence": 13
+    },
+    {
+      "id": "FLEETSPLICE-FPX-G10-001",
+      "short_id": "G10",
+      "title": "Release, package, H4",
+      "track": "RELEASE",
+      "mode": "GATED",
+      "deps": [
+        "FLEETSPLICE-FPX-G09-001",
+        "FLEETSPLICE-FPX-UX05-001",
+        "FLEETSPLICE-FPX-UX06-001"
+      ],
+      "gates": [
+        "G09_ACCEPTED",
+        "H0",
+        "H1",
+        "H2",
+        "H3",
+        "GATE_S",
+        "H4"
+      ],
+      "estimated_effort": "2–5 + waits",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-G10-001.md",
+      "can_run_local_source_before_gates": false,
+      "optional": false,
+      "sequence": 14
+    },
+    {
+      "id": "FLEETSPLICE-FPX-UX07-001",
+      "short_id": "UX07",
+      "title": "Optional read-only Changes/Diff/PR",
+      "track": "OPTIONAL",
+      "mode": "DEFERRED",
+      "deps": [
+        "FLEETSPLICE-FPX-UX03-001"
+      ],
+      "gates": [
+        "H2"
+      ],
+      "estimated_effort": "1–3 if chosen",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-UX07-001.md",
+      "can_run_local_source_before_gates": false,
+      "optional": true,
+      "sequence": 15
+    },
+    {
+      "id": "FLEETSPLICE-FPX-V02-001",
+      "short_id": "V02",
+      "title": "Post-v0.1 G11–G16 and AI4S",
+      "track": "FUTURE",
+      "mode": "DEFERRED",
+      "deps": [
+        "FLEETSPLICE-FPX-G10-001"
+      ],
+      "gates": [
+        "H4"
+      ],
+      "estimated_effort": "post v0.1",
+      "state": "NOT_STARTED",
+      "path": "goals/fpx/FLEETSPLICE-FPX-V02-001.md",
+      "can_run_local_source_before_gates": false,
+      "optional": true,
+      "sequence": 16
+    }
+  ],
+  "normative_sequence": [
+    "G06",
+    "G07",
+    "G08",
+    "G09",
+    "G10"
+  ],
+  "source_only_integration_without_live_authority": true,
+  "no_fake_gate_propagation": true,
+  "progress_state": "private local file, not updated by planning manifest",
+  "stop_when": "No ready local source goals or elapsed session timebox; print consolidated Owner actions"
+}

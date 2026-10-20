@@ -1,0 +1,138 @@
+{
+  "schema": "fleetsplice.goal-train.b2-c-parity.v1",
+  "goal_id": "FLEETSPLICE-B2-C-CONTRACT-PARITY-PILOT-001",
+  "status": "PLAN_READY_NOT_STARTED",
+  "authorization": "BOUNDED_REAL_PASEO_SDK_SANDBOX_VS_FS_ADAPTER_MOCK_PARITY_ONLY",
+  "max_wall_minutes": 720,
+  "host": "ZENBOOK14",
+  "repository": "JerrySkywalker/FleetSplice",
+  "base_branch": "train/pre-gate-s-development-001",
+  "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+  "head_branch": "research/fs-b2-c-contract-parity-pilot-20261020",
+  "study_root": "docs/research/platform-decision/FLEETSPLICE-B2-C-CONTRACT-PARITY-PILOT-001",
+  "harness_root": "research/pilots/fleetsplice-b2-c-contract-parity-001",
+  "canonical_checkout": "C:\\Dev\\src\\FleetSplice",
+  "worktree_parent": "C:\\Dev\\worktrees",
+  "raw_artifacts": "C:\\Dev\\artifacts\\fleetsplice\\FLEETSPLICE-B2-C-CONTRACT-PARITY-PILOT-001",
+  "study_inputs": [
+    {
+      "repo": "JerrySkywalker/FleetSplice",
+      "pr": 21,
+      "head": "8da2f2d51997b829dd4796032f021bef04b6d6fa",
+      "role": "foundation results and scoped development baseline"
+    },
+    {
+      "repo": "JerrySkywalker/FleetSplice",
+      "pr": 20,
+      "head": "8fd8b8d9130a6eb33d5f5831c24ac2ae45c7e791",
+      "role": "one earlier local native availability proof; zero reusable effects"
+    },
+    {
+      "repo": "JerrySkywalker/FleetSplice",
+      "pr": 19,
+      "head": "25f2bae8b39eb6222c7d2e0b8237227f53504acc",
+      "role": "build/reuse undecided"
+    }
+  ],
+  "paseo_reference": {
+    "older_evaluated_head": "eda3e4318f4e06cbe1e1dee8639725d6d95240fc",
+    "planning_observed_main": "0d61cca50c10c2943f94247c518ab77f4d6a05b2",
+    "planning_plugin_version": "0.12.0",
+    "planning_provider_blob_unchanged": true,
+    "execution_must_repin": true
+  },
+  "phases": [
+    {
+      "id": "P00",
+      "label": "Source/authority freeze",
+      "budget_minutes": 30
+    },
+    {
+      "id": "P01",
+      "label": "Actual SDK compile/import",
+      "budget_minutes": 120
+    },
+    {
+      "id": "P02",
+      "label": "B2 provider lifecycle in isolated real SDK context",
+      "budget_minutes": 150
+    },
+    {
+      "id": "P03",
+      "label": "FS adapter against same synthetic native fixtures",
+      "budget_minutes": 120
+    },
+    {
+      "id": "P04",
+      "label": "Matched parity suite and evidence",
+      "budget_minutes": 120
+    },
+    {
+      "id": "P05",
+      "label": "Engineering cost/maintenance alternatives",
+      "budget_minutes": 60
+    },
+    {
+      "id": "P06",
+      "label": "Owner route decision pack",
+      "budget_minutes": 60
+    },
+    {
+      "id": "P07",
+      "label": "Sanitized repo publication/stop",
+      "budget_minutes": 60
+    }
+  ],
+  "expected_study_reports": [
+    "01-SOURCE-SDK-AND-BUILD.md",
+    "02-PARITY-EXECUTION-AND-TESTS.md",
+    "03-ENGINEERING-COST-AND-DECISION.md",
+    "04-OWNER-HANDOFF.md"
+  ],
+  "expected_harness": [
+    "package.json",
+    "reproducible package lock or equivalent",
+    "src",
+    "tests",
+    "fixtures",
+    "one-command local runner"
+  ],
+  "terminal_dispositions": [
+    "READY_FOR_OWNER_ROUTE_DECISION",
+    "PARTIAL_WITH_SPECIFIC_BLOCKERS",
+    "BLOCKED_WITH_EXACT_CAUSE"
+  ],
+  "allowed_changed_paths": [
+    "docs/research/platform-decision/FLEETSPLICE-B2-C-CONTRACT-PARITY-PILOT-001/**",
+    "research/pilots/fleetsplice-b2-c-contract-parity-001/**"
+  ],
+  "native_server_connections_allowed": 0,
+  "native_effects_allowed": 0,
+  "owner_existing_paseo_plugin_mutation_allowed": false,
+  "upstream_repo_mutation_allowed": false,
+  "native_daemon_lifecycle_mutation_allowed": false,
+  "product_code_mutation_allowed": false,
+  "global_toolchain_mutation_allowed": false,
+  "production_deploy_allowed": false,
+  "new_cloud_resources_allowed": false,
+  "main_merge_allowed": false,
+  "pr_merge_allowed": false,
+  "product_route_adoption_allowed": false,
+  "g08_started": false,
+  "g06_g07_g08_g09_g10_order_preserved": true,
+  "expected_receipts": [
+    "FINAL-RECEIPT.json",
+    "OWNER-HANDOFF.md"
+  ],
+  "required_evidence": [
+    "ACTUAL_SDK_COMPILE_EXIT_AND_PIN",
+    "PLUGIN_LOADER_GRADE",
+    "B2_CASE_RESULTS",
+    "C_CASE_RESULTS",
+    "UNSUPPORTED_HARD_GAPS",
+    "PRODUCT_ROUTE_NOT_SELECTED",
+    "NATIVE_EFFECT_COUNT_ZERO",
+    "EXACT_DRAFT_PR_HEAD",
+    "ELAPSED_TIME"
+  ]
+}

@@ -31,7 +31,7 @@ Foundation pinned Paseo main `eda3e4318f4e06cbe1e1dee8639725d6d95240fc` (package
 - [GOAL-TRAIN.md](GOAL-TRAIN.md) — exact P00–P07 autonomous 12-hour sequence and permissions.
 - [ACCEPTANCE-AND-EVIDENCE.md](ACCEPTANCE-AND-EVIDENCE.md) — matched scenario matrix, evidence levels, no-go and comparison outputs.
 - [manifest.json](manifest.json) — machine-readable scope, inputs, phases, receipts.
-- [Pilot harness README](../../../.. /research/pilots/fleetsplice-b2-c-contract-parity-001/README.md) — **note:** see canonical path below; the relative link should be corrected/validated by the local Implementer before publication.
+- [Pilot harness README](../../../../research/pilots/fleetsplice-b2-c-contract-parity-001/README.md) — test-only implementation and runnable parity fixtures.
 - Canonical harness path: `research/pilots/fleetsplice-b2-c-contract-parity-001/`.
 
 ## Required completion artifacts

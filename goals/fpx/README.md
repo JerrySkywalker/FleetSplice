@@ -2,6 +2,8 @@
 
 Program: [Fast Product+UX Train](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/README.md). These 17 files are **plans**; their existence does not mark code written or H0–H4 accepted.
 
+2026-10-21 执行补充：[源码结果与下一步](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/13-EXECUTION-RESULT-AND-OWNER-HANDOFF.md)、[H0 体验卡](../../docs/ux/fpx-h0-owner-card.md)。独立 Goal 文件继续定义边界，实际完成由精确 PR/回执证明；H0–H4 不会自动通过。
+
 每个文件现有独立的详细执行设计、开发复选清单、精确验收、范围和阻碍/下游。
 先读 [中文完整设计](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/09-COMPLETE-DESIGN-AND-ROADMAP.md)，
 再读 [文件/回执模板](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/10-GOAL-FILE-AND-EXECUTION-MODEL.md)。

@@ -187,6 +187,40 @@ fn open_logs() -> Result<(), String> {
   Command::new("explorer.exe").arg(local_base()?).spawn().map_err(|e| e.to_string())?; Ok(())
 }
 
+fn workspace_navigation_allowed(url: &tauri::Url) -> bool {
+  url.scheme() == "https" || (url.scheme() == "http" && matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]")))
+}
+
+fn workspace_origin(input: &str) -> Result<tauri::Url, String> {
+  let url = tauri::Url::parse(input.trim()).map_err(|_| "WORKSPACE_ORIGIN_REQUIRED")?;
+  if !workspace_navigation_allowed(&url) || !url.username().is_empty() || url.password().is_some()
+    || url.query().is_some() || url.fragment().is_some() || url.path() != "/" {
+    return Err("WORKSPACE_ORIGIN_REQUIRED".into());
+  }
+  Ok(url)
+}
+
+#[tauri::command]
+async fn open_workspace(app: tauri::AppHandle, origin: String) -> Result<(), String> {
+  let url = workspace_origin(&origin)?;
+  if let Some(window) = app.get_webview_window("workspace") {
+    if window.url().map_err(|e| e.to_string())?.origin() != url.origin() {
+      return Err("WORKSPACE_OPEN_AT_ANOTHER_ORIGIN_CLOSE_IT_FIRST".into());
+    }
+    window.show().map_err(|e| e.to_string())?;
+    return window.set_focus().map_err(|e| e.to_string());
+  }
+  let manager = MenuItem::with_id(&app, "return-manager", "Agent Manager", true, None::<&str>).map_err(|e| e.to_string())?;
+  let menu = Menu::with_items(&app, &[&manager]).map_err(|e| e.to_string())?;
+  tauri::WebviewWindowBuilder::new(&app, "workspace", tauri::WebviewUrl::External(url))
+    .title("FleetSplice Workspace").inner_size(1100.0, 760.0).min_inner_size(360.0, 480.0)
+    .zoom_hotkeys_enabled(true).menu(menu)
+    .on_navigation(workspace_navigation_allowed)
+    .on_menu_event(|window, event| { if event.id.as_ref() == "return-manager" { show_main(window.app_handle()); } })
+    .build().map_err(|e| e.to_string())?;
+  Ok(())
+}
+
 fn show_main(app: &tauri::AppHandle) { if let Some(window) = app.get_webview_window("main") { let _ = window.show(); let _ = window.set_focus(); } }
 
 fn main() {
@@ -213,7 +247,7 @@ fn main() {
       }).build(app)?;
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![agent_status, onboard_agent, agent_runtimes, set_runtime_sharing, drain_agent, request_pairing, autostart_enabled, set_autostart, open_dashboard, open_logs])
+    .invoke_handler(tauri::generate_handler![agent_status, onboard_agent, agent_runtimes, set_runtime_sharing, drain_agent, request_pairing, autostart_enabled, set_autostart, open_dashboard, open_logs, open_workspace])
     .run(tauri::generate_context!())
     .expect("FleetSplice Desktop failed to run");
 }
@@ -223,6 +257,37 @@ mod tests {
   use super::{bundled_cli_result, ensure_no_other_running_root, local_workspace_root, read_guard_for_onboarding};
   use std::{env, fs, process::Command};
   use serde_json::json;
+
+  #[test]
+  fn ux05_workspace_requires_token_free_origin_and_web_navigation() {
+    for input in ["https://gateway.example.test", "http://127.0.0.1:43123", "http://[::1]:43123"] {
+      assert!(super::workspace_origin(input).is_ok(), "{input}");
+    }
+    for input in ["http://remote.example.test", "file:///C:/private", "tauri://localhost", "https://user:secret@gateway.example.test", "https://gateway.example.test/#bootstrap=synthetic", "https://gateway.example.test/?token=synthetic", "https://gateway.example.test/path"] {
+      assert_eq!(super::workspace_origin(input).unwrap_err(), "WORKSPACE_ORIGIN_REQUIRED");
+    }
+    assert!(!super::workspace_navigation_allowed(&"http://tauri.localhost".parse().unwrap()));
+  }
+
+  #[test]
+  fn ux05_workspace_management_ipc_is_denied_to_workspace_and_remote_origins() {
+    // Real Tauri ACL/dispatch with its MockRuntime; no production handler,
+    // setup hook, Agent control pipe, autostart plugin or OS window is invoked.
+    let app = tauri::test::mock_builder().invoke_handler(|invoke| {
+      if invoke.message.command() == "agent_status" { invoke.resolver.resolve("fixture-only"); true } else { false }
+    })
+      .build(tauri::generate_context!()).unwrap();
+    let main = tauri::WebviewWindowBuilder::new(&app, "main", tauri::WebviewUrl::App("index.html".into())).build().unwrap();
+    let workspace = tauri::WebviewWindowBuilder::new(&app, "workspace", tauri::WebviewUrl::External("https://gateway.example.test".parse().unwrap())).build().unwrap();
+    let invoke = |window: &tauri::WebviewWindow<tauri::test::MockRuntime>, url: &str| tauri::test::get_ipc_response(window, tauri::webview::InvokeRequest {
+      cmd: "agent_status".into(), callback: tauri::ipc::CallbackFn(0), error: tauri::ipc::CallbackFn(1), url: url.parse().unwrap(),
+      body: tauri::ipc::InvokeBody::default(), headers: Default::default(), invoke_key: tauri::test::INVOKE_KEY.into(),
+    });
+    assert_eq!(invoke(&main, "http://tauri.localhost").unwrap().deserialize::<String>().unwrap(), "fixture-only");
+    assert!(invoke(&workspace, "https://gateway.example.test").is_err());
+    assert!(invoke(&workspace, "http://tauri.localhost").is_err());
+    assert!(invoke(&main, "https://gateway.example.test").is_err());
+  }
 
   #[test]
   fn normal_owner_drive_root_survives_windows_verbatim_canonicalization() {

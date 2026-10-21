@@ -1,0 +1,11 @@
+{
+  "identifier": "agent-manager",
+  "description": "Bundled main Manager only; Workspace and remote origins receive no management IPC.",
+  "windows": ["main"],
+  "local": true,
+  "permissions": [
+    "allow-agent-status", "allow-onboard-agent", "allow-agent-runtimes", "allow-set-runtime-sharing",
+    "allow-drain-agent", "allow-request-pairing", "allow-autostart-enabled", "allow-set-autostart",
+    "allow-open-dashboard", "allow-open-logs", "allow-open-workspace"
+  ]
+}

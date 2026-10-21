@@ -23,8 +23,10 @@ import { AuthoritativeReconcileScheduler, type ReconcileReason } from './reconci
 import { classifyRealtimeRefresh, shouldUpdateLiveTimeline } from './realtime-refresh-policy.ts';
 import { AppShell } from './components/AppShell.tsx';
 import { SessionConfigBar } from './components/SessionConfigBar.tsx';
+import { SessionNavigation, SessionQuickSwitcher } from './components/SessionNavigation.tsx';
+import { readNavigationPreference, saveNavigationPreference } from './layout/session-navigation.ts';
 import {
-  ApprovalCard, OwnershipSurface, ReviewCard, SessionConnectPreview, SessionItem,
+  ApprovalCard, OwnershipSurface, ReviewCard, SessionConnectPreview,
   StreamingMessage, ToolActivityCard,
 } from './components/Presentation.tsx';
 import { SemanticIcon } from './icons/semantic-icons.tsx';
@@ -83,6 +85,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const t = (en: string, zh: string) => locale === 'zh-CN' ? zh : en;
   const [snapshot, setSnapshot] = useState<AdoptionSnapshot | null>(null);
   const [selected, setSelected] = useState('');
+  const [recentSessions, setRecentSessions] = useState<string[]>([]);
+  const [navigationRevision, setNavigationRevision] = useState(0);
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -103,7 +107,20 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const lastTriggerRef = useRef<{ event: string; revision: string | null; turnId: string | null }>({
     event: 'bootstrap', revision: null, turnId: null,
   });
+  const observationRequest = useRef(0);
+  const navigationScope = snapshot ? `${snapshot.incarnation}:${snapshot.workspace}` : '';
+  useEffect(() => {
+    if (!navigationScope) return;
+    const preference = readNavigationPreference(navigationScope);
+    setSelected(preference.selected); setRecentSessions(preference.recent);
+  }, [navigationScope]);
+  function selectSession(threadId: string) {
+    setSelected(threadId);
+    setNavigationRevision(revision => revision + 1);
+    setRecentSessions(saveNavigationPreference(navigationScope, threadId, recentSessions).recent);
+  }
   async function applySnapshot(discover = false, reasons: readonly ReconcileReason[] = ['manual']) {
+    const requestId = ++observationRequest.current;
     const reason = reasons[0] ?? (discover ? 'manual' : 'manual');
     const trigger = lastTriggerRef.current;
     const params = new URLSearchParams();
@@ -114,6 +131,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     const url = `/api/native/snapshot?${params.toString()}`;
     try {
       const next = await request(url);
+      if (requestId !== observationRequest.current) return;
       const row: SnapshotCausalityRow = {
         snapshotSeq: auditRef.current.networkSnapshots.length + 1,
         reconcileReason: reasons.join('+') || reason,
@@ -147,7 +165,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         return advanced;
       });
     }
-    catch (e) { setError(e instanceof Error ? e.message : 'NATIVE_OBSERVATION_LOST'); setSnapshot(old => old ? { ...old, state: 'NATIVE_OBSERVATION_LOST' } : old); }
+    catch (e) { if (requestId === observationRequest.current) { setError(e instanceof Error ? e.message : 'NATIVE_OBSERVATION_LOST'); setSnapshot(old => old ? { ...old, state: 'NATIVE_OBSERVATION_LOST' } : old); } }
   }
   function refresh(discover = false) {
     const scheduler = schedulerRef.current;
@@ -343,22 +361,13 @@ export function NativeAdoption({ client, request, locale, preferences }: {
 
   return <AppShell
     brand={<div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('NATIVE SESSION · LOCAL', '原生会话 · 本地')}</span></div>}
-    headerActions={preferences}
+    headerActions={<><SessionQuickSwitcher threads={snapshot?.threads ?? []} selected={thread?.id ?? ''} onSelect={selectSession} locale={locale} recent={recentSessions} />{preferences}</>}
     navTitle={t('Sessions', '会话')}
+    navigationSelection={`${thread?.id}:${navigationRevision}`}
     contextTitle={t('Context', '上下文')}
     navigation={<>
-      <div className="eyebrow">{t('Native sessions', '原生会话')}</div>
-      {!snapshot?.threads.length && <p className="muted">{t('Waiting for an existing native session.', '等待已有原生会话。')}</p>}
-      {snapshot?.threads.map(item => <SessionItem
-        key={item.id}
-        selected={thread?.id === item.id}
-        title="Codex"
-        subtitle={t('Native session', '原生会话')}
-        workspace={item.workspace}
-        status={`${item.attached ? t('Connected', '已连接') : t('Available', '可连接')} · ${item.status}${item.activeTurnId ? ` · ${t('active turn', '活动轮次')}` : ''}`}
-        connected={!!item.attached}
-        onSelect={() => setSelected(item.id)}
-      />)}
+      <SessionNavigation threads={snapshot?.threads ?? []} selected={thread?.id ?? ''} onSelect={selectSession} locale={locale}
+        controller={controlled} recent={recentSessions} state={snapshot?.state ?? 'CONNECTING'} />
       <button type="button" disabled={busy} onClick={() => void refresh(true)}>{t('Refresh discovery', '刷新发现')}</button>
       <div className="local-note">{t('Local browser only', '仅限本地浏览器')}</div>
     </>}

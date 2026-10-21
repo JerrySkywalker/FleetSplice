@@ -94,7 +94,7 @@ function ResizeHandle({ side, width, min, max, onWidth, label }: {
 
 export function AppShell({
   brand, headerActions, navigation, conversation, context,
-  footer, navTitle, contextTitle,
+  footer, navTitle, contextTitle, navigationSelection,
 }: {
   brand: ReactNode;
   headerActions: ReactNode;
@@ -104,6 +104,7 @@ export function AppShell({
   footer: ReactNode;
   navTitle: string;
   contextTitle: string;
+  navigationSelection?: string;
 }) {
   const breakpoint = useBreakpoint();
   const layoutIntent = layoutIntentFromWebBreakpoint(breakpoint);
@@ -116,6 +117,10 @@ export function AppShell({
   const contextCloseRef = useRef<HTMLButtonElement>(null);
   const desktop = breakpoint === 'desktop';
   const showDrawers = !desktop;
+
+  useEffect(() => {
+    if (navOpen) { setNavOpen(false); navTriggerRef.current?.focus(); }
+  }, [navigationSelection]);
 
   useEffect(() => {
     if (desktop) { setNavOpen(false); setContextOpen(false); }

@@ -1,5 +1,7 @@
 # FleetSplice Fast Product + UX Train (2026-10-21)
 
+> **2026-10-22 follow-up:** Owner requested replacement of the current custom visual language. The [SUI plan](../FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/README.md) is the new presentation entry; previous FPX source results and receipts below remain historical/functional evidence. SUI planning merge is authorized, 60h execution is still pending. This does not pass H0 or resume Native/production work.
+
 `PROGRAM_ID=FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001`  
 `OWNER_DECISION=APPROVED_ROADMAP_AND_LOCAL_SOURCE_EXECUTION`  
 `EXECUTION=OWNER_AUTHORIZED_LOCAL_SOURCE_AFTER_DOCUMENTATION_MERGE`

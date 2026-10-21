@@ -1,5 +1,7 @@
 # FPX cockpit contract — UX00
 
+> **2026-10-22 presentation amendment:** [design.md](design.md) supersedes this document's visual layout, custom skin/token policy and permanent panel treatment for the SUI migration. Preserve the Thread/authority/approval/unknown/IME/receipt semantics below. Actual source migration awaits the separate 60h authorization; this historical SOURCE_COMPLETE receipt is not rewritten.
+
 `GOAL_ID=FLEETSPLICE-FPX-UX00-001` · `STATUS=SOURCE_COMPLETE` · `DATE=2026-10-21`
 
 Base: development `9586c6c031697c5738dc38d9cdebc8ca50fb4ec4`. This is the bounded presentation amendment authorized by the [FPX decision](../roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/01-OWNER-TECHNOLOGY-DECISION.md) and [fast contract](../roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/02-FAST-DEVELOPMENT-CONTRACT.md). Architecture, server authority and native P0 stay in force. Historical G05C receipts remain historical.

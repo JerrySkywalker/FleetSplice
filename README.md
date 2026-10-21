@@ -1,5 +1,7 @@
 # FleetSplice
 
+> UI planning update (2026-10-22): [shadcn migration Goal Train](docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/README.md) · [design contract](docs/ux/design.md). Planning approved; the proposed 60h source execution awaits Owner authorization.
+
 FleetSplice is a self-hosted control plane for coding-agent sessions in existing
 development environments. It is intentionally **not** an IDE/ADE.
 

@@ -1,5 +1,7 @@
 # FleetSplice UI Grammar Lite 0.1
 
+> **2026-10-22:** The [new design.md](design.md) is the prospective SUI presentation authority, replacing old visual/skin/layout constraints while keeping functional and native safety semantics. This frozen document remains historical evidence; no source migration or human acceptance is claimed.
+
 Status: frozen for train `FLEETSPLICE-G05C-UX-R2-DENSITY-SEMANTICS-001`.
 Authority semantics remain Architecture 0.1. This grammar governs presentation only.
 

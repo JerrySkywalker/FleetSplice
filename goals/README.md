@@ -1,5 +1,7 @@
 # FleetSplice Goals
 
+> **Current presentation planning — 2026-10-22:** Read the [SUI Goals](shadcn/README.md), [design.md](../docs/ux/design.md) and [current status](../docs/train/current-status.md). Owner authorized this planning PR merge; the later 60h source window is pending. The older G04A/model/automatic-execution snapshot below is historical and does not override current authority.
+
 The [root train](FLEETSPLICE-FULL-DEVELOPMENT-TRAIN-001.md) and
 [manifest](train-manifest.v1.json) describe the full roadmap. The active Owner
 instruction is bounded [G04A](FLEETSPLICE-G04A-VISIBLE-MVP-PREDEVELOPMENT-CLOSURE-004A.md).

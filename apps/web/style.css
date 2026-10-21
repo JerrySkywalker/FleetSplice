@@ -63,7 +63,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible {
   outline: 2px solid var(--focus); outline-offset: 2px;
 }
-.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
 .primary:hover:not(:disabled) { background: var(--accent-hover); color: var(--on-accent); }
 .ghost-button, .icon-button {
   background: transparent;
@@ -107,7 +107,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .mark {
   display: inline-grid; place-items: center;
   width: 28px; height: 28px; flex-shrink: 0;
-  background: var(--accent); color: var(--on-accent);
+  background: var(--primary); color: var(--primary-foreground);
   border-radius: 8px; font-size: 18px;
 }
 .edition {

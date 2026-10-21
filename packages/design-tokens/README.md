@@ -1,3 +1,5 @@
+> S07 status: retained as historical DTCG/Flutter portability evidence. Active Web/Desktop presentation consumes `packages/ui/styles.css` and the Mira preset. The six old theme files and probe are not product imports.
+
 # FleetSplice design tokens
 
 Small DTCG-aligned token source for Web CSS generation and a Flutter Dart

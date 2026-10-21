@@ -599,8 +599,9 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
         <pre>{JSON.stringify({ daemon: snapshot?.daemon, compatibility: snapshot?.compatibility, observationFailure: snapshot?.observationFailure, createdNativeThread: false }, null, 2)}</pre>
         <pre>{JSON.stringify(snapshot?.receipts.at(-1) ?? null, null, 2)}</pre>
       </details>
+      <p className="local-note">{t('Native TUI availability needs separate verification', '原生 TUI 可用性需另行验证')}</p>
       {fleet}
     </>}
-    footer={<><span>{snapshot?.state ?? 'CONNECTING'}</span><span className="footer-right">{t('Native TUI availability needs separate verification', '原生 TUI 可用性需另行验证')}</span></>}
+    footer={<><span>{snapshot?.state ?? 'CONNECTING'}</span></>}
   />;
 }

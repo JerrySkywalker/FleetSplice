@@ -444,7 +444,7 @@ async function run(): Promise<number> {
 
     // --- Theme gallery dense ---
     await page.setViewportSize({ width: 1440, height: 900 });
-    await setPresentation(page, 'en-US', 'oled-black');
+    await setPresentation(page, 'en-US', 'dark');
     await resetTimelineScroll(page);
     await page.screenshot({ path: path.join(evidenceRoot, 'desktop-oled-dense.png'), fullPage: true });
     checks.push(check('OLED_TRUE_BLACK', await oledTrueBlack(page), 'canvas/body true black'));
@@ -454,7 +454,7 @@ async function run(): Promise<number> {
 
     // Desktop geometry
     await page.setViewportSize({ width: 1440, height: 900 });
-    await setPresentation(page, 'en-US', 'oled-black');
+    await setPresentation(page, 'en-US', 'dark');
     await page.locator('#native-prompt').fill('');
     await waitIdle(page);
     const desktopGeom = await measureComposerGeometry(page);
@@ -617,7 +617,7 @@ async function run(): Promise<number> {
     checks.push(check('ICON_ACCESSIBLE_NAMES', !!navLabel && !!ctxLabel, `nav=${navLabel} ctx=${ctxLabel}`));
 
     // --- Tablet interaction ---
-    await setPresentation(page, 'en-US', 'midnight');
+    await setPresentation(page, 'en-US', 'dark');
     await expect(page.getByTestId('app-shell')).toHaveAttribute('data-breakpoint', 'tablet');
     await page.locator('#native-prompt').fill('');
     checks.push(check('NO_OVERFLOW_TABLET', await noHorizontalOverflow(page), '1024x768'));
@@ -739,7 +739,7 @@ async function run(): Promise<number> {
 
     // Element clipping scan (connected desktop)
     await page.setViewportSize({ width: 1440, height: 900 });
-    await setPresentation(page, 'en-US', 'oled-black');
+    await setPresentation(page, 'en-US', 'dark');
     await waitIdle(page);
     const clipOffenders = await scanClipping(page);
     density.clipping = clipOffenders;

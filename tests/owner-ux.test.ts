@@ -48,17 +48,17 @@ test('locale and all appearances persist independently and survive a new read', 
   assert.equal(persistPreference(denied, 'appearance', 'light'), false);
   assert.equal(persistPreference(undefined, 'locale', 'en-US'), false);
 });
-test('exactly seven appearances resolve system changes and respect explicit overrides', () => {
-  assert.deepEqual([...appearances], ['system', 'light', 'dark', 'oled-black', 'midnight', 'graphite', 'warm']);
+test('three appearances and legacy aliases resolve system changes and respect explicit overrides', () => {
+  assert.deepEqual([...appearances], ['system', 'light', 'dark']);
   assert.equal(resolveAppearance('unknown'), 'system');
   for (const dark of [true, false]) {
     assert.equal(resolveTheme('system', dark), dark ? 'dark' : 'light');
-    for (const explicit of ['light', 'dark', 'oled-black', 'midnight', 'graphite', 'warm'] as const) assert.equal(resolveTheme(explicit, dark), explicit);
+    for (const explicit of ['light', 'dark'] as const) assert.equal(resolveTheme(explicit, dark), explicit);
   }
 });
 test('blocking prepaint bootstrap matches typed preferences, including denied storage', () => {
   const source = readFileSync('apps/web/public/assets/preferences-init.js', 'utf8');
-  for (const explicitLocale of [null, 'en-US', 'zh-CN', 'invalid']) for (const explicitAppearance of [null, ...appearances, 'invalid']) {
+  for (const explicitLocale of [null, 'en-US', 'zh-CN', 'invalid']) for (const explicitAppearance of [null, ...appearances, 'oled-black', 'midnight', 'graphite', 'warm', 'invalid']) {
     for (const language of ['zh-CN', 'en-US']) for (const systemDark of [false, true]) {
       const root = { lang: '', dataset: {} as Record<string, string> };
       const storage = { getItem: (key: string) => key === preferenceKeys.locale ? explicitLocale : explicitAppearance };
@@ -74,4 +74,11 @@ test('blocking prepaint bootstrap matches typed preferences, including denied st
   const html = readFileSync('apps/web/index.html', 'utf8');
   assert.ok(html.indexOf('src="/assets/preferences-init.js"') < html.indexOf('src="/main.tsx"'));
   assert.ok(!/\b(?:async|defer|type="module")\b/.test(html.match(/<script[^>]*preferences-init[^>]*>/)![0]));
+});
+
+test('legacy appearances preserve locale and unrelated session preferences', () => {
+  for (const [legacy,expected] of [['oled-black','dark'],['midnight','dark'],['graphite','dark'],['warm','light']] as const) {
+    const storage={getItem:(key:string)=>key===preferenceKeys.appearance?legacy:'zh-CN',setItem:()=>{throw Error('read must not mutate storage');}};
+    assert.deepEqual(readPreferences(storage,['en-US']),{locale:'zh-CN',appearance:expected});
+  }
 });

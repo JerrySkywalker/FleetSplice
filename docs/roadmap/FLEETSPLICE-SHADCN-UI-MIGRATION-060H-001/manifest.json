@@ -143,11 +143,12 @@
         "FLEETSPLICE-SUI-S05-001",
         "FLEETSPLICE-SUI-S06-001"
       ],
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "planned_hours": 5,
       "mode": "SOURCE_ONLY_AFTER_AUTHORIZATION",
       "human_gate_prerequisites": [],
-      "acceptance_gates": []
+      "acceptance_gates": [],
+      "receipt": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S07.md"
     },
     {
       "id": "FLEETSPLICE-SUI-S08-001",

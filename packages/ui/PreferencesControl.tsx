@@ -29,7 +29,6 @@ export function PreferencesControl({ locale, appearance, saved, onLocale, onAppe
         <label className="grid gap-2 text-sm" htmlFor="appearance">{t('appearance')}
           <NativeSelect id="appearance" className={fieldClass} data-testid="appearance-select" value={appearance} onChange={event => onAppearance(event.target.value as Appearance)}>
             <NativeSelectOption value="system">{t('system')}</NativeSelectOption><NativeSelectOption value="light">{t('light')}</NativeSelectOption><NativeSelectOption value="dark">{t('dark')}</NativeSelectOption>
-            <NativeSelectOption value="oled-black">{t('oledBlack')}</NativeSelectOption><NativeSelectOption value="midnight">{t('midnight')}</NativeSelectOption><NativeSelectOption value="graphite">{t('graphite')}</NativeSelectOption><NativeSelectOption value="warm">{t('warm')}</NativeSelectOption>
           </NativeSelect>
         </label>
       </div>

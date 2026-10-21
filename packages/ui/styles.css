@@ -138,6 +138,11 @@
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
 }
 
-/* One shared readable control scale; component geometry remains Mira. */
-:where([data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="command-input"], [data-slot="dialog-description"]) { font-size: 14px; }
 
+/* Shared business states supplement the fixed Zinc palette; labels also convey state. */
+:root { --success:#227354; --attention:#925d12; --warning-bg:color-mix(in oklch,var(--background),#d89c37 10%); --warning-border:#ad7924; --ring:oklch(0.552 0.016 285.938); }
+:root[data-theme="dark"], .dark { --success:#80cba4; --attention:#e1b862; --ring:oklch(0.705 0.015 286.067); }
+@layer base {
+  :focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+  @media(max-width:1279px) { button:not(.resize-handle), input:not([type="checkbox"]), select { min-height:44px; } }
+}

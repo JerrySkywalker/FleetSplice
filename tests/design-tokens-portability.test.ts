@@ -67,8 +67,8 @@ test('skin-probe fixture changes accent/surface/radius without being a user them
   assert.match(skinCss, /data-skin-probe="true"/);
   assert.match(skinCss, /--accent: #7a2f6b/);
   assert.match(skinCss, /--radius-md: 4px/);
-  // Preferences theme IDs remain the production set — probe is attribute-gated.
-  const prefs = readFileSync(path.join(root, 'apps/web/preferences.ts'), 'utf8');
+  // Historical probe stays out of production; old theme IDs survive only as preference aliases.
+  const prefs = readFileSync(path.join(root, 'packages/ui/preferences.ts'), 'utf8');
   assert.match(prefs, /oled-black/);
   assert.doesNotMatch(prefs, /skin-probe/);
 });

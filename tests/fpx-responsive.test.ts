@@ -10,7 +10,7 @@ import { startHub } from '../apps/hub/server.ts';
 import { target } from './helpers.ts';
 import type { AdoptionSnapshot, NativeThread } from '../packages/native-adoption/types.ts';
 
-const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S05/responsive');
+const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S07/responsive');
 
 test('FPX UX04: PWA assets are narrowly served with explicit MIME and no-store', async () => {
   mkdirSync(artifacts, { recursive: true });

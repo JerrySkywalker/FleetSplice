@@ -6,9 +6,9 @@ is the registry configuration; `provenance.json` records the generating CLI and
 unmodified generation hashes. Internal imports use relative `.tsx` paths for the
 existing NodeNext build. Applicable source and font notices are in `licenses/`.
 
-`styles.css` owns semantic colors. `legacy-adapter.css` temporarily maps existing
-layout names; the former text color `--muted` is explicitly migrated to
-`--muted-foreground`. Historical DTCG proofs remain historical evidence.
+`styles.css` owns semantic colors, business status colors and the shared control scale.
+Web and Desktop consume the same system/light/dark preset; historical DTCG/Flutter
+proofs remain historical evidence and are not imported into product CSS.
 
 The development-only `/ui-gallery.html` route demonstrates real controls and
 portals without initializing a FleetSplice or native client. It is not included

@@ -23,19 +23,22 @@ export async function inspectContrast(page: Page) {
   const rows = await page.evaluate(() => {
     const selectors = ['.brand', '.mark', '.empty-symbol', '.empty p', '.eyebrow', '.subtitle', '.session.selected', '.session.selected small', '.workspace small',
       '.local-note', '.status', '.context .muted', '.context dt', '.context dd', '.control-next', '.composer label',
-      '.message-text', '.message-label', 'footer', 'button:not(:disabled)', 'input', 'dialog[open] h2', 'dialog[open] label', 'dialog[open] select', 'dialog[open] p'];
+      '.message-text', '.message-label', 'footer', 'button:not(:disabled)', 'input:not(:disabled)', '[role=dialog] h2', '[role=dialog] label', '[role=dialog] select', '[role=dialog] p'];
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+    const paint = canvas.getContext('2d', { willReadFrequently: true })!;
     return selectors.flatMap(selector => [...document.querySelectorAll<HTMLElement>(selector)].filter(element => element.checkVisibility()).map(element => {
-      let current: Element | null = element; let background = '';
-      while (current) {
-        background = getComputedStyle(current).backgroundColor;
-        if (background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent') break;
-        current = current.parentElement;
-      }
-      return { selector, foreground: getComputedStyle(element).color, background };
+      const ancestors: Element[] = []; let current: Element | null = element;
+      while (current) { ancestors.unshift(current); current = current.parentElement; }
+      paint.clearRect(0, 0, 1, 1); paint.fillStyle = '#fff'; paint.fillRect(0, 0, 1, 1);
+      for (const ancestor of ancestors) { paint.fillStyle = getComputedStyle(ancestor).backgroundColor; paint.fillRect(0, 0, 1, 1); }
+      const background = [...paint.getImageData(0, 0, 1, 1).data].slice(0, 3);
+      paint.fillStyle = getComputedStyle(element).color; paint.fillRect(0, 0, 1, 1);
+      const foreground = [...paint.getImageData(0, 0, 1, 1).data].slice(0, 3);
+      return { selector, foreground, background };
     }));
   });
-  const luminance = (color: string) => {
-    const components = color.match(/[\d.]+/g)!.map(Number).slice(0, 3).map(value => {
+  const luminance = (color: number[]) => {
+    const components = color.map(value => {
       const channel = value / 255; return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
     });
     return .2126 * components[0]! + .7152 * components[1]! + .0722 * components[2]!;

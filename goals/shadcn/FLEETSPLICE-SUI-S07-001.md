@@ -1,6 +1,6 @@
 # FLEETSPLICE-SUI-S07-001 — 旧外观退出与视觉收敛
 
-状态：NOT_STARTED；计划日期：2026-10-22；计划额度：5h（不要求耗尽）。
+状态：SOURCE_COMPLETE（实现与定向检查；不代表 H0）；计划日期：2026-10-22；计划额度：5h（不要求耗尽）。
 依赖：[S05](FLEETSPLICE-SUI-S05-001.md)、[S06](FLEETSPLICE-SUI-S06-001.md)。目标分支：train/pre-gate-s-development-001。
 
 ## 权威入口
@@ -29,13 +29,13 @@ Implementer为唯一intentional writer；仓库/Git写前持有coordinator write
 
 ## 开发清单
 
-- [ ] 基于引用证据删除已替代样式和重复原件，逐一检查可达legacy managed表面，不为宣布完成删除功能入口。
-- [ ] 把oled-black/midnight/graphite映射dark、warm映射light，system/light/dark原义不变，保留locale及非外观偏好。
-- [ ] 移除产品活动CSS对六种旧皮肤的依赖；历史DTCG/Flutter证明保留出处，不为迁移重写旧收据。
-- [ ] 检查中英文文案、长路径/名称、焦点、颜色之外的状态语义和触屏44px区域。
-- [ ] 仅添加帮助展开/关闭/选择的短过渡与反馈，尊重reduced-motion；React Bits默认不安装，避免装饰性背景和持续动画。
-- [ ] 将最终component/token/pattern约束与实际实现对齐，清除过期导航/截图说明，保留明确历史标识。
-- [ ] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
+- [x] 基于引用证据删除已替代样式和重复原件，逐一检查可达legacy managed表面，不为宣布完成删除功能入口。
+- [x] 把oled-black/midnight/graphite映射dark、warm映射light，system/light/dark原义不变，保留locale及非外观偏好。
+- [x] 移除产品活动CSS对六种旧皮肤的依赖；历史DTCG/Flutter证明保留出处，不为迁移重写旧收据。
+- [x] 检查中英文文案、长路径/名称、焦点、颜色之外的状态语义和触屏44px区域。
+- [x] 仅添加帮助展开/关闭/选择的短过渡与反馈，尊重reduced-motion；React Bits默认不安装，避免装饰性背景和持续动画。
+- [x] 将最终component/token/pattern约束与实际实现对齐，清除过期导航/截图说明，保留明确历史标识。
+- [x] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
 
 ## 最小检查与通过标准
 
@@ -52,3 +52,7 @@ SOURCE_COMPLETE需要真实产物与受影响验证；不是H0或Native可用性
 不做相邻后端清理、Flutter应用或六套新皮肤；预算不足则列明未迁移表面。
 达到总60h截止前保存部分提交/patch与回执；恢复从私有state和有效证据继续，不重跑无变化审计。
 实际阻碍只阻止依赖项；有独立就绪项时继续。下一项：S08。
+
+## 本次执行回执
+
+见 [S07 回执](../../docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S07.md)。执行授权见本 train EXECUTION-AUTHORIZATION.md。

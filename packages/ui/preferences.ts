@@ -1,5 +1,5 @@
 import { locales, type Locale } from './i18n.ts';
-export const appearances = ['system', 'light', 'dark', 'oled-black', 'midnight', 'graphite', 'warm'] as const;
+export const appearances = ['system', 'light', 'dark'] as const;
 export type Appearance = typeof appearances[number];
 export type ResolvedTheme = Exclude<Appearance, 'system'>;
 export type Preferences = { locale: Locale; appearance: Appearance };
@@ -10,6 +10,8 @@ export function resolveLocale(explicit: unknown, languages: readonly string[]): 
   return /^zh(?:-|$)/i.test(languages[0] ?? '') ? 'zh-CN' : 'en-US';
 }
 export function resolveAppearance(explicit: unknown): Appearance {
+  if (['oled-black', 'midnight', 'graphite'].includes(explicit as string)) return 'dark';
+  if (explicit === 'warm') return 'light';
   return appearances.includes(explicit as Appearance) ? explicit as Appearance : 'system';
 }
 export function resolveTheme(appearance: Appearance, systemDark: boolean): ResolvedTheme {

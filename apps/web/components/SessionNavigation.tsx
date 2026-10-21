@@ -18,7 +18,7 @@ export function SessionNavigation({ threads, selected, onSelect, locale, control
   const matches = matchingSessions(threads, query, recent);
   const workspaces = [...new Set(matches.map(thread => thread.workspace))];
   return <nav className="session-navigation" aria-label={zh ? 'Fleet 会话' : 'Fleet sessions'}>
-    <h2 className="mb-3 text-sm font-medium">{zh ? '会话' : 'Sessions'}</h2>
+    <h2 className="session-nav-title mb-3 text-sm font-medium">{zh ? '会话' : 'Sessions'}</h2>
     <label className="relative block"><Search size={14} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/><Input className="h-9 pl-9 max-sm:h-11" type="search" value={query}
       aria-label={zh ? '搜索会话' : 'Search sessions'} placeholder={zh ? '搜索会话' : 'Search sessions'} onChange={event => setQuery(event.target.value)}/></label>
     <div className="navigation-observation" role="status">{state === 'READY' ? (zh ? `${threads.length} 个本地会话` : `${threads.length} local sessions`) : state}</div>
@@ -29,7 +29,7 @@ export function SessionNavigation({ threads, selected, onSelect, locale, control
       {matches.filter(thread => thread.workspace === workspace).map(thread => <SessionItem key={thread.id}
         selected={selected === thread.id} title={sessionTitle(thread)} subtitle={`Codex · ${thread.id.slice(0, 12)} · NATIVE_ADOPTED`}
         workspace={thread.workspace} connected={thread.attached} onSelect={() => onSelect(thread.id)}
-        status={`${thread.attached ? (controller ? 'Controller' : 'Viewer') : (zh ? '未连接' : 'Not connected')} · ${state === 'READY' ? thread.status : (zh ? '观察不可用' : 'Observation unavailable')}`} />)}
+        status={`${thread.attached ? (controller ? (zh ? '控制者' : 'Controller') : (zh ? '只读观察' : 'Viewer')) : (zh ? '未连接' : 'Not connected')} · ${state === 'READY' ? (zh ? ({ idle: '空闲', active: '工作中' }[thread.status] ?? thread.status) : thread.status) : (zh ? '观察不可用' : 'Observation unavailable')}`} />)}
     </section>)}
   </nav>;
 }

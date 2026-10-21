@@ -75,7 +75,7 @@ async function run(): Promise<number> {
     }
 
     await page.setViewportSize({ width: 1440, height: 900 });
-    for (const theme of ['light', 'dark', 'oled-black'] as const) {
+    for (const theme of ['light', 'dark'] as const) {
       await setPresentation(page, 'en-US', theme);
       await page.waitForTimeout(150);
       await page.screenshot({
@@ -88,7 +88,7 @@ async function run(): Promise<number> {
       capturedAt: new Date().toISOString(),
       head: process.env.FLEETSPLICE_BASELINE_HEAD ?? 'bf7184f8f9403c0bcdedd476e8831b530830a248',
       viewports: viewports.map(v => v.name),
-      themes: ['light', 'dark', 'oled-black'],
+      themes: ['light', 'dark'],
       observations: [
         'Desktop uses fixed three-column grid (nav | conversation | context) with no resize/collapse.',
         'Model/permission appear only as status summary and context dl; no composer control bar.',
@@ -96,7 +96,7 @@ async function run(): Promise<number> {
         'Acquire and Release controls both visible; Acquire disabled when controller present.',
         'External advance notice duplicates review action also available in composer mode=review.',
         'Narrow breakpoints stack columns but still render miniature side panels instead of drawers.',
-        'Themes: system/light/dark/oled-black only; midnight/graphite/warm missing.',
+        'Current preset: system/light/dark; legacy IDs map to these modes.',
         'Repeated information: model/permission/controller shown in header summary and context panel.',
         'Inspector dumps raw JSON prominently in context panel.',
         'Composer has Send/Steer/Interrupt but configuration lives in sidebar (managed) or is observe-only (native).',
@@ -136,7 +136,7 @@ History + provisional + flat live rows. Tool activity appears as system-like deb
 Ownership buttons (Acquire+Release simultaneous), model/permission dl, activity list, Inspector with raw JSON.
 
 ## Theme presentation
-Four appearances (system/light/dark/oled-black). OLED uses true black canvas. Missing product themes: midnight, graphite, warm.
+Mira preset: system/light/dark; legacy themes are preference aliases only.
 
 ## Streaming presentation
 Live deltas/finals/tools render as separate flat articles keyed by eventId; semantic tool cards and in-place growth indicators are absent.

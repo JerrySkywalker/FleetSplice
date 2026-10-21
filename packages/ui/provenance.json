@@ -24,9 +24,9 @@
   },
   "local_changes": [
     "Registry internal @/components/ui imports rewritten to explicit relative .tsx for NodeNext.",
-    "Shared CSS font adds Chinese system fallbacks; dark variant also reads data-theme; temporary legacy layout adapters.",
     "Official shadcn 4.22.1 tailwind.css vendored verbatim with MIT notice; CLI excluded from app dependencies.",
-    "Shared 14px control text scale; original Mira component classes retained."
+    "Chinese system font fallbacks and data-theme dark variant; legacy adapter removed at S07.",
+    "Readable 14px control text classes in Button, Input, Textarea, NativeSelect and DialogDescription; Mira geometry retained."
   ],
   "native_connections": 0,
   "native_effects": 0,

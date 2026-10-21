@@ -6,8 +6,9 @@
   const locale = ['zh-CN', 'en-US'].includes(savedLocale) ? savedLocale
     : /^zh(?:-|$)/i.test(navigator.languages?.[0] ?? navigator.language ?? '') ? 'zh-CN' : 'en-US';
   const savedAppearance = read('fleetsplice.appearance');
-  const appearances = ['system', 'light', 'dark', 'oled-black', 'midnight', 'graphite', 'warm'];
-  const appearance = appearances.includes(savedAppearance) ? savedAppearance : 'system';
+  const appearances = ['system', 'light', 'dark'];
+  const appearance = ['oled-black', 'midnight', 'graphite'].includes(savedAppearance) ? 'dark'
+    : savedAppearance === 'warm' ? 'light' : appearances.includes(savedAppearance) ? savedAppearance : 'system';
   document.documentElement.lang = locale;
   document.documentElement.dataset.appearance = appearance;
   document.documentElement.dataset.theme = appearance === 'system'

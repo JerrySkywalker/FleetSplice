@@ -37,6 +37,8 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
   try {
     await page.goto(`${origin}/#bootstrap=${bootstrapToken}`);
     await expectState(page.getByTestId('connection-status'), 'READY');
+    await page.getByTestId('toggle-right').click();
+    await page.getByTestId('fleet-overview-trigger').click();
     await expect(page.getByTestId('fleet-summary')).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Fleet navigation' }).getByRole('button', { name: 'Settings' })).toBeVisible();
     await page.getByRole('navigation', { name: 'Fleet navigation' }).getByRole('button', { name: 'Settings' }).click();
@@ -73,7 +75,7 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     try {
       await expect(page.getByTestId('lane-state')).toHaveAttribute('data-state', 'PENDING');
       await expect(page.getByTestId('lane-state')).toHaveText('Pending');
-      await setPresentation(page, 'zh-CN', 'oled-black');
+      await setPresentation(page, 'zh-CN', 'dark');
       await expect(page.getByTestId('lane-state')).toHaveAttribute('data-state', 'PENDING');
       await expect(page.getByTestId('lane-state')).toHaveText('处理中');
       await expect(page.getByRole('navigation', { name: '会话' }).locator('small').first()).toHaveText('处理中');
@@ -93,7 +95,7 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     };
     page.on('request', observePreferences);
     const contrast: unknown[] = [];
-    for (const [locale, theme] of [['zh-CN', 'oled-black'], ['en-US', 'dark'], ['zh-CN', 'light']] as const) {
+    for (const [locale, theme] of [['zh-CN', 'dark'], ['en-US', 'dark'], ['zh-CN', 'light']] as const) {
       await setPresentation(page, locale, theme);
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await expectState(page.getByTestId('lane-state'), 'IDLE', locale);
@@ -103,12 +105,11 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
       contrast.push({ locale, theme, dialog: await inspectContrast(page) });
       for (let tab = 0; tab < 6; tab++) {
         await page.keyboard.press('Tab');
-        assert.equal(await page.evaluate(() => document.querySelector('dialog')!.contains(document.activeElement)), true);
+        assert.equal(await page.evaluate(() => document.querySelector('[role=dialog]')!.contains(document.activeElement)), true);
       }
       await page.keyboard.press('Escape'); await expect(page.getByTestId('preferences')).toBeFocused();
-      if (theme === 'oled-black') {
-        assert.equal(await page.locator('main').evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(0, 0, 0)');
-        await page.screenshot({ path: 'test-results/synthetic-zh-CN-oled-black.png', fullPage: true });
+      if (theme === 'dark') {
+        await page.screenshot({ path: 'test-results/synthetic-zh-CN-dark.png', fullPage: true });
       }
       await page.emulateMedia({ colorScheme: theme === 'light' ? 'dark' : 'light' });
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
@@ -121,7 +122,7 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     for (const width of [320, 390, 768]) {
       await page.setViewportSize({ width, height: 844 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'narrow UI must not overflow');
-      await expect(page.locator('.context')).toBeVisible();
+      await page.getByTestId('context-menu').click(); await expect(page.getByTestId('context-drawer')).toBeVisible(); await page.keyboard.press('Escape');
       await page.getByRole('button', { name: 'Release control' }).scrollIntoViewIfNeeded();
       await expect(page.getByRole('button', { name: 'Release control' })).toBeInViewport();
       await page.getByTestId('preferences').click();
@@ -132,7 +133,7 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     await setPresentation(page, 'en-US', 'light');
     assert.deepEqual(await page.evaluate(() => [localStorage.getItem('fleetsplice.locale'), localStorage.getItem('fleetsplice.appearance')]), ['en-US', 'light']);
     // Main bundle blocked: saved presentation must already apply without React or a new client.
-    for (const [locale, theme] of [['zh-CN', 'oled-black'], ['en-US', 'light']] as const) {
+    for (const [locale, theme] of [['zh-CN', 'dark'], ['en-US', 'light']] as const) {
       await setPresentation(page, locale, theme);
       const prepaint = await context.newPage();
       await prepaint.route('**/assets/index-*.js', route => route.abort());
@@ -164,7 +165,7 @@ test('SYNTHETIC_BROWSER: create, control, stream rendering, viewer and loss look
     await expectState(page.getByTestId('lane-state'), 'RUNNING');
     await expect(page.getByRole('button', { name: 'Check command receipt' })).toBeEnabled();
     const pendingBeforeSwitch = await page.evaluate(() => sessionStorage.getItem('fleetsplice.pending'));
-    await setPresentation(page, 'zh-CN', 'oled-black');
+    await setPresentation(page, 'zh-CN', 'dark');
     await expect(page.getByRole('button', { name: '查询命令回执' })).toBeVisible();
     await expectState(page.getByTestId('lane-state'), 'RUNNING', 'zh-CN');
     await setPresentation(page, 'en-US', 'light');

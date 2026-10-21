@@ -10,6 +10,11 @@ import { BrowserClientSession } from './client-session.ts';
 import { SessionConfigBar } from './components/SessionConfigBar.tsx';
 import { OwnershipSurface } from './components/Presentation.tsx';
 import { GatewayDashboard } from './components/GatewayDashboard.tsx';
+import { AppShell } from './components/AppShell.tsx';
+import { Button } from '../../packages/ui/components/button.tsx';
+import { Input } from '../../packages/ui/components/input.tsx';
+import { NativeSelect, NativeSelectOption } from '../../packages/ui/components/native-select.tsx';
+import { InputGroup, InputGroupTextarea, InputGroupAddon } from '../../packages/ui/components/input-group.tsx';
 import './style.css';
 
 type Client = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; csrf: string };
@@ -35,7 +40,9 @@ function App() {
   useLayoutEffect(() => {
     document.documentElement.lang = locale; document.title = translate(locale, 'pageTitle');
     document.documentElement.dataset.appearance = appearance;
-    document.documentElement.dataset.theme = resolveTheme(appearance, systemDark);
+    const theme = resolveTheme(appearance, systemDark);
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#18181b' : '#ffffff');
   }, [locale, appearance, systemDark]);
   const changeLocale = (value: Locale) => { setLocale(value); const saved = persistPreference(browserStorage(), 'locale', value); setPreferenceSaves(previous => ({ ...previous, locale: saved })); };
   const changeAppearance = (value: Appearance) => { setAppearance(value); const saved = persistPreference(browserStorage(), 'appearance', value); setPreferenceSaves(previous => ({ ...previous, appearance: saved })); };
@@ -212,31 +219,44 @@ function App() {
   }
   if (nativeMode && client) return <div className="native-workspace"><NativeAdoption client={client} request={request} locale={locale} fleet={<GatewayDashboard locale={locale} request={request} ready={true} compact/>}
     preferences={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}/></div>;
-  return <div className="shell">
-    <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('edition')}</span></div><div className="owner"><PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/><span className="owner-name">Jerry</span><span className="avatar">J</span></div></header>
-    <GatewayDashboard locale={locale} request={request} ready={!!client}/>
-    <aside className="navigation">
-      <div className="eyebrow">{t('yourFleet')}</div><div className="host"><span className={`dot ${snapshot?.status === 'READY' ? 'online' : ''}`}/><strong>SKYFORGE-01</strong></div><div className="environment">└ &nbsp; windows-user</div>
-      <label className="section-title" htmlFor="workspace">{t('newWorkspaceTarget')}</label>
-      <select id="workspace" value={workspace?.registryId ?? ''} disabled={!available} onChange={event => setSelectedWorkspace(event.target.value)}><option value="" disabled>{t('workspace')}</option>{snapshot?.workspaces.map(item => <option key={item.registryId} value={item.registryId} disabled={!item.valid}>{item.displayName}{item.valid ? '' : ` · ${t('workspaceInvalid')}`}</option>)}</select>
+  return <div className="native-workspace"><AppShell
+    brand={<div className="brand session-brand"><span className="mark">F</span><div><h1>{lane?.title ?? 'FleetSplice'}</h1><span className="session-target">{t('mainLane')} · {lane ? stateText(locale, lane.state) : t('noSession')}</span></div></div>}
+    headerActions={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}
+    navTitle={t('sessions')} contextTitle={t('controlContext')} navigationSelection={selected ?? ''}
+    navigation={<><label className="section-title" htmlFor="workspace">{t('newWorkspaceTarget')}</label>
+      <NativeSelect className="w-full [&_select]:w-full" id="workspace" value={workspace?.registryId ?? ''} disabled={!available} onChange={event => setSelectedWorkspace(event.target.value)}><NativeSelectOption value="" disabled>{t('workspace')}</NativeSelectOption>{snapshot?.workspaces.map(item => <NativeSelectOption key={item.registryId} value={item.registryId} disabled={!item.valid}>{item.displayName}{item.valid ? '' : ` · ${t('workspaceInvalid')}`}</NativeSelectOption>)}</NativeSelect>
       <div className="workspace"><span>▣</span><div><strong>{workspace?.displayName ?? t('localWorkspace')}</strong><small data-testid="selected-workspace-root">{workspace?.root ?? t('bootstrapHint')}</small><small data-testid="selected-workspace-identity">{workspace?.rootIdentity ?? '—'}</small></div></div>
-      {!workspace?.registered && <button disabled={!available || !workspace?.valid} onClick={() => command('workspace.register', { root: workspace?.root })}>{t('registerWorkspace')}</button>}
+      {!workspace?.registered && <Button variant="outline" disabled={!available || !workspace?.valid} onClick={() => command('workspace.register', { root: workspace?.root })}>{t('registerWorkspace')}</Button>}
       <div className="section-title">{t('sessions')} <span>{snapshot?.lanes.length ?? 0}</span></div>
-      <nav aria-label={t('sessions')}>{snapshot?.lanes.map(item => <button className={`session ${selected === item.laneId ? 'selected' : ''}`} key={item.laneId} onClick={() => setSelected(item.laneId)}><span>{item.title}</span><small>{stateText(locale, item.state)}</small></button>)}</nav>
-      <form className="new-session" onSubmit={e => { e.preventDefault(); void command('logicalSession.create', { title: sessionTitle }); }}><label htmlFor="title">{t('newTitle')}</label><input id="title" maxLength={80} value={sessionTitle} onChange={e => setTitle(e.target.value)}/><button disabled={!available || !workspace?.registered || !workspace.valid || (snapshot?.lanes.length ?? 24) >= 24 || !sessionTitle.trim()}>{t('newSession')}</button></form>
+      <nav aria-label={t('sessions')}>{snapshot?.lanes.map(item => <Button variant="ghost" className={`session h-auto items-start justify-start ${selected === item.laneId ? 'selected' : ''}`} key={item.laneId} onClick={() => setSelected(item.laneId)}><span>{item.title}</span><small>{stateText(locale, item.state)}</small></Button>)}</nav>
+      <form className="new-session" onSubmit={e => { e.preventDefault(); void command('logicalSession.create', { title: sessionTitle }); }}><label htmlFor="title">{t('newTitle')}</label><Input id="title" maxLength={80} value={sessionTitle} onChange={e => setTitle(e.target.value)}/><Button type="submit" variant="outline" disabled={!available || !workspace?.registered || !workspace.valid || (snapshot?.lanes.length ?? 24) >= 24 || !sessionTitle.trim()}>{t('newSession')}</Button></form>
       <div className="local-note">{t('onThisMachine')}<br/><span>{t('nativeReadOnly')}</span></div>
-    </aside>
-    <main>
-      <div className="session-heading"><div><div className="eyebrow">{t('mainLane')}</div><h1>{lane?.title ?? t('companion')}</h1><div className="subtitle">{lane ? t('logicalSession', { id: short(lane.sessionId), control: t(controlled ? 'haveControl' : 'viewer') }) : t('chooseSession')}</div></div><span className="status" data-testid="lane-state" data-state={lane?.state ?? 'NO_SESSION'}>{lane ? stateText(locale, lane.state) : t('noSession')}</span></div>
-      {(error || (snapshot && snapshot.status !== 'READY')) && <div role="alert" className="alert">{error ? t(error.key, { code: error.code ?? '' }) : stateText(locale, snapshot!.status)}</div>}
-      {pending && <div className="pending">{t('pendingReceipt', { id: short(pending.commandId) })}<button disabled={busy} onClick={lookupPending}>{t('checkReceipt')}</button></div>}
+    </>}
+    conversation={<><span className="sr-only" data-testid="lane-state" data-state={lane?.state ?? 'NO_SESSION'}>{lane ? stateText(locale, lane.state) : t('noSession')}</span>
+            <section className="session-attention"><div className="attention-cards">{(error || (snapshot && snapshot.status !== 'READY')) && <div role="alert" className="alert">{error ? t(error.key, { code: error.code ?? '' }) : stateText(locale, snapshot!.status)}</div>}
+      {pending && <div className="pending">{t('pendingReceipt', { id: short(pending.commandId) })}<Button variant="outline" disabled={busy} onClick={lookupPending}>{t('checkReceipt')}</Button></div>}
+      </div></section>
       <div ref={timeline} className="timeline" aria-label={t('conversation')} role="log" aria-live="polite" aria-relevant="additions text">
-        {!lane?.transcript.length && <div className="empty"><div className="empty-symbol">↗</div><h2>{t('emptyHeading')}</h2><p>{t(lane ? 'emptySession' : 'emptyNoSession')}</p><div className="path">{t('browser')} <span>→</span> Hub <span>→</span> SKYFORGE Edge <span>→</span> Codex</div></div>}
+        {!lane?.transcript.length && <div className="empty"><div className="empty-symbol">↗</div><h2>{t('emptyHeading')}</h2><p>{t(lane ? 'emptySession' : 'emptyNoSession')}</p></div>}
         {lane?.transcript.map((item, index) => <article className={`message ${item.role}`} key={index}><div className="message-label">{t(item.role === 'user' ? 'you' : item.role === 'assistant' ? 'codex' : 'session')}</div><div className="message-text" data-testid={item.role === 'assistant' ? 'assistant-text' : undefined}>{(item.role === 'system' ? systemText(locale, item.text) : item.text) || (lane.state === 'RUNNING' ? '…' : '')}</div></article>)}
       </div>
-      <form className="composer composer-surface" onSubmit={e => { e.preventDefault(); void command('turn.submit', { text: prompt }); }}>
-        <textarea id="prompt" data-testid="managed-prompt" placeholder={t('promptPlaceholder')} aria-label={t('messageCodex')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'} rows={1}/>
-        <SessionConfigBar locale={locale}
+      <form className="composer composer-surface" onSubmit={e => { e.preventDefault(); if (available && controlled && lane?.state === 'IDLE' && prompt.trim()) void command('turn.submit', { text: prompt }); }}>
+        <div className="composer-status"><OwnershipSurface
+        controlled={controlled}
+        controllerLabel={t('haveControl')}
+        viewerLabel={t('viewer')}
+        releaseLabel={t('releaseControl')}
+        acquireLabel={t('acquireControl')}
+        canRelease={!!available && controlled}
+        canAcquire={!!available && !!lane && lane.fence.controller === null}
+        onRelease={() => void command('sessionLane.releaseControl')}
+        onAcquire={() => void command('sessionLane.acquireControl')}
+      /></div>
+        <div className="managed-continue"><Button variant="outline" ref={continueButton} disabled={!available || !controlled || (!lane?.nativeThreadId && !configurationSelected) || !['EMPTY', 'IDLE'].includes(lane?.state ?? '')} onClick={() => command('sessionLane.continue', { model: lane?.nativeThreadId ? lane.requestedModel : selectedModel, reasoningEffort: lane?.nativeThreadId ? lane.requestedReasoningEffort : selectedReasoning, permission: lane?.nativeThreadId ? lane.requestedPermission ?? 'READ_ONLY' : selectedPermission })}>{t('continueSession')}</Button></div>
+        <InputGroup className="composer-input-group">
+        <InputGroupTextarea className="min-h-16 max-h-40 resize-none text-[15px] md:text-[15px]" id="prompt" data-testid="managed-prompt" placeholder={t('promptPlaceholder')} aria-label={t('messageCodex')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'} rows={1} onKeyDown={event => { if (!event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229 && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}/>
+        <InputGroupAddon align="block-end" className="composer-toolbar">
+        <SessionConfigBar locale={locale} showController={false}
           modelLabel={t('model')} reasoningLabel={t('reasoning')} permissionLabel={t('permission')}
           controllerLabel={controlled ? t('haveControl') : t('viewer')}
           model={selectedModel} reasoning={selectedReasoning} permission={selectedPermission}
@@ -248,33 +268,27 @@ function App() {
           mutationSupported={true}
         />
         <div className="composer-actions">
-          <button className="primary" disabled={!available || !controlled || lane?.state !== 'IDLE' || !prompt.trim()}>{t('sendMessage')} <span aria-hidden="true">↑</span></button>
+          <Button type="submit" variant="default" disabled={!available || !controlled || lane?.state !== 'IDLE' || !prompt.trim()}>{t('sendMessage')} <span aria-hidden="true">↑</span></Button>
         </div>
+        </InputGroupAddon></InputGroup>
       </form>
-    </main>
-    <aside className="context"><div className="eyebrow">{t('controlContext')}</div><h3>{t('nativeCapabilities')}</h3><p className="muted">{t('liveCatalogHint')}</p><p className="muted">{t('newSessionConfigurationHint')}</p>
-      <button disabled={!available || !workspace?.registered || !workspace.valid} onClick={() => command('native.capabilities.read')}>{t('refreshCapabilities')}</button>
+    </>}
+    context={<><div className="eyebrow">{t('controlContext')}</div><h3>{t('nativeCapabilities')}</h3><p className="muted">{t('liveCatalogHint')}</p><p className="muted">{t('newSessionConfigurationHint')}</p>
+      <Button variant="outline" disabled={!available || !workspace?.registered || !workspace.valid} onClick={() => command('native.capabilities.read')}>{t('refreshCapabilities')}</Button>
       <p className="muted">{t('permissionHint')}</p>
       <h3>{t('sessionControl')}</h3><p className="muted">{t(controlled ? 'controllerHint' : 'viewerHint')}</p>
       {available && lane && ['EMPTY', 'IDLE'].includes(lane.state) && (controlled || lane.fence.controller === null) && <p className="control-next" role="status">{t(!controlled ? 'nextAcquire' : !lane.nativeThreadId ? 'nextContinue' : 'nextPrompt')}</p>}
-      <OwnershipSurface
-        controlled={controlled}
-        controllerLabel={t('haveControl')}
-        viewerLabel={t('viewer')}
-        releaseLabel={t('releaseControl')}
-        acquireLabel={t('acquireControl')}
-        canRelease={!!available && controlled}
-        canAcquire={!!available && !!lane && lane.fence.controller === null}
-        onRelease={() => void command('sessionLane.releaseControl')}
-        onAcquire={() => void command('sessionLane.acquireControl')}
-      />
-      <button ref={continueButton} disabled={!available || !controlled || (!lane?.nativeThreadId && !configurationSelected) || !['EMPTY', 'IDLE'].includes(lane?.state ?? '')} onClick={() => command('sessionLane.continue', { model: lane?.nativeThreadId ? lane.requestedModel : selectedModel, reasoningEffort: lane?.nativeThreadId ? lane.requestedReasoningEffort : selectedReasoning, permission: lane?.nativeThreadId ? lane.requestedPermission ?? 'READ_ONLY' : selectedPermission })}>{t('continueSession')}</button>
-      <h3>{t('execution')}</h3><dl><dt>{t('host')}</dt><dd>SKYFORGE-01</dd><dt>{t('environment')}</dt><dd>windows-user</dd><dt>{t('agent')}</dt><dd>{t('nativeAgent')}</dd><dt>{t('continuity')}</dt><dd>{lane?.nativeThreadId ? t(snapshot?.status === 'READY' ? 'sameNative' : 'nativeUnavailable') : t('nativeNotStarted')}</dd><dt>{t('controlRevision')}</dt><dd data-testid="control-fence">{lane ? `${lane.fence.epoch} / ${lane.fence.revision}` : '—'}</dd><dt>{t('requestedConfiguration')}</dt><dd>{lane?.requestedModel ? `${lane.requestedModel} / ${lane.requestedReasoningEffort}` : '—'}</dd><dt>{t('effectiveConfiguration')}</dt><dd>{lane?.effectiveModel ? `${lane.effectiveModel} / ${lane.effectiveReasoningEffort}` : '—'}</dd><dt>{t('nativeThread')}</dt><dd className="id" data-testid="native-thread">{lane?.nativeThreadId ?? '—'}</dd><dt>{t('nativeTurn')}</dt><dd className="id" data-testid="native-turn">{lane?.nativeTurnId ?? '—'}</dd></dl>
+
+
+      <h3>{t('execution')}</h3><dl><dt>{t('agent')}</dt><dd>{t('nativeAgent')}</dd><dt>{t('continuity')}</dt><dd>{lane?.nativeThreadId ? t(snapshot?.status === 'READY' ? 'sameNative' : 'nativeUnavailable') : t('nativeNotStarted')}</dd><dt>{t('controlRevision')}</dt><dd data-testid="control-fence">{lane ? `${lane.fence.epoch} / ${lane.fence.revision}` : '—'}</dd><dt>{t('requestedConfiguration')}</dt><dd>{lane?.requestedModel ? `${lane.requestedModel} / ${lane.requestedReasoningEffort}` : '—'}</dd><dt>{t('effectiveConfiguration')}</dt><dd>{lane?.effectiveModel ? `${lane.effectiveModel} / ${lane.effectiveReasoningEffort}` : '—'}</dd><dt>{t('nativeThread')}</dt><dd className="id" data-testid="native-thread">{lane?.nativeThreadId ?? '—'}</dd><dt>{t('nativeTurn')}</dt><dd className="id" data-testid="native-turn">{lane?.nativeTurnId ?? '—'}</dd></dl>
       <dl><dt>{t('requestedPermission')}</dt><dd data-testid="requested-permission">{lane?.requestedPermission ? t(lane.requestedPermission) : '—'}</dd><dt>{t('effectivePermission')}</dt><dd data-testid="effective-permission">{lane?.effectivePermission ? `${t(lane.effectivePermission.preset)} · ${lane.effectivePermission.sandbox} · approval=${lane.effectivePermission.approvalPolicy} · network=${lane.effectivePermission.network}` : '—'}</dd></dl>
       <h3>{t('activity')}</h3><ul className="activity" aria-label={t('activity')}>{lane?.activity.length ? lane.activity.slice(-8).map((item, index) => <li key={`${item.text}-${index}`}>{item.text}</li>) : <li>{t('noActivity')}</li>}</ul>
       <dl><dt>{t('sessionWorkspace')}</dt><dd data-testid="session-workspace-root">{lane?.root ?? '—'}</dd><dt>{t('workspaceIdentity')}</dt><dd className="id" data-testid="session-workspace-identity">{lane?.target.rootIdentity ?? '—'}</dd></dl>
       <details><summary>{t('commandReceipt')}</summary><pre data-testid="receipt">{receipt ? JSON.stringify({ commandId: receipt.command.commandId, planId: receipt.plan.planId, status: receipt.status, receipt: receipt.receipt }, null, 2) : t('noCommands')}</pre></details>
-    </aside><footer><span className={`dot ${snapshot?.status === 'READY' ? 'online' : ''}`}/><span data-testid="connection-status" data-state={snapshot?.status ?? 'CONNECTING'}>{stateText(locale, snapshot?.status ?? 'CONNECTING')}</span><span className="footer-right">{t('footer')}</span></footer>
-  </div>;
+
+<GatewayDashboard locale={locale} request={request} ready={!!client} compact/>
+</>}
+    footer={<><span className={snapshot?.status === 'READY' ? 'dot online' : 'dot'}/><span data-testid="connection-status" data-state={snapshot?.status ?? 'CONNECTING'}>{stateText(locale, snapshot?.status ?? 'CONNECTING')}</span></>}
+  /></div>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

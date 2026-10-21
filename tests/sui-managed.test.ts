@@ -1,0 +1,85 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { createServer } from 'node:net';
+import { chromium, expect } from '@playwright/test';
+import { WebSocket } from 'ws';
+import { startHub } from '../apps/hub/server.ts';
+import { EdgeKernel } from '../apps/edge/kernel.ts';
+import { Journal } from '../packages/journal/index.ts';
+import { canonical, type Hcp } from '../packages/contracts/index.ts';
+import { FixtureNative, target } from './helpers.ts';
+import { expectState, inspectContrast, setPresentation } from './ui-preferences.ts';
+
+test('SUI S07: reachable managed entry retains create/control/config/submit and one theme', async () => {
+  const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S07/managed');
+  mkdirSync(artifacts, { recursive: true });
+  const directory = mkdtempSync(path.join(artifacts, 'fixture-'));
+  const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
+  const port = (probe.address() as { port: number }).port; await new Promise<void>(resolve => probe.close(() => resolve()));
+  const origin = `http://127.0.0.1:${port}`; const identity = target();
+  const bootstrapToken = randomBytes(32).toString('hex'); const hcpToken = randomBytes(32).toString('hex');
+  const hub = await startHub({ port, target: identity, root: 'V:\\synthetic-workspace', sid: 'fixture', principal: 'fixture', sessionId: 1, stateDirectory: directory, webDirectory: path.resolve('dist/web'), hcpToken, bootstrapToken });
+  const journal = new Journal(path.join(directory, 'edge.sqlite')); journal.set('root', 'V:\\synthetic-workspace');
+  const native = new FixtureNative();
+  const socket = new WebSocket(`ws://127.0.0.1:${port}/hcp/v1/connect`, 'fleetsplice.hcp.v1', { origin, headers: { Authorization: `Bearer ${hcpToken}` }, perMessageDeflate: false });
+  const envelope = { v: 1 as const, target: identity, connectionId: identity.connectionId };
+  const edge = new EdgeKernel(journal, identity, native, async () => {}, event => socket.send(canonical({ ...envelope, kind: 'event', event })));
+  socket.on('message', async bytes => { const message = JSON.parse(String(bytes)) as Hcp;
+    if (message.kind === 'ready') edge.connected = true;
+    else if (message.kind === 'command') socket.send(canonical({ ...envelope, kind: 'receipt', receipt: await edge.execute(message.command) }));
+  });
+  await new Promise<void>(resolve => socket.once('open', resolve));
+  socket.send(canonical({ ...envelope, kind: 'hello', identity: { principal: 'fixture', sid: 'fixture', sessionId: 1, elevated: false, root: 'V:\\synthetic-workspace', rootIdentity: identity.rootIdentity }, recovered: false }));
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const page = await context.newPage(); const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  try {
+    await page.goto(`${origin}/#bootstrap=${bootstrapToken}`);
+    await expectState(page.getByTestId('connection-status'), 'READY');
+    await expect(page.getByTestId('context-panel')).toBeHidden();
+    assert.equal(await page.getByText('SKYFORGE-01', { exact: true }).count(), 0);
+    await page.getByRole('button', { name: 'Register selected Workspace' }).click();
+    await page.getByTestId('toggle-right').click();
+    await page.getByRole('button', { name: 'Refresh live catalog' }).click();
+    await page.getByTestId('config-capsule').click();
+    await expect(page.getByTestId('config-model')).toHaveValue('fixture-model');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '＋ New session' }).click();
+    await expectState(page.getByTestId('lane-state'), 'EMPTY');
+    await page.getByRole('button', { name: 'Acquire control' }).click();
+    await expect(page.getByRole('button', { name: 'Continue session' })).toBeFocused();
+    assert.equal(native.creates, 0);
+    await page.getByRole('button', { name: 'Continue session' }).click();
+    await expectState(page.getByTestId('lane-state'), 'IDLE'); assert.equal(native.creates, 1);
+    const prompt = page.getByTestId('managed-prompt'); await prompt.fill('Preserved managed draft');
+    const before = hub.kernel.snapshot(); const contrast = [];
+    for (const [locale, theme] of [['zh-CN','dark'],['en-US','light']] as const) {
+      await setPresentation(page, locale, theme);
+      await expect(prompt).toHaveValue('Preserved managed draft'); assert.deepEqual(hub.kernel.snapshot(), before);
+      contrast.push({ locale, theme, rows: await inspectContrast(page) });
+      await page.screenshot({ path: path.join(artifacts, `managed-${locale}-${theme}-1440.png`), animations: 'disabled' });
+    }
+    writeFileSync(path.join(artifacts,'CONTRAST.json'),JSON.stringify(contrast,null,2));
+    await page.getByTestId('preferences').click();
+    assert.deepEqual(await page.getByTestId('appearance-select').locator('option').evaluateAll(options => options.map(option => (option as HTMLOptionElement).value)), ['system','light','dark']);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('preferences')).toBeFocused();
+    await prompt.dispatchEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true }); assert.equal(native.turns, 0);
+    await prompt.press('Control+Enter'); await expectState(page.getByTestId('lane-state'), 'RUNNING'); assert.equal(native.turns, 1);
+    native.delta('Synthetic managed result.'); native.complete(); await expectState(page.getByTestId('lane-state'), 'IDLE');
+    await expect(page.getByTestId('assistant-text')).toContainText('Synthetic managed result.');
+    await page.getByTestId('toggle-right').click(); await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId('managed-prompt')).toBeInViewport();
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.getByTestId('nav-menu').click(); await expect(page.getByTestId('nav-drawer')).toBeVisible(); await page.keyboard.press('Escape');
+    await page.getByTestId('context-menu').click(); await expect(page.getByTestId('context-drawer').getByTestId('native-thread')).toHaveText(native.threadId); await page.keyboard.press('Escape');
+    await page.screenshot({ path: path.join(artifacts,'managed-light-390.png'), animations: 'disabled' });
+    assert.equal(native.turns, 1); assert.equal(native.capabilityReads, 2, 'explicit refresh plus existing Continue qualification'); assert.deepEqual(errors, []);
+  } finally {
+    await browser.close(); socket.close(); await new Promise(resolve => socket.once('close', resolve));
+    journal.close(); await hub.close();
+  }
+});

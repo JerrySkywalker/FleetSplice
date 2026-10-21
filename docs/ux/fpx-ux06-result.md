@@ -1,6 +1,7 @@
 # UX06 source preparation — runnable H0 pack
 
-`GOAL_ID=FLEETSPLICE-FPX-UX06-001` · `DISPOSITION=READY_FOR_OWNER_H0`  
+`GOAL_ID=FLEETSPLICE-FPX-UX06-001` · `DISPOSITION=READY_FOR_OWNER_H0`
+
 `EVIDENCE=TESTED_SYNTHETIC_HUB_WEB` · `OWNER_EXECUTED=false` · `OWNER_APPROVED=false`
 
 Base: development `2dbf353a4c88b509259b2ec588815d90f39de145` after qualified UX04 and UX05. The [five-step Owner card](fpx-h0-owner-card.md) is the next human action. H0 is **not passed**.

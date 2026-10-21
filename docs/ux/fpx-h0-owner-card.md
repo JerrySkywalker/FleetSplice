@@ -1,6 +1,7 @@
 # H0 体验卡 — 合成 Web 与 Desktop 预览
 
-`GOAL_ID=FLEETSPLICE-FPX-UX06-001` · `H0=READY_FOR_OWNER`  
+`GOAL_ID=FLEETSPLICE-FPX-UX06-001` · `H0=READY_FOR_OWNER`
+
 `OWNER_EXECUTED=false` · `OWNER_APPROVED=false` · `REAL_NATIVE_EFFECTS=0`
 
 这是一份可操作的 UI 候选。所有 Thread、消息、工具、审批和回执均为合成数据。

@@ -234,44 +234,20 @@ h3 { font-size: 12px; font-weight: 650; margin: 14px 0 6px; }
 .status-dot.is-working { background: var(--streaming); }
 
 .native-approvals { flex-shrink: 0; }
-.composer, .sticky-composer, .composer-surface {
-  margin: 0 var(--conversation-gutter) 8px; padding: 8px 10px;
-  border: 1px solid var(--border); border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: none;
-  transition: border-color var(--motion), box-shadow var(--motion);
-  min-width: 0;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
+.composer:not(.composer-surface), .sticky-composer {
+  margin: 0 var(--conversation-gutter) 8px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); min-width: 0; flex-shrink: 0;
 }
-.composer-surface {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "prompt prompt"
-    "config actions";
-  gap: 4px 8px;
-  align-items: center;
-}
-.composer:hover, .sticky-composer:hover, .composer-surface:hover {
-  border-color: color-mix(in srgb, var(--text) 28%, var(--border));
-}
-.composer:focus-within, .sticky-composer:focus-within, .composer-surface:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 28%, transparent);
-}
-/* Composer participates in flex layout — do not sticky-overlap the timeline. */
-.sticky-composer { position: relative; bottom: auto; z-index: 1; }
-.composer label { font-size: 11px; color: var(--muted-foreground); }
-.composer textarea, .composer-surface textarea {
+.composer:not(.composer-surface) textarea, .sticky-composer textarea {
   resize: none; width: 100%; min-width: 0; min-height: 32px; max-height: 120px;
   border: 0; margin: 0; padding: 2px 0; background: transparent; line-height: 1.4; font-size: 14px;
 }
-.composer-surface textarea { grid-area: prompt; }
-.composer-surface textarea::placeholder { color: var(--muted-foreground); opacity: .85; }
-.composer textarea:focus, .composer-surface textarea:focus { outline: none; }
-.composer-surface .session-config-bar { grid-area: config; margin-bottom: 0; min-width: 0; }
+.composer-surface { display: block; border: 0; padding: 0; background: transparent; flex-shrink: 0; min-width: 0; }
+.composer-surface:focus-within { box-shadow: none; }
+.composer-input-group { border-radius: var(--radius-lg); }
+.composer-input-group textarea { line-height: 1.5; }
+.composer-toolbar { justify-content: space-between; gap: 8px; padding: 8px 12px; }
+.composer-toolbar .session-config-bar { flex: 1 1 140px; min-width: 0; }
+.session-config-bar { grid-area: config; margin-bottom: 0; min-width: 0; }
 .session-config-bar {
   display: flex; flex-wrap: nowrap; gap: 6px; align-items: center;
   margin-bottom: 0;
@@ -513,15 +489,8 @@ dialog.drawer-config { margin: 0; padding: 0; max-width: none; max-height: none;
 .product-shell.breakpoint-mobile .session-heading h1 { font-size: 16px; }
 .product-shell.breakpoint-mobile .controller-label-full { display: none; }
 .product-shell.breakpoint-mobile .controller-label-short { display: inline; }
-.product-shell.breakpoint-mobile .composer-surface,
-.product-shell.breakpoint-tablet .composer-surface {
-  margin: 0 var(--conversation-gutter) 6px; padding: 6px 8px;
-  gap: 4px 8px;
-}
-.product-shell.breakpoint-mobile .composer-surface textarea,
-.product-shell.breakpoint-tablet .composer-surface textarea {
-  min-height: 32px; max-height: 64px; margin: 0;
-}
+
+
 .product-shell.breakpoint-mobile .composer-actions {
   flex-direction: row;
   gap: 4px;
@@ -708,7 +677,7 @@ dialog.drawer-config { margin: 0; padding: 0; max-width: none; max-height: none;
 .message.user { background: var(--muted); border: 0; border-radius: var(--radius-lg); padding: 12px 16px; }
 .message-label { font-size: 12px; letter-spacing: 0; margin-bottom: 6px; }
 .message-text { font-size: 15px; line-height: 1.7; }
-.composer-surface { margin-block: 12px; padding: 12px; background: var(--background); }
+.composer-surface { margin-block: 12px; padding: 0; background: transparent; }
 .composer-actions button { min-width: 32px; }
 .session-row-state { color: var(--muted-foreground); }
 .native-workspace .attention-heading .ownership-surface { width: auto; padding: 0; flex-wrap: nowrap; }
@@ -729,5 +698,25 @@ dialog.drawer-config { margin: 0; padding: 0; max-width: none; max-height: none;
  .attention-heading { gap: 4px; }
  [data-slot="button"] { min-height: 44px; }
  [data-slot="command-input-wrapper"] [data-slot="input-group"] { min-height: 44px; }
+}
+
+/* S04: compact trace rows and a single input frame. */
+.tool-card { padding: 0; border: 0; background: transparent; margin-block: 12px; }
+.tool-card .tool-trigger { display: flex; width: 100%; height: auto; min-height: 36px; justify-content: flex-start; gap: 8px; padding: 6px 8px; text-align: left; color: var(--muted-foreground); }
+.tool-summary { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.tool-chevron { flex-shrink: 0; transition: transform 100ms ease; }
+.tool-card[data-open] .tool-chevron { transform: rotate(90deg); }
+.tool-state { flex-shrink: 0; }
+.tool-details { margin-left: 22px; padding: 8px 12px; border-left: 1px solid var(--border); }
+.tool-details pre { margin: 0; white-space: pre-wrap; font-size: 12px; }
+.tool-details p { margin-block: 8px 0; font-size: 12px; }
+.message { margin-bottom: 20px; animation: none; }
+.message-label { font-weight: 500; }
+.native-source-badge { border: 0; background: transparent; padding: 0; }
+.composer-surface .composer-actions { flex: 0 1 auto; flex-wrap: wrap; max-width: 100%; }
+@media(max-width:767px) {
+ .tool-card .tool-trigger { min-height: 44px; }
+ .tool-state { font-size: 11px; }
+ .composer-toolbar { padding: 6px 8px; }
 }
 }

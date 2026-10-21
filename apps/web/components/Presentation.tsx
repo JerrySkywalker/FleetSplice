@@ -1,6 +1,7 @@
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../../packages/ui/components/collapsible.tsx';
 import { Button } from '../../../packages/ui/components/button.tsx';
 import React from 'react';
-import { Circle } from 'lucide-react';
+import { Circle, ChevronRight } from 'lucide-react';
 import { SemanticIcon, toolFailedIcon as ToolFailedIcon } from '../icons/semantic-icons.tsx';
 import type { TimelinePresentationItem } from '../../../packages/contracts/realtime-timeline.ts';
 import type { MessageSource } from '../../../packages/native-adoption/types.ts';
@@ -73,26 +74,23 @@ export function ToolActivityCard({ item, runningLabel, completedLabel, failedLab
   const completed = item.kind === 'tool.completed' || status === 'completed';
   const stateLabel = failed ? failedLabel : running ? runningLabel : completed ? completedLabel : unknownLabel;
   const { title, detail } = toolTitle(item.text);
-  return <article
+  return <Collapsible render={<article/>}
     className={`tool-card ${running ? 'is-running' : failed ? 'is-failed' : completed ? 'is-completed' : 'is-unknown'}`}
-    data-live-kind={item.kind}
-    data-ephemeral={item.ephemeral === false ? undefined : 'true'}
+    data-live-kind={item.kind} data-ephemeral={item.ephemeral === false ? undefined : 'true'}
     data-item-id={item.itemId ?? item.toolId ?? undefined}
-    data-tool-status={running ? 'running' : failed ? 'failed' : completed ? 'completed' : 'unknown'}
-    data-testid="tool-activity-card"
-  >
-    <div className="tool-card-head">
-      <strong>{title}</strong>
-      <span className={`tool-state ${running ? 'pulse' : ''}`}>
-        {running ? <SemanticIcon intent="toolRunning" size={14} className="tool-icon" spin />
-          : failed ? <ToolFailedIcon size={14} className="tool-icon" aria-hidden="true" />
-            : completed ? <SemanticIcon intent="toolCompleted" size={14} className="tool-icon" /> : <Circle size={14} aria-hidden="true" />}
+    data-tool-status={running ? 'running' : failed ? 'failed' : completed ? 'completed' : 'unknown'} data-testid="tool-activity-card">
+    <CollapsibleTrigger render={<Button variant="ghost"/>} className="tool-trigger" aria-label={`${detailsLabel}: ${title}`}>
+      <ChevronRight size={14} className="tool-chevron" aria-hidden="true"/>
+      <span className="tool-summary">{detail || title}</span>
+      <span className="tool-state">
+        {running ? <SemanticIcon intent="toolRunning" size={14} className="tool-icon" spin/>
+          : failed ? <ToolFailedIcon size={14} className="tool-icon" aria-hidden="true"/>
+            : completed ? <SemanticIcon intent="toolCompleted" size={14} className="tool-icon"/> : <Circle size={14} aria-hidden="true"/>}
         {stateLabel}
       </span>
-    </div>
-    {detail ? <div className="tool-summary">{detail}</div> : null}
-    {item.text && item.text.trim() !== detail ? <details><summary>{detailsLabel}</summary><pre>{item.text}</pre>{detailsHint && <p className="muted">{detailsHint}</p>}</details> : null}
-  </article>;
+    </CollapsibleTrigger>
+    <CollapsibleContent className="tool-details"><pre>{item.text}</pre>{detailsHint && <p className="muted">{detailsHint}</p>}</CollapsibleContent>
+  </Collapsible>;
 }
 
 export function OwnershipSurface({

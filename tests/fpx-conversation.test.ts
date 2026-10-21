@@ -68,11 +68,16 @@ test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME an
     }
     throw Error(`Unexpected fixture request: ${url.pathname}`);
   });
-  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/execution-200h-20261021/UX02'); mkdirSync(artifact, { recursive: true });
+  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S04'); mkdirSync(artifact, { recursive: true });
   try {
     await page.goto(`http://127.0.0.1:${(server.httpServer.address() as { port: number }).port}`);
     const prompt = page.getByTestId('native-prompt'); await expect(prompt).toBeEnabled();
+    assert.ok(await prompt.evaluate(node => parseFloat(getComputedStyle(node).fontSize) >= 14));
     await expect(page.locator('[data-tool-status="unknown"]')).toContainText('Status unknown');
+    const tool = page.locator('[data-tool-status="unknown"]');
+    assert.ok((await tool.boundingBox())!.height <= 52, 'tool begins as a compact trace row');
+    await tool.getByRole('button').click(); await expect(tool.locator('pre')).toHaveText('Synthetic tool summary');
+    await tool.getByRole('button').click(); await expect(tool.locator('pre')).toHaveCount(0);
     assert.equal(await page.evaluate(() => (window as any).pwned), undefined);
     await expect(page.locator('.message-code pre')).toHaveCount(1);
     await page.getByRole('button', { name: 'Copy code', exact: true }).click();
@@ -86,7 +91,9 @@ test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME an
     await expect(page.getByRole('button', { name: 'Copy code', exact: true })).toHaveCount(1);
     await expect(page.locator('.message-code pre')).toContainText('const second = 2;');
     await page.keyboard.press('Control+k');
-    await switcher.getByRole('option').filter({ hasText: new RegExp(`${thread.id}$`) }).click();
+    // Full native IDs are not visible row copy; Command's value still binds the
+    // exact thread, including fixture IDs sharing the same prefix.
+    await switcher.locator(`[cmdk-item][data-value="${thread.id}"]`).click();
     await expect.poll(async () => Math.abs(await timeline.evaluate(node => node.scrollTop) - readingA)).toBeLessThan(2);
     await prompt.fill('Viewer draft'); await prompt.press('Enter');
     await expect(prompt).toHaveValue('Viewer draft\n');
@@ -100,6 +107,11 @@ test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME an
     await expect.poll(() => commands.length).toBe(1);
     await expect(page.getByTestId('presentation-state')).toHaveText('Accepted (awaiting observation)');
     await expect(page.locator('.native-turn-marker [data-turn-id="accepted-turn"]')).toContainText('Working');
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'active-turn controls wrap within the phone width');
+    await expect(page.getByTestId('config-capsule')).toBeVisible();
+    await page.screenshot({ path: path.join(artifact, 'composer-active-390.png') });
+    await page.setViewportSize({ width: 1440, height: 900 });
     const emit = async (eventId: string, kind: string, text: string, itemId = 'new-answer') => page.evaluate(data => (window as any).emit(data), {
       eventId, revision: eventId, stream: 'agent.execution', kind, threadId: thread.id, turnId: 'accepted-turn', semantic: { role: 'assistant', text, itemId },
     });

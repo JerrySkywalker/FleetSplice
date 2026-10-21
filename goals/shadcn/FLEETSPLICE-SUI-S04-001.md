@@ -1,6 +1,6 @@
 # FLEETSPLICE-SUI-S04-001 — 对话、工具记录和Composer统一
 
-状态：NOT_STARTED；计划日期：2026-10-22；计划额度：8h（不要求耗尽）。
+状态：SOURCE_COMPLETE（实现与定向检查；不代表 H0）；计划日期：2026-10-22；计划额度：8h（不要求耗尽）。
 依赖：[S03](FLEETSPLICE-SUI-S03-001.md)。目标分支：train/pre-gate-s-development-001。
 
 ## 权威入口
@@ -27,13 +27,13 @@ Implementer为唯一intentional writer；仓库/Git写前持有coordinator write
 
 ## 开发清单
 
-- [ ] 在S02的正式Conversation上覆盖全部已有消息类型，合理借用AI Elements/Trace/Code Block组合，不引入新的模型调用SDK或第二个状态store。
-- [ ] 保留Thread/Turn/item稳定身份、流式归并和final reconciliation，不因重渲染制造重复消息。
-- [ ] 工具行默认紧凑摘要，详情按需展开；保留原文复制、HTML inert和长代码局部横滚。
-- [ ] 保留每会话阅读位置、用户滚离与回到最新，不通过不停scrollIntoView抢焦点。
-- [ ] Composer用统一控件表达状态：Enter换行、Ctrl/Cmd+Enter调用同一handler、IME/keyCode229不发送。
-- [ ] 发送/Steer/Interrupt和provisional pending沿用现有业务可用性，不把Accepted显示成native完成。
-- [ ] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
+- [x] 在S02的正式Conversation上覆盖全部已有消息类型，合理借用AI Elements/Trace/Code Block组合，不引入新的模型调用SDK或第二个状态store。
+- [x] 保留Thread/Turn/item稳定身份、流式归并和final reconciliation，不因重渲染制造重复消息。
+- [x] 工具行默认紧凑摘要，详情按需展开；保留原文复制、HTML inert和长代码局部横滚。
+- [x] 保留每会话阅读位置、用户滚离与回到最新，不通过不停scrollIntoView抢焦点。
+- [x] Composer用统一控件表达状态：Enter换行、Ctrl/Cmd+Enter调用同一handler、IME/keyCode229不发送。
+- [x] 发送/Steer/Interrupt和provisional pending沿用现有业务可用性，不把Accepted显示成native完成。
+- [x] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
 
 ## 最小检查与通过标准
 
@@ -50,3 +50,7 @@ SOURCE_COMPLETE需要真实产物与受影响验证；不是H0或Native可用性
 不升级为完整Markdown/编辑器/终端产品，也不实现G08完整历史。
 达到总60h截止前保存部分提交/patch与回执；恢复从私有state和有效证据继续，不重跑无变化审计。
 实际阻碍只阻止依赖项；有独立就绪项时继续。下一项：S05。
+
+## 本次执行回执
+
+见 [S04 回执](../../docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S04.md)。执行授权见本 train EXECUTION-AUTHORIZATION.md。

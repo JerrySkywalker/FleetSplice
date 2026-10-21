@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AdoptionCommand, AdoptionReceipt, AdoptionSnapshot, NativeTurn } from '../../packages/native-adoption/types.ts';
 import type { TimelinePresentationItem } from '../../packages/contracts/realtime-timeline.ts';
 import { foldTimeline, retireLiveWhenAuthoritative } from '../../packages/contracts/realtime-timeline.ts';
@@ -44,8 +44,10 @@ type SnapshotCausalityRow = {
   url: string;
 };
 type SessionProvisional = ProvisionalMessage & { threadId: string; incarnation: string; nativeTurnId: string | null; draftKey: string };
-function observedProvisional(provisional: SessionProvisional | null, thread: AdoptionSnapshot['threads'][number] | undefined, incarnation: string | undefined, clientId: string) {
-  return !!provisional && !!thread && provisional.threadId === thread.id && provisional.incarnation === incarnation && !!provisional.nativeTurnId &&
+export function observedProvisional(provisional: SessionProvisional | null, thread: AdoptionSnapshot['threads'][number] | undefined, incarnation: string | undefined, clientId: string) {
+  // A steer acknowledgment identifies an existing Turn, not the new input
+  // item. Earlier identical input is not proof that this steer was observed.
+  return !!provisional && provisional.family === 'native.submit' && !!thread && provisional.threadId === thread.id && provisional.incarnation === incarnation && !!provisional.nativeTurnId &&
     correlateProvisional(provisional, thread.history.filter(item => item.turnId === provisional.nativeTurnId), clientId);
 }
 
@@ -104,6 +106,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   });
   const [liveTimeline, setLiveTimeline] = useState<TimelinePresentationItem[]>([]);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const readingPositions = useRef(new Map<string, { top: number; following: boolean }>());
   const followTail = useRef(true);
   const [following, setFollowing] = useState(true);
   const timerRef = useRef(new LocalLoopTimer());
@@ -124,6 +127,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     setSelected(preference.selected); setRecentSessions(preference.recent);
   }, [navigationScope]);
   function selectSession(threadId: string) {
+    const node = timelineRef.current;
+    if (node) readingPositions.current.set(conversationKey, { top: node.scrollTop, following: node.scrollTop + node.clientHeight >= node.scrollHeight - 48 });
     setSelected(threadId);
     setNavigationRevision(revision => revision + 1);
     setRecentSessions(saveNavigationPreference(navigationScope, threadId, recentSessions).recent);
@@ -258,6 +263,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   }, []);
   const thread = snapshot?.threads.find(item => item.id === selected) ?? snapshot?.threads[0];
   const draftKey = thread ? `${snapshot!.incarnation}:${thread.workspaceIdentity}:${thread.id}` : '';
+  const conversationKey = draftKey;
   const text = drafts[draftKey] ?? '';
   function setDraft(key: string, value: string) {
     setDrafts(current => {
@@ -375,11 +381,11 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   function conversationMessages(turnId: string) {
     const history = thread?.history.filter(message => message.turnId === turnId) ?? [];
     return [
-      ...history.map((message, index) => <ConversationMessage key={message.itemId ? `${turnId}:${message.itemId}` : `${turnId}:observed:${index}`}
+      ...history.map((message, index) => <ConversationMessage key={message.itemId ? `${conversationKey}:${turnId}:${message.itemId}` : `${conversationKey}:${turnId}:observed:${index}`}
         role={message.role} text={message.text} itemId={message.itemId ?? undefined} source={message.source}
         label={message.role === 'user' ? t('You', '你') : 'Codex'} streamingLabel={t('Streaming', '生成中')} locale={locale} />),
       ...liveMessages.filter(item => item.turnId === turnId && !history.some(message => !!item.itemId && message.itemId === item.itemId))
-        .map(item => <ConversationMessage key={item.itemId ? `${turnId}:${item.itemId}` : `${turnId}:live:${item.eventId}`}
+        .map(item => <ConversationMessage key={item.itemId ? `${conversationKey}:${turnId}:${item.itemId}` : `${conversationKey}:${turnId}:live:${item.eventId}`}
           role={item.role === 'user' ? 'user' : 'assistant'} text={item.text ?? ''} itemId={item.itemId ?? undefined}
           liveKind={item.kind === 'message.delta' ? 'message.delta' : 'message.final'} label={item.role === 'user' ? t('You', '你') : 'Codex'}
           turnEnded={thread?.turns.some(turn => turn.id === turnId && turn.state !== 'RUNNING')}
@@ -392,11 +398,18 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   ];
   const tools = [...observedTools.filter(item => !liveTools.some(live => live.turnId === item.turnId && (live.toolId ?? live.itemId) === item.toolId && !['completed', 'failed', 'declined'].includes(item.status))),
     ...liveTools.filter(item => !observedTools.some(tool => tool.toolId === (item.toolId ?? item.itemId) && tool.turnId === item.turnId && ['completed', 'failed', 'declined'].includes(tool.status)))];
+  useLayoutEffect(() => {
+    const node = timelineRef.current; if (!node) return;
+    const saved = readingPositions.current.get(conversationKey);
+    followTail.current = saved?.following ?? true; setFollowing(followTail.current);
+    node.scrollTo({ top: saved?.top ?? node.scrollHeight, behavior: 'auto' });
+  }, [conversationKey]);
+  const liveToolRevision = liveTools.map(item => item.revision).join(',');
   useEffect(() => {
     const node = timelineRef.current;
     if (!node || !followTail.current) return;
     node.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
-  }, [thread?.id, thread?.history.length, thread?.history.at(-1)?.text.length, liveMessages.at(-1)?.revision, showProvisional, provisional?.state]);
+  }, [conversationKey, thread?.history.length, thread?.history.at(-1)?.text.length, thread?.activity, liveToolRevision, liveMessages.at(-1)?.revision, showProvisional, provisional?.state]);
   const mutationHint = t(
     'Native Adoption shows observed effective configuration only. This runtime does not provide a structured model/reasoning/permission mutation API.',
     '原生会话仅显示已观察的有效配置。此运行时未提供结构化的模型/推理/权限变更接口。',
@@ -456,7 +469,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       />}
       <div className="timeline" role="log" aria-label={t('Native conversation', '原生对话')} ref={timelineRef} data-testid="conversation-timeline"
         onScroll={event => { const node = event.currentTarget; const atTail = node.scrollTop + node.clientHeight >= node.scrollHeight - 48; followTail.current = atTail; setFollowing(atTail); }}>
-        {thread?.attached && turnIds.map(turnId => <React.Fragment key={turnId}>
+        {thread?.attached && turnIds.map(turnId => <React.Fragment key={`${conversationKey}:${turnId}`}>
           {conversationMessages(turnId)}
           {tools.filter(item => item.turnId === turnId).map(item => <ToolActivityCard key={`tool:${item.toolId ?? item.itemId}`} item={item}
             runningLabel={t('Running…', '运行中…')} completedLabel={t('Completed', '已完成')} failedLabel={t('Failed', '失败')}
@@ -465,7 +478,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
           {thread.turns.find(turn => turn.id === turnId) && <div className="native-turn-marker"><TurnStatus turn={thread.turns.find(turn => turn.id === turnId)!} locale={locale} live={snapshot?.state === 'READY'}/></div>}
         </React.Fragment>)}
         {showProvisional && <article className="message user provisional" data-presentation-state={provisional.state} data-command-id={provisional.commandId}>
-          <div className="message-label">{t('Web (provisional)', '网页（临时）')}<small data-testid="presentation-state">{presentationLabel(provisional.state, locale === 'zh-CN')}</small></div>
+          <div className="message-label">{t('Web (provisional)', '网页（临时）')}<small data-testid="presentation-state">{provisional.family === 'native.steer' && provisional.state === 'NATIVE_ACCEPTED'
+            ? t('Steer accepted; exact item observation unavailable', '引导已接受；尚无法验证精确消息项') : presentationLabel(provisional.state, locale === 'zh-CN')}</small></div>
           <div className="message-text">{provisional.text}</div>
         </article>}
         {thread?.historyLimited && <p className="muted">{t('Showing bounded recent history.', '仅显示最近的有限历史。')}</p>}

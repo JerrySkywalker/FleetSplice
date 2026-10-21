@@ -5,6 +5,7 @@ import path from 'node:path';
 import { preview } from 'vite';
 import { chromium, expect } from '@playwright/test';
 import { messageBlocks } from '../apps/web/components/MessageText.tsx';
+import { observedProvisional } from '../apps/web/NativeAdoption.tsx';
 import type { AdoptionSnapshot, AdoptionCommand, NativeThread } from '../packages/native-adoption/types.ts';
 
 test('FPX fenced blocks preserve text/code and unterminated stream without parsing HTML', () => {
@@ -12,6 +13,13 @@ test('FPX fenced blocks preserve text/code and unterminated stream without parsi
     { kind: 'text', text: 'Literal <img src=x>' }, { kind: 'code', language: 'ts', text: 'const a = 1;\nconsole.log(a);' }, { kind: 'text', text: 'Tail' },
   ]);
   assert.deepEqual(messageBlocks('```\npartial'), [{ kind: 'code', language: '', text: 'partial' }]);
+});
+test('FPX existing identical input in a steer Turn cannot prove the newly accepted input item', () => {
+  const provisional = { commandId: 'new-command', family: 'native.steer' as const, text: 'continue', state: 'NATIVE_ACCEPTED' as const,
+    createdAt: 0, threadId: 'thread', incarnation: 'incarnation', nativeTurnId: 'turn', draftKey: 'draft' };
+  const thread = { id: 'thread', history: [{ role: 'user', text: 'continue', turnId: 'turn', itemId: 'previous-input', source: { kind: 'FLEETSPLICE_WEB', clientInstanceId: 'client' } }] } as NativeThread;
+  assert.equal(observedProvisional(provisional, thread, 'incarnation', 'client'), false);
+  assert.equal(observedProvisional({ ...provisional, family: 'native.submit' }, thread, 'another-incarnation', 'client'), false);
 });
 
 test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME and one explicit submission', async () => {
@@ -40,12 +48,16 @@ test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME an
     daemon: { executablePath: null, reportedVersion: 'fixture', sha256: null, processId: 202, processCreationTime: '2020001', endpoint: 'fixture-only', endpointIdentity: 'fixture', serverIncarnation: null },
     compatibility: { profile: 'ADOPT_FULL', observedAt: '2026-10-21T00:00:00Z', capabilities: Object.fromEntries(['sharedDaemon','threadList','threadRead','resume','events','turnStart','activeTurn','interrupt','steer','approvalObserve','approvalResolve','models','effectiveState'].map(key => [key, { available: false, evidence: 'SYNTHETIC_UI_ONLY' }])) as AdoptionSnapshot['compatibility']['capabilities'] },
     workspace: thread.workspace, controller: null, fence: 0, threads: [thread], receipts: [], controlMode: 'COOPERATIVE', observationFailure: null };
+  const other = JSON.parse(JSON.stringify(thread)) as NativeThread;
+  other.id = 'fixture-conversation-other';
+  other.history[0]!.text = 'Another thread\n```ts\nconst second = 2;\n```';
+  snapshot.threads.push(other); // Deliberately colliding Turn/item IDs in the same workspace.
   const commands: AdoptionCommand[] = [];
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url()); const send = (value: unknown) => route.fulfill({ json: value });
     if (url.pathname === '/api/client') return send({ actorId: 'fixture', clientInstanceId: 'fixture-client', grantId: 'fixture-grant', grantRevision: '1', expiresAt: Date.now() + 3600000, csrf: 'synthetic' });
     if (url.pathname === '/api/mode') return send({ mode: 'NATIVE_ADOPTION' });
-    if (url.pathname === '/api/fleet/summary') return send({ gateway: { status: 'READY', deployment: {} }, hosts: [], runtimes: [], sessions: { discovered: 1, active: 0 }, attention: [], devices: [] });
+    if (url.pathname === '/api/fleet/summary') return send({ gateway: { status: 'READY', deployment: {} }, hosts: [], runtimes: [], sessions: { discovered: 2, active: 0 }, attention: [], devices: [] });
     if (url.pathname === '/api/auth/principal') return send({ principal: { issuer: 'fixture', subject: 'fixture', displayName: 'Synthetic Owner' }, mode: 'FIXTURE' });
     if (url.pathname === '/api/native/snapshot') return send(snapshot);
     if (url.pathname === '/api/native/commands') {
@@ -65,6 +77,17 @@ test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME an
     await expect(page.locator('.message-code pre')).toHaveCount(1);
     await page.getByRole('button', { name: 'Copy code', exact: true }).click();
     assert.match(await page.evaluate(() => (window as any).copied), /const message =/);
+    const timeline = page.getByTestId('conversation-timeline');
+    await timeline.evaluate(node => node.scrollTo({ top: 240, behavior: 'instant' }));
+    const readingA = await timeline.evaluate(node => node.scrollTop);
+    await page.keyboard.press('Control+k');
+    const switcher = page.getByRole('dialog', { name: 'Switch session', exact: true });
+    await switcher.getByRole('combobox').fill(other.id); await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: 'Copy code', exact: true })).toHaveCount(1);
+    await expect(page.locator('.message-code pre')).toContainText('const second = 2;');
+    await page.keyboard.press('Control+k');
+    await switcher.getByRole('option').filter({ hasText: new RegExp(`${thread.id}$`) }).click();
+    await expect.poll(async () => Math.abs(await timeline.evaluate(node => node.scrollTop) - readingA)).toBeLessThan(2);
     await prompt.fill('Viewer draft'); await prompt.press('Enter');
     await expect(prompt).toHaveValue('Viewer draft\n');
     await prompt.press('Control+Enter'); assert.equal(commands.length, 0);
@@ -85,7 +108,16 @@ test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME an
     await message.evaluate(node => { (node as any).identityProbe = 'preserved'; });
     await emit('d2', 'message.delta', ' world'); await emit('f1', 'message.final', 'Hello world'); await emit('f2', 'message.final', 'Hello world'); await emit('d3', 'message.delta', 'old fragment');
     await expect(message).toHaveCount(1); await expect(message).toContainText('Hello world'); await expect(message).not.toContainText('old fragment');
-    const timeline = page.getByTestId('conversation-timeline'); await timeline.evaluate(node => node.scrollTo({ top: 0, behavior: 'instant' }));
+    await timeline.evaluate(node => node.scrollTo({ top: node.scrollHeight, behavior: 'instant' }));
+    await page.evaluate(data => (window as any).emit(data), { eventId: 'tool-only', revision: '50', stream: 'agent.execution', kind: 'tool.started',
+      threadId: thread.id, turnId: 'accepted-turn', semantic: { role: 'tool', toolId: 'tool-only', itemId: 'tool-only', status: 'inProgress', text: `powershell ${'Synthetic tool-only output summary. '.repeat(40)}` } });
+    await expect(page.locator('[data-item-id="tool-only"]')).toHaveAttribute('data-tool-status', 'running');
+    await expect.poll(() => timeline.evaluate(node => node.scrollTop + node.clientHeight >= node.scrollHeight - 48)).toBe(true);
+    thread.activity.push({ id: 'observed-tool-only', turnId: 'accepted-turn', text: `powershell ${'Authoritative activity-only summary. '.repeat(40)}`, status: 'inProgress' });
+    await page.getByRole('button', { name: 'Refresh discovery', exact: true }).click();
+    await expect(page.locator('[data-item-id="observed-tool-only"]')).toHaveAttribute('data-tool-status', 'running');
+    await expect.poll(() => timeline.evaluate(node => node.scrollTop + node.clientHeight >= node.scrollHeight - 48)).toBe(true);
+    await timeline.evaluate(node => node.scrollTo({ top: 0, behavior: 'instant' }));
     await expect(page.getByRole('button', { name: 'Jump to latest activity' })).toBeVisible();
     await emit('d4', 'message.delta', 'New output while reading', 'another-answer');
     await expect(page.locator('[data-item-id="another-answer"]')).toContainText('New output while reading');

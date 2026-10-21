@@ -1,6 +1,6 @@
 # FLEETSPLICE-SUI-S05-001 — Attention、审批、配置与设置
 
-状态：NOT_STARTED；计划日期：2026-10-22；计划额度：6h（不要求耗尽）。
+状态：SOURCE_COMPLETE（实现与定向检查；不代表 H0）；计划日期：2026-10-22；计划额度：6h（不要求耗尽）。
 依赖：[S04](FLEETSPLICE-SUI-S04-001.md)。目标分支：train/pre-gate-s-development-001。
 
 ## 权威入口
@@ -28,13 +28,13 @@ Implementer为唯一intentional writer；仓库/Git写前持有coordinator write
 
 ## 开发清单
 
-- [ ] 把unknown、approval、external review、offline按已有优先级集中呈现；正常working/done不重复堆满通知。
-- [ ] 每个状态只保留一个命令入口，必要提示可以定位该入口，不能产生第二次独立提交。
-- [ ] 审批保留完整请求摘要、身份和实际Allow once/Deny，保留exact request/Thread/Turn/fence判断，不用通用确认替代业务准入。
-- [ ] unknown保留回执查询和provisional，不通过刷新、重连或换ID消除不确定状态。
-- [ ] 配置详情用现有能力投影；requested/effective、不可用选项和只读模式继续明确，使用合适Select/Combobox/Dialog/Sheet。
-- [ ] Preferences迁入统一Dialog/字段，保留双语、偏好持久化和焦点恢复；最终旧主题迁移由S07统一处理。
-- [ ] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
+- [x] 把unknown、approval、external review、offline按已有优先级集中呈现；正常working/done不重复堆满通知。
+- [x] 每个状态只保留一个命令入口，必要提示可以定位该入口，不能产生第二次独立提交。
+- [x] 审批保留完整请求摘要、身份和实际Allow once/Deny，保留exact request/Thread/Turn/fence判断，不用通用确认替代业务准入。
+- [x] unknown保留回执查询和provisional，不通过刷新、重连或换ID消除不确定状态。
+- [x] 配置详情用现有能力投影；requested/effective、不可用选项和只读模式继续明确，使用合适Select/Combobox/Dialog/Sheet。
+- [x] Preferences迁入统一Dialog/字段，保留双语、偏好持久化和焦点恢复；最终旧主题迁移由S07统一处理。
+- [x] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
 
 ## 最小检查与通过标准
 
@@ -51,3 +51,7 @@ SOURCE_COMPLETE需要真实产物与受影响验证；不是H0或Native可用性
 服务端能力不足显示既有unavailable；不新增权限API或认证例外。
 达到总60h截止前保存部分提交/patch与回执；恢复从私有state和有效证据继续，不重跑无变化审计。
 实际阻碍只阻止依赖项；有独立就绪项时继续。下一项：S06或已完成S06后S07。
+
+## 本次执行回执
+
+见 [S05 回执](../../docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S05.md)。执行授权见本 train EXECUTION-AUTHORIZATION.md。

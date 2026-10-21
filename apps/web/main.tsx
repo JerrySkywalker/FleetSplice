@@ -236,7 +236,7 @@ function App() {
       </div>
       <form className="composer composer-surface" onSubmit={e => { e.preventDefault(); void command('turn.submit', { text: prompt }); }}>
         <textarea id="prompt" data-testid="managed-prompt" placeholder={t('promptPlaceholder')} aria-label={t('messageCodex')} maxLength={16000} value={prompt} onChange={e => setPrompt(e.target.value)} disabled={!controlled || lane?.state !== 'IDLE'} rows={1}/>
-        <SessionConfigBar
+        <SessionConfigBar locale={locale}
           modelLabel={t('model')} reasoningLabel={t('reasoning')} permissionLabel={t('permission')}
           controllerLabel={controlled ? t('haveControl') : t('viewer')}
           model={selectedModel} reasoning={selectedReasoning} permission={selectedPermission}

@@ -54,11 +54,25 @@ test('FPX UX03: exact approval, viewer, stale authority, review, ambiguous recei
     }
     throw Error(`Unexpected fixture request: ${url.pathname}`);
   });
-  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/execution-200h-20261021/UX03'); mkdirSync(artifact, { recursive: true });
+  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S05/attention'); mkdirSync(artifact, { recursive: true });
   try {
     await page.goto(`http://127.0.0.1:${(server.httpServer.address() as { port: number }).port}`);
     const attention = page.getByTestId('session-attention'); const card = attention.getByTestId('approval-card'); const prompt = page.getByTestId('native-prompt');
     const refresh = () => page.getByRole('button', { name: 'Refresh discovery', exact: true }).click();
+    await expect(prompt).toBeEnabled(); await prompt.fill('Local preferences draft');
+    await page.getByTestId('preferences').click();
+    await page.getByTestId('locale-select').selectOption('zh-CN'); await page.getByTestId('appearance-select').selectOption('dark');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN'); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.screenshot({ path: path.join(artifact, 'preferences-dark-zh-1440.png') });
+    await page.keyboard.press('Escape'); await expect(page.getByTestId('preferences')).toBeFocused(); await expect(prompt).toHaveValue('Local preferences draft');
+    assert.equal(await page.evaluate(() => localStorage.getItem('fleetsplice.locale')), 'zh-CN');
+    await page.getByTestId('preferences').click(); await page.getByTestId('locale-select').selectOption('en-US'); await page.getByTestId('appearance-select').selectOption('light'); await page.keyboard.press('Escape');
+    await page.getByTestId('config-capsule').click(); await expect(page.getByTestId('config-sheet')).toHaveAttribute('data-config-surface', 'side');
+    await expect(page.getByTestId('config-detail-model')).toHaveText('fixture-model'); await expect(page.getByTestId('config-sheet-controls')).toHaveCount(0);
+    await page.setViewportSize({ width: 390, height: 844 }); await expect(page.getByTestId('config-sheet')).toHaveAttribute('data-config-surface', 'sheet');
+    await page.screenshot({ path: path.join(artifact, 'configuration-390.png') });
+    await page.keyboard.press('Escape'); await expect(page.getByTestId('config-capsule')).toBeFocused(); await page.setViewportSize({ width: 1440, height: 1000 });
+    assert.equal(commands.length, 0, 'display settings and configuration inspection do not issue native commands');
     await expect(card).toContainText('Request 0'); await expect(card).toContainText('Item fixture-item');
     await expect(card.getByRole('button')).toHaveCount(0);
     await prompt.fill('Viewer draft'); await prompt.press('Control+Enter'); assert.equal(commands.length, 0);
@@ -69,7 +83,7 @@ test('FPX UX03: exact approval, viewer, stale authority, review, ambiguous recei
     await expect(card.getByRole('button', { name: 'Deny', exact: true })).toBeEnabled();
     await page.screenshot({ path: path.join(artifact, 'approval-1440.png') });
     await card.getByRole('button', { name: 'Allow once', exact: true }).click();
-    await expect(card).toContainText('Native request resolved'); await expect(card.getByRole('button')).toHaveCount(0);
+    await expect(card).toContainText('Native request resolved'); await expect(card.locator('.approval-actions button')).toHaveCount(0);
     assert.equal(commands.length, 1); assert.equal(commands[0]!.expectedFence, 7);
     assert.deepEqual(commands[0]!.approval, { requestId: 0, threadId: thread.id, turnId: 'fixture-turn', itemId: 'fixture-item', requestType: 'commandExecution', digest: 'fixture-digest', authority: 'fixture-authority', decision: 'ALLOW_ONCE' });
     thread.externalAdvance = true; thread.stateToken = 'advanced-state'; await refresh();
@@ -100,8 +114,8 @@ test('FPX UX03: exact approval, viewer, stale authority, review, ambiguous recei
     await prompt.press('Control+Enter'); assert.equal(commands.length, 5);
     await page.getByTestId('other-thread-pending').getByRole('button').click();
     snapshot.state = 'NATIVE_CONNECTION_LOST'; await refresh();
-    await expect(page.getByTestId('observation-attention')).toContainText('Native execution state is unverified');
-    await expect(page.getByRole('button', { name: 'Refresh observed state', exact: true })).toBeEnabled();
+    await expect(page.getByTestId('receipt-attention')).toContainText('Native execution state is unverified');
+    await expect(page.getByRole('button', { name: 'Check receipt', exact: true })).toBeEnabled();
     await expect(page.getByTestId('ownership-action')).toBeDisabled();
     await expect(page.locator('body')).not.toContainText('original native TUI remains usable');
     await page.screenshot({ path: path.join(artifact, 'unknown-offline-1440.png') });

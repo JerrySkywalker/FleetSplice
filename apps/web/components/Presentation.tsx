@@ -1,5 +1,6 @@
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../../../packages/ui/components/collapsible.tsx';
 import { Button } from '../../../packages/ui/components/button.tsx';
+import { Badge } from '../../../packages/ui/components/badge.tsx';
 import React from 'react';
 import { Circle, ChevronRight } from 'lucide-react';
 import { SemanticIcon, toolFailedIcon as ToolFailedIcon } from '../icons/semantic-icons.tsx';
@@ -8,15 +9,16 @@ import type { MessageSource } from '../../../packages/native-adoption/types.ts';
 import type { Locale } from '../i18n.ts';
 import { MessageText } from './MessageText.tsx';
 
-export function StatusChip({ kind, label, testId }: {
+export function StatusChip({ kind, label, testId, title }: {
   kind: 'controller' | 'viewer' | 'working' | 'attention' | 'connected';
   label: string;
   testId?: string;
+  title?: string;
 }) {
-  return <span className={`status-chip status-chip-${kind}`} data-testid={testId ?? `status-chip-${kind}`} data-kind={kind}>
+  return <Badge variant="secondary" className={`status-chip status-chip-${kind}`} title={title} data-testid={testId ?? `status-chip-${kind}`} data-kind={kind}>
     <span className={`status-dot ${kind === 'viewer' ? 'is-outline' : kind === 'attention' ? 'is-attention' : kind === 'working' ? 'is-working' : 'is-filled'}`} aria-hidden="true" />
     <span>{label}</span>
-  </span>;
+  </Badge>;
 }
 
 export function StreamingMessage({ item, streamingLabel }: {
@@ -146,6 +148,7 @@ export function ReviewCard({ title, body, actionLabel, disabled, onReview }: {
 
 export function ApprovalCard({
   statusLabel, summary, meta, unsupportedHint, canAllow, canDeny, onAllow, onDeny, allowLabel, denyLabel,
+  resolved = false, resolvedDetailsLabel = 'Request details',
 }: {
   statusLabel: string;
   summary: string;
@@ -157,15 +160,15 @@ export function ApprovalCard({
   onDeny: () => void;
   allowLabel: string;
   denyLabel: string;
+  resolved?: boolean; resolvedDetailsLabel?: string;
 }) {
-  return <article className="approval-card" data-testid="approval-card">
+  const context = <><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{summary}</p><small className="approval-meta">{meta}</small>{unsupportedHint && <p className="muted">{unsupportedHint}</p>}</>;
+  return <article className="approval-card" data-testid="approval-card" data-resolved={resolved}>
     <div className="notice-card-head">
-      <SemanticIcon intent="warning" size={16} />
+      <SemanticIcon intent={resolved ? 'toolCompleted' : 'warning'} size={16} />
       <strong>{statusLabel}</strong>
     </div>
-    <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{summary}</p>
-    <small>{meta}</small>
-    {unsupportedHint ? <p className="muted">{unsupportedHint}</p> : null}
+    {resolved ? <Collapsible><CollapsibleTrigger render={<Button variant="ghost" size="sm"/>}>{resolvedDetailsLabel}</CollapsibleTrigger><CollapsibleContent>{context}</CollapsibleContent></Collapsible> : context}
     {(canAllow || canDeny) && <div className="approval-actions">
       <Button variant="default" type="button" disabled={!canAllow} onClick={onAllow}>{allowLabel}</Button>
       <Button variant="outline" type="button" disabled={!canDeny} onClick={onDeny}>{denyLabel}</Button>

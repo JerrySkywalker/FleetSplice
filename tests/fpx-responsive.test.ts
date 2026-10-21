@@ -10,7 +10,7 @@ import { startHub } from '../apps/hub/server.ts';
 import { target } from './helpers.ts';
 import type { AdoptionSnapshot, NativeThread } from '../packages/native-adoption/types.ts';
 
-const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S03/responsive');
+const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S05/responsive');
 
 test('FPX UX04: PWA assets are narrowly served with explicit MIME and no-store', async () => {
   mkdirSync(artifacts, { recursive: true });
@@ -62,7 +62,7 @@ test('FPX UX04: responsive viewport matrix, keyboard viewport, focus, drafts and
     const prompt = page.getByTestId('native-prompt'); await expect(prompt).toBeEnabled(); await prompt.fill('Preserve this draft across resize');
     for (const [width, height] of [[390,844],[412,915],[768,1024],[1024,768],[360,740],[540,720],[844,390],[1440,900]]) {
       await page.setViewportSize({ width: width!, height: height! });
-      await expect.poll(() => page.getByTestId('composer-surface').evaluate(node => node.getBoundingClientRect().bottom <= innerHeight + 1)).toBe(true);
+      await expect.poll(() => page.getByTestId('composer-surface').evaluate(node => node.getBoundingClientRect().bottom <= innerHeight + 1), { message: `${width}x${height} composer stays in view` }).toBe(true);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight + 1), `${width}x${height} page overflow`);
       await expect(prompt).toHaveValue('Preserve this draft across resize'); await expect(page.getByTestId('composer-send')).toBeEnabled();
       const bounds = await page.getByTestId('composer-surface').boundingBox(); measurements.push({ width, height, composer: bounds });
@@ -74,7 +74,7 @@ test('FPX UX04: responsive viewport matrix, keyboard viewport, focus, drafts and
     await page.getByTestId('nav-menu').click(); await expect(page.getByTestId('nav-drawer')).toBeVisible(); await page.keyboard.press('Escape'); await expect(page.getByTestId('nav-menu')).toBeFocused();
     await page.getByTestId('config-capsule').click(); await expect(page.getByTestId('config-sheet')).toBeVisible();
     await page.screenshot({ path: path.join(artifacts, 'config-sheet-390.png') });
-    await prompt.evaluate(node => (node as HTMLElement).focus()); await expect(prompt).not.toBeFocused();
+    for (let index = 0; index < 4; index++) { await page.keyboard.press('Tab'); await expect.poll(() => page.getByTestId('config-sheet').evaluate(node => node.contains(document.activeElement))).toBe(true); }
     await page.keyboard.press('Escape'); await expect(page.getByTestId('config-capsule')).toBeFocused();
     await page.evaluate(() => { Object.defineProperty(visualViewport!, 'height', { configurable: true, value: 380 }); visualViewport!.dispatchEvent(new Event('resize')); });
     await expect.poll(() => page.getByTestId('composer-surface').evaluate(node => node.getBoundingClientRect().bottom <= 381)).toBe(true);

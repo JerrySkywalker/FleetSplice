@@ -719,4 +719,23 @@ dialog.drawer-config { margin: 0; padding: 0; max-width: none; max-height: none;
  .tool-state { font-size: 11px; }
  .composer-toolbar { padding: 6px 8px; }
 }
+
+/* S05: one ownership surface next to the actual input target. */
+.composer-status { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-block: 0 6px; }
+.composer-status .ownership-surface { margin: 0; padding: 0; border: 0; background: transparent; min-width: 0; width: auto; gap: 8px; }
+.composer-status .ownership-status { font-size: 12px; }
+.composer-status .session-state { flex-shrink: 0; font-size: 11px; }
+.composer-status .ownership-surface button { flex-shrink: 0; }
+.native-workspace .session-attention { flex-shrink: 1; }
+.attention-heading:empty { display: none; }
+.attention-cards .approval-card { margin-inline: 0; }
+.config-field > span { font-weight: 500; }
+.config-detail-list dt { font-size: 12px; }
+.config-detail-list dd { font-size: 14px; margin-bottom: 16px; }
+.config-detail-hint { font-size: 13px; line-height: 1.6; }
+.approval-meta { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; color: var(--muted-foreground); }
+.approval-card[data-resolved="true"] { background: transparent; gap: 0; }
+@media(max-width:767px) {
+ .composer-status .ownership-status { font-size: 11px; }
+}
 }

@@ -11,9 +11,10 @@ import * as json from '../packages/contracts/json.ts';
 async function discover(layout: 'legacy' | 'daemon', changes: {
   missing?: boolean; malformed?: boolean; pid?: number; birth?: string;
   executable?: string; endpoint?: string; command?: string; ownerOrAclError?: boolean;
+  unknownFamily?: boolean;
 } = {}) {
   const home = 'C:\\synthetic-native-discovery';
-  const executable = path.win32.join(home, layout === 'legacy' ? 'packages\\standalone\\current\\bin\\codex.exe' : 'packages\\daemon\\current\\bin\\codex.exe');
+  const executable = path.win32.join(home, changes.unknownFamily ? 'unqualified\\codex.exe' : layout === 'legacy' ? 'packages\\standalone\\current\\bin\\codex.exe' : 'packages\\app-server-daemon\\current\\bin\\codex.exe');
   const endpoint = path.win32.join(home, 'app-server-control', 'app-server-control.sock');
   const selected = layout === 'legacy' ? 'app-server.pid' : 'daemon.pid';
   const reads: string[] = [];
@@ -78,4 +79,9 @@ test('C02: PID, FILETIME, executable, endpoint, owner/ACL and command conflicts 
     { endpoint: 'C:\\other\\control.sock' }, { ownerOrAclError: true }, { command: 'codex.exe app-server --listen unix:// --unqualified' }]) {
     assert.notEqual((await discover('daemon', changes)).error, null);
   }
+});
+test('C01: an unknown managed-executable family never acquires a daemon PID record', async () => {
+  const result = await discover('daemon', { unknownFamily: true });
+  assert.equal(result.error, 'NATIVE_DAEMON_INSTALLATION_FAMILY_UNSUPPORTED');
+  assert.equal(result.reads.filter(file => file.endsWith('.pid')).length, 0);
 });

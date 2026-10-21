@@ -38,6 +38,8 @@ export function discoverDaemon(): NativeArtifactIdentity {
   // This Windows backend's official PID record binds PID to native FILETIME.
   const installation = path.resolve(status.managedCodexPath).toLowerCase();
   const legacyRoot = path.join(home, 'packages', 'standalone').toLowerCase() + path.sep;
+  const daemonRoot = path.join(home, 'packages', 'app-server-daemon').toLowerCase() + path.sep;
+  requireThat(installation.startsWith(legacyRoot) || installation.startsWith(daemonRoot), 'NATIVE_DAEMON_INSTALLATION_FAMILY_UNSUPPORTED');
   const pidFile = installation.startsWith(legacyRoot) ? 'app-server.pid' : 'daemon.pid';
   let pidState: any;
   try { pidState = JSON.parse(readFileSync(path.join(home, 'app-server-daemon', pidFile), 'utf8')); }

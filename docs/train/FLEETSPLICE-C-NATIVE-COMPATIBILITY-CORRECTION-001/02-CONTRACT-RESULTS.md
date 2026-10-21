@@ -32,10 +32,19 @@ node scripts/with-qualified-node.mjs --test --test-name-pattern='same PR22|C05:|
 
 - Typecheck and product build passed; affected four-file suite **79/79** passed.
 - Additional discovery cases **3/3** passed; same-contract/event/journal delta **8/8** passed (includes three added PR22 fixture cases and five already counted tests).
-- Unique affected cases: **85**. Do not add repeated runs into a success count.
+- Initial unique affected cases: **85**. Do not add repeated runs into a success count.
 - While adding discovery tests, compilation caught one VM namespace typing error, then the first VM run caught two assertions caused by cross-realm Array prototypes. Both fixture issues were fixed; only the affected discovery cases were rerun. The earlier failing output is retained privately.
 - No full-repository CI, SDK loader rerun, installer, cloud, benchmark or soak was executed. The final small native event delta was compiled and its affected tests rerun; unchanged UI browser coverage was not repeated.
 
 Tests explicitly inject a simulated subscribed-control oracle for legacy control safety branches. Production qualification is separately tested **without** that oracle and remains UNSUPPORTED. Passing these tests cannot enable real control.
 
-Independent exact-head read-only review remains **PENDING**. The writing session's tests are not an independent review. No code merge is permitted by this receipt.
+The first independent `jerry-supervisor` read-only process reviewed exact head `724517fd3510a3e0747f10b4763fe794b6bfee68` and returned CHANGES_REQUIRED for stale/duplicate receipt ordering and unknown installation-family acceptance. Both were corrected using the existing journal and shared lifecycle predicate. The modern fixture was aligned with the pinned official `packages/app-server-daemon` root. An actual compiled Edge composition test uses only fake contact functions; uncertainty stops before any discovery/connection.
+
+The correction delta **11/11 PASS** includes three new regression groups (unknown family, stale/duplicate/daemon receipt history, Edge preflight) and one newly selected existing local lifecycle test; the other seven cases repeat only affected recovery/discovery coverage. Overall unique affected cases are **89**. Reproduce this bounded delta with:
+
+```powershell
+node scripts/with-qualified-node.mjs node_modules/typescript/bin/tsc -p tsconfig.test.json
+node scripts/with-qualified-node.mjs --experimental-vm-modules --test --test-name-pattern='C0[126]:|same PR22 CP15|completed native attach' test-results/compiled/tests/native-adoption.test.js test-results/compiled/tests/native-discovery.test.js test-results/compiled/tests/native-edge-recovery.test.js test-results/compiled/tests/native-pilot-correction.test.js test-results/compiled/tests/local-operation.test.js
+```
+
+A fresh delta-only read-only review must bind the correction head before source closeout; its exact result belongs in the private receipt and current PR description. The writing session's tests are not an independent review. PR23 stays Draft and no code merge is authorized by this receipt.

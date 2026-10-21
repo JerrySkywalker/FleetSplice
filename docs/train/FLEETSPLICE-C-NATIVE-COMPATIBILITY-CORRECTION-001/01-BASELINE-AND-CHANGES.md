@@ -26,13 +26,16 @@ CP15 was an adapter-only fixture finding. Existing production Edge startup alrea
 - NativeActivityJournal writes the **existing** `NATIVE_EFFECT_ATTEMPT` before dispatch and receipts afterward. Adapter recovery reads that same evidence; successful duplicate lookup precedes dispatch, changed payload is refused, and uncertain predecessors stop construction. Existing Edge preflight and source provenance continue to consume the same records.
 - Stable source event IDs, when supplied, deduplicate within a bounded window and are scoped by incarnation/thread. Conflicting bytes fence the adapter. Frames without source identity are not suppressed by equal text. Snapshot explicitly states INCOMPLETE coverage and bounded-resnapshot requirement; local revision is not a native cursor.
 
-Changes are confined to `packages/native-adoption/**`, focused tests and this report directory. No adjacent-file exception, new dependency, schema migration, UI, G08 history store or second Writer was introduced.
+The first independent read-only review found two concrete gaps: a stale receipt could satisfy a later duplicate attempt, and an unknown installation path was treated as modern. The correction shares the ordered receipt/daemon match predicate with existing `packages/local-operation` lifecycle admission, rejects duplicate attempts/receipts, and explicitly recognizes `packages/standalone` and `packages/app-server-daemon` roots. The modern fixture now uses the exact official directory name rather than a generic synthetic daemon path.
+
+One necessary adjacent-file exception is `apps/edge/native-adoption.ts`: its prior loose preflight is replaced with the same journal recovery method **before discovery or transport**, and duplicate provenance restoration is removed. A compiled composition test injects discovery/transport that can only throw, proving an uncertain predecessor makes zero contacts. This implements C06 at the actual composition seam without touching a daemon. All other changes remain in admitted native-adoption/local-operation/tests/report paths. No new dependency, schema migration, UI, G08 store or second Writer was introduced.
 
 ## Official source pin
 
 All protocol statements refer to OpenAI Codex commit `83086188ae0614bd882818ff1aa23f3194962012`, not an unmeasured current installation:
 
 - [Daemon namespace selection](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-daemon/src/lib.rs).
+- [Official package roots and managed executable layouts](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-daemon/src/managed_install.rs).
 - [Daemon command arguments](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-daemon/src/backend/pid.rs) and [optional flag](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-daemon/src/backend/pid_start.rs).
 - [Request methods](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/typescript/ClientRequest.ts), [initialize response](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server-protocol/schema/typescript/InitializeResponse.ts) and [thread-read implementation](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server/src/request_processors/thread_processor.rs).
 

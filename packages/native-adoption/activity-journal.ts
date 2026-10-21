@@ -1,9 +1,17 @@
 import { Journal } from '../journal/index.ts';
-import { requireThat } from '../contracts/json.ts';
+import { canonical, requireThat } from '../contracts/json.ts';
 import { commandTerminal } from './projection.ts';
 import type { AdoptionCommand, AdoptionReceipt, NativeArtifactIdentity, NativeThread } from './types.ts';
 
 type Activity = NativeThread['activity'][number];
+type EvidenceRow = { seq: number; key: string; value: any };
+/** Shared with local lifecycle admission; acknowledgment is not turn completion. */
+export function nativeAttemptReceiptMatches(attempt: EvidenceRow, receipt: EvidenceRow | undefined): boolean {
+  const command = attempt.value?.command; const result = receipt?.value;
+  return !!command && command.commandId === attempt.key && !!receipt && receipt.key === attempt.key && receipt.seq > attempt.seq &&
+    result?.commandId === attempt.key && result.status === 'SUCCEEDED' && result.family === command.family && result.threadId === command.threadId &&
+    !!attempt.value.daemon && !!result.daemon && canonical(attempt.value.daemon) === canonical(result.daemon);
+}
 /** Durable safety evidence, independent of the recent UI cache. No replay path. */
 export class NativeActivityJournal {
   constructor(private readonly journal: Journal) {
@@ -23,13 +31,15 @@ export class NativeActivityJournal {
     this.journal.append('NATIVE_ADOPTION_RECEIPT', receipt.commandId, receipt);
   }
   recoveredEffects(): { command: AdoptionCommand; receipt: AdoptionReceipt }[] {
-    return this.journal.db.prepare("SELECT key,value FROM evidence WHERE kind='NATIVE_EFFECT_ATTEMPT' ORDER BY seq").all().map(row => {
-      const saved = this.journal.db.prepare("SELECT value FROM evidence WHERE kind='NATIVE_ADOPTION_RECEIPT' AND key=? ORDER BY seq DESC LIMIT 1").get(row.key!);
-      const receipt = saved ? JSON.parse(String(saved.value)) as AdoptionReceipt : null;
-      const command = JSON.parse(String(row.value)).command as AdoptionCommand;
-      requireThat(receipt?.status === 'SUCCEEDED' && receipt.commandId === command.commandId &&
-        receipt.threadId === command.threadId && receipt.family === command.family, 'NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY');
-      return { command, receipt };
+    const seen = new Set<string>();
+    return this.journal.db.prepare("SELECT seq,key,value FROM evidence WHERE kind='NATIVE_EFFECT_ATTEMPT' ORDER BY seq").all().map(row => {
+      const attempt = { seq: Number(row.seq), key: String(row.key), value: JSON.parse(String(row.value)) };
+      const saved = this.journal.db.prepare("SELECT seq,key,value FROM evidence WHERE kind='NATIVE_ADOPTION_RECEIPT' AND key=?").all(attempt.key);
+      requireThat(!seen.has(attempt.key) && saved.length === 1, 'NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY');
+      const receipt = { seq: Number(saved[0]!.seq), key: String(saved[0]!.key), value: JSON.parse(String(saved[0]!.value)) };
+      requireThat(nativeAttemptReceiptMatches(attempt, receipt), 'NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY');
+      seen.add(attempt.key);
+      return { command: attempt.value.command as AdoptionCommand, receipt: receipt.value as AdoptionReceipt };
     });
   }
   observe(incarnation: string, thread: string, item: Activity): Activity {

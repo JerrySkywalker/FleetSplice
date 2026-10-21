@@ -149,6 +149,24 @@ test('C06: crash after durable admission and before native send leaves no replay
   } finally { journal.close(); }
 });
 
+test('C06: recovery refuses duplicate attempts/receipts, stale acknowledgment and changed daemon', async () => {
+  for (const variant of ['duplicate-attempt', 'duplicate-receipt', 'stale-receipt', 'daemon-mismatch']) {
+    const r = await setup();
+    const command = r.command(await r.adapter.snapshot(), 'native.submit');
+    const receipt: import('../packages/native-adoption/types.ts').AdoptionReceipt = { commandId: command.commandId, family: command.family,
+      status: 'SUCCEEDED', code: 'SYNTHETIC_ACCEPTED', daemon: r.adapter.identity, threadId: command.threadId, turnId: 'fixture-turn',
+      origin: 'NATIVE_ADOPTED', createdNativeThread: false, processTerminationClaim: false };
+    if (variant === 'stale-receipt') r.activity.receipt(receipt);
+    r.activity.attempt(command, r.adapter.identity);
+    if (variant !== 'stale-receipt') r.activity.receipt(variant === 'daemon-mismatch' ? { ...receipt, daemon: { ...receipt.daemon, processId: 909 } } : receipt);
+    if (variant === 'duplicate-attempt') r.activity.attempt(command, r.adapter.identity);
+    if (variant === 'duplicate-receipt') r.activity.receipt(receipt);
+    assert.throws(() => r.activity.recoveredEffects(), /NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY/, variant);
+    assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start').length, 0);
+    r.journal.close();
+  }
+});
+
 async function approvalRig(options: Parameters<typeof setup>[0] = {}) {
   const r = await setup(options);
   const responses: { id: string | number; result: any }[] = [];

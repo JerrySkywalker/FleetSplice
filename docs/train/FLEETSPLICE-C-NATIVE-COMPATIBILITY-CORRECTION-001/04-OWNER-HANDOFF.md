@@ -10,7 +10,7 @@ The original four blockers were reproduced. Source now selects the official PID 
 
 **The central blocker remains:** no supported non-mutating subscription was found in the pinned official source. Qualification now issues reads only and refuses adopted control; attach no longer resumes a loaded thread. This is a truthful safe negative result, not working native adoption. Tests of submit/steer safety inject a mock subscription/control oracle. Real identity/Writer/TUI return, H1, phone, cloud, G08 and release are all NOT_RUN.
 
-Validation: check/build passed, 79 affected tests plus 3 discovery and 3 same-PR22-fixture cases passed; later focused reruns covered changed event/journal code. Unique cases 85, real connections/effects 0/0. Independent exact-head review is pending, and PR23 remains Draft/unmerged. See [detailed contract results](02-CONTRACT-RESULTS.md).
+Validation: check/build passed, the initial 85 unique affected cases passed. Independent review identified two source gaps; the correction adds strict ordered/identity-bound recovery shared with local lifecycle admission, explicit official package roots and actual Edge preflight before contact. Its affected delta passed 11/11; total unique cases 89, real connections/effects 0/0. Fresh delta review results bind the exact PR head in the private receipt/PR description. PR23 remains Draft/unmerged. See [detailed contract results](02-CONTRACT-RESULTS.md).
 
 This closes the bounded N00 source attempt under the 200-hour FPX program, with a specific native blocker. Continue independent UX00–UX06 source work; prepare N01 only as a blocked H1 handoff. Do not spend the remaining time replaying tests or trying private interfaces, native locks or competing Writers.
 

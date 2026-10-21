@@ -6,6 +6,7 @@ import { createServer } from 'node:net';
 import path from 'node:path';
 import { canonical, requireThat, type Target } from '../contracts/index.ts';
 import { CODEX_SHA256 } from '../driver-codex/index.ts';
+import { nativeAttemptReceiptMatches } from '../native-adoption/activity-journal.ts';
 
 export const QUALIFIED_NODE = 'v24.20.0';
 export const QUALIFIED_SQLITE = '3.53.4';
@@ -471,9 +472,7 @@ function nativeAdoptionLifecycleEvidence(file: string): { identities: Observatio
         attempt.createdNativeThread !== false ||
         (row.kind === 'NATIVE_ATTACH_ATTEMPT' ? command.family !== 'native.attach' :
           !effectFamilies.includes(command.family) || attempt.origin !== 'NATIVE_ADOPTED') ||
-        !receiptRow || receiptRow.seq <= row.seq || receipt.status !== 'SUCCEEDED' ||
-        receipt.family !== command.family || receipt.threadId !== command.threadId ||
-        !same(receipt.daemon, attempt.daemon)) return null;
+        !nativeAttemptReceiptMatches(row, receiptRow)) return null;
       if (row.kind === 'NATIVE_EFFECT_ATTEMPT' &&
         (typeof receipt.turnId !== 'string' || !terminalEvents.some(event => event.seq > row.seq &&
           (event.value as any).threadId === command.threadId && (event.value as any).turnId === receipt.turnId))) return null;

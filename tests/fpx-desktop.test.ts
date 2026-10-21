@@ -33,6 +33,7 @@ test('FPX UX05: Desktop modes preserve Manager selection and use only the explic
     await page.screenshot({ path: path.join(artifacts, 'manager-overview-960.png'), animations: 'disabled' });
     await page.getByTestId('preferences').click(); await page.getByTestId('appearance-select').selectOption('dark'); await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Gateway', exact: true }).click();
+    await expect(page.getByLabel('Workspace for this Agent')).toHaveAttribute('placeholder', 'C:\\src\\your-workspace');
     await page.screenshot({ path: path.join(artifacts, 'manager-gateway-dark-960.png'), animations: 'disabled' });
     await page.getByRole('button', { name: 'Workspace', exact: true }).click();
     const input = page.getByLabel('Gateway origin'); await input.fill('https://gateway.example.test/#bootstrap=synthetic');

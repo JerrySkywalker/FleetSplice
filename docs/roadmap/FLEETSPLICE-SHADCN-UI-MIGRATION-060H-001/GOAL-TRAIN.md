@@ -3,7 +3,7 @@
 > **Execution admission, 2026-10-22:** Owner has explicitly approved [the60h source window](EXECUTION-AUTHORIZATION.md). PENDING_OWNER/NOT_STARTED planning statements below are the initial snapshot; actual progress is in per-Goal receipts. Start2026-10-21T17:00:50Z; deadline2026-10-24T05:00:50Z. Native connections/effects stay0/0.
 
 入口：[README](README.md) · 规范：[design.md](../../ux/design.md) · 状态：[manifest](manifest.json)。
-当前仅规划 PR 获准创建、推送和正常合并；全部 S00–S08 为 `NOT_STARTED`，等待后续 60h 授权。
+实际：S00–S08 SOURCE_COMPLETE；H0 READY_FOR_OWNER（未执行/批准）。见 [RESULTS](RESULTS.md) 与逐 Goal 回执。
 
 ## DAG 与可见增量
 
@@ -40,7 +40,7 @@ Goal 级文件范围见各 MD。跨越 Native、Rust 生命周期、认证协议
 
 每个 Goal 对应一个主要审阅单元和一个 source-only PR；小修可在同一 PR 内提交，不为每个复选框开 PR。
 S00 的锁/文档若没有独立源码差异，可与 S01 的一个 PR 一起提交，分别保留 Goal 回执。
-后续源码 PR 的创建及开发分支正常合并必须在未来 Owner 授权中明确包含。
+本次后续 Owner 已授权源码 PR 和合格后开发分支正常合并，见 EXECUTION-AUTHORIZATION。
 不得强推、绕过分支保护、自动合并历史 PR19–23、切换产品路线或修改 `main`。
 
 ## 状态模型
@@ -51,6 +51,6 @@ S00 的锁/文档若没有独立源码差异，可与 S01 的一个 PR 一起提
 - `ACCEPTED`：仅有 Owner 对准确候选的实际接受证据才能使用。
 - `BUDGET_EXPIRED`：保存部分结果与阻碍；不得将时间耗尽写为完成。
 
-私有 `state.json` 和每 Goal 回执维护实际进度；manifest 是初始计划，不因文件存在就把 Goal 置为完成。
+私有 `state.json` 和每 Goal 回执维护实际进度；manifest 已按实际回执更新；不能仅因文件存在就把 Goal 置为完成。
 旧 `scripts/fpx-train.mjs` 硬编码 FPX 路径，**不适用于这个 manifest**。本轮不改调度器；按本 DAG 直接选择，勿用旧 helper 输出授予权限。
 最终候选视觉复核可以准备为 H0，但不改变 H1–H4、Gate S 或 G06→G10 的原依赖。

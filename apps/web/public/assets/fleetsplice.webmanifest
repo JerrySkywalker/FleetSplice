@@ -1,0 +1,12 @@
+{
+  "id": "/",
+  "name": "FleetSplice",
+  "short_name": "FleetSplice",
+  "description": "Observe and control admitted coding-agent sessions.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#235c6b",
+  "icons": [{ "src": "/assets/fleetsplice.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

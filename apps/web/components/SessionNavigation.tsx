@@ -1,4 +1,8 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import { Button } from '../../../packages/ui/components/button.tsx';
+import { Input } from '../../../packages/ui/components/input.tsx';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '../../../packages/ui/components/dialog.tsx';
+import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from '../../../packages/ui/components/command.tsx';
+import React, { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import type { NativeThread } from '../../../packages/native-adoption/types.ts';
 import type { Locale } from '../i18n.ts';
@@ -14,11 +18,10 @@ export function SessionNavigation({ threads, selected, onSelect, locale, control
   const matches = matchingSessions(threads, query, recent);
   const workspaces = [...new Set(matches.map(thread => thread.workspace))];
   return <nav className="session-navigation" aria-label={zh ? 'Fleet 会话' : 'Fleet sessions'}>
-    <div className="eyebrow">Fleet</div>
-    <p className="navigation-scope muted">{zh ? 'Host / Environment：当前投影未提供' : 'Host / Environment: not reported by this projection'}</p>
-    <label className="session-search"><Search size={14} aria-hidden="true" /><input type="search" value={query}
-      aria-label={zh ? '搜索会话' : 'Search sessions'} placeholder={zh ? '搜索会话' : 'Search sessions'} onChange={event => setQuery(event.target.value)} /></label>
-    <div className="navigation-observation" role="status">{state === 'READY' ? (zh ? '已收到观察快照' : 'Observed snapshot received') : state}</div>
+    <h2 className="mb-3 text-sm font-medium">{zh ? '会话' : 'Sessions'}</h2>
+    <label className="relative block"><Search size={14} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/><Input className="h-9 pl-9 max-sm:h-11" type="search" value={query}
+      aria-label={zh ? '搜索会话' : 'Search sessions'} placeholder={zh ? '搜索会话' : 'Search sessions'} onChange={event => setQuery(event.target.value)}/></label>
+    <div className="navigation-observation" role="status">{state === 'READY' ? (zh ? `${threads.length} 个本地会话` : `${threads.length} local sessions`) : state}</div>
     {!threads.length && <p className="muted">{state === 'CONNECTING' ? (zh ? '正在发现会话…' : 'Discovering sessions…') : (zh ? '未观察到已有会话。' : 'No existing sessions observed.')}</p>}
     {!!threads.length && !matches.length && <p className="muted">{zh ? '没有匹配的会话' : 'No matching sessions'}</p>}
     {workspaces.map(workspace => <section key={workspace} className="workspace-session-group">
@@ -33,45 +36,40 @@ export function SessionNavigation({ threads, selected, onSelect, locale, control
 
 export function SessionQuickSwitcher({ threads, selected, onSelect, locale, recent }: Omit<Props, 'controller' | 'state'>) {
   const zh = locale === 'zh-CN';
-  const dialog = useRef<HTMLDialogElement>(null); const trigger = useRef<HTMLButtonElement>(null); const search = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState(''); const [active, setActive] = useState(0);
-  const listId = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState('');
   const matches = matchingSessions(threads, query, recent);
-  const close = () => { dialog.current?.close(); trigger.current?.focus(); };
-  const open = () => { setQuery(''); setActive(0); if (!dialog.current?.open) dialog.current?.showModal(); search.current?.focus(); };
-  const choose = (id: string) => { onSelect(id); close(); };
+  const changeOpen = (value: boolean) => { if (value) { setQuery(''); setActive(matchingSessions(threads, '', recent)[0]?.id ?? ''); } setOpen(value); };
+  const choose = (id: string) => { onSelect(id); setOpen(false); };
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !event.isComposing && event.keyCode !== 229) {
-        if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
-        event.preventDefault(); if (!event.repeat) open();
+        event.preventDefault();
+        if (document.querySelector('[role="dialog"], dialog[open]')) return;
+        if (!event.repeat) changeOpen(true);
       }
     };
     window.addEventListener('keydown', shortcut); return () => window.removeEventListener('keydown', shortcut);
-  }, []);
-  return <>
-    <button type="button" ref={trigger} className="ghost-button quick-switch-trigger" data-testid="quick-switch-trigger" aria-keyshortcuts="Control+k Meta+k"
-      onClick={open}><Search size={16} aria-hidden="true" /><span>{zh ? '切换会话' : 'Switch session'}</span><kbd>⌘/Ctrl K</kbd></button>
-    <dialog ref={dialog} className="session-switcher" aria-label={zh ? '切换会话' : 'Switch session'} onCancel={event => { event.preventDefault(); close(); }}>
-      <div className="switcher-heading"><strong>{zh ? '切换会话' : 'Switch session'}</strong><button type="button" className="icon-button" onClick={close} aria-label={zh ? '关闭切换器' : 'Close switcher'}><X size={18} aria-hidden="true" /></button></div>
-      <input ref={search} type="search" role="combobox" aria-expanded="true" aria-controls={listId} aria-autocomplete="list"
-        aria-activedescendant={matches[active] ? `${listId}-${active}` : undefined} aria-label={zh ? '搜索会话' : 'Search sessions'}
-        placeholder={zh ? '按会话、工作区或 Thread ID 搜索' : 'Search session, workspace or Thread ID'} value={query}
-        onChange={event => { setQuery(event.target.value); setActive(0); }}
-        onKeyDown={event => {
-          if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-          if (event.key === 'ArrowDown') { event.preventDefault(); setActive(index => Math.min(matches.length - 1, index + 1)); }
-          if (event.key === 'ArrowUp') { event.preventDefault(); setActive(index => Math.max(0, index - 1)); }
-          if (event.key === 'Enter' && matches[active]) { event.preventDefault(); choose(matches[active]!.id); }
-        }} />
-      <div role="listbox" id={listId} aria-label={zh ? '匹配的会话' : 'Matching sessions'}>
-        {matches.map((thread, index) => <button type="button" role="option" id={`${listId}-${index}`} key={thread.id}
-          aria-selected={thread.id === selected} className={`switcher-option ${active === index ? 'is-active' : ''}`}
-          onMouseMove={() => setActive(index)} onClick={() => choose(thread.id)}>
-          <strong>{sessionTitle(thread)}</strong><span>{thread.workspace}</span><small>{thread.id}</small>
-        </button>)}
-        {!matches.length && <p className="muted">{zh ? '没有匹配的会话' : 'No matching sessions'}</p>}
-      </div>
-    </dialog>
-  </>;
+  }, [threads, recent]);
+  return <Dialog open={open} onOpenChange={changeOpen}>
+    <DialogTrigger render={<Button type="button" variant="ghost" ref={trigger} className="quick-switch-trigger" data-testid="quick-switch-trigger" aria-keyshortcuts="Control+k Meta+k"/>}>
+      <Search size={16} aria-hidden="true"/><span>{zh ? '切换会话' : 'Switch session'}</span><kbd>⌘/Ctrl K</kbd>
+    </DialogTrigger>
+    <DialogContent showCloseButton={false} finalFocus={trigger} className="top-1/3 max-w-[min(560px,calc(100vw-32px))]! translate-y-0 p-0">
+      <DialogHeader className="sr-only"><DialogTitle>{zh ? '切换会话' : 'Switch session'}</DialogTitle><DialogDescription>{zh ? '搜索并选择已有会话。' : 'Search and choose an existing session.'}</DialogDescription></DialogHeader>
+      <DialogClose render={<Button variant="ghost" size="icon" className="absolute right-2 top-1 z-10 max-sm:min-h-11 max-sm:min-w-11" aria-label={zh ? '关闭切换器' : 'Close switcher'}/>}><X size={16}/></DialogClose>
+      <Command shouldFilter={false} value={active} onValueChange={setActive}>
+        <CommandInput className="pr-10" aria-label={zh ? '搜索会话' : 'Search sessions'} placeholder={zh ? '搜索会话、工作区或 Thread ID' : 'Search session, workspace or Thread ID'} value={query}
+          onValueChange={value => { setQuery(value); setActive(matchingSessions(threads, value, recent)[0]?.id ?? ''); }}
+          onKeyDown={event => { if (event.nativeEvent.isComposing || event.keyCode === 229) event.stopPropagation(); }}/>
+        <CommandList><CommandEmpty>{zh ? '没有匹配的会话' : 'No matching sessions'}</CommandEmpty>
+          {matches.map(thread => <CommandItem key={thread.id} value={thread.id} className="min-h-11 sm:min-h-9" data-checked={thread.id === selected} onSelect={() => choose(thread.id)}>
+            <div className="min-w-0 flex-1"><div className="truncate text-sm">{sessionTitle(thread)}</div><div className="truncate text-xs text-muted-foreground">{thread.workspace}</div></div>
+          </CommandItem>)}
+        </CommandList>
+      </Command>
+    </DialogContent>
+  </Dialog>;
 }

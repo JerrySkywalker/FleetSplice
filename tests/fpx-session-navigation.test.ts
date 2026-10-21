@@ -24,7 +24,7 @@ test('FPX navigation searches identity/workspace and prioritizes only observed r
 test('FPX UX01: passive navigation, modal focus and attached-thread draft/unknown isolation', async () => {
   const server = await preview({ configFile: path.resolve('apps/web/vite.config.ts'), preview: { host: '127.0.0.1', port: 0, strictPort: true } });
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
-  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/execution-200h-20261021/UX01');
+  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S03/navigation');
   mkdirSync(artifact, { recursive: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'en-US' });
   const page = await context.newPage();
@@ -66,6 +66,8 @@ test('FPX UX01: passive navigation, modal focus and attached-thread draft/unknow
     await page.keyboard.press('Control+k');
     const switcher = page.getByRole('dialog', { name: 'Switch session', exact: true });
     await expect(switcher).toBeVisible();
+    await expect(switcher).toHaveCSS('opacity', '1');
+    await page.screenshot({ path: path.join(artifact, 'command-1440.png'), animations: 'disabled' });
     await switcher.getByRole('combobox').fill('second-workspace');
     await page.keyboard.press('Enter');
     await expect(switcher).not.toBeVisible();
@@ -79,14 +81,22 @@ test('FPX UX01: passive navigation, modal focus and attached-thread draft/unknow
     await page.screenshot({ path: path.join(artifact, 'desktop-1440.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByTestId('nav-menu').click();
+    await page.keyboard.press('Control+k');
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+    await expect(page.getByTestId('nav-drawer')).toHaveCSS('opacity', '1');
+    await page.screenshot({ path: path.join(artifact, 'session-sheet-390.png'), animations: 'disabled' });
     await page.getByTestId('nav-drawer').getByRole('button', { name: 'Close sessions' }).focus();
     await page.keyboard.press('Shift+Tab');
     assert.ok(await page.getByTestId('nav-drawer').evaluate(node => node.contains(document.activeElement)));
-    await expect(page.getByTestId('conversation-pane')).toHaveAttribute('inert', '');
+    // Base UI owns the modal focus guards; verify the keyboard behavior rather
+    // than the former hand-written inert attribute implementation.
+    for (let index = 0; index < 6; index++) {
+      await page.keyboard.press('Tab');
+      await expect.poll(() => page.getByTestId('nav-drawer').evaluate(node => node.contains(document.activeElement))).toBe(true);
+    }
     await page.getByTestId('nav-drawer').getByRole('button', { name: /Review a small patch/ }).click();
     await expect(page.getByTestId('nav-drawer')).toHaveCount(0);
     await expect(page.getByTestId('nav-menu')).toBeFocused();
-    await expect(page.getByTestId('conversation-pane')).not.toHaveAttribute('inert');
     await page.getByTestId('quick-switch-trigger').click();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('quick-switch-trigger')).toBeFocused();

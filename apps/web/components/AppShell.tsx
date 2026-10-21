@@ -1,3 +1,5 @@
+import { Button } from '../../../packages/ui/components/button.tsx';
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '../../../packages/ui/components/sheet.tsx';
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
 import { SemanticIcon } from '../icons/semantic-icons.tsx';
@@ -92,19 +94,9 @@ function ResizeHandle({ side, width, min, max, onWidth, label }: {
   />;
 }
 
-export function AppShell({
-  brand, headerActions, navigation, conversation, context,
-  footer, navTitle, contextTitle, navigationSelection,
-}: {
-  brand: ReactNode;
-  headerActions: ReactNode;
-  navigation: ReactNode;
-  conversation: ReactNode;
-  context: ReactNode;
-  footer: ReactNode;
-  navTitle: string;
-  contextTitle: string;
-  navigationSelection?: string;
+export function AppShell({ brand, headerActions, navigation, conversation, context, footer, navTitle, contextTitle, navigationSelection }: {
+  brand: ReactNode; headerActions: ReactNode; navigation: ReactNode; conversation: ReactNode; context: ReactNode;
+  footer: ReactNode; navTitle: string; contextTitle: string; navigationSelection?: string;
 }) {
   const breakpoint = useBreakpoint();
   const layoutIntent = layoutIntentFromWebBreakpoint(breakpoint);
@@ -113,21 +105,15 @@ export function AppShell({
   const [contextOpen, setContextOpen] = useState(false);
   const navTriggerRef = useRef<HTMLButtonElement>(null);
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
-  const navCloseRef = useRef<HTMLButtonElement>(null);
-  const contextCloseRef = useRef<HTMLButtonElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
-  const navDrawerRef = useRef<HTMLDivElement>(null);
-  const contextDrawerRef = useRef<HTMLDivElement>(null);
   const desktop = breakpoint === 'desktop';
-  const showDrawers = !desktop;
+  const zh = navTitle === '会话';
 
   useEffect(() => {
     const workspace = shellRef.current?.closest<HTMLElement>('.native-workspace');
     const viewport = window.visualViewport;
     if (!workspace || !viewport) return;
     const update = () => {
-      // Keyboard occlusion changes the visual viewport. Pinch zoom keeps the
-      // normal layout so the browser can pan/zoom rather than reflow controls.
       if (viewport.scale !== 1) { workspace.style.removeProperty('--workspace-height'); workspace.style.removeProperty('--workspace-top'); return; }
       workspace.style.setProperty('--workspace-height', `${viewport.height}px`);
       workspace.style.setProperty('--workspace-top', `${viewport.offsetTop}px`);
@@ -135,141 +121,48 @@ export function AppShell({
     update(); viewport.addEventListener('resize', update); viewport.addEventListener('scroll', update);
     return () => { viewport.removeEventListener('resize', update); viewport.removeEventListener('scroll', update); workspace.style.removeProperty('--workspace-height'); workspace.style.removeProperty('--workspace-top'); };
   }, []);
+  useEffect(() => { setNavOpen(false); }, [navigationSelection]);
+  useEffect(() => { if (desktop) { setNavOpen(false); setContextOpen(false); } }, [desktop]);
 
-  useEffect(() => {
-    if (navOpen) { setNavOpen(false); navTriggerRef.current?.focus(); }
-  }, [navigationSelection]);
-
-  useEffect(() => {
-    if (desktop) { setNavOpen(false); setContextOpen(false); }
-  }, [desktop]);
-
-  useEffect(() => {
-    if (!navOpen && !contextOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (navOpen) { setNavOpen(false); navTriggerRef.current?.focus(); }
-        if (contextOpen) { setContextOpen(false); contextTriggerRef.current?.focus(); }
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [navOpen, contextOpen]);
-
-  useEffect(() => {
-    if (navOpen) navCloseRef.current?.focus();
-  }, [navOpen]);
-  useEffect(() => {
-    if (contextOpen) contextCloseRef.current?.focus();
-  }, [contextOpen]);
-
-  useEffect(() => {
-    const drawer = navOpen ? navDrawerRef.current : contextOpen ? contextDrawerRef.current : null;
-    const shell = shellRef.current;
-    if (!drawer || !shell) return;
-    const background = [...shell.children, ...(shell.parentElement?.children ?? [])]
-      .filter((node): node is HTMLElement => node instanceof HTMLElement && node !== shell && node !== drawer && !node.classList.contains('drawer-backdrop'));
-    const prior = background.map(node => [node, node.inert] as const);
-    for (const node of background) node.inert = true;
-    const containFocus = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const controls = [...drawer.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]')]
-        .filter(node => node.getClientRects().length > 0);
-      const first = controls[0]; const last = controls.at(-1);
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-    };
-    window.addEventListener('keydown', containFocus);
-    return () => {
-      window.removeEventListener('keydown', containFocus);
-      for (const [node, wasInert] of prior) node.inert = wasInert;
-      (navOpen ? navTriggerRef : contextTriggerRef).current?.focus();
-    };
-  }, [navOpen, contextOpen]);
-
-  return <div
-    ref={shellRef}
-    className={`shell product-shell breakpoint-${breakpoint}`}
-    data-testid="app-shell"
-    data-breakpoint={breakpoint}
-    data-layout-intent={layoutIntent}
-    data-left-collapsed={layout.leftCollapsed}
-    data-right-collapsed={layout.rightCollapsed}
-    style={desktop ? {
-      ['--left-panel' as string]: layout.leftCollapsed ? '0px' : `${layout.leftWidth}px`,
-      ['--right-panel' as string]: layout.rightCollapsed ? '0px' : `${layout.rightWidth}px`,
-    } : undefined}
-  >
+  return <div ref={shellRef} className={`shell product-shell breakpoint-${breakpoint}`} data-testid="app-shell"
+    data-breakpoint={breakpoint} data-layout-intent={layoutIntent} data-left-collapsed={layout.leftCollapsed} data-right-collapsed={layout.rightCollapsed}
+    style={desktop ? { ['--left-panel' as string]: layout.leftCollapsed ? '0px' : `${layout.leftWidth}px`, ['--right-panel' as string]: layout.rightCollapsed ? '0px' : `${layout.rightWidth}px` } : undefined}>
     <header className="product-header">
       <div className="header-leading">
-        {showDrawers && <button type="button" ref={navTriggerRef} className="icon-button" data-testid="nav-menu" aria-label={navTitle}
-          aria-expanded={navOpen} onClick={() => { setNavOpen(true); setContextOpen(false); }}>
-          <SemanticIcon intent="sessions" size={20} />
-        </button>}
+        {!desktop && <Sheet open={navOpen} onOpenChange={open => { setNavOpen(open); if (open) setContextOpen(false); }}>
+          <SheetTrigger render={<Button type="button" variant="ghost" size="icon" ref={navTriggerRef} className="icon-button" data-testid="nav-menu" aria-label={navTitle}/> }><SemanticIcon intent="sessions" size={20}/></SheetTrigger>
+          <SheetContent side="left" showCloseButton={false} finalFocus={navTriggerRef} data-testid="nav-drawer" className="w-[min(340px,90vw)]!">
+            <SheetHeader className="flex-row items-center justify-between border-b p-3"><SheetTitle>{navTitle}</SheetTitle><SheetClose render={<Button variant="ghost" size="icon" className="min-h-11 min-w-11" aria-label={zh ? '关闭会话' : 'Close sessions'}/> }><X size={18}/></SheetClose></SheetHeader>
+            <SheetDescription className="sr-only">{zh ? '选择已有会话；选择不会获取控制权。' : 'Choose an existing session. Selection does not acquire control.'}</SheetDescription>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">{navigation}</div>
+          </SheetContent>
+        </Sheet>}
         {brand}
       </div>
-      <div className="header-trailing">
-        {headerActions}
-        {showDrawers && <button type="button" ref={contextTriggerRef} className="icon-button" data-testid="context-menu" aria-label={contextTitle}
-          aria-expanded={contextOpen} onClick={() => { setContextOpen(true); setNavOpen(false); }}>
-          <SemanticIcon intent="context" size={20} />
-        </button>}
+      <div className="header-trailing">{headerActions}
+        {!desktop && <Sheet open={contextOpen} onOpenChange={open => { setContextOpen(open); if (open) setNavOpen(false); }}>
+          <SheetTrigger render={<Button type="button" variant="ghost" size="icon" ref={contextTriggerRef} className="icon-button" data-testid="context-menu" aria-label={contextTitle}/> }><SemanticIcon intent="context" size={20}/></SheetTrigger>
+          <SheetContent side="right" showCloseButton={false} finalFocus={contextTriggerRef} data-testid="context-drawer" className="w-[min(420px,100vw)]!">
+            <SheetHeader className="flex-row items-center justify-between border-b p-3"><SheetTitle>{contextTitle}</SheetTitle><SheetClose render={<Button variant="ghost" size="icon" className="min-h-11 min-w-11" aria-label={zh ? '关闭详情' : 'Close context'}/> }><X size={18}/></SheetClose></SheetHeader>
+            <SheetDescription className="sr-only">{zh ? '已观察的会话身份和配置。' : 'Observed session identity and configuration.'}</SheetDescription>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">{context}</div>
+          </SheetContent>
+        </Sheet>}
         {desktop && <>
-          <button type="button" className="ghost-button icon-button" data-testid="toggle-left"
-            aria-label={layout.leftCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-            title={layout.leftCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-            aria-pressed={layout.leftCollapsed}
-            onClick={() => updateLayout({ leftCollapsed: !layout.leftCollapsed })}>
-            {layout.leftCollapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}
-          </button>
-          <button type="button" className="ghost-button icon-button" data-testid="toggle-right"
-            aria-label={layout.rightCollapsed ? 'Expand context' : 'Collapse context'}
-            title={layout.rightCollapsed ? 'Expand context' : 'Collapse context'}
-            aria-pressed={layout.rightCollapsed}
-            onClick={() => updateLayout({ rightCollapsed: !layout.rightCollapsed })}>
-            {layout.rightCollapsed ? <PanelRightOpen size={16} aria-hidden="true" /> : <PanelRightClose size={16} aria-hidden="true" />}
-          </button>
+          <Button type="button" variant="ghost" size="icon" data-testid="toggle-left" aria-label={layout.leftCollapsed ? (zh ? '展开导航' : 'Expand navigation') : (zh ? '收起导航' : 'Collapse navigation')}
+            aria-pressed={layout.leftCollapsed} onClick={() => updateLayout({ leftCollapsed: !layout.leftCollapsed })}>{layout.leftCollapsed ? <PanelLeftOpen size={16}/> : <PanelLeftClose size={16}/>}</Button>
+          <Button type="button" variant="ghost" size="icon" data-testid="toggle-right" aria-label={layout.rightCollapsed ? (zh ? '展开详情' : 'Expand context') : (zh ? '收起详情' : 'Collapse context')}
+            aria-pressed={layout.rightCollapsed} onClick={() => updateLayout({ rightCollapsed: !layout.rightCollapsed })}>{layout.rightCollapsed ? <PanelRightOpen size={16}/> : <PanelRightClose size={16}/>}</Button>
         </>}
       </div>
     </header>
-
-    <aside className={`navigation panel-surface ${layout.leftCollapsed && desktop ? 'is-collapsed' : ''}`}
-      data-testid="navigation-panel" hidden={desktop && layout.leftCollapsed}>
-      {navigation}
-      {desktop && !layout.leftCollapsed && <ResizeHandle side="left" width={layout.leftWidth} min={LEFT_MIN} max={LEFT_MAX}
-        label="Resize navigation" onWidth={value => updateLayout({ leftWidth: value })} />}
+    <aside className={`navigation panel-surface ${layout.leftCollapsed && desktop ? 'is-collapsed' : ''}`} data-testid="navigation-panel" hidden={desktop && layout.leftCollapsed}>
+      {navigation}{desktop && !layout.leftCollapsed && <ResizeHandle side="left" width={layout.leftWidth} min={LEFT_MIN} max={LEFT_MAX} label={zh ? '调整导航宽度' : 'Resize navigation'} onWidth={value => updateLayout({ leftWidth: value })}/>}
     </aside>
-
     <main className="conversation-pane" data-testid="conversation-pane">{conversation}</main>
-
-    <aside className={`context panel-surface ${layout.rightCollapsed && desktop ? 'is-collapsed' : ''}`}
-      data-testid="context-panel" hidden={desktop && layout.rightCollapsed}>
-      {desktop && !layout.rightCollapsed && <ResizeHandle side="right" width={layout.rightWidth} min={RIGHT_MIN} max={RIGHT_MAX}
-        label="Resize context" onWidth={value => updateLayout({ rightWidth: value })} />}
-      {context}
+    <aside className={`context panel-surface ${layout.rightCollapsed && desktop ? 'is-collapsed' : ''}`} data-testid="context-panel" hidden={desktop && layout.rightCollapsed}>
+      {desktop && !layout.rightCollapsed && <ResizeHandle side="right" width={layout.rightWidth} min={RIGHT_MIN} max={RIGHT_MAX} label={zh ? '调整详情宽度' : 'Resize context'} onWidth={value => updateLayout({ rightWidth: value })}/>}{context}
     </aside>
-
-    {showDrawers && navOpen && <>
-      <div className="drawer-backdrop" data-testid="nav-backdrop" onClick={() => { setNavOpen(false); navTriggerRef.current?.focus(); }} />
-      <div ref={navDrawerRef} className="drawer drawer-nav" role="dialog" aria-modal="true" aria-label={navTitle} data-testid="nav-drawer">
-        <div className="drawer-toolbar"><strong>{navTitle}</strong>
-          <button type="button" ref={navCloseRef} aria-label="Close sessions" onClick={() => { setNavOpen(false); navTriggerRef.current?.focus(); }}>
-            <X size={16} aria-hidden="true" /> Close
-          </button></div>
-        <div className="drawer-body">{navigation}</div>
-      </div>
-    </>}
-    {showDrawers && contextOpen && <>
-      <div className="drawer-backdrop" data-testid="context-backdrop" onClick={() => { setContextOpen(false); contextTriggerRef.current?.focus(); }} />
-      <div ref={contextDrawerRef} className="drawer drawer-context" role="dialog" aria-modal="true" aria-label={contextTitle} data-testid="context-drawer">
-        <div className="drawer-toolbar"><strong>{contextTitle}</strong>
-          <button type="button" ref={contextCloseRef} aria-label="Close context" onClick={() => { setContextOpen(false); contextTriggerRef.current?.focus(); }}>
-            <X size={16} aria-hidden="true" /> Close
-          </button></div>
-        <div className="drawer-body">{context}</div>
-      </div>
-    </>}
-
     <footer className="product-footer">{footer}</footer>
   </div>;
 }

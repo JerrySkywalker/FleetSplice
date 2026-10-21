@@ -82,11 +82,12 @@
       "deps": [
         "FLEETSPLICE-SUI-S02-001"
       ],
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "planned_hours": 6,
       "mode": "SOURCE_ONLY_AFTER_AUTHORIZATION",
       "human_gate_prerequisites": [],
-      "acceptance_gates": []
+      "acceptance_gates": [],
+      "receipt": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S03.md"
     },
     {
       "id": "FLEETSPLICE-SUI-S04-001",

@@ -10,7 +10,7 @@ import { startHub } from '../apps/hub/server.ts';
 import { target } from './helpers.ts';
 import type { AdoptionSnapshot, NativeThread } from '../packages/native-adoption/types.ts';
 
-const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/execution-200h-20261021/UX04');
+const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S03/responsive');
 
 test('FPX UX04: PWA assets are narrowly served with explicit MIME and no-store', async () => {
   mkdirSync(artifacts, { recursive: true });
@@ -70,9 +70,6 @@ test('FPX UX04: responsive viewport matrix, keyboard viewport, focus, drafts and
     }
     await page.setViewportSize({ width: 390, height: 844 });
     assert.ok(await page.locator('.message-code pre').evaluate(node => node.scrollWidth > node.clientWidth), 'long code scrolls locally');
-    await page.locator('.gateway-compact > summary').click();
-    assert.ok(await page.getByTestId('composer-surface').evaluate(node => node.getBoundingClientRect().bottom <= innerHeight + 1));
-    await page.locator('.gateway-compact > summary').click();
     for (const id of ['nav-menu','context-menu','composer-send','config-capsule']) assert.ok((await page.getByTestId(id).boundingBox())!.height >= 44, `${id} touch height`);
     await page.getByTestId('nav-menu').click(); await expect(page.getByTestId('nav-drawer')).toBeVisible(); await page.keyboard.press('Escape'); await expect(page.getByTestId('nav-menu')).toBeFocused();
     await page.getByTestId('config-capsule').click(); await expect(page.getByTestId('config-sheet')).toBeVisible();

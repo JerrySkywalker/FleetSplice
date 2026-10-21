@@ -42,6 +42,7 @@ export function SessionConfigBar({
   const [sheetOpen, setSheetOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const surfaceRef = useRef<HTMLDialogElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const observedModel = effectiveModel ?? model;
@@ -56,12 +57,8 @@ export function SessionConfigBar({
 
   useEffect(() => {
     if (!sheetOpen) return;
+    surfaceRef.current?.showModal();
     closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSheetOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
   }, [sheetOpen]);
 
   useEffect(() => {
@@ -172,15 +169,18 @@ export function SessionConfigBar({
     </button>
     {controller}
 
-    {sheetOpen && <>
-      <div className="drawer-backdrop" data-testid="config-sheet-backdrop" onClick={closeSurface} />
-      <div
+    {sheetOpen && <dialog
+        ref={surfaceRef}
         className={`drawer drawer-config config-surface config-surface-${surfaceVariant}${surfaceVariant === 'sheet' ? ' sheet' : ''}`}
-        role="dialog"
-        aria-modal="true"
         aria-labelledby={titleId}
         data-testid="config-sheet"
         data-config-surface={surfaceVariant}
+        onCancel={event => { event.preventDefault(); closeSurface(); }}
+        onClick={event => {
+          if (event.target !== event.currentTarget) return;
+          const box = event.currentTarget.getBoundingClientRect();
+          if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeSurface();
+        }}
       >
         <div className="drawer-toolbar">
           <strong id={titleId}>Configuration</strong>
@@ -191,7 +191,6 @@ export function SessionConfigBar({
           {detailRows}
           {mutationSupported ? <div className="config-sheet-controls" data-testid="config-sheet-controls">{interactiveSelects}</div> : null}
         </div>
-      </div>
-    </>}
+      </dialog>}
   </div>;
 }

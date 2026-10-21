@@ -12,6 +12,16 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--canvas); color: var(--text); }
 body.is-resizing { cursor: col-resize; user-select: none; }
+.native-workspace {
+  position: fixed; inset-inline: 0; top: var(--workspace-top, 0px); height: var(--workspace-height, 100dvh);
+  display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+.native-workspace > .product-shell { flex: 1; height: auto; min-height: 0; max-width: 100%; }
+.native-workspace .session-attention { display: flex; flex-direction: column; max-height: 35%; min-height: 0; flex-shrink: 1; }
+.native-workspace .attention-heading { flex-shrink: 0; }
+.native-workspace .attention-cards { min-height: 0; }
+.native-workspace .product-footer > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .navigation-scope { font-size: 11px; line-height: 1.5; margin-block: 8px 12px; }
 .session-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 6px 8px; }
 .session-search input { width: 100%; min-width: 0; border: 0; outline-offset: 3px; background: transparent; }
@@ -474,6 +484,7 @@ dialog p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-bottom
   background: var(--surface);
   animation: popover-in var(--motion);
 }
+dialog.drawer-config { margin: 0; padding: 0; max-width: none; max-height: none; }
 .drawer-config.sheet, .config-surface-sheet,
 .breakpoint-mobile .drawer-context, .breakpoint-mobile .drawer-config {
   top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: min(78dvh, 640px);
@@ -648,3 +659,35 @@ dialog p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-bottom
 .fleet-summary strong { display: block; font-size: 16px; margin: 2px 0; }
 .gateway-panel { margin: 10px 0 0; color: var(--muted); }
 @media (max-width: 700px) { .fleet-summary { grid-template-columns: repeat(2, minmax(100px, 1fr)); } }
+.gateway-compact { padding: 0 12px; flex-shrink: 0; margin: 0; }
+.gateway-compact > summary { min-height: 36px; display: list-item; align-content: center; font-size: 12px; padding-block: 6px; }
+.gateway-compact > summary span { color: var(--muted); font-size: 11px; margin-inline-start: 12px; }
+.gateway-content { max-height: min(24dvh, 220px); overflow: auto; padding-bottom: 8px; }
+.gateway-content .gateway-panel { overflow-wrap: anywhere; }
+@media (max-width: 1279px) {
+  .native-workspace { --touch-h: 44px; }
+  .native-workspace button, .native-workspace summary, .native-workspace input, .native-workspace select { min-height: 44px; }
+  .native-workspace .icon-button, .native-workspace .quick-switch-trigger { min-width: 44px; }
+  .native-workspace .composer textarea { font-size: 16px; }
+  .native-workspace .session-attention { margin-block: 4px; }
+  .native-workspace .attention-heading .ownership-surface { padding: 4px 8px; }
+  .native-workspace .product-footer { padding-inline: 8px; gap: 8px; }
+}
+@media (max-width: 767px) {
+  .native-workspace .product-header { padding-inline: 6px; gap: 4px; }
+  .native-workspace .header-leading { gap: 4px; }
+  .native-workspace .header-trailing { gap: 2px; }
+  .native-workspace .brand { font-size: 15px; gap: 6px; }
+  .native-workspace .session-heading h1 { font-size: 15px; }
+  .native-workspace .session-heading .status { max-width: 45%; white-space: normal; text-align: end; }
+  .native-workspace .attention-heading { gap: 4px; }
+  .native-workspace .attention-heading .ownership-surface { width: 100%; min-width: 0; }
+  .native-workspace .session-heading .subtitle { font-size: 11px; }
+  .native-workspace .config-capsule { max-width: 100%; }
+}
+@media (max-height: 600px) {
+  .native-workspace .session-heading { padding-block: 4px; }
+  .native-workspace .session-heading .subtitle { display: none; }
+  .native-workspace .product-shell { grid-template-rows: 48px minmax(0, 1fr) 0px; }
+  .native-workspace .product-footer { display: none; }
+}

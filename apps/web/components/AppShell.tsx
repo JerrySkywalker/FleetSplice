@@ -122,6 +122,21 @@ export function AppShell({
   const showDrawers = !desktop;
 
   useEffect(() => {
+    const workspace = shellRef.current?.closest<HTMLElement>('.native-workspace');
+    const viewport = window.visualViewport;
+    if (!workspace || !viewport) return;
+    const update = () => {
+      // Keyboard occlusion changes the visual viewport. Pinch zoom keeps the
+      // normal layout so the browser can pan/zoom rather than reflow controls.
+      if (viewport.scale !== 1) { workspace.style.removeProperty('--workspace-height'); workspace.style.removeProperty('--workspace-top'); return; }
+      workspace.style.setProperty('--workspace-height', `${viewport.height}px`);
+      workspace.style.setProperty('--workspace-top', `${viewport.offsetTop}px`);
+    };
+    update(); viewport.addEventListener('resize', update); viewport.addEventListener('scroll', update);
+    return () => { viewport.removeEventListener('resize', update); viewport.removeEventListener('scroll', update); workspace.style.removeProperty('--workspace-height'); workspace.style.removeProperty('--workspace-top'); };
+  }, []);
+
+  useEffect(() => {
     if (navOpen) { setNavOpen(false); navTriggerRef.current?.focus(); }
   }, [navigationSelection]);
 

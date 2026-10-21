@@ -2,7 +2,7 @@
 
 Program: [FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001](../../docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/README.md)。一个Goal一个MD，每个文件定义可见增量、文件所有权、清单和实际通过标准。
 
-当前全部NOT_STARTED；规划合并已获准，60h实现尚待后续Owner授权。先读[design.md](../../docs/ux/design.md)。
+当前S00–S08 SOURCE_COMPLETE，H0 READY_FOR_OWNER且未执行/批准；见程序RESULTS与逐Goal回执。先读[design.md](../../docs/ux/design.md)。
 
 | Goal | 文件 | 依赖 | 计划小时 |
 | --- | --- | --- | ---: |

@@ -1,3 +1,5 @@
+> **Execution result,2026-10-22:** S00–S08 source delivery is complete. [RESULTS](RESULTS.md) and [H0 card](../../ux/sui-h0-owner-card.md) are current. Below preserves the original planning/research snapshot; pending statements do not override the later explicit authorization or actual receipts. H0/native are not accepted.
+
 # Proposed 60-hour autonomous execution contract
 
 > **Execution admission, 2026-10-22:** Owner has explicitly approved [the60h source window](EXECUTION-AUTHORIZATION.md). PENDING_OWNER/NOT_STARTED planning statements below are the initial snapshot; actual progress is in per-Goal receipts. Start2026-10-21T17:00:50Z; deadline2026-10-24T05:00:50Z. Native connections/effects stay0/0.

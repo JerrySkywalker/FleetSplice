@@ -1,6 +1,6 @@
 # FLEETSPLICE-SUI-S08-001 — 最终合成体验包与Owner交接
 
-状态：NOT_STARTED；计划日期：2026-10-22；计划额度：5h（不要求耗尽）。
+状态：SOURCE_COMPLETE（实现与定向检查；不代表 H0）；计划日期：2026-10-22；计划额度：5h（不要求耗尽）。
 依赖：[S07](FLEETSPLICE-SUI-S07-001.md)。目标分支：train/pre-gate-s-development-001。
 
 ## 权威入口
@@ -26,13 +26,13 @@ Implementer为唯一intentional writer；仓库/Git写前持有coordinator write
 
 ## 开发清单
 
-- [ ] 在准确集成HEAD运行一次综合合成回归，复用现有七场景而非重建大型harness，验证源与证据对应。
-- [ ] 只对最终改变的入口做Web/Desktop UI build；准确tree已有可复用证据时注明来源，不重复构建。
-- [ ] 拍摄验收矩阵最小截图组合并实际查看，记录宽窄屏/浅深色/Manager与未执行的真实设备项。
-- [ ] 准备隔离demo:fpx与已有test-only Desktop preview的启动、停止、一次性profile和已知认证限制；所有Native连接/effect保持0。
-- [ ] 引用前序已通过报告，对末次差异与集成接缝一次独立只读审查并绑定准确candidate HEAD，真实修正后只查增量，再正常推送/合并获准source-only PR。
-- [ ] 生成私有FINAL-RECEIPT.json和简短OWNER-HANDOFF.md，公共目录写脱敏结果及新的H0卡，列出各Goal实际完成/partial/blocker。
-- [ ] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
+- [x] 在准确集成HEAD运行一次综合合成回归，复用现有七场景而非重建大型harness，验证源与证据对应。
+- [x] 只对最终改变的入口做Web/Desktop UI build；准确tree已有可复用证据时注明来源，不重复构建。
+- [x] 拍摄验收矩阵最小截图组合并实际查看，记录宽窄屏/浅深色/Manager与未执行的真实设备项。
+- [x] 准备隔离demo:fpx与已有test-only Desktop preview的启动、停止、一次性profile和已知认证限制；所有Native连接/effect保持0。
+- [x] 引用前序已通过报告，对末次差异与集成接缝一次独立只读审查并绑定准确candidate HEAD，真实修正后只查增量，再正常推送/合并获准source-only PR。
+- [x] 生成私有FINAL-RECEIPT.json和简短OWNER-HANDOFF.md，公共目录写脱敏结果及新的H0卡，列出各Goal实际完成/partial/blocker。
+- [x] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
 
 ## 最小检查与通过标准
 
@@ -49,3 +49,7 @@ SOURCE_COMPLETE需要真实产物与受影响验证；不是H0或Native可用性
 结束自建预览进程，保存worktree和回执；不以余下预算启动Native、生产或新路线。
 达到总60h截止前保存部分提交/patch与回执；恢复从私有state和有效证据继续，不重跑无变化审计。
 实际阻碍只阻止依赖项；有独立就绪项时继续。下一项：Owner实际审阅准确候选。
+
+## 本次执行回执
+
+见 [S08 回执](../../docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S08.md)。执行授权见本 train EXECUTION-AUTHORIZATION.md。

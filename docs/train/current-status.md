@@ -1,3 +1,7 @@
+# SUI source delivery checkpoint —2026-10-22
+
+S00–S08 source delivery complete under the [approved60h contract](../roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/EXECUTION-AUTHORIZATION.md). [RESULTS](../roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/RESULTS.md) and [new H0 card](../ux/sui-h0-owner-card.md) bind the current Mira candidate/PR43. Real Native connections/effects0/0. H0 READY_FOR_OWNER, executed/approved=false; H1–H4, Gate S, Native PR23, Desktop first-use auth and G06 live remain unchanged. Stop for Owner review; unused budget does not admit more work. Below is dated historical context.
+
 # Current FleetSplice development status
 
 ## SUI execution admitted — 2026-10-22

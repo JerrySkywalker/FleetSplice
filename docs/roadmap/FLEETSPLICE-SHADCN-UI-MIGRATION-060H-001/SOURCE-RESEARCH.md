@@ -1,3 +1,5 @@
+> **Execution result,2026-10-22:** S00–S08 source delivery is complete. [RESULTS](RESULTS.md) and [H0 card](../../ux/sui-h0-owner-card.md) are current. Below preserves the original planning/research snapshot; pending statements do not override the later explicit authorization or actual receipts. H0/native are not accepted.
+
 # Source research and transfer decisions
 
 日期：2026-10-22（Asia/Shanghai）。这是源码/文档研究，不是依赖安装、视觉渲染或真实 Native 验证。

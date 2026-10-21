@@ -2,7 +2,7 @@
   "schema": "fleetsplice.sui-train.v1",
   "program_id": "FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001",
   "date": "2026-10-22",
-  "status": "EXECUTION_ACTIVE",
+  "status": "SOURCE_COMPLETE_READY_FOR_OWNER",
   "base_branch": "train/pre-gate-s-development-001",
   "planning_base_sha": "f42313b5e32f73957d331227a967394f2f3ad805",
   "design": "docs/ux/design.md",
@@ -28,7 +28,9 @@
     "deadline_utc": "2026-10-24T05:00:50Z",
     "start_trigger": "LATER_EXPLICIT_OWNER_AUTHORIZATION",
     "finish_early": true,
-    "authorization_source": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/EXECUTION-AUTHORIZATION.md"
+    "authorization_source": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/EXECUTION-AUTHORIZATION.md",
+    "source_completed_utc": "2026-10-21T19:14:36.497Z",
+    "finished_early": true
   },
   "goals": [
     {
@@ -158,13 +160,14 @@
       "deps": [
         "FLEETSPLICE-SUI-S07-001"
       ],
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "planned_hours": 5,
       "mode": "SOURCE_ONLY_AFTER_AUTHORIZATION",
       "human_gate_prerequisites": [],
       "acceptance_gates": [
         "H0"
-      ]
+      ],
+      "receipt": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S08.md"
     }
   ],
   "default_order": [
@@ -181,7 +184,7 @@
   "gates": [
     {
       "id": "H0",
-      "status": "NOT_RUN",
+      "status": "READY_FOR_OWNER",
       "owner_executed": false,
       "owner_approved": false,
       "source_prepare_goal": "S08",
@@ -191,12 +194,17 @@
   "evidence": {
     "preset": "OFFICIAL_CLI_4_22_1_GENERATED",
     "component_installation": "LOCKED_AND_BUILT",
-    "rendering": "TESTED_UI_COMPONENTS",
+    "rendering": "TARGETED_AND_COMBINED_SYNTHETIC_BROWSER_PASSED",
     "native_connections": 0,
-    "native_effects": 0
+    "native_effects": 0,
+    "desktop_browser": "IPC_MOCK_PASSED",
+    "desktop_example": "BUILT_NOT_GUI_OBSERVED"
   },
-  "status_authority": "private per-run state.json and exact-head receipts; this manifest is the initial plan",
+  "status_authority": "actual per-Goal receipts, RESULTS, GitHub final source PR and private FINAL-RECEIPT",
   "old_fpx_helper_compatible": false,
   "terminal_disposition": "STOP_FOR_OWNER_SHADCN_UI_REVIEW",
-  "execution_base_sha": "97c61b51b2647d741145c7d7c5245e9e2a9f3047"
+  "execution_base_sha": "97c61b51b2647d741145c7d7c5245e9e2a9f3047",
+  "tested_source_head": "5089e3747d240d8acfd664c50316704f5374dc9b",
+  "delivery_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/43",
+  "result": "RESULTS.md"
 }

@@ -1,10 +1,10 @@
 # FleetSplice UI design contract
 
-`DESIGN_VERSION=1` · `DATE=2026-10-22` · `IMPLEMENTATION=AUTHORIZED_SOURCE_ONLY_60H`
+`DESIGN_VERSION=1` · `DATE=2026-10-22` · `IMPLEMENTATION=SOURCE_COMPLETE_H0_PENDING`
 
 本文件是新 UI 的唯一呈现规范。修改界面前先读本文件，再读对应的 [SUI Goal](../../goals/shadcn/README.md)。
 Owner 已决定替换旧自研外观，采用单一 shadcn 预设，学习 Paseo 的组件复用和规范执行习惯。
-本文规定未来实现，不表示迁移、兼容性验证或 Owner 视觉验收已完成。
+本文规定当前呈现实现。S00–S08 源码迁移及定向合成检查已完成，见 SUI RESULTS；不表示真实 Native 或 Owner 视觉验收通过。
 
 ## 1. 依据和优先级
 
@@ -12,7 +12,7 @@ Owner 已决定替换旧自研外观，采用单一 shadcn 预设，学习 Paseo
 - [来源研究](../roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/SOURCE-RESEARCH.md)记录完整读取的 Paseo design.md、固定源码和本项目的适用性判断。
 - 本文替代旧 UI grammar、pattern/cockpit contract 中的**外观、密度、常驻面板、主题和禁止 Tailwind**条款；线程身份、能力、审批、未知结果与权限语义继续有效。
 - 不把 Paseo 的 RN API、工作区编辑器、终端、Git、daemon 操作或工程专用禁词移植为 FS 功能。
-- H0 尚未通过；旧候选保存为历史，新候选在 S08 交接。规划合并不启动实现。
+- H0 尚未通过；旧候选保存为历史，新候选已由 S08 交接，H0仍由Owner实际体验决定。
 
 ## 2. 唯一预设
 
@@ -124,3 +124,5 @@ zh-CN/en-US 同时提供新文案，短句、明确动词、直接状态；保�
 只做与改动直接相关的检查，最终做一次组合回归；不重复 Native 审计或全套 CI。
 最终候选保持真实 Native 连接/effect 为 0；独立合成演示与只读 Desktop 预览不能证明实际 Native 可用。
 H0 的视觉/可用性批准属于 Owner，自动截图只证明候选已准备好。
+
+S07/S08 implementation notes: active CSS directly consumes shared Mira tokens; old DTCG remains historical. Light muted copy uses Zinc600 for contrast on muted message backgrounds. Shared control text is14px; these local adjustments are recorded in packages/ui/provenance.json.

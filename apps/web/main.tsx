@@ -210,7 +210,7 @@ function App() {
     const model = models.find(item => item.id === value);
     setSelectedModel(value); setSelectedReasoning(model?.defaultReasoningEffort ?? '');
   }
-  if (nativeMode && client) return <div className="native-workspace"><GatewayDashboard request={request} ready={true} compact/><NativeAdoption client={client} request={request} locale={locale}
+  if (nativeMode && client) return <div className="native-workspace"><NativeAdoption client={client} request={request} locale={locale} fleet={<GatewayDashboard request={request} ready={true} compact/>}
     preferences={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}/></div>;
   return <div className="shell">
     <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('edition')}</span></div><div className="owner"><PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/><span className="owner-name">Jerry</span><span className="avatar">J</span></div></header>

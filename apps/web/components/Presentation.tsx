@@ -1,3 +1,4 @@
+import { Button } from '../../../packages/ui/components/button.tsx';
 import React from 'react';
 import { Circle } from 'lucide-react';
 import { SemanticIcon, toolFailedIcon as ToolFailedIcon } from '../icons/semantic-icons.tsx';
@@ -125,8 +126,8 @@ export function OwnershipSurface({
       <span>{controlled ? controllerLabel : viewerLabel}</span>
     </div>
     {controlled
-      ? <button type="button" data-testid="ownership-action" disabled={!canRelease} onClick={onRelease}>{releaseLabel}</button>
-      : <button type="button" className="primary" data-testid="ownership-action" disabled={!canAcquire} onClick={onAcquire}>{acquireLabel}</button>}
+      ? <Button variant="outline" type="button" data-testid="ownership-action" disabled={!canRelease} onClick={onRelease}>{releaseLabel}</Button>
+      : <Button variant="default" type="button" data-testid="ownership-action" disabled={!canAcquire} onClick={onAcquire}>{acquireLabel}</Button>}
   </div>;
 }
 
@@ -141,7 +142,7 @@ export function ReviewCard({ title, body, actionLabel, disabled, onReview }: {
         <p>{body}</p>
       </div>
     </div>
-    <button type="button" className="primary review-card-action" data-testid="external-review-action" disabled={disabled} onClick={onReview}>{actionLabel}</button>
+    <Button variant="default" type="button" className="review-card-action" data-testid="external-review-action" disabled={disabled} onClick={onReview}>{actionLabel}</Button>
   </div>;
 }
 
@@ -168,8 +169,8 @@ export function ApprovalCard({
     <small>{meta}</small>
     {unsupportedHint ? <p className="muted">{unsupportedHint}</p> : null}
     {(canAllow || canDeny) && <div className="approval-actions">
-      <button type="button" className="primary" disabled={!canAllow} onClick={onAllow}>{allowLabel}</button>
-      <button type="button" disabled={!canDeny} onClick={onDeny}>{denyLabel}</button>
+      <Button variant="default" type="button" disabled={!canAllow} onClick={onAllow}>{allowLabel}</Button>
+      <Button variant="outline" type="button" disabled={!canDeny} onClick={onDeny}>{denyLabel}</Button>
     </div>}
   </article>;
 }
@@ -186,22 +187,14 @@ export function SessionItem({
   onSelect: () => void;
   testId?: string;
 }) {
-  return <button
-    type="button"
-    className={`session session-item ${selected ? 'selected' : ''}`}
-    data-testid={testId ?? 'session-item'}
-    data-connected={connected}
-    aria-current={selected ? 'page' : undefined}
-    onClick={onSelect}
-  >
-    <strong className="text-ellipsis" title={title}>{title}</strong>
-    <span className="text-ellipsis" title={subtitle}>{subtitle}</span>
-    <small className="session-workspace text-ellipsis" data-clipping-policy="ellipsis" title={workspace}>{workspace}</small>
-    <small className="session-item-status text-ellipsis" title={status}>
-      {connected ? <SemanticIcon intent="connected" size={12} /> : <Circle size={12} aria-hidden="true" />}
-      {status}
-    </small>
-  </button>;
+  return <Button variant="ghost" type="button"
+    className={`session-item grid h-auto min-h-14 w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 px-3 py-2 text-left font-normal ${selected ? 'bg-accent text-accent-foreground' : ''}`}
+    data-testid={testId ?? 'session-item'} data-connected={connected} aria-current={selected ? 'page' : undefined}
+    title={`${workspace} · ${subtitle} · ${status}`} onClick={onSelect}>
+    <span className="truncate font-medium" title={title}>{title}</span>
+    <span className="session-row-state" title={status} aria-label={status}>{connected ? <SemanticIcon intent="connected" size={12}/> : <Circle size={12} aria-hidden="true"/>}</span>
+    <span className="col-span-2 truncate text-xs text-muted-foreground" title={workspace}>{workspace.split(/[\\/]/).filter(Boolean).at(-1)} · {status}</span>
+  </Button>;
 }
 
 export function SessionConnectPreview({
@@ -232,8 +225,8 @@ export function SessionConnectPreview({
       <dt>{threadLabel}</dt><dd className="id text-wrap-safe">{threadShort}</dd>
     </dl>
     <p className="muted connect-body text-wrap-safe">{body}</p>
-    <button type="button" className="primary connect-session-action" data-testid="connect-session" disabled={disabled} onClick={onConnect}>
+    <Button variant="default" type="button" className="connect-session-action" data-testid="connect-session" disabled={disabled} onClick={onConnect}>
       {actionLabel}
-    </button>
+    </Button>
   </div>;
 }

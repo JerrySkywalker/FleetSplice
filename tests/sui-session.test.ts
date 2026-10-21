@@ -1,0 +1,60 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { chromium, expect } from '@playwright/test';
+import { startFpxOwnerPreview } from '../scripts/fpx-owner-preview.ts';
+
+test('SUI S02: reusable session surface normal, approval and unknown in two widths', async () => {
+  const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S02');
+  mkdirSync(artifacts, { recursive: true });
+  const demo = await startFpxOwnerPreview(artifacts);
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: 'en-US', reducedMotion: 'reduce' });
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  try {
+    await page.goto(demo.url);
+    await expect(page.getByTestId('context-panel')).toBeHidden();
+    assert.ok((await page.getByTestId('resize-left').boundingBox())!.width <= 8, 'legacy button rules must not enlarge resize handles');
+    await expect(page.locator('.native-workspace > .gateway-dashboard')).toHaveCount(0);
+    await expect(page.locator('.product-header h1')).toHaveCount(1);
+    await expect(page.getByTestId('adopted-thread-id')).not.toHaveText('—');
+    const originalThread = await page.getByTestId('adopted-thread-id').textContent();
+    await page.getByTestId('toggle-right').click();
+    await page.locator('.gateway-compact > summary').click();
+    await expect(page.getByTestId('fleet-summary')).toBeVisible();
+    await page.getByTestId('toggle-right').click();
+    await page.getByTestId('ownership-action').click();
+    const prompt = page.getByTestId('native-prompt');
+    await prompt.fill('Synthetic representative input'); await page.getByTestId('composer-send').click();
+    await expect(page.getByTestId('conversation-timeline')).toContainText('Synthetic response: preview input received. No native action was performed.');
+    await page.screenshot({ path: path.join(artifacts, 'normal-light-1440.png') });
+    const scenario = async (name: string) => {
+      const fence = demo.setScenario(name);
+      await expect(page.getByTestId('context-panel').locator('dt').filter({ hasText: 'Fleet controller fence' }).locator('xpath=following-sibling::dd[1]')).toHaveText(String(fence));
+    };
+    await page.keyboard.press('Control+k'); const switcher = page.getByRole('dialog', { name: 'Switch session', exact: true });
+    await switcher.getByRole('combobox').fill('fixture-thread-approval'); await page.keyboard.press('Enter');
+    await scenario('approval'); await expect(page.getByRole('button', { name: 'Deny', exact: true })).toBeEnabled();
+    await page.screenshot({ path: path.join(artifacts, 'approval-light-1440.png') });
+    await page.getByRole('button', { name: 'Deny', exact: true }).click();
+    await expect(page.getByTestId('approval-card')).toContainText('resolved');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByTestId('preferences').click(); await page.getByTestId('appearance-select').selectOption('dark'); await page.keyboard.press('Escape');
+    await scenario('unknown'); await prompt.fill('Synthetic uncertain input'); await page.getByTestId('composer-send').click();
+    await expect(page.getByTestId('receipt-attention')).toContainText('Outcome unknown');
+    await page.getByRole('button', { name: 'Check receipt', exact: true }).click();
+    await expect(page.getByTestId('presentation-state')).toHaveText('Ambiguous effect');
+    await expect(page.getByRole('button', { name: 'Check receipt', exact: true })).toBeEnabled();
+    await page.keyboard.press('Control+k'); await switcher.getByRole('combobox').fill(originalThread!); await page.keyboard.press('Enter');
+    await expect(page.getByTestId('other-thread-pending')).toContainText('will not be sent again automatically');
+    await expect(page.getByTestId('other-thread-pending')).toContainText('unverified');
+    await page.keyboard.press('Control+k'); await switcher.getByRole('combobox').fill('fixture-thread-approval'); await page.keyboard.press('Enter');
+    assert.equal(demo.counters().syntheticCommands, 4);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    assert.ok(await page.getByTestId('composer-surface').evaluate(node => node.getBoundingClientRect().bottom <= innerHeight + 1));
+    await page.screenshot({ path: path.join(artifacts, 'unknown-dark-390.png') });
+    writeFileSync(path.join(artifacts, 'counters.json'), JSON.stringify(demo.counters(), null, 2));
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); await demo.close(); }
+});

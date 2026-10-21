@@ -1,7 +1,7 @@
 import { Journal } from '../journal/index.ts';
 import { requireThat } from '../contracts/json.ts';
 import { commandTerminal } from './projection.ts';
-import type { NativeThread } from './types.ts';
+import type { AdoptionCommand, AdoptionReceipt, NativeArtifactIdentity, NativeThread } from './types.ts';
 
 type Activity = NativeThread['activity'][number];
 /** Durable safety evidence, independent of the recent UI cache. No replay path. */
@@ -14,6 +14,23 @@ export class NativeActivityJournal {
       CREATE TABLE IF NOT EXISTS native_interrupted (
       incarnation TEXT NOT NULL, thread TEXT NOT NULL, turn TEXT NOT NULL,
       PRIMARY KEY(incarnation,thread,turn));`);
+  }
+  /** Reuse the Edge's existing FULL-commit evidence, not a second ledger. */
+  attempt(command: AdoptionCommand, daemon: NativeArtifactIdentity) {
+    this.journal.append('NATIVE_EFFECT_ATTEMPT', command.commandId, { command, daemon, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
+  }
+  receipt(receipt: AdoptionReceipt) {
+    this.journal.append('NATIVE_ADOPTION_RECEIPT', receipt.commandId, receipt);
+  }
+  recoveredEffects(): { command: AdoptionCommand; receipt: AdoptionReceipt }[] {
+    return this.journal.db.prepare("SELECT key,value FROM evidence WHERE kind='NATIVE_EFFECT_ATTEMPT' ORDER BY seq").all().map(row => {
+      const saved = this.journal.db.prepare("SELECT value FROM evidence WHERE kind='NATIVE_ADOPTION_RECEIPT' AND key=? ORDER BY seq DESC LIMIT 1").get(row.key!);
+      const receipt = saved ? JSON.parse(String(saved.value)) as AdoptionReceipt : null;
+      const command = JSON.parse(String(row.value)).command as AdoptionCommand;
+      requireThat(receipt?.status === 'SUCCEEDED' && receipt.commandId === command.commandId &&
+        receipt.threadId === command.threadId && receipt.family === command.family, 'NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY');
+      return { command, receipt };
+    });
   }
   observe(incarnation: string, thread: string, item: Activity): Activity {
     const prior = this.journal.db.prepare('SELECT value FROM native_commands WHERE incarnation=? AND thread=? AND id=?').get(incarnation, thread, item.id);

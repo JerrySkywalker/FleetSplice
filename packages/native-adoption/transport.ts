@@ -4,7 +4,7 @@ import WebSocket from 'ws';
 import { Fault, requireThat } from '../contracts/json.ts';
 import type { NativeArtifactIdentity } from './types.ts';
 
-export type NativeMessage = { id?: string | number; method?: string; params?: any; result?: any; error?: { code: number; message: string } };
+export type NativeMessage = { id?: string | number; eventId?: string; method?: string; params?: any; result?: any; error?: { code: number; message: string } };
 export interface NativeRpc { call(method: string, params: unknown): Promise<any>; respond?(id: string | number, result: unknown): Promise<void>; onEvent: (message: NativeMessage) => void; onClose: () => void; close(): void; }
 export class NativeRpcError extends Error { constructor(readonly code: number, message: string) { super(message); } }
 

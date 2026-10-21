@@ -1,7 +1,7 @@
 {
   "schema": "fleetsplice.goal-train.native-compat-correction.v1",
   "goal_id": "FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001",
-  "plan_status": "OWNER_APPROVED_LOCAL_IMPLEMENTATION_NOT_STARTED",
+  "plan_status": "PARTIAL_WITH_SPECIFIC_BLOCKERS",
   "owner_authorization": "ALL_LOCAL_PRODUCT_CHANGES_WITHIN_GOAL_SCOPE_NO_PER_PHASE_PROMPTS",
   "route_status": "CONDITIONAL_C_CORRECTION_APPROVED_FULL_ROUTE_NOT_SELECTED",
   "max_elapsed_minutes": 720,
@@ -105,5 +105,26 @@
     "READY_FOR_OWNER_PRODUCT_REVIEW",
     "PARTIAL_WITH_SPECIFIC_BLOCKERS",
     "BLOCKED_WITH_EXACT_CAUSE"
-  ]
+  ],
+  "execution": {
+    "phases": {
+      "C05": "PARTIAL_NO_NATIVE_CURSOR",
+      "C02": "BLOCKED_SUPPORTED_OBSERVER",
+      "C04": "TESTED_SYNTHETIC",
+      "C00": "COMPLETE",
+      "C03": "TESTED_SYNTHETIC_CONDITIONAL",
+      "C07": "REPORTS_WRITTEN",
+      "C06": "TARGETED_TESTS_PASS_REVIEW_PENDING",
+      "C01": "TESTED_SYNTHETIC"
+    },
+    "unique_synthetic_cases": 85,
+    "baseline": "2bf6cdf5cddce330e4b26d66a266dee87ce4f7fe",
+    "driver": "DESKTOP_CODEX_LOCAL",
+    "independent_review": "PENDING",
+    "real_native_effects": 0,
+    "result": "PARTIAL_WITH_SPECIFIC_BLOCKERS",
+    "adopted_control": "UNSUPPORTED_NON_MUTATING_OBSERVER",
+    "real_native_connections": 0,
+    "date": "2026-10-21"
+  }
 }

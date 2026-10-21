@@ -4,7 +4,7 @@ import type { Compatibility, NativeArtifactIdentity } from './types.ts';
 
 export function classifyCapabilities(capabilities: Compatibility['capabilities']): Compatibility['profile'] {
   const has = (...names: (keyof typeof capabilities)[]) => names.every(name => capabilities[name].available);
-  if (has('sharedDaemon', 'threadList', 'threadRead', 'resume', 'turnStart')) {
+  if (has('sharedDaemon', 'threadList', 'threadRead', 'turnStart')) {
     // Steer, interrupt and approvals are independent optional controls.
     return has('events', 'activeTurn') ? 'ADOPT_FULL' : 'ADOPT_RESUME';
   }
@@ -13,7 +13,7 @@ export function classifyCapabilities(capabilities: Compatibility['capabilities']
 export function incarnationOf(identity: NativeArtifactIdentity): string {
   return createHash('sha256').update(canonical({ pid: identity.processId,
     executable: identity.executablePath?.toLowerCase() ?? null,
-    created: identity.processCreationTime, endpoint: identity.endpoint,
+    created: identity.processCreationTime, sha256: identity.sha256, endpoint: identity.endpoint,
     endpointIdentity: identity.endpointIdentity, server: identity.serverIncarnation })).digest('hex');
 }
 export function assertSameIncarnation(before: NativeArtifactIdentity, now: NativeArtifactIdentity): void {

@@ -1,5 +1,7 @@
 # FleetSplice Pattern Contract 0.1
 
+> **2026-10-22:** The [new design.md](design.md) is the prospective SUI presentation authority, replacing old visual/skin/layout constraints while keeping functional and native safety semantics. This frozen document remains historical evidence; no source migration or human acceptance is claimed.
+
 Status: FINAL-05. Cross-platform **semantic** contract only.
 React and Flutter implementations remain separate. Not a component library.
 

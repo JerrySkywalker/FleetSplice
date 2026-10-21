@@ -1,5 +1,9 @@
 # Current FleetSplice development status
 
+## Owner presentation decision — 2026-10-22
+
+Owner chose one shadcn preset and replacement of the custom FS visual language under the [SUI plan](../roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/README.md). Planning PR creation/normal development-branch merge is authorized; **60h execution is PENDING_OWNER and all S00–S08 remain NOT_STARTED**. [design.md](../ux/design.md) is the new prospective presentation contract, including scoped Tailwind adoption. Prior UI source remains functional ancestry; old H0 candidate is historical for visual review, with no invented Owner-executed/approved result. The new candidate will be prepared by S08 after authorization. Native PR23, Desktop embedded-auth blocker, H1–H4, Gate S and G06–G10 remain unchanged. The concluded 200h run is not resumed.
+
 ## FPX source delivery checkpoint — 2026-10-21
 
 Scoped local S00/UX00–UX05 source is merged to the development train; UX06 prepares a runnable synthetic H0 pack. See [dated source results and exact blockers](../roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/13-EXECUTION-RESULT-AND-OWNER-HANDOFF.md). Native Draft PR23 is `30770ece5dbd4909f2a45da688f317d183648e62`, unmerged with its supported non-mutating observer contract still blocked. Actual Native connections/effects remain 0/0. H0 is ready for Owner; H1–H4, Gate S and G06 live acceptance are not promoted. This is source delivery, not acceptance of the complete product route or a `main` release.

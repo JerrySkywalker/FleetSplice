@@ -1,0 +1,24 @@
+{
+  "schema": "fleetsplice.shadcn-preset.v1",
+  "base": "base",
+  "registry_style": "base-mira",
+  "code": "bdvw9FeS",
+  "config": {
+    "style": "mira",
+    "baseColor": "zinc",
+    "theme": "zinc",
+    "chartColor": "zinc",
+    "iconLibrary": "lucide",
+    "font": "inter",
+    "fontHeading": "inherit",
+    "radius": "default",
+    "menuAccent": "subtle",
+    "menuColor": "default"
+  },
+  "rtl": false,
+  "url": "https://ui.shadcn.com/create?base=base&preset=bdvw9FeS",
+  "source_sha": "ba1503c64472b82256d9de95e2e62c5901a38e8b",
+  "verification": "PINNED_OFFICIAL_ENCODER_ROUNDTRIP_ONLY",
+  "installed": false,
+  "rendered": false
+}

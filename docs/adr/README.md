@@ -20,3 +20,7 @@ decision and consequence; record bodies remain historical accepted evidence.
 [Current status](../train/G04A-status.md) governs formal G04/G04A acceptance and
 the explicit stop before G05. Old pending-review wording inside a G03 body
 describes that historical object, not current repository status.
+
+## 2026-10-22 presentation decision
+
+- [ADR 0009 — One shadcn preset](0009-shadcn-presentation-migration.md): Owner design direction; future60h implementation awaits separate authorization.

@@ -1,5 +1,7 @@
 # v0.1 Implementation Roadmap
 
+> **2026-10-22 presentation update:** The [SUI roadmap](../roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/README.md) defines the next UI delivery sequence and [design.md](../ux/design.md) replaces prior presentation rules. Planning PR merge is authorized; its proposed 60h source window has not started. Product G06→G10, Native/human gates and production admission below are unchanged.
+
 > **2026-10-21 Owner UX amendment:** Near-term UI/UX is reopened for bounded local code work under the [Fast Product+UX Train](../roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/README.md), with H0–H4 human gates and the focused-test/no-duplicate-CI contract. Below, older `FROZEN` tokens are historical source baseline; they are not a veto on this later scoped UI authorization. The canonical product Gate order **G06→G07→G08→G09→G10** and Gate S admission do not change. Native C PR #23 is not automatically accepted or merged. This note does not assert live acceptance, real phone operation or G08 completed.
 
 

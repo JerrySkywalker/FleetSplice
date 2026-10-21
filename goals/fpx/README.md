@@ -1,5 +1,7 @@
 # FleetSplice FPX Goal Train index
 
+> **2026-10-22:** New presentation implementation is planned in the [SUI Goal files](../shadcn/README.md). Existing FPX files retain functional and Native/Gate semantics; old custom visual rules are superseded by the new design contract. SUI implementation is not yet authorized by its planning merge.
+
 Program: [Fast Product+UX Train](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/README.md). These 17 files are **plans**; their existence does not mark code written or H0–H4 accepted.
 
 2026-10-21 执行补充：[源码结果与下一步](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/13-EXECUTION-RESULT-AND-OWNER-HANDOFF.md)、[H0 体验卡](../../docs/ux/fpx-h0-owner-card.md)。独立 Goal 文件继续定义边界，实际完成由精确 PR/回执证明；H0–H4 不会自动通过。

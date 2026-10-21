@@ -26,7 +26,7 @@ test('FPX UX05: Desktop modes preserve Manager selection and use only the explic
     } };
   });
   const page = await context.newPage();
-  const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S06/desktop'); mkdirSync(artifacts, { recursive: true });
+  const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S08/desktop'); mkdirSync(artifacts, { recursive: true });
   try {
     await page.goto(`http://127.0.0.1:${(server.httpServer.address() as { port: number }).port}`);
     await expect(page.locator('main')).toContainText('SYNTHETIC_READY');

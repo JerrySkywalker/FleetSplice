@@ -171,6 +171,7 @@ export function SessionItem({
     className={`session session-item ${selected ? 'selected' : ''}`}
     data-testid={testId ?? 'session-item'}
     data-connected={connected}
+    aria-current={selected ? 'page' : undefined}
     onClick={onSelect}
   >
     <strong className="text-ellipsis" title={title}>{title}</strong>

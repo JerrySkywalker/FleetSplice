@@ -12,6 +12,26 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--canvas); color: var(--text); }
 body.is-resizing { cursor: col-resize; user-select: none; }
+.navigation-scope { font-size: 11px; line-height: 1.5; margin-block: 8px 12px; }
+.session-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 6px 8px; }
+.session-search input { width: 100%; min-width: 0; border: 0; outline-offset: 3px; background: transparent; }
+.navigation-observation { color: var(--muted); font-size: 11px; margin-block: 10px; }
+.workspace-group-heading { font-size: 11px; font-weight: 500; color: var(--muted); margin-block: 16px 8px; }
+.workspace-group-heading span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
+.quick-switch-trigger { display: inline-flex; align-items: center; gap: 6px; }
+.quick-switch-trigger kbd { font-size: 10px; color: var(--muted); }
+dialog.session-switcher { width: min(560px, calc(100vw - 32px)); max-height: min(70dvh, 640px); padding: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.switcher-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.session-switcher > input { width: 100%; min-height: 40px; background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: 12px; }
+.session-switcher [role="listbox"] { display: grid; gap: 4px; }
+.switcher-option { display: grid; gap: 4px; min-width: 0; width: 100%; text-align: left; padding: 10px; border-color: transparent; background: transparent; }
+.switcher-option > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switcher-option span, .switcher-option small { color: var(--muted); font-size: 11px; }
+.switcher-option.is-active { background: var(--selected); border-color: var(--border); }
+@media (max-width: 767px) {
+  .quick-switch-trigger kbd, .quick-switch-trigger > span { display: none; }
+  .session-search { min-height: 40px; }
+}
 button, input, textarea, select { color: var(--text); font: inherit; }
 button {
   cursor: pointer;

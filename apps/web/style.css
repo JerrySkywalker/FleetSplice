@@ -44,7 +44,7 @@ dialog.session-switcher { width: min(560px, calc(100vw - 32px)); max-height: min
   .session-search { min-height: 40px; }
 }
 button, input, textarea, select { color: var(--text); font: inherit; }
-button {
+:where(button:not([data-slot])) {
   cursor: pointer;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -693,4 +693,48 @@ dialog.drawer-config { margin: 0; padding: 0; max-width: none; max-height: none;
   .native-workspace .product-footer { display: none; }
 }
 
+
+/* S02: the conversation is the primary workspace. */
+.session-brand { gap: 10px; font-size: 14px; font-weight: 500; }
+.session-brand > div { min-width: 0; }
+.session-brand h1 { font-size: 14px; font-weight: 500; margin: 0; max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0; }
+.session-target { color: var(--muted-foreground); font-size: 11px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mark { width: 24px; height: 24px; border-radius: var(--radius-md); font-size: 14px; }
+.product-header { min-height: 56px; height: 56px; }
+.product-shell { grid-template-rows: 56px minmax(0, 1fr) 24px; min-height: 0; }
+.conversation-pane { background: var(--background); }
+.timeline { padding-block: 20px; }
+.timeline > *, .composer-surface, .session-attention { width: calc(100% - 48px); max-width: 860px; margin-inline: auto; }
+.timeline > * { width: 100%; }
+.attention-heading { justify-content: space-between; min-height: 36px; }
+.attention-heading .ownership-surface { min-width: 0; border: 0; padding: 0; background: transparent; gap: 8px; }
+.ownership-status { font-size: 12px; }
+.session-state { font-size: 12px; color: var(--muted-foreground); }
+.session-state .turn-status-chip { margin: 0; padding: 0; background: transparent; }
+.attention-cards { max-height: 32dvh; }
+.session-attention { margin-block: 4px 0; }
+.message.user { background: var(--muted); border: 0; border-radius: var(--radius-lg); padding: 12px 16px; }
+.message-label { font-size: 12px; letter-spacing: 0; margin-bottom: 6px; }
+.message-text { font-size: 15px; line-height: 1.7; }
+.composer-surface { margin-block: 12px; padding: 12px; background: var(--background); }
+.composer-actions button { min-width: 32px; }
+.session-row-state { color: var(--muted-foreground); }
+.native-workspace .attention-heading .ownership-surface { width: auto; padding: 0; flex-wrap: nowrap; }
+.native-workspace .session-attention { max-height: 45%; flex-shrink: 0; }
+.native-turn-marker { display: block; background: transparent; padding: 0; margin-block: 12px; }
+.native-turn-marker .turn-status-chip { background: transparent; color: var(--muted-foreground); margin: 0; padding: 0; }
+.receipt-attention details { margin: 0; padding: 0; border: 0; font-size: 12px; }
+.receipt-attention p { font-size: 13px; line-height: 1.5; }
+.context > .eyebrow { font-size: 12px; letter-spacing: 0; text-transform: none; }
+@media (max-width:767px) {
+ .session-brand h1 { max-width: 36vw; font-size: 13px; }
+ .session-target { max-width: 36vw; }
+ .session-brand .mark { display: none; }
+ .timeline { padding: 14px 16px; }
+ .composer-surface, .session-attention { width: calc(100% - 24px); }
+ .composer-surface { margin-block: 6px; }
+ .ownership-status { font-size: 11px; }
+ .attention-heading { gap: 4px; }
+ [data-slot="button"] { min-height: 44px; }
+}
 }

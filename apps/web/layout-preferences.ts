@@ -51,7 +51,7 @@ export function readShellLayout(storage: Pick<Storage, 'getItem'> | undefined = 
     leftWidth: readNumber(storage, layoutKeys.leftWidth, LEFT_DEFAULT, LEFT_MIN, LEFT_MAX),
     rightWidth: readNumber(storage, layoutKeys.rightWidth, RIGHT_DEFAULT, RIGHT_MIN, RIGHT_MAX),
     leftCollapsed: readBool(storage, layoutKeys.leftCollapsed, false),
-    rightCollapsed: readBool(storage, layoutKeys.rightCollapsed, false),
+    rightCollapsed: readBool(storage, layoutKeys.rightCollapsed, true),
   };
 }
 

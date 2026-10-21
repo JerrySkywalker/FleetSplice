@@ -210,11 +210,11 @@ function App() {
     const model = models.find(item => item.id === value);
     setSelectedModel(value); setSelectedReasoning(model?.defaultReasoningEffort ?? '');
   }
-  if (nativeMode && client) return <div className="native-workspace"><NativeAdoption client={client} request={request} locale={locale} fleet={<GatewayDashboard request={request} ready={true} compact/>}
+  if (nativeMode && client) return <div className="native-workspace"><NativeAdoption client={client} request={request} locale={locale} fleet={<GatewayDashboard locale={locale} request={request} ready={true} compact/>}
     preferences={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}/></div>;
   return <div className="shell">
     <header><div className="brand"><span className="mark">F</span> FleetSplice <span className="edition">{t('edition')}</span></div><div className="owner"><PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/><span className="owner-name">Jerry</span><span className="avatar">J</span></div></header>
-    <GatewayDashboard request={request} ready={!!client}/>
+    <GatewayDashboard locale={locale} request={request} ready={!!client}/>
     <aside className="navigation">
       <div className="eyebrow">{t('yourFleet')}</div><div className="host"><span className={`dot ${snapshot?.status === 'READY' ? 'online' : ''}`}/><strong>SKYFORGE-01</strong></div><div className="environment">└ &nbsp; windows-user</div>
       <label className="section-title" htmlFor="workspace">{t('newWorkspaceTarget')}</label>

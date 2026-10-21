@@ -8,7 +8,7 @@ import { chromium, expect } from '@playwright/test';
 test('FPX UX05: Desktop modes preserve Manager selection and use only the explicit Workspace IPC', async () => {
   const server = await preview({ configFile: path.resolve('apps/desktop/vite.config.ts'), preview: { host: '127.0.0.1', port: 0, strictPort: true } });
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
-  const context = await browser.newContext({ viewport: { width: 960, height: 680 }, deviceScaleFactor: 1.5 });
+  const context = await browser.newContext({ viewport: { width: 960, height: 680 }, deviceScaleFactor: 1.5, locale: 'en-US' });
   await context.addInitScript(() => {
     const fixture = window as any; fixture.desktopCalls = []; fixture.failWorkspace = false;
     fixture.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
@@ -26,27 +26,37 @@ test('FPX UX05: Desktop modes preserve Manager selection and use only the explic
     } };
   });
   const page = await context.newPage();
-  const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/execution-200h-20261021/UX05'); mkdirSync(artifacts, { recursive: true });
+  const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S06/desktop'); mkdirSync(artifacts, { recursive: true });
   try {
     await page.goto(`http://127.0.0.1:${(server.httpServer.address() as { port: number }).port}`);
     await expect(page.locator('main')).toContainText('SYNTHETIC_READY');
+    await page.screenshot({ path: path.join(artifacts, 'manager-overview-960.png'), animations: 'disabled' });
+    await page.getByTestId('preferences').click(); await page.getByTestId('appearance-select').selectOption('dark'); await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Gateway', exact: true }).click();
+    await expect(page.getByLabel('Workspace for this Agent')).toHaveAttribute('placeholder', 'C:\\src\\your-workspace');
+    await page.screenshot({ path: path.join(artifacts, 'manager-gateway-dark-960.png'), animations: 'disabled' });
     await page.getByRole('button', { name: 'Workspace', exact: true }).click();
     const input = page.getByLabel('Gateway origin'); await input.fill('https://gateway.example.test/#bootstrap=synthetic');
     await page.getByRole('button', { name: 'Open / return to Workspace', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('WORKSPACE_ORIGIN_REQUIRED');
     await input.fill('https://gateway.example.test'); await page.getByRole('button', { name: 'Open / return to Workspace', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('normal Gateway login');
-    await page.screenshot({ path: path.join(artifacts, 'workspace-launcher-960-dpi150.png') });
+    await page.screenshot({ path: path.join(artifacts, 'workspace-launcher-960-dpi150.png'), animations: 'disabled' });
     await page.getByRole('button', { name: 'Agent Manager', exact: true }).click(); await expect(page.getByRole('heading', { name: 'Gateway', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Workspace', exact: true }).click(); await expect(input).toHaveValue('https://gateway.example.test');
     await page.evaluate(() => { (window as any).failWorkspace = true; });
     await page.getByRole('button', { name: 'Open / return to Workspace', exact: true }).click(); await expect(page.getByRole('status')).toContainText('SYNTHETIC_WORKSPACE_UNAVAILABLE');
     await page.setViewportSize({ width: 640, height: 480 });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    await page.screenshot({ path: path.join(artifacts, 'workspace-launcher-640.png') });
+    await page.screenshot({ path: path.join(artifacts, 'workspace-launcher-640.png'), animations: 'disabled' });
     const calls = await page.evaluate(() => (window as any).desktopCalls) as { command: string; args?: { origin: string } }[];
     assert.deepEqual(calls.map(call => call.command), ['agent_status','agent_runtimes','autostart_enabled','open_workspace','open_workspace','open_workspace']);
     assert.equal(calls[4]!.args!.origin, 'https://gateway.example.test');
+    await page.getByTestId('preferences').click(); await page.getByTestId('locale-select').selectOption('zh-CN'); await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '代理管理', exact: true }).click(); await expect(page.getByRole('heading', { name: '网关', exact: true })).toBeVisible();
+    assert.ok((await page.locator('.manager-navigation button').first().boundingBox())!.width < 200, 'narrow navigation items use content width');
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.screenshot({ path: path.join(artifacts, 'manager-zh-640.png'), animations: 'disabled' });
+    assert.equal(await page.evaluate(() => (window as any).desktopCalls.length), 6, 'display preferences do not invoke Agent IPC');
   } finally { await browser.close(); await new Promise<void>((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve())); }
 });

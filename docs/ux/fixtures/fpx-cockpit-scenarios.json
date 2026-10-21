@@ -1,0 +1,21 @@
+{
+  "schema": "fleetsplice.fpx-cockpit-fixtures.v1",
+  "goal_id": "FLEETSPLICE-FPX-UX00-001",
+  "evidence": "ORIGINAL_SYNTHETIC_PRESENTATION_DATA",
+  "native_connections": 0,
+  "native_effects": 0,
+  "observed_at": "2026-10-21T00:00:00Z",
+  "host_label": "Synthetic host",
+  "environment_label": "Synthetic Windows",
+  "workspace": "C:\\synthetic-fpx\\workspace",
+  "viewports": [[1440, 900], [1024, 768], [390, 844], [360, 740], [900, 700]],
+  "scenarios": [
+    { "id": "normal", "thread_id": "fixture-thread-normal", "title": "Review a small patch", "role": "controller", "status": "idle", "primary_action": "send", "messages": [{ "id": "fixture-user-normal", "role": "user", "text": "Explain this synthetic patch." }, { "id": "fixture-answer-normal", "role": "assistant", "text": "The fixture updates a label. No files were changed by this demo." }] },
+    { "id": "long-code", "thread_id": "fixture-thread-code", "title": "Read a code example", "role": "viewer", "status": "idle", "primary_action": "acquire", "messages": [{ "id": "fixture-answer-code", "role": "assistant", "text": "A synthetic example:\n\n```typescript\nconst message = 'A long line used to check code scrolling without horizontal page overflow';\nconsole.log(message);\n```\n\nThis example is text only." }] },
+    { "id": "tool", "thread_id": "fixture-thread-tool", "title": "Inspect synthetic activity", "role": "controller", "status": "active", "primary_action": "steer", "tool": { "id": "fixture-tool-1", "turn_id": "fixture-turn-tool", "title": "Synthetic test runner", "status": "inProgress", "detail": "No command is executed by the fixture." } },
+    { "id": "approval", "thread_id": "fixture-thread-approval", "title": "Review a pending request", "role": "controller", "status": "active", "primary_action": "allow-once", "approval": { "id": "fixture-approval-1", "turn_id": "fixture-turn-approval", "status": "PENDING", "summary": "Synthetic request to run a unit test", "supported_in_mock_only": true } },
+    { "id": "viewer", "thread_id": "fixture-thread-viewer", "title": "Observe another controller", "role": "viewer", "status": "active", "primary_action": null, "controller_label": "Another synthetic client", "messages": [{ "id": "fixture-answer-viewer", "role": "assistant", "text": "Viewer can read; native input controls are unavailable." }] },
+    { "id": "unknown", "thread_id": "fixture-thread-unknown", "title": "Look up an uncertain receipt", "role": "controller", "status": "unknown", "primary_action": "lookup", "pending": { "command_id": "fixture-command-unknown", "presentation_state": "OUTCOME_UNKNOWN", "text": "Synthetic pending message", "replay_allowed": false } },
+    { "id": "reconnect-gap", "thread_id": "fixture-thread-gap", "title": "Recover observation", "role": "viewer", "status": "disconnected", "primary_action": "refresh-observation", "coverage": "INCOMPLETE", "native_replay_cursor": null, "history_limited": true }
+  ]
+}

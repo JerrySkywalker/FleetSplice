@@ -25,3 +25,31 @@ Only after accepted G06, enroll two independent Hosts/Environments with no crede
 ## Receipt and handoff
 
 Create or update a concise goal report carrying: `GOAL_ID, BASE_SHA, FINAL_HEAD, CHANGED_FILES, TESTS, EVIDENCE_LEVEL, REAL_NATIVE_EFFECTS, HUMAN_GATES, BLOCKERS, DISPOSITION, NEXT_READY_GOAL`. Raw credentials/native session files and user screenshots go to local private artifacts under `C:\Dev\artifacts\fleetsplice`, not to the public repository. Finish within the session timebox or sooner.
+
+## 详细执行设计与清单（规划补充）
+
+### 入口与产品边界
+
+只有 G06 ACCEPTED + H2 真实回执齐备后才开始本 Goal 产品实现/准入。
+第二 Host 由 Owner 明确选择，不能默认把离线 SKYFORGE 当可用，也不能用一机双标签冒充。
+
+### 开发清单
+
+- [ ] 为第二 Host 建立独立 principal、Environment、设备密钥/注册与 generation；每机单独完成能力资格化。
+- [ ] UI 同时表达“当前查看的 Host”和“命令明确绑定的 Host/Workspace/Thread”。
+- [ ] Host 切换取消旧观察请求；迟到消息不能落入另一 Host 的 timeline/控制面板。
+- [ ] 同一 Lane 的 Controller acquire/renew/takeover/release 通过既有服务器 CAS/fence。
+- [ ] 离线 Host 仍可只读查看标记过期的状态，但不能把该缓存当作当前可控。
+- [ ] 设备撤销、重新注册、同名 Host 重建 generation、过期 grant 的写入均明确拒绝。
+- [ ] 不把两主机的 native Writer/凭据/Workspace 互相复制，不增加跨 Host 自动调度。
+- [ ] 提供 H3 的两个真实目标、实际动作授权卡与合并视图/切换说明。
+
+### 验收清单
+
+- [ ] 聚焦两 Host fixture：交错事件、选中项切换、过期 fence、撤销、重连、同名不同 generation。
+- [ ] Owner 在两台真实 Host 之间切换并验证精确目标与显式 takeover；需要 native turn 的部分仍须具体授权。
+- [ ] 两台真实身份、分别资格化/注册的证据和 H3 Owner 反馈，绑定同一集成 SHA。
+- [ ] 独立接受后记录 G07_ACCEPTED；两个浏览器标签或两份合成服务不能替代 H3。
+
+源码/集成产物保留；第二 Host 不可用时 BLOCKED_EXTERNAL，不能自动启动 G08。
+范围内回滚只撤销测试注册/新 admission 的已批准部分，先处理未知效果与现有会话保留策略。

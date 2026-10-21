@@ -25,3 +25,29 @@ Bundle one real runnable local Web/Tauri preview with deterministic simulated se
 ## Receipt and handoff
 
 Create or update a concise goal report carrying: `GOAL_ID, BASE_SHA, FINAL_HEAD, CHANGED_FILES, TESTS, EVIDENCE_LEVEL, REAL_NATIVE_EFFECTS, HUMAN_GATES, BLOCKERS, DISPOSITION, NEXT_READY_GOAL`. Raw credentials/native session files and user screenshots go to local private artifacts under `C:\Dev\artifacts\fleetsplice`, not to the public repository. Finish within the session timebox or sooner.
+
+## 详细执行设计与清单（规划补充）
+
+### H0 演示包
+
+- [ ] 固定 UX04+UX05 集成候选 SHA、构建路径、启动/停止方式与“全部为模拟 native”标签。
+- [ ] 准备同一组包含 Viewer、工具流、approval、外部推进、UNKNOWN 和离线的合成会话。
+- [ ] 提供五步卡：找 Session → 看对话/工具 → 处理模拟 Attention → 用模拟 Composer → 改主题/视口。
+- [ ] 准备桌面与窄屏的少量代表截图、键盘/触摸检查和已知限制。
+- [ ] Owner 实际打开本地可运行构建后记录体验意见、最影响操作的三个问题和 approve/revise/hold。
+- [ ] 反馈造成的修正只改对应界面；记录前后截图、精确 SHA，一次聚焦回归后重新交给 Owner。
+- [ ] 若 Owner 未操作，保存 READY_FOR_OWNER_H0，不循环等待或制造 PASS。
+
+### 人工验收判定
+
+H0 的最小问题：能否找对会话；是否清楚自己是 Viewer 还是 Controller；是否理解工具/未知状态；
+窄屏能否看/输入；是否只有一个明确主动作。视觉偏好和安全语义问题分别记录，不能用漂亮截图覆盖后者。
+
+截图、Playwright 和自动可访问性检查只证明测试范围。真正 PASS_OWNER_OBSERVED 必须有
+OWNER_EXECUTED、OWNER_APPROVED、SOURCE_SHA、实际反馈和操作证据，不通过 JSON 布尔值自动制造人类验收。
+
+### 下游和恢复
+
+- H0 后端门禁不会自动通过 H1 或 Gate S。
+- Owner 不在线可继续 N00/N01 准备或合格的 G06 源码准备；G07/G08 不解锁。
+- 源码完成后保留可重复启动的演示包，避免下次对话先重新构造整个测试环境。

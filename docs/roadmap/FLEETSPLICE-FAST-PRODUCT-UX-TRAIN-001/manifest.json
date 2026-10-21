@@ -414,5 +414,13 @@
   "source_only_integration_without_live_authority": true,
   "no_fake_gate_propagation": true,
   "progress_state": "private local file, not updated by planning manifest",
-  "stop_when": "No ready local source goals or elapsed session timebox; print consolidated Owner actions"
+  "stop_when": "No ready local source goals or elapsed session timebox; print consolidated Owner actions",
+  "execution_window": {
+    "authorization": "OWNER_2026_10_21_DOCUMENTATION_PR_MERGE_THEN_ELIGIBLE_SOURCE_GOALS",
+    "started_utc": "2026-10-21T04:53:09Z",
+    "deadline_utc": "2026-10-29T12:53:09Z",
+    "max_total_wall_hours": 200,
+    "finish_early_when_no_authorized_ready_work": true,
+    "source": "12-OWNER-200H-EXECUTION-AUTHORIZATION.md"
+  }
 }

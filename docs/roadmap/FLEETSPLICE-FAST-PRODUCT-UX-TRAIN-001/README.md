@@ -2,7 +2,7 @@
 
 `PROGRAM_ID=FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001`  
 `OWNER_DECISION=APPROVED_ROADMAP_AND_LOCAL_SOURCE_EXECUTION`  
-`EXECUTION=NOT_STARTED_BY_THIS_DOCUMENTATION_PR`
+`EXECUTION=OWNER_AUTHORIZED_LOCAL_SOURCE_AFTER_DOCUMENTATION_MERGE`
 
 ## Owner-approved change
 
@@ -20,6 +20,16 @@
 - User-approved autonomous execution applies to bounded *local development/documentation/synthetic tests* under the Goal files. It cannot itself provide a human H0–H4 observation, production credentials, a real native effect, server deployment or gate promotion.
 
 ## Documents
+
+- **[Owner 200 小时执行授权与截止](12-OWNER-200H-EXECUTION-AUTHORIZATION.md)** — 先合并文档，再推进有权限的就绪 Goal；不制造人类/生产门禁证据。
+
+- **[中文完整设计与 17-Goal 路线图](09-COMPLETE-DESIGN-AND-ROADMAP.md)** — 当前事实、系统/数据边界、阶段 DAG 与全部独立 Goal 入口。
+- [一个 Goal 一个 MD 的模板、执行和回执规范](10-GOAL-FILE-AND-EXECUTION-MODEL.md)。
+- [功能清单覆盖、工作量估算、G11–G16 后续设计](11-COVERAGE-ESTIMATES-AND-FUTURE.md)。
+
+2026-10-21 详细设计补充为 planning-only：17 个现有 FPX Goal 和 6 个既有未来 Goal 分别细化任务与验收，
+未启动产品 Goal、未填写人工 Gate、未改变 manifest 的依赖或实际进度。规划读取基线为
+`16f9f6c66ceaae16030d6f3391db1cf19f651207`；执行须再次取得真实 HEAD。
 
 - [Technology, reference-source decisions and scope](01-OWNER-TECHNOLOGY-DECISION.md)
 - [Fast development and no-duplicate-CI contract](02-FAST-DEVELOPMENT-CONTRACT.md)

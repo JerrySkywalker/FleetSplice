@@ -2,6 +2,12 @@
 
 Program: [Fast Product+UX Train](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/README.md). These 17 files are **plans**; their existence does not mark code written or H0–H4 accepted.
 
+每个文件现有独立的详细执行设计、开发复选清单、精确验收、范围和阻碍/下游。
+先读 [中文完整设计](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/09-COMPLETE-DESIGN-AND-ROADMAP.md)，
+再读 [文件/回执模板](../../docs/roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/10-GOAL-FILE-AND-EXECUTION-MODEL.md)。
+17 项中 15 项为 v0.1 必需、UX07/V02 为延后可选；G11–G16 沿用 root goals 中各自的 MD，
+通过 V02 链接，未自动加入当前执行 DAG。详细化本身不执行产品 Goal，也不修改私有进度。
+
 - [S00 — Exact-baseline and PR graph](FLEETSPLICE-FPX-S00-001.md) · COORD · deps none · gates none
 - [N00 — C Native compatibility continuation](FLEETSPLICE-FPX-N00-001.md) · CORE · deps S00 · gates none
 - [N01 — Corrected-native H1 handoff](FLEETSPLICE-FPX-N01-001.md) · CORE · deps N00 · gates H1

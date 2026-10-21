@@ -9,6 +9,7 @@ flowchart TD
 S00 --> N00 --> N01 --> H1[H1 human native]
 S00 --> UX00 --> UX01 --> UX02 --> UX03 --> UX04 --> UX06 --> H0[H0 human UI]
 UX02 --> UX05[UX05 Tauri]
+UX05 --> UX06
 N00 --> G06
 UX04 --> G06
 H0 -. admission .-> G06
@@ -45,3 +46,9 @@ G10 -.after H4.-> V02
 ## Estimated pace and exclusions
 
 Optimistic previously discussed target roughly **15–31 engineering days** for a narrow v0.1 critical path, conditional on reusing G05C and G06 predeploy, not a guaranteed elapsed or Codex schedule. Do not inflate scope with generic IDE, terminal emulation, desktop browser tool suite, many-Agent scheduler, Expo migration or multi-region Relay. Defer optional UX07/V02. Production infrastructure wait is outside estimate. Avoid redundant CI and speculative defensive layers per [fast contract](02-FAST-DEVELOPMENT-CONTRACT.md).
+
+Itemized planning clarification (2026-10-21): the manifest's 15 required entries sum to 19–43 engineering days;
+using the plan-only PR23 correction's 3–6-day risk range gives a provisional 21–46-day budget.
+The older 15–31 target above is an optimistic critical-path discussion, not a single-engineer commitment.
+See [coverage and effort arithmetic](11-COVERAGE-ESTIMATES-AND-FUTURE.md) and
+[complete detailed design](09-COMPLETE-DESIGN-AND-ROADMAP.md). No execution or acceptance state changes here.

@@ -2,6 +2,10 @@
 
 All boxes are **planning placeholders**, not claimed implementation status. Existing partial G05C surfaces may be reused and checked via actual new acceptance receipts.
 
+逐项开发以 [17 个独立 Goal 文件](../../../goals/fpx/README.md) 的详细清单为准；
+本页为产品层索引，不作为第二份实际进度数据库。每条需求的实现/接受归属见
+[覆盖矩阵](11-COVERAGE-ESTIMATES-AND-FUTURE.md)。
+
 ## Native/Hub correctness
 - [ ] PR #23: daemon.pid vs app-server.pid, source identity/owner PID+creation and stale refusal.
 - [ ] Already loaded exact native thread attached without resume/new server; same TUI remains.

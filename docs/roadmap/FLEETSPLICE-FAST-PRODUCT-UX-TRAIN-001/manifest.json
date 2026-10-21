@@ -1,7 +1,7 @@
 {
   "schema": "fleetsplice.fpx-train.v1",
   "program_id": "FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001",
-  "status": "APPROVED_SOURCE_PLAN_UNEXECUTED",
+  "status": "SOURCE_TRAIN_READY_FOR_REVIEW",
   "date": "2026-10-21",
   "root_branch": "train/pre-gate-s-development-001",
   "worktree_root": "C:\\Dev\\worktrees",
@@ -32,7 +32,7 @@
   "gates": [
     {
       "id": "H0",
-      "status": "OWNER_ACTION_REQUIRED",
+      "status": "READY_FOR_OWNER",
       "description": "Human local UI first-use, mock allowed"
     },
     {
@@ -91,11 +91,12 @@
       "deps": [],
       "gates": [],
       "estimated_effort": "0.5–1",
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "path": "goals/fpx/FLEETSPLICE-FPX-S00-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
-      "sequence": 0
+      "sequence": 0,
+      "source_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/27"
     },
     {
       "id": "FLEETSPLICE-FPX-N00-001",
@@ -108,11 +109,13 @@
       ],
       "gates": [],
       "estimated_effort": "1–3",
-      "state": "NOT_STARTED",
+      "state": "BLOCKED_EXACT",
       "path": "goals/fpx/FLEETSPLICE-FPX-N00-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
-      "sequence": 1
+      "sequence": 1,
+      "source_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/23",
+      "source_head": "30770ece5dbd4909f2a45da688f317d183648e62"
     },
     {
       "id": "FLEETSPLICE-FPX-N01-001",
@@ -127,7 +130,7 @@
         "H1"
       ],
       "estimated_effort": "0.5–1",
-      "state": "NOT_STARTED",
+      "state": "BLOCKED_BY_DEPENDENCY_OR_GATE",
       "path": "goals/fpx/FLEETSPLICE-FPX-N01-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
@@ -144,11 +147,12 @@
       ],
       "gates": [],
       "estimated_effort": "0.5–1",
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "path": "goals/fpx/FLEETSPLICE-FPX-UX00-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
-      "sequence": 3
+      "sequence": 3,
+      "source_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/28"
     },
     {
       "id": "FLEETSPLICE-FPX-UX01-001",
@@ -161,11 +165,12 @@
       ],
       "gates": [],
       "estimated_effort": "1–2",
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "path": "goals/fpx/FLEETSPLICE-FPX-UX01-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
-      "sequence": 4
+      "sequence": 4,
+      "source_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/29"
     },
     {
       "id": "FLEETSPLICE-FPX-UX02-001",
@@ -178,11 +183,12 @@
       ],
       "gates": [],
       "estimated_effort": "1–3",
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "path": "goals/fpx/FLEETSPLICE-FPX-UX02-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
-      "sequence": 5
+      "sequence": 5,
+      "source_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/30"
     },
     {
       "id": "FLEETSPLICE-FPX-UX03-001",
@@ -195,11 +201,12 @@
       ],
       "gates": [],
       "estimated_effort": "1–2",
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "path": "goals/fpx/FLEETSPLICE-FPX-UX03-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
-      "sequence": 6
+      "sequence": 6,
+      "source_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/31"
     },
     {
       "id": "FLEETSPLICE-FPX-UX04-001",
@@ -212,11 +219,12 @@
       ],
       "gates": [],
       "estimated_effort": "1–2",
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "path": "goals/fpx/FLEETSPLICE-FPX-UX04-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
-      "sequence": 7
+      "sequence": 7,
+      "source_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/32"
     },
     {
       "id": "FLEETSPLICE-FPX-UX05-001",
@@ -229,11 +237,12 @@
       ],
       "gates": [],
       "estimated_effort": "1–2",
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "path": "goals/fpx/FLEETSPLICE-FPX-UX05-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
-      "sequence": 8
+      "sequence": 8,
+      "source_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/33"
     },
     {
       "id": "FLEETSPLICE-FPX-UX06-001",
@@ -249,7 +258,7 @@
         "H0"
       ],
       "estimated_effort": "0.5–1",
-      "state": "NOT_STARTED",
+      "state": "SOURCE_PREPARED_H0_PENDING",
       "path": "goals/fpx/FLEETSPLICE-FPX-UX06-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
@@ -272,7 +281,7 @@
         "H2"
       ],
       "estimated_effort": "2–5 + infrastructure",
-      "state": "NOT_STARTED",
+      "state": "BLOCKED_BY_DEPENDENCY_OR_GATE",
       "path": "goals/fpx/FLEETSPLICE-FPX-G06-001.md",
       "can_run_local_source_before_gates": true,
       "optional": false,
@@ -293,7 +302,7 @@
         "H3"
       ],
       "estimated_effort": "2–4 + host readiness",
-      "state": "NOT_STARTED",
+      "state": "BLOCKED_BY_DEPENDENCY_OR_GATE",
       "path": "goals/fpx/FLEETSPLICE-FPX-G07-001.md",
       "can_run_local_source_before_gates": false,
       "optional": false,
@@ -313,7 +322,7 @@
         "G07_ACCEPTED"
       ],
       "estimated_effort": "4–8 optimistic",
-      "state": "NOT_STARTED",
+      "state": "BLOCKED_BY_DEPENDENCY_OR_GATE",
       "path": "goals/fpx/FLEETSPLICE-FPX-G08-001.md",
       "can_run_local_source_before_gates": false,
       "optional": false,
@@ -332,7 +341,7 @@
         "G08_ACCEPTED"
       ],
       "estimated_effort": "1–3",
-      "state": "NOT_STARTED",
+      "state": "BLOCKED_BY_DEPENDENCY_OR_GATE",
       "path": "goals/fpx/FLEETSPLICE-FPX-G09-001.md",
       "can_run_local_source_before_gates": false,
       "optional": false,
@@ -359,7 +368,7 @@
         "H4"
       ],
       "estimated_effort": "2–5 + waits",
-      "state": "NOT_STARTED",
+      "state": "BLOCKED_BY_DEPENDENCY_OR_GATE",
       "path": "goals/fpx/FLEETSPLICE-FPX-G10-001.md",
       "can_run_local_source_before_gates": false,
       "optional": false,
@@ -378,7 +387,7 @@
         "H2"
       ],
       "estimated_effort": "1–3 if chosen",
-      "state": "NOT_STARTED",
+      "state": "DEFERRED",
       "path": "goals/fpx/FLEETSPLICE-FPX-UX07-001.md",
       "can_run_local_source_before_gates": false,
       "optional": true,
@@ -397,7 +406,7 @@
         "H4"
       ],
       "estimated_effort": "post v0.1",
-      "state": "NOT_STARTED",
+      "state": "DEFERRED",
       "path": "goals/fpx/FLEETSPLICE-FPX-V02-001.md",
       "can_run_local_source_before_gates": false,
       "optional": true,
@@ -422,5 +431,7 @@
     "max_total_wall_hours": 200,
     "finish_early_when_no_authorized_ready_work": true,
     "source": "12-OWNER-200H-EXECUTION-AUTHORIZATION.md"
-  }
+  },
+  "progress_authority": "Dated public snapshot only; private state.json and per-goal receipts remain execution authority.",
+  "execution_result": "13-EXECUTION-RESULT-AND-OWNER-HANDOFF.md"
 }

@@ -1,5 +1,9 @@
 # Current FleetSplice development status
 
+## FPX source delivery checkpoint — 2026-10-21
+
+Scoped local S00/UX00–UX05 source is merged to the development train; UX06 prepares a runnable synthetic H0 pack. See [dated source results and exact blockers](../roadmap/FLEETSPLICE-FAST-PRODUCT-UX-TRAIN-001/13-EXECUTION-RESULT-AND-OWNER-HANDOFF.md). Native Draft PR23 is `30770ece5dbd4909f2a45da688f317d183648e62`, unmerged with its supported non-mutating observer contract still blocked. Actual Native connections/effects remain 0/0. H0 is ready for Owner; H1–H4, Gate S and G06 live acceptance are not promoted. This is source delivery, not acceptance of the complete product route or a `main` release.
+
 ## Owner amendment — 2026-10-21 Fast Product + UX Track
 
 `FPX_OWNER_ROADMAP=APPROVED`  

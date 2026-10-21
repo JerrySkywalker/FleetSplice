@@ -21,13 +21,16 @@
 
 ## Documents
 
+- **[本轮源码结果、准确阻碍与统一交接](13-EXECUTION-RESULT-AND-OWNER-HANDOFF.md)** — S00/UX00–UX05 已合并，UX06 H0 包已准备；Native PR23 保持 Draft，H0–H4 未通过。
+- **[H0 五步体验卡](../../ux/fpx-h0-owner-card.md)** — 唯一建议下一步；可运行合成候选，不连接真实 Native。
+
 - **[Owner 200 小时执行授权与截止](12-OWNER-200H-EXECUTION-AUTHORIZATION.md)** — 先合并文档，再推进有权限的就绪 Goal；不制造人类/生产门禁证据。
 
 - **[中文完整设计与 17-Goal 路线图](09-COMPLETE-DESIGN-AND-ROADMAP.md)** — 当前事实、系统/数据边界、阶段 DAG 与全部独立 Goal 入口。
 - [一个 Goal 一个 MD 的模板、执行和回执规范](10-GOAL-FILE-AND-EXECUTION-MODEL.md)。
 - [功能清单覆盖、工作量估算、G11–G16 后续设计](11-COVERAGE-ESTIMATES-AND-FUTURE.md)。
 
-2026-10-21 详细设计补充为 planning-only：17 个现有 FPX Goal 和 6 个既有未来 Goal 分别细化任务与验收，
+下段为详细设计发布时的历史 planning-only 状态，实际本轮执行结果以上方交接为准：17 个现有 FPX Goal 和 6 个既有未来 Goal 分别细化任务与验收，
 未启动产品 Goal、未填写人工 Gate、未改变 manifest 的依赖或实际进度。规划读取基线为
 `16f9f6c66ceaae16030d6f3391db1cf19f651207`；执行须再次取得真实 HEAD。
 

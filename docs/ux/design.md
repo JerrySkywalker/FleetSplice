@@ -1,6 +1,6 @@
 # FleetSplice UI design contract
 
-`DESIGN_VERSION=1` · `DATE=2026-10-22` · `IMPLEMENTATION=AWAITING_60H_OWNER_AUTHORIZATION`
+`DESIGN_VERSION=1` · `DATE=2026-10-22` · `IMPLEMENTATION=AUTHORIZED_SOURCE_ONLY_60H`
 
 本文件是新 UI 的唯一呈现规范。修改界面前先读本文件，再读对应的 [SUI Goal](../../goals/shadcn/README.md)。
 Owner 已决定替换旧自研外观，采用单一 shadcn 预设，学习 Paseo 的组件复用和规范执行习惯。
@@ -29,7 +29,7 @@ Owner 已决定替换旧自研外观，采用单一 shadcn 预设，学习 Paseo
 | modes | system、light、dark，属于同一预设的明暗模式 |
 | preset code | `bdvw9FeS`；base 单独指定，不包含在编码字段中 |
 
-预设码仅通过固定版本官方编码器的 round-trip 校验，**未安装、未渲染**。
+规划阶段完成编码器 round-trip；执行 S00/S01 已由官方 CLI 4.22.1 实际生成、安装、构建并渲染控件样板。见本 train 回执。
 S00 固定实际 CLI、组件依赖版本及生成输出；不能用 floating latest 建立不可复验的完成回执。
 配方无法复现时记录准确差异，继续独立文档工作；不悄悄选择另一套风格。
 字体随应用本地打包并保留许可，页面渲染不依赖外部字体 CDN；不安装全局字体。

@@ -1,6 +1,6 @@
 # FLEETSPLICE-SUI-S03-001 — 会话导航与自适应工作区完成
 
-状态：NOT_STARTED；计划日期：2026-10-22；计划额度：6h（不要求耗尽）。
+状态：SOURCE_COMPLETE（实现与定向检查；不代表 H0）；计划日期：2026-10-22；计划额度：6h（不要求耗尽）。
 依赖：[S02](FLEETSPLICE-SUI-S02-001.md)。目标分支：train/pre-gate-s-development-001。
 
 ## 权威入口
@@ -28,13 +28,13 @@ Implementer为唯一intentional writer；仓库/Git写前持有coordinator write
 
 ## 开发清单
 
-- [ ] 复用S02样板，把所有现有会话行、搜索、分组、空态和连接错误迁移至同一组件体系。
-- [ ] 将Quick Switch组合到Command/Dialog，保留本地匹配排序、当前选中和原有线程切换语义。
-- [ ] 列表主名称、次上下文、选中与活动信号分层，完整身份进入详情；不发明未报告Host。
-- [ ] 保持Ctrl/Cmd+K、方向键、Enter选择、Esc关闭及焦点返回，选择本身不连接/acquire或重定向pending。
-- [ ] 扩展窄屏导航/详情、VisualViewport键盘避让、safe-area、可调整桌面宽度；临时clamp不覆盖保存值。
-- [ ] 删除本范围已被替代的手写焦点/模态代码与CSS，确认通用原件承担其职责，避免两套shortcut同时触发。
-- [ ] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
+- [x] 复用S02样板，把所有现有会话行、搜索、分组、空态和连接错误迁移至同一组件体系。
+- [x] 将Quick Switch组合到Command/Dialog，保留本地匹配排序、当前选中和原有线程切换语义。
+- [x] 列表主名称、次上下文、选中与活动信号分层，完整身份进入详情；不发明未报告Host。
+- [x] 保持Ctrl/Cmd+K、方向键、Enter选择、Esc关闭及焦点返回，选择本身不连接/acquire或重定向pending。
+- [x] 扩展窄屏导航/详情、VisualViewport键盘避让、safe-area、可调整桌面宽度；临时clamp不覆盖保存值。
+- [x] 删除本范围已被替代的手写焦点/模态代码与CSS，确认通用原件承担其职责，避免两套shortcut同时触发。
+- [x] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
 
 ## 最小检查与通过标准
 
@@ -51,3 +51,7 @@ SOURCE_COMPLETE需要真实产物与受影响验证；不是H0或Native可用性
 不把导航层级扩张为G07真实多Host、worktree管理器或远程搜索服务。
 达到总60h截止前保存部分提交/patch与回执；恢复从私有state和有效证据继续，不重跑无变化审计。
 实际阻碍只阻止依赖项；有独立就绪项时继续。下一项：S04。
+
+## 本次执行回执
+
+见 [S03 回执](../../docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S03.md)。执行授权见本 train EXECUTION-AUTHORIZATION.md。

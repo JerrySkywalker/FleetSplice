@@ -31,14 +31,6 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .workspace-group-heading span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
 .quick-switch-trigger { display: inline-flex; align-items: center; gap: 6px; }
 .quick-switch-trigger kbd { font-size: 10px; color: var(--muted-foreground); }
-dialog.session-switcher { width: min(560px, calc(100vw - 32px)); max-height: min(70dvh, 640px); padding: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.switcher-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.session-switcher > input { width: 100%; min-height: 40px; background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: 12px; }
-.session-switcher [role="listbox"] { display: grid; gap: 4px; }
-.switcher-option { display: grid; gap: 4px; min-width: 0; width: 100%; text-align: left; padding: 10px; border-color: transparent; background: transparent; }
-.switcher-option > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.switcher-option span, .switcher-option small { color: var(--muted-foreground); font-size: 11px; }
-.switcher-option.is-active { background: var(--selected); border-color: var(--border); }
 @media (max-width: 767px) {
   .quick-switch-trigger kbd, .quick-switch-trigger > span { display: none; }
   .session-search { min-height: 40px; }
@@ -736,5 +728,6 @@ dialog.drawer-config { margin: 0; padding: 0; max-width: none; max-height: none;
  .ownership-status { font-size: 11px; }
  .attention-heading { gap: 4px; }
  [data-slot="button"] { min-height: 44px; }
+ [data-slot="command-input-wrapper"] [data-slot="input-group"] { min-height: 44px; }
 }
 }

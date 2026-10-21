@@ -426,6 +426,12 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
   const threadShort = thread?.id ? (thread.id.length > 16 ? `${thread.id.slice(0, 12)}…` : thread.id) : '—';
   const connectDisabled = !available || !thread || (!!snapshot?.controller && !controlled);
 
+  const ownership = <OwnershipSurface connected={!!thread?.attached} notConnectedLabel={t('Not connected', '未连接')} controlled={controlled}
+            controllerLabel={t('You control this session', '你控制此会话')} viewerLabel={t('Read-only viewer', '只读查看者')}
+            releaseLabel={t('Release', '释放')} acquireLabel={t('Acquire control', '获取控制权')}
+            canRelease={available && controlled && !!thread?.attached} canAcquire={available && !!thread?.attached && !snapshot?.controller}
+            onRelease={() => void command('native.release')} onAcquire={() => void command('native.attach')} />;
+
   return <AppShell
     brand={<div className="brand session-brand"><span className="mark">F</span><div><h1 title={thread ? sessionTitle(thread) : 'FleetSplice'}>{thread ? sessionTitle(thread) : 'FleetSplice'}</h1><span className="session-target" title={thread?.id}>Codex · {threadShort}</span></div></div>}
     headerActions={<><SessionQuickSwitcher threads={snapshot?.threads ?? []} selected={thread?.id ?? ''} onSelect={selectSession} locale={locale} recent={recentSessions} />
@@ -442,13 +448,7 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
     </>}
     conversation={<>
       <section ref={attentionRef} tabIndex={-1} className="session-attention" aria-label={t('Current session attention', '当前会话待处理')} data-testid="session-attention">
-        <div className="attention-heading"><span className="session-state" aria-live="polite">{thread?.activeTurnId && thread.turns.find(turn => turn.id === thread.activeTurnId) ? <TurnStatus turn={thread.turns.find(turn => turn.id === thread.activeTurnId)!} locale={locale} live={snapshot?.state === 'READY'}/> : thread?.status ?? t('Waiting', '等待中')}</span>
-          <OwnershipSurface connected={!!thread?.attached} notConnectedLabel={t('Not connected', '未连接')} controlled={controlled}
-            controllerLabel={t('You control this session', '你控制此会话')} viewerLabel={t('Read-only viewer', '只读查看者')}
-            releaseLabel={t('Release', '释放')} acquireLabel={t('Acquire control', '获取控制权')}
-            canRelease={available && controlled && !!thread?.attached} canAcquire={available && !!thread?.attached && !snapshot?.controller}
-            onRelease={() => void command('native.release')} onAcquire={() => void command('native.attach')} />
-        </div>
+        {!thread?.attached && <div className="attention-heading">{ownership}</div>}
         <div className="attention-cards">
           {otherPendingThread && <div className="notice" role="status" data-testid="other-thread-pending">
             <p>{t('A command for another thread awaits its receipt. Controls remain paused.', '另一个线程的命令正在等待回执，控制操作保持暂停。')}</p>
@@ -472,6 +472,7 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
             body={t('Review the currently observed state before continuing.', '请先检查当前观察到的状态再继续。')}
             actionLabel={t('Review and continue', '查看并继续')} disabled={!available || !controlled} onReview={() => void command('native.reviewState')} />}
           {sessionApprovals.map(approval => <ApprovalCard key={`${typeof approval.requestId}:${approval.requestId}`}
+            resolved={approval.status === 'RESOLVED'} resolvedDetailsLabel={t('Request details', '请求详情')}
             statusLabel={approval.status === 'PENDING' ? t('Needs approval', '需要审批') : approval.status === 'RESOLVED' ? t('Native request resolved', '原生请求已解决') : approval.status === 'STALE' ? t('Request expired or changed', '请求已失效或变更') : approval.status}
             summary={approval.summary}
             meta={`${approval.workspace} · ${approval.requestType}\nThread ${approval.threadId} · Turn ${approval.turnId}\nItem ${approval.itemId} · Request ${approval.requestId}`}
@@ -528,6 +529,7 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
         followTail.current = true; setFollowing(true); const node = timelineRef.current; node?.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
       }}>{t('Jump to latest activity', '返回最新活动')}</Button>}
       {thread?.attached && <form className="composer composer-surface" data-testid="composer-surface" data-control-mode={mode} onSubmit={event => { event.preventDefault(); void command('native.submit'); }}>
+        <div className="composer-status">{ownership}<span className="session-state">{snapshot?.state !== 'READY' || !!receiptTarget || !!thread?.externalAdvance ? t('Controls paused', '控制已暂停') : thread.status === 'active' ? t('Working', '工作中') : thread.status === 'idle' ? t('Idle', '空闲') : thread.status}</span></div>
         <InputGroup className="composer-input-group rounded-xl">
         <InputGroupTextarea
           className="min-h-18 max-h-36 px-4 py-3 text-[15px] md:text-[15px] max-sm:min-h-16 max-sm:px-3 max-sm:py-2.5"
@@ -549,7 +551,7 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
           }}
         />
         <InputGroupAddon align="block-end" className="composer-toolbar flex-wrap justify-between gap-2 px-3 py-2 max-sm:px-2 max-sm:py-1.5">
-        <SessionConfigBar
+        <SessionConfigBar locale={locale} showController={false}
           modelLabel={t('Model', '模型')} reasoningLabel={t('Reasoning', '推理')} permissionLabel={t('Permission', '权限')}
           controllerLabel={controlled ? t('You control this session', '你控制此会话') : t('Read-only viewer', '只读查看者')}
           model={thread?.model ?? ''} reasoning="" permission={permission.label}

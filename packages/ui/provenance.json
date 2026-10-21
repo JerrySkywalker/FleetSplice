@@ -19,7 +19,8 @@
     "skeleton.tsx": "4c2af7fa9c645358a0fb188779deab6f0b981733b62befc25e18aaebea1350dc",
     "textarea.tsx": "a1615b32d672032b01f4b64c8cd0563eb0306250ce81f1bc8d12ae9a8a092d6c",
     "tooltip.tsx": "100101631756e1bebc1f1831e1642b26cd11a6a6c4affb6c638c42001dc14e83",
-    "collapsible.tsx": "3de60b605e64c835588cecc189fbcf907eb602b0158f970d614b067e868b491e"
+    "collapsible.tsx": "3de60b605e64c835588cecc189fbcf907eb602b0158f970d614b067e868b491e",
+    "native-select.tsx": "06adf0047218f64e837be2a259c736958c977e89d8fe642dcb05caa916fd5ad9"
   },
   "local_changes": [
     "Registry internal @/components/ui imports rewritten to explicit relative .tsx for NodeNext.",
@@ -34,6 +35,11 @@
     "collapsible": {
       "cli": "4.22.1",
       "generated_utc": "2026-10-21T17:47:44.514Z",
+      "local_changes": []
+    },
+    "native-select": {
+      "cli": "4.22.1",
+      "generated_utc": "2026-10-21T18:02:45.010Z",
       "local_changes": []
     }
   }

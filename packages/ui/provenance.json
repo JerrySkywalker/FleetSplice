@@ -26,7 +26,8 @@
     "Registry internal @/components/ui imports rewritten to explicit relative .tsx for NodeNext.",
     "Official shadcn 4.22.1 tailwind.css vendored verbatim with MIT notice; CLI excluded from app dependencies.",
     "Chinese system font fallbacks and data-theme dark variant; legacy adapter removed at S07.",
-    "Readable 14px control text classes in Button, Input, Textarea, NativeSelect and DialogDescription; Mira geometry retained."
+    "Readable 14px control text classes in Button, Input, Textarea, NativeSelect and DialogDescription; Mira geometry retained.",
+    "Light muted foreground uses Zinc600 so normal-size text on muted message backgrounds meets4.5:1; final painted-color check."
   ],
   "native_connections": 0,
   "native_effects": 0,
@@ -39,7 +40,7 @@
     },
     "native-select": {
       "cli": "4.22.1",
-      "generated_utc": "2026-10-21T18:02:45.010Z",
+      "generated_utc": "2026-10-21T18:02:45.01Z",
       "local_changes": []
     }
   }

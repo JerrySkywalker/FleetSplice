@@ -120,7 +120,7 @@
     "unique_synthetic_cases": 89,
     "baseline": "2bf6cdf5cddce330e4b26d66a266dee87ce4f7fe",
     "driver": "DESKTOP_CODEX_LOCAL",
-    "independent_review": "FIRST_CHANGES_REQUIRED_CORRECTION_DELTA_REVIEW_PENDING",
+    "independent_review": "EXACT_RESULT_IN_PRIVATE_RECEIPT_AND_CURRENT_PR_DESCRIPTION",
     "real_native_effects": 0,
     "result": "PARTIAL_WITH_SPECIFIC_BLOCKERS",
     "adopted_control": "UNSUPPORTED_NON_MUTATING_OBSERVER",

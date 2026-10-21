@@ -27,7 +27,7 @@ import { SessionNavigation, SessionQuickSwitcher } from './components/SessionNav
 import { readNavigationPreference, saveNavigationPreference } from './layout/session-navigation.ts';
 import {
   ApprovalCard, OwnershipSurface, ReviewCard, SessionConnectPreview,
-  StreamingMessage, ToolActivityCard,
+  ConversationMessage, ToolActivityCard,
 } from './components/Presentation.tsx';
 import { SemanticIcon } from './icons/semantic-icons.tsx';
 
@@ -105,6 +105,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const [liveTimeline, setLiveTimeline] = useState<TimelinePresentationItem[]>([]);
   const timelineRef = useRef<HTMLDivElement>(null);
   const followTail = useRef(true);
+  const [following, setFollowing] = useState(true);
   const timerRef = useRef(new LocalLoopTimer());
   const schedulerRef = useRef<AuthoritativeReconcileScheduler | null>(null);
   const auditRef = useRef<SnapshotAuditSurface>({
@@ -157,8 +158,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       // A successful authoritative read retires only an observation outage.
       // Command uncertainty still needs explicit receipt lookup and must stay.
       setError(current => ['RUNTIME_UNSHARED', 'EDGE_DISCONNECTED', 'NATIVE_OBSERVATION_LOST'].includes(current) ? '' : current);
-      const history = (next.threads ?? []).flatMap((item: any) => item.history ?? []);
-      const activity = (next.threads ?? []).flatMap((item: any) => item.activity ?? []);
+      const history = (next.threads ?? []).flatMap((item: any) => (item.history ?? []).map((message: any) => ({ ...message, threadId: item.id })));
+      const activity = (next.threads ?? []).flatMap((item: any) => (item.activity ?? []).map((tool: any) => ({ ...tool, threadId: item.id })));
       setLiveTimeline(current => retireLiveWhenAuthoritative(current, history, activity));
       setProvisional(current => {
         if (!current || !['native.submit', 'native.steer'].includes(current.family)) return current;
@@ -367,15 +368,35 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     viewer: !controlled,
   });
   const permission = permissionPresentation(thread?.permission, locale === 'zh-CN');
+  const liveMessages = liveTimeline.filter(item => item.threadId === thread?.id && (item.kind === 'message.delta' || item.kind === 'message.final'));
+  const liveTools = liveTimeline.filter(item => item.threadId === thread?.id && item.kind.startsWith('tool.'));
+  const turnIds = [...new Set([...(thread?.turns.map(turn => turn.id) ?? []), ...liveMessages.map(item => item.turnId).filter((id): id is string => !!id),
+    ...(thread?.activity.map(item => item.turnId) ?? []), ...liveTools.map(item => item.turnId).filter((id): id is string => !!id)])];
+  function conversationMessages(turnId: string) {
+    const history = thread?.history.filter(message => message.turnId === turnId) ?? [];
+    return [
+      ...history.map((message, index) => <ConversationMessage key={message.itemId ? `${turnId}:${message.itemId}` : `${turnId}:observed:${index}`}
+        role={message.role} text={message.text} itemId={message.itemId ?? undefined} source={message.source}
+        label={message.role === 'user' ? t('You', '你') : 'Codex'} streamingLabel={t('Streaming', '生成中')} locale={locale} />),
+      ...liveMessages.filter(item => item.turnId === turnId && !history.some(message => !!item.itemId && message.itemId === item.itemId))
+        .map(item => <ConversationMessage key={item.itemId ? `${turnId}:${item.itemId}` : `${turnId}:live:${item.eventId}`}
+          role={item.role === 'user' ? 'user' : 'assistant'} text={item.text ?? ''} itemId={item.itemId ?? undefined}
+          liveKind={item.kind === 'message.delta' ? 'message.delta' : 'message.final'} label={item.role === 'user' ? t('You', '你') : 'Codex'}
+          turnEnded={thread?.turns.some(turn => turn.id === turnId && turn.state !== 'RUNNING')}
+          streamingLabel={t('Streaming', '生成中')} locale={locale} />),
+    ];
+  }
+  const observedTools = [
+    ...(thread?.activity ?? []).map(item => ({ itemId: item.id, toolId: item.id, turnId: item.turnId, text: item.text, status: item.status, ephemeral: false,
+      kind: item.status === 'completed' ? 'tool.completed' as const : ['failed', 'declined'].includes(item.status) ? 'tool.failed' as const : 'tool.updated' as const })),
+  ];
+  const tools = [...observedTools.filter(item => !liveTools.some(live => live.turnId === item.turnId && (live.toolId ?? live.itemId) === item.toolId && !['completed', 'failed', 'declined'].includes(item.status))),
+    ...liveTools.filter(item => !observedTools.some(tool => tool.toolId === (item.toolId ?? item.itemId) && tool.turnId === item.turnId && ['completed', 'failed', 'declined'].includes(tool.status)))];
   useEffect(() => {
     const node = timelineRef.current;
     if (!node || !followTail.current) return;
-    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    node.scrollTo({ top: node.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
-  }, [thread?.history.length, liveTimeline.length, showProvisional, provisional?.state]);
-
-  const liveMessages = liveTimeline.filter(item => item.threadId === thread?.id && (item.kind === 'message.delta' || item.kind === 'message.final'));
-  const liveTools = liveTimeline.filter(item => item.threadId === thread?.id && item.kind.startsWith('tool.'));
+    node.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
+  }, [thread?.id, thread?.history.length, thread?.history.at(-1)?.text.length, liveMessages.at(-1)?.revision, showProvisional, provisional?.state]);
   const mutationHint = t(
     'Native Adoption shows observed effective configuration only. This runtime does not provide a structured model/reasoning/permission mutation API.',
     '原生会话仅显示已观察的有效配置。此运行时未提供结构化的模型/推理/权限变更接口。',
@@ -434,23 +455,24 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         onConnect={() => void command('native.attach')}
       />}
       <div className="timeline" role="log" aria-label={t('Native conversation', '原生对话')} ref={timelineRef} data-testid="conversation-timeline"
-        onScroll={event => { const node = event.currentTarget; followTail.current = node.scrollTop + node.clientHeight >= node.scrollHeight - 48; }}>
-        {thread?.attached && thread.turns.map(turn => <React.Fragment key={turn.id}>
-          {thread.history.filter(message => message.turnId === turn.id).map((message, index) => <article className={`message ${message.role}`} key={message.itemId ? `${message.turnId}-${message.itemId}` : `${message.turnId}-${index}`} data-item-id={message.itemId ?? undefined}><div className="message-label">{message.role === 'user' ? t('You', '你') : 'Codex'}
-            {message.role === 'user' && <small className="native-source-badge" data-source={message.source?.kind ?? 'NATIVE_EXTERNAL'} title={message.source?.kind === 'FLEETSPLICE_WEB' ? message.source.clientInstanceId : undefined}>{message.source?.kind === 'FLEETSPLICE_WEB' ? `Web${message.source.deviceLabel || message.source.clientDisplayLabel ? ` · ${message.source.deviceLabel || message.source.clientDisplayLabel}` : ''}` : t('Native', '原生')}</small>}
-          </div><div className="message-text">{message.text}</div></article>)}
-          <div className="native-turn-marker"><TurnStatus turn={turn} locale={locale} live={snapshot?.state === 'READY'}/></div>
+        onScroll={event => { const node = event.currentTarget; const atTail = node.scrollTop + node.clientHeight >= node.scrollHeight - 48; followTail.current = atTail; setFollowing(atTail); }}>
+        {thread?.attached && turnIds.map(turnId => <React.Fragment key={turnId}>
+          {conversationMessages(turnId)}
+          {tools.filter(item => item.turnId === turnId).map(item => <ToolActivityCard key={`tool:${item.toolId ?? item.itemId}`} item={item}
+            runningLabel={t('Running…', '运行中…')} completedLabel={t('Completed', '已完成')} failedLabel={t('Failed', '失败')}
+            unknownLabel={t('Status unknown', '状态未知')} detailsLabel={t('Observed details', '已观察的详情')}
+            detailsHint={t('Recent command summary; full tool output is not provided by this projection.', '此投影仅提供最近命令摘要，未提供完整工具输出。')} />)}
+          {thread.turns.find(turn => turn.id === turnId) && <div className="native-turn-marker"><TurnStatus turn={thread.turns.find(turn => turn.id === turnId)!} locale={locale} live={snapshot?.state === 'READY'}/></div>}
         </React.Fragment>)}
         {showProvisional && <article className="message user provisional" data-presentation-state={provisional.state} data-command-id={provisional.commandId}>
           <div className="message-label">{t('Web (provisional)', '网页（临时）')}<small data-testid="presentation-state">{presentationLabel(provisional.state, locale === 'zh-CN')}</small></div>
           <div className="message-text">{provisional.text}</div>
         </article>}
-        {liveTools.map(item => <ToolActivityCard key={item.toolId ?? item.itemId ?? item.eventId} item={item}
-          runningLabel={t('Running…', '运行中…')} completedLabel={t('Completed', '已完成')} failedLabel={t('Failed', '失败')}
-          detailsLabel={t('Details', '详情')} />)}
-        {liveMessages.map(item => <StreamingMessage key={item.itemId ?? item.eventId} item={item} streamingLabel={t('Streaming', '生成中')} />)}
         {thread?.historyLimited && <p className="muted">{t('Showing bounded recent history.', '仅显示最近的有限历史。')}</p>}
       </div>
+      {!following && <button type="button" className="latest-activity" onClick={() => {
+        followTail.current = true; setFollowing(true); const node = timelineRef.current; node?.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
+      }}>{t('Jump to latest activity', '返回最新活动')}</button>}
       {thread?.attached && <section className="native-approvals" aria-label={t('Approvals', '审批')}>
         {snapshot?.approvals?.filter(a => a.threadId === thread.id).slice(-8).map(a => <ApprovalCard
           key={`${typeof a.requestId}:${a.requestId}`}
@@ -478,8 +500,15 @@ export function NativeAdoption({ client, request, locale, preferences }: {
           maxLength={16000}
           value={text}
           onChange={event => setDraft(draftKey, event.target.value)}
-          disabled={!canControl || mode === 'review' || mode === 'receipt_lookup'}
-          rows={1}
+          disabled={busy || snapshot?.state !== 'READY' || mode === 'review' || mode === 'receipt_lookup'}
+          rows={2}
+          onKeyDown={event => {
+            if (event.key !== 'Enter' || (!event.ctrlKey && !event.metaKey) || event.nativeEvent.isComposing || event.keyCode === 229 || event.repeat) return;
+            event.preventDefault();
+            if (!canControl || !text.trim()) return;
+            if (mode === 'send' && thread?.status === 'idle') void command('native.submit');
+            else if (mode === 'steer_interrupt' && steer && thread?.activeTurnId) void command('native.steer');
+          }}
         />
         <SessionConfigBar
           modelLabel={t('Model', '模型')} reasoningLabel={t('Reasoning', '推理')} permissionLabel={t('Permission', '权限')}

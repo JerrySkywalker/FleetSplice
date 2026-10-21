@@ -2,6 +2,9 @@ import React from 'react';
 import { Circle } from 'lucide-react';
 import { SemanticIcon, toolFailedIcon as ToolFailedIcon } from '../icons/semantic-icons.tsx';
 import type { TimelinePresentationItem } from '../../../packages/contracts/realtime-timeline.ts';
+import type { MessageSource } from '../../../packages/native-adoption/types.ts';
+import type { Locale } from '../i18n.ts';
+import { MessageText } from './MessageText.tsx';
 
 export function StatusChip({ kind, label, testId }: {
   kind: 'controller' | 'viewer' | 'working' | 'attention' | 'connected';
@@ -18,16 +21,31 @@ export function StreamingMessage({ item, streamingLabel }: {
   item: TimelinePresentationItem;
   streamingLabel: string;
 }) {
-  const streaming = item.kind === 'message.delta';
+  return <ConversationMessage role="assistant" text={item.text ?? ''} itemId={item.itemId ?? undefined}
+    liveKind={item.kind === 'message.delta' ? 'message.delta' : 'message.final'} label="Codex" streamingLabel={streamingLabel} />;
+}
+
+export function ConversationMessage({ role, text, itemId, source, liveKind, label, streamingLabel, turnEnded = false, locale = 'en-US' }: {
+  role: 'user' | 'assistant'; text: string; itemId?: string; source?: MessageSource;
+  liveKind?: 'message.delta' | 'message.final'; label: string; streamingLabel: string; locale?: Locale;
+  turnEnded?: boolean;
+}) {
+  const partial = liveKind === 'message.delta' && turnEnded;
+  const streaming = liveKind === 'message.delta' && !turnEnded;
   return <article
-    className={`message assistant streaming-message ${streaming ? 'is-streaming' : 'is-final'}`}
-    data-live-kind={item.kind}
-    data-ephemeral="true"
-    data-item-id={item.itemId ?? undefined}
-    data-testid={streaming ? 'streaming-assistant' : 'final-assistant'}
+    className={`message ${role} ${role === 'assistant' ? 'streaming-message' : ''} ${streaming ? 'is-streaming' : partial ? 'is-partial' : 'is-final'}`}
+    data-live-kind={liveKind} data-ephemeral={liveKind ? 'true' : undefined} data-item-id={itemId}
+    data-testid={liveKind ? streaming ? 'streaming-assistant' : partial ? 'partial-assistant' : 'final-assistant' : 'conversation-message'}
   >
-    <div className="message-label">Codex{streaming ? <small className="streaming-indicator" aria-live="polite">{streamingLabel}</small> : null}</div>
-    <div className="message-text">{item.text || (streaming ? '…' : '')}{streaming ? <span className="streaming-caret" aria-hidden="true" /> : null}</div>
+    <div className="message-label">{label}
+      {role === 'user' && <small className="native-source-badge" data-source={source?.kind ?? 'NATIVE_EXTERNAL'} title={source?.kind === 'FLEETSPLICE_WEB' ? source.clientInstanceId : undefined}>
+        {source?.kind === 'FLEETSPLICE_WEB' ? `Web${source.deviceLabel || source.clientDisplayLabel ? ` · ${source.deviceLabel || source.clientDisplayLabel}` : ''}` : locale === 'zh-CN' ? '原生' : 'Native'}
+      </small>}
+      {streaming ? <small className="streaming-indicator" aria-live="polite">{streamingLabel}</small> : null}
+      {partial && <small>{locale === 'zh-CN' ? '轮次已结束，内容观察不完整' : 'Turn ended; partial observation'}</small>}
+    </div>
+    <MessageText text={text || (streaming ? '…' : '')} locale={locale} />
+    {streaming ? <span className="streaming-caret" aria-hidden="true" /> : null}
   </article>;
 }
 
@@ -40,24 +58,26 @@ function toolTitle(text: string | undefined): { title: string; detail: string } 
   return { title: maybeShell, detail: firstLine };
 }
 
-export function ToolActivityCard({ item, runningLabel, completedLabel, failedLabel, detailsLabel }: {
-  item: TimelinePresentationItem;
+export function ToolActivityCard({ item, runningLabel, completedLabel, failedLabel, detailsLabel, unknownLabel = 'Status unknown', detailsHint }: {
+  item: Pick<TimelinePresentationItem, 'kind' | 'status' | 'text' | 'toolId' | 'itemId'> & { ephemeral?: boolean };
   runningLabel: string;
   completedLabel: string;
   failedLabel: string;
   detailsLabel: string;
+  unknownLabel?: string; detailsHint?: string;
 }) {
   const status = (item.status ?? item.kind).toLowerCase();
   const running = item.kind === 'tool.started' || /inprogress|running|started|in_progress/.test(status);
   const failed = item.kind === 'tool.failed' || /fail|error/.test(status);
-  const stateLabel = failed ? failedLabel : running ? runningLabel : completedLabel;
+  const completed = item.kind === 'tool.completed' || status === 'completed';
+  const stateLabel = failed ? failedLabel : running ? runningLabel : completed ? completedLabel : unknownLabel;
   const { title, detail } = toolTitle(item.text);
   return <article
-    className={`tool-card ${running ? 'is-running' : failed ? 'is-failed' : 'is-completed'}`}
+    className={`tool-card ${running ? 'is-running' : failed ? 'is-failed' : completed ? 'is-completed' : 'is-unknown'}`}
     data-live-kind={item.kind}
-    data-ephemeral="true"
+    data-ephemeral={item.ephemeral === false ? undefined : 'true'}
     data-item-id={item.itemId ?? item.toolId ?? undefined}
-    data-tool-status={running ? 'running' : failed ? 'failed' : 'completed'}
+    data-tool-status={running ? 'running' : failed ? 'failed' : completed ? 'completed' : 'unknown'}
     data-testid="tool-activity-card"
   >
     <div className="tool-card-head">
@@ -65,12 +85,12 @@ export function ToolActivityCard({ item, runningLabel, completedLabel, failedLab
       <span className={`tool-state ${running ? 'pulse' : ''}`}>
         {running ? <SemanticIcon intent="toolRunning" size={14} className="tool-icon" spin />
           : failed ? <ToolFailedIcon size={14} className="tool-icon" aria-hidden="true" />
-            : <SemanticIcon intent="toolCompleted" size={14} className="tool-icon" />}
+            : completed ? <SemanticIcon intent="toolCompleted" size={14} className="tool-icon" /> : <Circle size={14} aria-hidden="true" />}
         {stateLabel}
       </span>
     </div>
     {detail ? <div className="tool-summary">{detail}</div> : null}
-    {item.text && item.text.trim() !== detail ? <details><summary>{detailsLabel}</summary><pre>{item.text}</pre></details> : null}
+    {item.text && item.text.trim() !== detail ? <details><summary>{detailsLabel}</summary><pre>{item.text}</pre>{detailsHint && <p className="muted">{detailsHint}</p>}</details> : null}
   </article>;
 }
 

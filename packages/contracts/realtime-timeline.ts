@@ -21,6 +21,7 @@ export type TimelinePresentationItem = {
 };
 
 export type AuthoritativeHistoryMessage = {
+  threadId?: string;
   role: 'user' | 'assistant';
   text: string;
   turnId: string;
@@ -79,6 +80,7 @@ export function projectExecutionToTimeline(event: AgentExecutionEvent): Timeline
 export function foldTimeline(items: TimelinePresentationItem[], next: TimelinePresentationItem, limit = 48): TimelinePresentationItem[] {
   const without = items.filter(item => item.eventId !== next.eventId);
   if (next.kind === 'message.delta' && next.turnId) {
+    if (exactItemId(next.itemId) && without.some(item => item.kind === 'message.final' && exactItemId(item.itemId) && sameMessageIdentity(item, next))) return without;
     const priorDelta = without.findIndex(item => item.kind === 'message.delta' && sameMessageIdentity(item, next));
     if (priorDelta >= 0) {
       const prior = without[priorDelta]!;
@@ -91,10 +93,12 @@ export function foldTimeline(items: TimelinePresentationItem[], next: TimelinePr
     }
   }
   if (next.kind === 'message.final' && next.turnId) {
-    return [...without.filter(item => !(item.kind === 'message.delta' && sameMessageIdentity(item, next))), next].slice(-limit);
+    return [...without.filter(item => !((item.kind === 'message.delta' ||
+      (item.kind === 'message.final' && exactItemId(item.itemId) && exactItemId(next.itemId))) && sameMessageIdentity(item, next))), next].slice(-limit);
   }
   if (next.toolId && next.kind.startsWith('tool.')) {
-    const index = without.findIndex(item => item.toolId === next.toolId || (exactItemId(item.itemId) && exactItemId(item.itemId) === exactItemId(next.itemId)));
+    const index = without.findIndex(item => item.threadId === next.threadId && item.turnId === next.turnId &&
+      (item.toolId === next.toolId || (exactItemId(item.itemId) && exactItemId(item.itemId) === exactItemId(next.itemId))));
     if (index >= 0) {
       without[index] = { ...without[index]!, ...next };
       return without.slice(-limit);
@@ -110,18 +114,20 @@ export function foldTimeline(items: TimelinePresentationItem[], next: TimelinePr
 export function retireLiveWhenAuthoritative(
   live: TimelinePresentationItem[],
   history: AuthoritativeHistoryMessage[],
-  activity: { id: string; turnId: string }[] = [],
+  activity: { id: string; turnId: string; threadId?: string; status?: string }[] = [],
 ): TimelinePresentationItem[] {
   return live.filter(item => {
     if (item.kind === 'message.delta' || item.kind === 'message.final') {
       const id = exactItemId(item.itemId);
       if (!id || !item.turnId) return true;
-      return !history.some(message => message.turnId === item.turnId && exactItemId(message.itemId) === id);
+      return !history.some(message => (!message.threadId || message.threadId === item.threadId) && message.turnId === item.turnId && exactItemId(message.itemId) === id);
     }
     if (item.kind.startsWith('tool.')) {
       const id = exactItemId(item.itemId) ?? exactItemId(item.toolId);
       if (!id) return true;
-      return !activity.some(entry => entry.id === id && (!item.turnId || entry.turnId === item.turnId));
+      const terminal = item.kind === 'tool.completed' || item.kind === 'tool.failed';
+      return !activity.some(entry => entry.id === id && (!entry.threadId || entry.threadId === item.threadId) &&
+        (!item.turnId || entry.turnId === item.turnId) && (!terminal || ['completed', 'failed', 'declined'].includes(entry.status ?? '')));
     }
     return true;
   });

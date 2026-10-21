@@ -1,5 +1,5 @@
 import { Button } from '../../packages/ui/components/button.tsx';
-import { Textarea } from '../../packages/ui/components/textarea.tsx';
+import { InputGroup, InputGroupTextarea, InputGroupAddon } from '../../packages/ui/components/input-group.tsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AdoptionCommand, AdoptionReceipt, AdoptionSnapshot, NativeTurn } from '../../packages/native-adoption/types.ts';
 import type { TimelinePresentationItem } from '../../packages/contracts/realtime-timeline.ts';
@@ -528,7 +528,9 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
         followTail.current = true; setFollowing(true); const node = timelineRef.current; node?.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
       }}>{t('Jump to latest activity', '返回最新活动')}</Button>}
       {thread?.attached && <form className="composer composer-surface" data-testid="composer-surface" data-control-mode={mode} onSubmit={event => { event.preventDefault(); void command('native.submit'); }}>
-        <Textarea
+        <InputGroup className="composer-input-group rounded-xl">
+        <InputGroupTextarea
+          className="min-h-18 max-h-36 px-4 py-3 text-[15px] md:text-[15px] max-sm:min-h-16 max-sm:px-3 max-sm:py-2.5"
           id="native-prompt"
           data-testid="native-prompt"
           aria-label={t('Message Codex', '发送给 Codex')}
@@ -546,6 +548,7 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
             else if (mode === 'steer_interrupt' && steer && thread?.activeTurnId) void command('native.steer');
           }}
         />
+        <InputGroupAddon align="block-end" className="composer-toolbar flex-wrap justify-between gap-2 px-3 py-2 max-sm:px-2 max-sm:py-1.5">
         <SessionConfigBar
           modelLabel={t('Model', '模型')} reasoningLabel={t('Reasoning', '推理')} permissionLabel={t('Permission', '权限')}
           controllerLabel={controlled ? t('You control this session', '你控制此会话') : t('Read-only viewer', '只读查看者')}
@@ -569,6 +572,8 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
             </Button>
           </> : null}
         </div>
+        </InputGroupAddon>
+        </InputGroup>
       </form>}
     </>}
     context={<>

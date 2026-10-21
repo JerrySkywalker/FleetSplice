@@ -47,7 +47,7 @@ export function SessionQuickSwitcher({ threads, selected, onSelect, locale, rece
     const shortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !event.isComposing && event.keyCode !== 229) {
         event.preventDefault();
-        if (document.querySelector('[role="dialog"], dialog[open]')) return;
+        if (document.querySelector('[role="dialog"]:not([data-closed]), dialog[open]')) return;
         if (!event.repeat) changeOpen(true);
       }
     };

@@ -1,3 +1,5 @@
+import { Button } from '../../../packages/ui/components/button.tsx';
+import { Copy, Check } from 'lucide-react';
 import React, { useState } from 'react';
 import type { Locale } from '../i18n.ts';
 
@@ -19,10 +21,10 @@ export function messageBlocks(text: string): { kind: 'text' | 'code'; text: stri
 function CodeBlock({ text, language, locale }: { text: string; language?: string; locale: Locale }) {
   const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle'); const zh = locale === 'zh-CN';
   return <section className="message-code">
-    <div className="message-code-heading"><span>{language || (zh ? '代码' : 'Code')}</span><button type="button"
+    <div className="message-code-heading"><span>{language || (zh ? '代码' : 'Code')}</span><Button type="button" variant="ghost" size="sm"
       disabled={!navigator.clipboard?.writeText} onClick={async () => {
         try { await navigator.clipboard.writeText(text); setCopy('copied'); } catch { setCopy('failed'); }
-      }}>{copy === 'copied' ? (zh ? '已复制' : 'Copied') : copy === 'failed' ? (zh ? '复制失败' : 'Copy failed') : (zh ? '复制代码' : 'Copy code')}</button></div>
+      }}>{copy === 'copied' ? <Check size={14} aria-hidden="true"/> : <Copy size={14} aria-hidden="true"/>}{copy === 'copied' ? (zh ? '已复制' : 'Copied') : copy === 'failed' ? (zh ? '复制失败' : 'Copy failed') : (zh ? '复制代码' : 'Copy code')}</Button></div>
     <pre tabIndex={0}><code>{text}</code></pre>
   </section>;
 }

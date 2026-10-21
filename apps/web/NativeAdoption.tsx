@@ -452,6 +452,8 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
         <div className="attention-cards">
           {otherPendingThread && <div className="notice" role="status" data-testid="other-thread-pending">
             <p>{t('A command for another thread awaits its receipt. Controls remain paused.', '另一个线程的命令正在等待回执，控制操作保持暂停。')}</p>
+            <p>{t('This input will not be sent again automatically.', '此输入不会被自动重发。')}</p>
+            {observationUnavailable && <p>{t('Native execution state is unverified.', '原生执行状态尚未验证。')}</p>}
             <Button variant="outline" type="button" onClick={() => selectSession(receiptTarget!.threadId)}>{t('View thread', '查看线程')} {receiptTarget!.threadId}</Button>
           </div>}
           {receiptTarget && !otherPendingThread && <div className="receipt-attention severity-attention" data-testid="receipt-attention" role="status">
@@ -590,6 +592,7 @@ export function NativeAdoption({ client, request, locale, preferences, fleet }: 
         <pre>{JSON.stringify({ daemon: snapshot?.daemon, compatibility: snapshot?.compatibility, observationFailure: snapshot?.observationFailure, createdNativeThread: false }, null, 2)}</pre>
         <pre>{JSON.stringify(snapshot?.receipts.at(-1) ?? null, null, 2)}</pre>
       </details>
+      {fleet}
     </>}
     footer={<><span>{snapshot?.state ?? 'CONNECTING'}</span><span className="footer-right">{t('Native TUI availability needs separate verification', '原生 TUI 可用性需另行验证')}</span></>}
   />;

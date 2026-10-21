@@ -18,6 +18,12 @@ test('SUI S02: reusable session surface normal, approval and unknown in two widt
     assert.ok((await page.getByTestId('resize-left').boundingBox())!.width <= 8, 'legacy button rules must not enlarge resize handles');
     await expect(page.locator('.native-workspace > .gateway-dashboard')).toHaveCount(0);
     await expect(page.locator('.product-header h1')).toHaveCount(1);
+    await expect(page.getByTestId('adopted-thread-id')).not.toHaveText('—');
+    const originalThread = await page.getByTestId('adopted-thread-id').textContent();
+    await page.getByTestId('toggle-right').click();
+    await page.locator('.gateway-compact > summary').click();
+    await expect(page.getByTestId('fleet-summary')).toBeVisible();
+    await page.getByTestId('toggle-right').click();
     await page.getByTestId('ownership-action').click();
     const prompt = page.getByTestId('native-prompt');
     await prompt.fill('Synthetic representative input'); await page.getByTestId('composer-send').click();
@@ -40,6 +46,10 @@ test('SUI S02: reusable session surface normal, approval and unknown in two widt
     await page.getByRole('button', { name: 'Check receipt', exact: true }).click();
     await expect(page.getByTestId('presentation-state')).toHaveText('Ambiguous effect');
     await expect(page.getByRole('button', { name: 'Check receipt', exact: true })).toBeEnabled();
+    await page.keyboard.press('Control+k'); await switcher.getByRole('combobox').fill(originalThread!); await page.keyboard.press('Enter');
+    await expect(page.getByTestId('other-thread-pending')).toContainText('will not be sent again automatically');
+    await expect(page.getByTestId('other-thread-pending')).toContainText('unverified');
+    await page.keyboard.press('Control+k'); await switcher.getByRole('combobox').fill('fixture-thread-approval'); await page.keyboard.press('Enter');
     assert.equal(demo.counters().syntheticCommands, 4);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     assert.ok(await page.getByTestId('composer-surface').evaluate(node => node.getBoundingClientRect().bottom <= innerHeight + 1));

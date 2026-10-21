@@ -8,6 +8,27 @@ const base = {
   threadId: 't1', turnId: 'u1', stream: 'agent.execution' as const, trustLevel: 'NATIVE_STRUCTURED_API' as const,
 };
 
+test('FPX duplicate finals and late deltas preserve one final native item', () => {
+  const final = projectExecutionToTimeline({ ...base, eventId: 'final-1', kind: 'message.final', payload: { role: 'assistant', text: 'Complete', itemId: 'item' } })!;
+  let items = foldTimeline(foldTimeline([], final), { ...final, eventId: 'final-2' });
+  items = foldTimeline(items, { ...final, eventId: 'late-delta', kind: 'message.delta', text: 'old fragment' });
+  assert.equal(items.length, 1); assert.equal(items[0]!.kind, 'message.final'); assert.equal(items[0]!.text, 'Complete');
+});
+test('FPX absent native item identity never suppresses a distinct final or later message', () => {
+  const final = projectExecutionToTimeline({ ...base, eventId: 'no-id-1', kind: 'message.final', payload: { role: 'assistant', text: 'First answer' } })!;
+  const items = foldTimeline(foldTimeline([], final), { ...final, eventId: 'no-id-2', text: 'Second answer' });
+  assert.equal(items.length, 2);
+  assert.equal(foldTimeline(items, { ...final, eventId: 'no-id-3', kind: 'message.delta', text: 'New message' }).length, 3);
+});
+test('FPX snapshot retirement is Thread-scoped and waits for terminal tool evidence', () => {
+  const message = projectExecutionToTimeline({ ...base, kind: 'message.final', payload: { role: 'assistant', text: 'Complete', itemId: 'item' } })!;
+  assert.equal(retireLiveWhenAuthoritative([message], [{ threadId: 'another', turnId: 'u1', itemId: 'item', text: 'Same ID', role: 'assistant' }]).length, 1);
+  const tool = projectExecutionToTimeline({ ...base, kind: 'tool.completed', payload: { toolId: 'tool', status: 'completed' } })!;
+  assert.equal(retireLiveWhenAuthoritative([tool], [], [{ id: 'tool', turnId: 'u1', threadId: 't1', status: 'inProgress' }]).length, 1);
+  assert.equal(retireLiveWhenAuthoritative([tool], [], [{ id: 'tool', turnId: 'u1', threadId: 't1', status: 'completed' }]).length, 0);
+  assert.equal(foldTimeline([tool], { ...tool, eventId: 'another-tool', threadId: 'another' }).length, 2);
+});
+
 test('folds deltas by exact itemId and never merges distinct assistant items in one turn', () => {
   let items = foldTimeline([], projectExecutionToTimeline({ ...base, kind: 'turn.started', payload: { status: 'RUNNING' } })!);
   items = foldTimeline(items, projectExecutionToTimeline({ ...base, eventId: 'a1', kind: 'message.delta', payload: { role: 'assistant', text: 'First', itemId: 'msg-a' } })!);

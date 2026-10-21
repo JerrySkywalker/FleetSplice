@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "io.fleetsplice.desktop",
   "build": { "beforeBuildCommand": "npm run desktop:build", "frontendDist": "../dist" },
-  "app": { "windows": [{ "label": "main", "title": "FleetSplice", "width": 960, "height": 680, "minWidth": 640, "minHeight": 480 }] },
+  "app": { "windows": [{ "label": "main", "title": "FleetSplice Agent Manager", "width": 960, "height": 680, "minWidth": 640, "minHeight": 480 }], "security": { "capabilities": ["agent-manager"] } },
   "bundle": {
     "active": true,
     "targets": ["nsis"],

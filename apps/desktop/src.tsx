@@ -8,6 +8,10 @@ type AgentStatus = { code: string; hub?: string; edge?: string; edgeAdmission?: 
 const sections = ['Overview', 'Gateway', 'Agent Runtimes', 'Sharing', 'Startup', 'Security', 'Diagnostics', 'Advanced'] as const;
 
 function Desktop() {
+  const [mode, setMode] = useState<'Workspace' | 'Agent Manager'>('Agent Manager');
+  const [workspaceOrigin, setWorkspaceOrigin] = useState('');
+  const [workspaceMessage, setWorkspaceMessage] = useState('Open an authenticated Gateway in an isolated Workspace window.');
+  const [openingWorkspace, setOpeningWorkspace] = useState(false);
   const [section, setSection] = useState<(typeof sections)[number]>('Overview');
   const [status, setStatus] = useState<AgentStatus>({ code: 'LOADING' });
   const [runtimes, setRuntimes] = useState<Runtime[]>([]);
@@ -29,7 +33,25 @@ function Desktop() {
       setMessage(shared ? 'Sharing resumed through the admitted Agent.' : 'Sharing paused. Existing native work was not terminated.'); await refresh();
     } catch (error) { setMessage(String(error)); }
   };
-  return <main>
+  return <div className="desktop-shell"><header className="desktop-mode-bar"><strong>FleetSplice</strong><nav aria-label="Desktop mode">
+    {(['Workspace', 'Agent Manager'] as const).map(item => <button type="button" key={item} aria-pressed={mode === item} onClick={() => setMode(item)}>{item}</button>)}
+  </nav></header>
+  <section className="workspace-launcher" hidden={mode !== 'Workspace'}>
+    <h1>Workspace</h1><p>Use the same Web sessions, Attention and Composer. Your Gateway login and Controller grant remain authoritative.</p>
+    <form onSubmit={async event => {
+      event.preventDefault(); if (openingWorkspace) return;
+      setOpeningWorkspace(true);
+      try { await invoke('open_workspace', { origin: workspaceOrigin.trim() }); setWorkspaceMessage('Workspace opened. Sign in through the normal Gateway login. Return here using its Agent Manager menu.'); }
+      catch (error) { setWorkspaceMessage(String(error)); }
+      finally { setOpeningWorkspace(false); }
+    }}>
+      <label htmlFor="workspace-origin">Gateway origin</label><input id="workspace-origin" type="url" required placeholder="https://gateway.example.test" value={workspaceOrigin} onChange={event => setWorkspaceOrigin(event.target.value)} />
+      <p className="muted">Enter an origin only, without credentials, path, query or bootstrap fragment. Local first-use bootstrap authentication is not available in this window.</p>
+      <button type="submit" disabled={openingWorkspace || !workspaceOrigin.trim()}>{openingWorkspace ? 'Opening…' : 'Open / return to Workspace'}</button>
+    </form>
+    <p role="status">{workspaceMessage}</p><p className="muted">Desktop does not grant control automatically. Closing Workspace does not stop native work. A login or connection failure can be retried by returning to the same window; no native command is replayed.</p>
+  </section>
+  <main hidden={mode !== 'Agent Manager'}>
     <aside><h1>FleetSplice</h1><p className="muted">Windows Desktop</p>{sections.map(item => <button key={item} className={section === item ? 'selected' : ''} onClick={() => setSection(item)}>{item}</button>)}</aside>
     <section><header><div><h2>{section}</h2><p className="muted">{message}</p></div><button onClick={() => void refresh()}>Refresh</button></header>
       {section === 'Overview' && <div className="cards"><article><b>Agent</b><strong>{status.code}</strong></article><article><b>Gateway</b><strong>{status.hub ?? 'Unavailable'}</strong></article><article><b>Native Codex</b><strong>{status.nativeCodex ?? 'Not started'}</strong></article></div>}
@@ -39,6 +61,6 @@ function Desktop() {
       {section === 'Diagnostics' && <article><b>Diagnostics</b><pre>{JSON.stringify(status, null, 2)}</pre><button onClick={() => void invoke('open_logs')}>Open local logs</button></article>}
       {['Security', 'Advanced'].includes(section) && <article><b>{section}</b><p>Configuration remains owned by the local Agent and is exposed through its authenticated local IPC.</p></article>}
     </section>
-  </main>;
+  </main></div>;
 }
 createRoot(document.getElementById('root')!).render(<Desktop />);

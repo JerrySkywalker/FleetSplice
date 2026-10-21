@@ -1,6 +1,6 @@
 # FLEETSPLICE-SUI-S06-001 — Desktop Manager与Gateway统一呈现
 
-状态：NOT_STARTED；计划日期：2026-10-22；计划额度：5h（不要求耗尽）。
+状态：SOURCE_COMPLETE（实现与定向检查；不代表 H0）；计划日期：2026-10-22；计划额度：5h（不要求耗尽）。
 依赖：[S02](FLEETSPLICE-SUI-S02-001.md)。目标分支：train/pre-gate-s-development-001。
 
 ## 权威入口
@@ -27,13 +27,13 @@ Implementer为唯一intentional writer；仓库/Git写前持有coordinator write
 
 ## 开发清单
 
-- [ ] 迁移已有Manager列表、详情、输入和错误信息，保留现有可达功能及Manager/Workspace区分。
-- [ ] Gateway的观察、连接和登录状态采用同一设计语言；Workspace不再永久叠加第二层overview。
-- [ ] 两个入口同用S01组件和token，保留当前locale、主题和窗口尺寸，不另写一套桌面风格。
-- [ ] 保留现有origin/IPC权限边界、输入验证及作用范围，不改Rust command、权限清单或Agent生命周期。
-- [ ] 用固定IPC browser mock验证界面，必要时构建/运行已有test-only Desktop preview；禁止启动普通Desktop主程序。
-- [ ] 首次嵌入认证继续诚实标明既有阻碍，不用bootstrap fragment、控制token或浏览器profile绕过。
-- [ ] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
+- [x] 迁移已有Manager列表、详情、输入和错误信息，保留现有可达功能及Manager/Workspace区分。
+- [x] Gateway的观察、连接和登录状态采用同一设计语言；Workspace不再永久叠加第二层overview。
+- [x] 两个入口同用S01组件和token，保留当前locale、主题和窗口尺寸，不另写一套桌面风格。
+- [x] 保留现有origin/IPC权限边界、输入验证及作用范围，不改Rust command、权限清单或Agent生命周期。
+- [x] 用固定IPC browser mock验证界面，必要时构建/运行已有test-only Desktop preview；禁止启动普通Desktop主程序。
+- [x] 首次嵌入认证继续诚实标明既有阻碍，不用bootstrap fragment、控制token或浏览器profile绕过。
+- [x] 保存准确候选、变更范围、实际检查、证据级别、阻碍和下一项；只合并后续授权覆盖且检查通过的source-only PR。
 
 ## 最小检查与通过标准
 
@@ -50,3 +50,7 @@ SOURCE_COMPLETE需要真实产物与受影响验证；不是H0或Native可用性
 认证/IPC生命周期需求记录BLOCKED_EXACT，不扩大为Desktop安全/安装/发布工程。
 达到总60h截止前保存部分提交/patch与回执；恢复从私有state和有效证据继续，不重跑无变化审计。
 实际阻碍只阻止依赖项；有独立就绪项时继续。下一项：S07（等待S05）。
+
+## 本次执行回执
+
+见 [S06 回执](../../docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S06.md)。执行授权见本 train EXECUTION-AUTHORIZATION.md。

@@ -21,7 +21,7 @@ test('SUI S02: reusable session surface normal, approval and unknown in two widt
     await expect(page.getByTestId('adopted-thread-id')).not.toHaveText('—');
     const originalThread = await page.getByTestId('adopted-thread-id').textContent();
     await page.getByTestId('toggle-right').click();
-    await page.locator('.gateway-compact > summary').click();
+    await page.getByTestId('fleet-overview-trigger').click();
     await expect(page.getByTestId('fleet-summary')).toBeVisible();
     await page.getByTestId('toggle-right').click();
     await page.getByTestId('ownership-action').click();

@@ -1,5 +1,9 @@
 # Current FleetSplice development status
 
+## SUI execution admitted — 2026-10-22
+
+Owner explicitly approved [S00–S08 source execution](../roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/EXECUTION-AUTHORIZATION.md) and qualified source PR merges. The60h wall window starts2026-10-21T17:00:50Z and ends2026-10-24T05:00:50Z. Prior pending text below is historical. Implementation is active, not accepted; H0 and all native/production gates remain unpassed.
+
 ## Owner presentation decision — 2026-10-22
 
 Owner chose one shadcn preset and replacement of the custom FS visual language under the [SUI plan](../roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/README.md). Planning PR creation/normal development-branch merge is authorized; **60h execution is PENDING_OWNER and all S00–S08 remain NOT_STARTED**. [design.md](../ux/design.md) is the new prospective presentation contract, including scoped Tailwind adoption. Prior UI source remains functional ancestry; old H0 candidate is historical for visual review, with no invented Owner-executed/approved result. The new candidate will be prepared by S08 after authorization. Native PR23, Desktop embedded-auth blocker, H1–H4, Gate S and G06–G10 remain unchanged. The concluded 200h run is not resumed.

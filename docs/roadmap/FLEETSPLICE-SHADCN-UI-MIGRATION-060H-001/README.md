@@ -1,5 +1,7 @@
 # FleetSplice shadcn UI migration Goal Train
 
+> **Execution admission, 2026-10-22:** Owner has explicitly approved [the60h source window](EXECUTION-AUTHORIZATION.md). PENDING_OWNER/NOT_STARTED planning statements below are the initial snapshot; actual progress is in per-Goal receipts. Start2026-10-21T17:00:50Z; deadline2026-10-24T05:00:50Z. Native connections/effects stay0/0.
+
 `PROGRAM_ID=FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001` · `DATE=2026-10-22`
 
 `STATUS=PLANNING_APPROVED_EXECUTION_AWAITING_OWNER`

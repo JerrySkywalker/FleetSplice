@@ -1,0 +1,32 @@
+{
+  "preset": "bdvw9FeS",
+  "cli": "4.22.1",
+  "base": "base",
+  "style": "base-mira",
+  "generated_utc": "2026-10-21T17:10:15.473Z",
+  "registry": "https://ui.shadcn.com/r/styles/base-mira",
+  "generated_sha256": {
+    "badge.tsx": "64334d935c33ab5ef7b6987936a8a43354d8b5683a87648a940a990ac0f630b7",
+    "button.tsx": "d6ee890088e8a678f1f7daad150201d67dbee3d26cd4fbf43daef0740e89fa8b",
+    "command.tsx": "d80e7694cd72d51332059a0ebac3ee91372fdb39dc422ae76a69ab1e52d7cd93",
+    "dialog.tsx": "999a8680e0c364c026c393fe8599afe01554cf048f049ca601612093ca7d101f",
+    "dropdown-menu.tsx": "c209225a3d391257bcc6024deb043fe974cc56a01e49ffa3bd3deaf169ec6290",
+    "input-group.tsx": "38b8e42d59ddac268921530eef6f86a58d2629453c7cac2c479b357214bd1e38",
+    "input.tsx": "710a10d2c4a97aaeaa5c3361545a313ce6eea65bf4695c8b242cbe0ac50866d2",
+    "select.tsx": "b7aad7b093fea4b81144dad6e70fe4337a65664885111195dbf0ac2ed361e19b",
+    "separator.tsx": "9a80ff8c110e0c55489509f4f82ebcc929c0174b59544047147b7134f86a54e7",
+    "sheet.tsx": "0854633937bde0ecc540ce8cf952f8e7453a33d39f1bf448250398a0262624bf",
+    "skeleton.tsx": "4c2af7fa9c645358a0fb188779deab6f0b981733b62befc25e18aaebea1350dc",
+    "textarea.tsx": "a1615b32d672032b01f4b64c8cd0563eb0306250ce81f1bc8d12ae9a8a092d6c",
+    "tooltip.tsx": "100101631756e1bebc1f1831e1642b26cd11a6a6c4affb6c638c42001dc14e83"
+  },
+  "local_changes": [
+    "Registry internal @/components/ui imports rewritten to explicit relative .tsx for NodeNext.",
+    "Shared CSS font adds Chinese system fallbacks; dark variant also reads data-theme; temporary legacy layout adapters.",
+    "Official shadcn 4.22.1 tailwind.css vendored verbatim with MIT notice; CLI excluded from app dependencies.",
+    "Shared 14px control text scale; original Mira component classes retained."
+  ],
+  "native_connections": 0,
+  "native_effects": 0,
+  "registry_css_sha256": "4c371f7a1ff5d219ae2f7ff28bd256b4346fd546fe46fbae22092e57db2f0fae"
+}

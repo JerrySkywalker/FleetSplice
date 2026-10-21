@@ -1,5 +1,7 @@
 # SUI Goal Train
 
+> **Execution admission, 2026-10-22:** Owner has explicitly approved [the60h source window](EXECUTION-AUTHORIZATION.md). PENDING_OWNER/NOT_STARTED planning statements below are the initial snapshot; actual progress is in per-Goal receipts. Start2026-10-21T17:00:50Z; deadline2026-10-24T05:00:50Z. Native connections/effects stay0/0.
+
 入口：[README](README.md) · 规范：[design.md](../../ux/design.md) · 状态：[manifest](manifest.json)。
 当前仅规划 PR 获准创建、推送和正常合并；全部 S00–S08 为 `NOT_STARTED`，等待后续 60h 授权。
 

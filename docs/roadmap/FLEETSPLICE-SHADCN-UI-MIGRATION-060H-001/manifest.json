@@ -2,16 +2,16 @@
   "schema": "fleetsplice.sui-train.v1",
   "program_id": "FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001",
   "date": "2026-10-22",
-  "status": "PLANNING_APPROVED_EXECUTION_AWAITING_OWNER",
+  "status": "EXECUTION_ACTIVE",
   "base_branch": "train/pre-gate-s-development-001",
   "planning_base_sha": "f42313b5e32f73957d331227a967394f2f3ad805",
   "design": "docs/ux/design.md",
   "preset": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/preset.json",
   "authorization": {
     "planning_docs_pr_push_merge": true,
-    "source_implementation": false,
-    "source_pr_merge": false,
-    "budget_authorized": false,
+    "source_implementation": true,
+    "source_pr_merge": true,
+    "budget_authorized": true,
     "real_native_connections": false,
     "real_native_effects": false,
     "main_merge": false,
@@ -24,10 +24,11 @@
     "planned_goal_hours": 52,
     "correction_reserve_hours": 8,
     "checkpoint_max_hours": 12,
-    "started_utc": null,
-    "deadline_utc": null,
+    "started_utc": "2026-10-21T17:00:50Z",
+    "deadline_utc": "2026-10-24T05:00:50Z",
     "start_trigger": "LATER_EXPLICIT_OWNER_AUTHORIZATION",
-    "finish_early": true
+    "finish_early": true,
+    "authorization_source": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/EXECUTION-AUTHORIZATION.md"
   },
   "goals": [
     {
@@ -36,11 +37,12 @@
       "title": "执行准入与单一预设锁定",
       "path": "goals/shadcn/FLEETSPLICE-SUI-S00-001.md",
       "deps": [],
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "planned_hours": 3,
       "mode": "SOURCE_ONLY_AFTER_AUTHORIZATION",
       "human_gate_prerequisites": [],
-      "acceptance_gates": []
+      "acceptance_gates": [],
+      "receipt": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S00.md"
     },
     {
       "id": "FLEETSPLICE-SUI-S01-001",
@@ -50,11 +52,12 @@
       "deps": [
         "FLEETSPLICE-SUI-S00-001"
       ],
-      "state": "NOT_STARTED",
+      "state": "SOURCE_COMPLETE",
       "planned_hours": 6,
       "mode": "SOURCE_ONLY_AFTER_AUTHORIZATION",
       "human_gate_prerequisites": [],
-      "acceptance_gates": []
+      "acceptance_gates": [],
+      "receipt": "docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/receipts/S01.md"
     },
     {
       "id": "FLEETSPLICE-SUI-S02-001",
@@ -180,13 +183,14 @@
     }
   ],
   "evidence": {
-    "preset": "PINNED_OFFICIAL_ENCODER_ROUNDTRIP_ONLY",
-    "component_installation": "NOT_RUN",
-    "rendering": "NOT_RUN",
+    "preset": "OFFICIAL_CLI_4_22_1_GENERATED",
+    "component_installation": "LOCKED_AND_BUILT",
+    "rendering": "TESTED_UI_COMPONENTS",
     "native_connections": 0,
     "native_effects": 0
   },
   "status_authority": "private per-run state.json and exact-head receipts; this manifest is the initial plan",
   "old_fpx_helper_compatible": false,
-  "terminal_disposition": "STOP_FOR_OWNER_SHADCN_UI_REVIEW"
+  "terminal_disposition": "STOP_FOR_OWNER_SHADCN_UI_REVIEW",
+  "execution_base_sha": "97c61b51b2647d741145c7d7c5245e9e2a9f3047"
 }

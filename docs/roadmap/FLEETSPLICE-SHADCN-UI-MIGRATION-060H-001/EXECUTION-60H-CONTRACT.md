@@ -1,5 +1,7 @@
 # Proposed 60-hour autonomous execution contract
 
+> **Execution admission, 2026-10-22:** Owner has explicitly approved [the60h source window](EXECUTION-AUTHORIZATION.md). PENDING_OWNER/NOT_STARTED planning statements below are the initial snapshot; actual progress is in per-Goal receipts. Start2026-10-21T17:00:50Z; deadline2026-10-24T05:00:50Z. Native connections/effects stay0/0.
+
 `AUTHORIZATION=PENDING_OWNER` · `MAX_TOTAL_WALL_HOURS=60` · `STARTED_UTC=null` · `DEADLINE_UTC=null`
 
 Owner 本次授权的是设计规范、详细路线图、逐 Goal 文件与规划 PR 的创建/正常合并。

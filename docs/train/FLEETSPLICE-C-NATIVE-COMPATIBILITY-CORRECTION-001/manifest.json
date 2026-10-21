@@ -1,0 +1,135 @@
+{
+  "schema": "fleetsplice.goal-train.native-compat-correction.v1",
+  "goal_id": "FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001",
+  "plan_status": "PARTIAL_WITH_SPECIFIC_BLOCKERS",
+  "owner_authorization": "ALL_LOCAL_PRODUCT_CHANGES_WITHIN_GOAL_SCOPE_NO_PER_PHASE_PROMPTS",
+  "route_status": "CONDITIONAL_C_CORRECTION_APPROVED_FULL_ROUTE_NOT_SELECTED",
+  "max_elapsed_minutes": 720,
+  "host": "ZENBOOK14",
+  "repository": "JerrySkywalker/FleetSplice",
+  "parent_pr": 22,
+  "parent_ref": "research/fs-b2-c-contract-parity-pilot-20261020",
+  "parent_exact_head": "d6c34e12311e590611e4186efbf766d773eacc7b",
+  "base_training_ref": "train/pre-gate-s-development-001",
+  "base_training_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+  "new_branch": "feature/fs-c-native-compatibility-correction-20261020",
+  "pr_base": "research/fs-b2-c-contract-parity-pilot-20261020",
+  "goal_file": "goals/FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001.md",
+  "study_root": "docs/train/FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001",
+  "worktree_parent": "C:\\Dev\\worktrees",
+  "canonical_checkout": "C:\\Dev\\src\\FleetSplice",
+  "artifacts_root": "C:\\Dev\\artifacts\\fleetsplice\\FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001",
+  "phases": [
+    {
+      "id": "C00",
+      "name": "freeze and red baseline",
+      "minutes": 30
+    },
+    {
+      "id": "C01",
+      "name": "daemon layouts and identity",
+      "minutes": 105
+    },
+    {
+      "id": "C02",
+      "name": "loaded read-only thread adoption",
+      "minutes": 120
+    },
+    {
+      "id": "C03",
+      "name": "accepted Turn ID and no echo correlation",
+      "minutes": 120
+    },
+    {
+      "id": "C04",
+      "name": "integrated durable dispatch no replay",
+      "minutes": 120
+    },
+    {
+      "id": "C05",
+      "name": "event gaps and dedupe",
+      "minutes": 90
+    },
+    {
+      "id": "C06",
+      "name": "focused qualification",
+      "minutes": 75
+    },
+    {
+      "id": "C07",
+      "name": "reports/fast-forward Draft PR stop",
+      "minutes": 60
+    }
+  ],
+  "allowed_product_paths": [
+    "packages/native-adoption/**",
+    "packages/journal/**",
+    "packages/product-path/**",
+    "packages/reconnect/**",
+    "packages/permissions/**",
+    "packages/local-operation/**",
+    "tests/**"
+  ],
+  "allowed_document_paths": [
+    "goals/FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001.md",
+    "docs/train/FLEETSPLICE-C-NATIVE-COMPATIBILITY-CORRECTION-001/**"
+  ],
+  "one_adjacent_file_exception": "only documented, directly required by failing named acceptance test",
+  "project_local_dependency_restore": true,
+  "product_code_changes_authorized": true,
+  "full_repo_ci_required": false,
+  "real_native_connections_allowed": 0,
+  "real_native_effects_allowed": 0,
+  "read_real_native_credentials_allowed": false,
+  "real_daemon_lifecycle_mutation_allowed": false,
+  "system_global_changes_allowed": false,
+  "other_repository_writes_allowed": false,
+  "cloud_or_production_deployment_allowed": false,
+  "github_force_push_allowed": false,
+  "github_pr_merge_allowed": false,
+  "main_change_allowed": false,
+  "g06_g07_g08_g09_g10_implementation_allowed": false,
+  "must_not_ask_owner_during_run": true,
+  "block_out_of_scope_and_continue_independent": true,
+  "required_reports": [
+    "01-BASELINE-AND-CHANGES.md",
+    "02-CONTRACT-RESULTS.md",
+    "03-REMAINING-GAPS-AND-ROLLBACK.md",
+    "04-OWNER-HANDOFF.md"
+  ],
+  "private_receipts": [
+    "FINAL-RECEIPT.json",
+    "OWNER-HANDOFF.md"
+  ],
+  "terminal_states": [
+    "READY_FOR_OWNER_PRODUCT_REVIEW",
+    "PARTIAL_WITH_SPECIFIC_BLOCKERS",
+    "BLOCKED_WITH_EXACT_CAUSE"
+  ],
+  "execution": {
+    "phases": {
+      "C05": "PARTIAL_NO_NATIVE_CURSOR",
+      "C02": "BLOCKED_SUPPORTED_OBSERVER",
+      "C04": "TESTED_SYNTHETIC",
+      "C00": "COMPLETE",
+      "C03": "TESTED_SYNTHETIC_CONDITIONAL",
+      "C07": "REPORTS_WRITTEN",
+      "C06": "TARGETED_TESTS_PASS_REVIEW_PENDING",
+      "C01": "TESTED_SYNTHETIC"
+    },
+    "unique_synthetic_cases": 89,
+    "baseline": "2bf6cdf5cddce330e4b26d66a266dee87ce4f7fe",
+    "driver": "DESKTOP_CODEX_LOCAL",
+    "independent_review": "EXACT_RESULT_IN_PRIVATE_RECEIPT_AND_CURRENT_PR_DESCRIPTION",
+    "real_native_effects": 0,
+    "result": "PARTIAL_WITH_SPECIFIC_BLOCKERS",
+    "adopted_control": "UNSUPPORTED_NON_MUTATING_OBSERVER",
+    "real_native_connections": 0,
+    "date": "2026-10-21",
+    "adjacent_file_exception": {
+      "test": "tests/native-edge-recovery.test.ts",
+      "path": "apps/edge/native-adoption.ts",
+      "reason": "C06 canonical journal preflight before discovery/transport"
+    }
+  }
+}

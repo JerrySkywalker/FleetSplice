@@ -18,6 +18,155 @@ import { startHub } from '../apps/hub/server.ts';
 import { target } from './helpers.ts';
 import { NativeApprovals } from '../packages/native-adoption/approvals.ts';
 
+test('C03: production qualification uses only reads and refuses unproved loaded-thread subscription', async () => {
+  const r = await setup({ syntheticControl: false });
+  const snapshot = await r.adapter.snapshot();
+  assert.equal(snapshot.compatibility.profile, 'UNSUPPORTED');
+  assert.equal(snapshot.compatibility.capabilities.events.available, false);
+  assert.equal(snapshot.compatibility.capabilities.turnStart.available, false);
+  assert.equal((await r.attach()).code, 'NATIVE_NON_MUTATING_OBSERVER_UNSUPPORTED');
+  assert.ok(r.rpc.calls.every(c => ['thread/list', 'thread/loaded/list', 'thread/read', 'thread/turns/list', 'model/list'].includes(c.method)));
+  assert.deepEqual(snapshot.observationContinuity, { nativeReplayCursor: null, coverage: 'INCOMPLETE', recovery: 'BOUNDED_RESNAPSHOT_REQUIRED' });
+});
+
+test('C04: accepted fresh Turn ID correlates absent/null echo; extra user remains ambiguous', async () => {
+  for (const echo of [undefined, null, 'echo'] as const) {
+    const r = await setup(); await r.attach();
+    const call = r.rpc.call.bind(r.rpc);
+    r.rpc.call = async (method, params) => {
+      const result = await call(method, params);
+      if (method === 'turn/start') {
+        const turn = r.rpc.turns[0];
+        if (echo !== 'echo') turn.items[0].clientId = echo;
+        turn.items.push({ id: 'answer', type: 'agentMessage', text: 'Synthetic ACK' });
+        turn.status = 'completed'; r.rpc.thread.status.type = 'idle';
+      }
+      return result;
+    };
+    const receipt = await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'));
+    assert.equal(receipt.status, 'SUCCEEDED');
+    assert.equal(receipt.turnId, r.rpc.turns[0].id);
+    const view = (await r.adapter.snapshot()).threads[0]!;
+    assert.equal(view.lastTurnStatus, 'completed');
+    assert.equal(view.history.find(item => item.turnId === receipt.turnId && item.role === 'user')!.source!.kind, 'FLEETSPLICE_WEB');
+    assert.equal(r.rpc.calls.filter(c => c.method === 'thread/resume').length, 0);
+    r.journal.close();
+  }
+  const r = await setup(); await r.attach();
+  const call = r.rpc.call.bind(r.rpc);
+  r.rpc.call = async (method, params) => {
+    const result = await call(method, params);
+    if (method === 'turn/start') {
+      delete r.rpc.turns[0].items[0].clientId;
+      r.rpc.turns[0].items.push({ id: 'another-writer', type: 'userMessage', content: params.input });
+    }
+    return result;
+  };
+  assert.equal((await r.execute(r.command(await r.adapter.snapshot(), 'native.submit'))).status, 'AMBIGUOUS_EFFECT');
+  assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start').length, 1);
+});
+
+test('C05: stable source event dedupe is bounded; identical text without identity is not suppressed', async () => {
+  const r = await setup(); await r.attach();
+  const event = { eventId: 'source-frame-1', method: 'item/agentMessage/delta', params: { threadId: r.rpc.thread.id, turnId: r.rpc.turns[0].id, itemId: 'item', delta: 'x' } };
+  r.rpc.onEvent(event); r.rpc.onEvent(event);
+  assert.equal(r.adapter.recentExecutionEvents().filter(e => e.kind === 'message.delta').length, 1);
+  const { eventId, ...withoutId } = event;
+  r.rpc.onEvent(withoutId); r.rpc.onEvent(withoutId);
+  assert.equal(r.adapter.recentExecutionEvents().filter(e => e.kind === 'message.delta').length, 3);
+  r.rpc.onEvent({ ...event, params: { ...event.params, delta: 'conflicting bytes' } });
+  assert.equal((await r.adapter.snapshot()).state, 'NATIVE_EVENT_ID_CONFLICT');
+});
+
+test('C06: successful SQLite restart returns prior receipt before dispatch and rejects changed payload', async () => {
+  const r = await setup(); await r.attach();
+  const command = r.command(await r.adapter.snapshot(), 'native.submit');
+  const receipt = await r.execute(command);
+  r.adapter.close(); r.journal.close();
+  const journal = new Journal(r.journalFile);
+  try {
+    const next = new NativeAdoptionAdapter(r.adapter.identity, r.rpc, workspace, 'workspace-identity', () => r.adapter.identity,
+      () => ({ root: workspace, rootIdentity: 'workspace-identity' }), journal, new NativeActivityJournal(journal));
+    assert.deepEqual(next.lookup(command.commandId), receipt);
+    assert.deepEqual(await next.execute(command, r.authority), receipt);
+    await assert.rejects(next.execute({ ...command, text: 'changed' }, r.authority), /NATIVE_COMMAND_ID_CONFLICT/);
+    assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start').length, 1);
+  } finally { journal.close(); }
+});
+
+test('C06: integrated Hub to local Edge loses accepted response; completed-unseen restart cannot dispatch again', async () => {
+  const r = await setup();
+  const probe = createServer(); await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
+  const port = (probe.address() as { port: number }).port; await new Promise<void>(resolve => probe.close(() => resolve()));
+  const origin = `http://127.0.0.1:${port}`; const bootstrapToken = randomUUID();
+  const hub = await startHub({ port, target: target(), root: workspace, sid: 'fixture', principal: 'fixture', sessionId: 1,
+    stateDirectory: mkdtempSync(path.join(tmpdir(), 'fleet-unknown-')), webDirectory: path.resolve('dist/web'), hcpToken: randomUUID(), bootstrapToken,
+    adoptionCarriage: { kind: 'LOCAL_ADOPTION', port: { snapshot: () => r.adapter.snapshot(), execute: (c, client) => r.adapter.execute(c, client),
+      lookup: async id => r.adapter.lookup(id), renewClient: (a, b, c) => r.adapter.renewClient(a, b, c) } } });
+  try {
+    const boot = await fetch(`${origin}/api/bootstrap`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: bootstrapToken }) });
+    const cookie = boot.headers.get('set-cookie')!.split(';')[0]!;
+    const transport: typeof fetch = (url, init) => fetch(`${origin}${url}`, { ...init, headers: { ...init?.headers, Origin: origin, Cookie: cookie } });
+    const browser = new BrowserClientSession(() => {}, Date.now, transport);
+    browser.setClient(await browser.request('/api/client', {})); browser.native = true;
+    const clientInstanceId = browser.client!.clientInstanceId;
+    await browser.request('/api/native/commands', r.command(await browser.request('/api/native/snapshot'), 'native.attach', { clientInstanceId }));
+    const call = r.rpc.call.bind(r.rpc);
+    r.rpc.call = async (method, params) => {
+      if (method === 'turn/start') {
+        assert.equal(Number(r.journal.db.prepare("SELECT COUNT(*) AS n FROM evidence WHERE kind='NATIVE_EFFECT_ATTEMPT'").get()!.n), 1);
+      }
+      const result = await call(method, params);
+      if (method === 'turn/start') {
+        throw Error('SYNTHETIC_ACCEPTED_RESPONSE_LOST');
+      }
+      return result;
+    };
+    const command = r.command(await browser.request('/api/native/snapshot'), 'native.submit', { clientInstanceId });
+    const receipt = await browser.request('/api/native/commands', command);
+    assert.equal(receipt.status, 'AMBIGUOUS_EFFECT');
+    assert.deepEqual(await browser.request('/api/native/commands', command), receipt);
+    r.rpc.turns[0].status = 'completed'; r.rpc.thread.status.type = 'idle';
+  } finally { await hub.close(); r.adapter.close(); r.journal.close(); }
+  const journal = new Journal(r.journalFile);
+  try {
+    assert.throws(() => new NativeAdoptionAdapter(r.adapter.identity, r.rpc, workspace, 'workspace-identity', () => r.adapter.identity,
+      () => ({ root: workspace, rootIdentity: 'workspace-identity' }), journal, new NativeActivityJournal(journal)), /NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY/);
+    assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start').length, 1);
+  } finally { journal.close(); }
+});
+
+test('C06: crash after durable admission and before native send leaves no replay authority', async () => {
+  const r = await setup(); await r.attach();
+  const command = r.command(await r.adapter.snapshot(), 'native.submit');
+  r.activity.attempt(command, r.adapter.identity);
+  r.journal.close();
+  const journal = new Journal(r.journalFile);
+  try {
+    assert.throws(() => new NativeAdoptionAdapter(r.adapter.identity, r.rpc, workspace, 'workspace-identity', () => r.adapter.identity,
+      () => ({ root: workspace, rootIdentity: 'workspace-identity' }), journal, new NativeActivityJournal(journal)), /NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY/);
+    assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start').length, 0);
+  } finally { journal.close(); }
+});
+
+test('C06: recovery refuses duplicate attempts/receipts, stale acknowledgment and changed daemon', async () => {
+  for (const variant of ['duplicate-attempt', 'duplicate-receipt', 'stale-receipt', 'daemon-mismatch']) {
+    const r = await setup();
+    const command = r.command(await r.adapter.snapshot(), 'native.submit');
+    const receipt: import('../packages/native-adoption/types.ts').AdoptionReceipt = { commandId: command.commandId, family: command.family,
+      status: 'SUCCEEDED', code: 'SYNTHETIC_ACCEPTED', daemon: r.adapter.identity, threadId: command.threadId, turnId: 'fixture-turn',
+      origin: 'NATIVE_ADOPTED', createdNativeThread: false, processTerminationClaim: false };
+    if (variant === 'stale-receipt') r.activity.receipt(receipt);
+    r.activity.attempt(command, r.adapter.identity);
+    if (variant !== 'stale-receipt') r.activity.receipt(variant === 'daemon-mismatch' ? { ...receipt, daemon: { ...receipt.daemon, processId: 909 } } : receipt);
+    if (variant === 'duplicate-attempt') r.activity.attempt(command, r.adapter.identity);
+    if (variant === 'duplicate-receipt') r.activity.receipt(receipt);
+    assert.throws(() => r.activity.recoveredEffects(), /NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY/, variant);
+    assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start').length, 0);
+    r.journal.close();
+  }
+});
+
 async function approvalRig(options: Parameters<typeof setup>[0] = {}) {
   const r = await setup(options);
   const responses: { id: string | number; result: any }[] = [];
@@ -225,18 +374,31 @@ class Rpc implements NativeRpc {
     throw Error('unexpected fixture RPC');
   }
 }
-async function setup(options: { version?: string; sha?: string; missing?: string[]; now?: () => number; custody?: NativeServerCustody; onNativeClose?: () => void } = {}) {
+// Explicit synthetic control oracle. Official qualify() intentionally leaves
+// adopted control unsupported; these legacy safety tests exercise a simulated
+// subscribed port and cannot qualify the real native observation path.
+function simulatedControl(adapter: NativeAdoptionAdapter, missing: string[] = []) {
+  const methods = { sharedDaemon: '', threadList: 'thread/list', threadRead: 'thread/read', resume: 'thread/resume',
+    events: '', turnStart: 'turn/start', activeTurn: 'thread/turns/list', interrupt: 'turn/interrupt', steer: 'turn/steer',
+    approvalObserve: '', approvalResolve: '', models: 'model/list', effectiveState: '' };
+  for (const name of Object.keys(methods) as (keyof typeof methods)[]) adapter.compatibility.capabilities[name] = {
+    available: !['resume', 'approvalObserve', 'approvalResolve', 'effectiveState'].includes(name) && !missing.includes(methods[name]), evidence: 'TESTED_SYNTHETIC_ONLY: injected test control oracle' };
+  adapter.compatibility.profile = classifyCapabilities(adapter.compatibility.capabilities);
+}
+async function setup(options: { version?: string; sha?: string; missing?: string[]; now?: () => number; custody?: NativeServerCustody; onNativeClose?: () => void; syntheticControl?: boolean } = {}) {
   const rpc = new Rpc(); for (const method of options.missing ?? []) rpc.missing.add(method);
   let identity: NativeArtifactIdentity = { executablePath: 'C:\\official\\codex.exe', reportedVersion: options.version ?? 'future-build', sha256: options.sha ?? 'b'.repeat(64),
     processId: 100, processCreationTime: '123456', endpoint: 'C:\\user\\native.sock', endpointIdentity: 'socket-birth',
     serverIncarnation: options.custody === 'AGENT_SUPERVISED' ? randomUUID() : null,
     ...(options.custody ? { custody: options.custody } : {}) };
   const evidence: any[] = [];
-  const journal = new Journal(path.join(mkdtempSync(path.join(tmpdir(), 'fleet-activity-')), 'native.sqlite'));
+  const journalFile = path.join(mkdtempSync(path.join(tmpdir(), 'fleet-activity-')), 'native.sqlite');
+  const journal = new Journal(journalFile);
   const activity = new NativeActivityJournal(journal);
   const adapter = new NativeAdoptionAdapter(structuredClone(identity), rpc, workspace, 'workspace-identity', () => identity,
     () => ({ root: workspace, rootIdentity: 'workspace-identity' }), { append: (kind, key, value) => evidence.push({ kind, key, value }) }, activity, options.now, 0, options.onNativeClose);
   await adapter.qualify();
+  if (options.syntheticControl !== false) simulatedControl(adapter, options.missing);
   const client = randomUUID(); const expiresAt = (options.now ?? Date.now)() + 600000;
   const authority = { clientInstanceId: client, sessionBinding: randomUUID(), grantId: randomUUID(), grantRevision: '1', expiresAt };
   const command = (snapshot: AdoptionSnapshot, family: AdoptionCommand['family'], changes: Partial<AdoptionCommand> = {}): AdoptionCommand => ({ commandId: randomUUID(),
@@ -245,7 +407,7 @@ async function setup(options: { version?: string; sha?: string; missing?: string
     family, text: ['native.submit', 'native.steer'].includes(family) ? 'A harmless continuation' : '', ...changes });
   const execute = (value: AdoptionCommand, actor = client) => adapter.execute(value, { ...authority, clientInstanceId: actor });
   const attach = async () => execute(command(await adapter.snapshot(), 'native.attach'));
-  return { rpc, adapter, command, execute, attach, client, expiresAt, evidence, journal, activity, authority, replace: (change: Partial<NativeArtifactIdentity>) => { identity = { ...identity, ...change }; } };
+  return { rpc, adapter, command, execute, attach, client, expiresAt, evidence, journal, journalFile, activity, authority, replace: (change: Partial<NativeArtifactIdentity>) => { identity = { ...identity, ...change }; } };
 }
 test('native connection loss fences the adapter and updates Agent observation', async () => {
   let closed = 0;
@@ -254,7 +416,7 @@ test('native connection loss fences the adapter and updates Agent observation', 
   assert.equal(closed, 1);
   assert.equal((await r.adapter.snapshot()).state, 'NATIVE_CONNECTION_LOST');
 });
-test('adoption version and SHA are evidence rather than an allowlist; runtime capabilities admit ADOPT_FULL', async () => {
+test('synthetic control oracle has no version or SHA allowlist; it is not real qualification', async () => {
   for (const [version, sha] of [['future.9000', 'a'.repeat(64)], ['unversioned-development', 'c'.repeat(64)]]) {
     const r = await setup({ version, sha });
     assert.equal(r.adapter.compatibility.profile, 'ADOPT_FULL'); assert.equal((await r.attach()).status, 'SUCCEEDED');
@@ -382,16 +544,16 @@ for (const phase of ['initial', 'final'] as const) test(`attach ${phase} refresh
   const r = await setup();
   r.rpc.turns[0].items.push(...Array.from({ length: 64 }, (_, index) => ({ id: `command-${index}`, type: 'commandExecution', status: 'completed' })));
   const command = r.command(await r.adapter.snapshot(), 'native.attach');
-  let resumed = false; let injected = false;
+  let reads = 0; let injected = false;
   r.rpc.before = method => {
-    if (method === 'thread/resume') resumed = true;
-    if (!injected && method === 'thread/turns/list' && (phase === 'initial' || resumed)) {
+    if (method === 'thread/turns/list') reads++;
+    if (!injected && method === 'thread/turns/list' && (phase === 'initial' || reads === 2)) {
       injected = true; r.rpc.turns[0].items.push({ id: 'command-65', type: 'commandExecution', status: 'completed' });
     }
   };
   const receipt = await r.execute(command);
   assert.equal(injected, true); assert.equal(receipt.status, 'SUCCEEDED');
-  assert.equal(r.rpc.calls.filter(call => call.method === 'thread/resume' && call.params.threadId === r.rpc.thread.id).length, 1);
+  assert.equal(r.rpc.calls.filter(call => call.method === 'thread/resume').length, 0);
   const snapshot = await r.adapter.snapshot(); assert.equal(snapshot.state, 'READY'); assert.equal(snapshot.controller, r.client);
   assert.equal(Number(r.journal.db.prepare('SELECT COUNT(*) AS n FROM native_commands WHERE terminal=1').get()!.n), 65);
   assert.ok(snapshot.threads[0]!.activity.length <= 16);
@@ -400,7 +562,7 @@ test('capability modes downgrade without requiring optional controls', async () 
   const r = await setup(); const c = structuredClone(r.adapter.compatibility.capabilities);
   c.steer.available = false; c.interrupt.available = false; assert.equal(classifyCapabilities(c), 'ADOPT_FULL');
   c.events.available = false; assert.equal(classifyCapabilities(c), 'ADOPT_RESUME');
-  c.resume.available = false; c.events.available = true; assert.equal(classifyCapabilities(c), 'MANAGED_ONLY');
+  c.resume.available = false; c.events.available = true; assert.equal(classifyCapabilities(c), 'ADOPT_FULL');
   c.turnStart.available = false; assert.equal(classifyCapabilities(c), 'UNSUPPORTED');
 });
 test('PID reuse, process replacement, endpoint replacement and server incarnation change fail closed', async () => {
@@ -412,8 +574,9 @@ test('PID reuse, process replacement, endpoint replacement and server incarnatio
     assert.equal(r.rpc.calls.filter(c => c.method === 'turn/start' && c.params.threadId === r.rpc.thread.id).length, 0);
   }
 });
-test('metadata changes alone do not claim a replacement incarnation', async () => {
-  const r = await setup(); assert.equal(incarnationOf(r.adapter.identity), incarnationOf({ ...r.adapter.identity, reportedVersion: 'new metadata', sha256: 'd'.repeat(64) }));
+test('version metadata is not identity, but changed executable bytes change incarnation', async () => {
+  const r = await setup(); assert.equal(incarnationOf(r.adapter.identity), incarnationOf({ ...r.adapter.identity, reportedVersion: 'new metadata' }));
+  assert.notEqual(incarnationOf(r.adapter.identity), incarnationOf({ ...r.adapter.identity, sha256: 'd'.repeat(64) }));
 });
 test('missing steer or interrupt is disabled and cannot issue that native effect', async () => {
   for (const family of ['native.steer', 'native.interrupt'] as const) {
@@ -429,7 +592,9 @@ test('missing steer or interrupt is disabled and cannot issue that native effect
 test('exact loaded thread is required and a returned replacement cannot masquerade as adoption', async () => {
   const missing = await setup(); const initial = await missing.adapter.snapshot(); missing.rpc.loaded = false;
   assert.equal((await missing.execute(missing.command(initial, 'native.attach'))).code, 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
-  const wrong = await setup(); wrong.rpc.resumeId = 'replacement-thread';
+  const wrong = await setup(); await wrong.adapter.snapshot();
+  const call = wrong.rpc.call.bind(wrong.rpc);
+  wrong.rpc.call = async (method, params) => { const result = await call(method, params); if (method === 'thread/read') result.thread.id = 'replacement-thread'; return result; };
   const receipt = await wrong.attach(); assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_THREAD_IDENTITY_MISMATCH');
   assert.equal((await wrong.adapter.snapshot()).threads[0]!.attached, false);
 });
@@ -896,15 +1061,15 @@ test('more than 64 active commands are never evicted by terminal compaction', as
 for (const phase of ['initial', 'final'] as const) test(`attach ${phase} terminal journal failure holds before control assignment`, async () => {
   const r = await setup(); const command = r.command(await r.adapter.snapshot(), 'native.attach');
   r.journal.db.exec("CREATE TRIGGER deny_command BEFORE INSERT ON native_commands BEGIN SELECT RAISE(ABORT,'fixture journal unavailable'); END");
-  let resumed = false;
+  let reads = 0;
   r.rpc.before = method => {
-    if (method === 'thread/resume') resumed = true;
-    if (method === 'thread/turns/list' && (phase === 'initial' || resumed))
+    if (method === 'thread/turns/list') reads++;
+    if (method === 'thread/turns/list' && (phase === 'initial' || reads === 2))
       r.rpc.turns[0].items.push({ id: 'unjournaled', type: 'commandExecution', status: 'completed' });
   };
   const receipt = await r.execute(command); assert.equal(receipt.status, 'REJECTED'); assert.equal(receipt.code, 'NATIVE_JOURNAL_UNPROVABLE');
   assert.equal((await r.adapter.snapshot()).controller, null);
-  assert.equal(r.rpc.calls.filter(c => c.method === 'thread/resume' && c.params.threadId === r.rpc.thread.id).length, phase === 'initial' ? 0 : 1);
+  assert.equal(r.rpc.calls.filter(c => c.method === 'thread/resume').length, 0);
 });
 
 test('an event journal failure during the final native read blocks dispatch without replay', async () => {

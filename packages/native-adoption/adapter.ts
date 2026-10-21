@@ -46,6 +46,7 @@ export class NativeAdoptionAdapter {
   private readonly realtime = new RealtimeEventBus();
   private lastControlSignature = '';
   private executionEvents: AgentExecutionEvent[] = [];
+  private sourceEvents = new Map<string, string>();
   private needsFullDiscovery = true;
   private lastFullDiscoveryAt = 0;
   private dirtyThreads = new Set<string>();
@@ -57,6 +58,7 @@ export class NativeAdoptionAdapter {
       id(command.commandId) && id(command.clientInstanceId) && typeof command.text === 'string', 'NATIVE_SOURCE_EVIDENCE_UNPROVABLE');
     this.ownedInputs.set(command.commandId, { threadId: command.threadId, turnId: receipt.turnId, text: command.text,
       clientInstanceId: command.clientInstanceId, clientDisplayLabel: command.clientDisplayLabel, deviceLabel: command.deviceLabel });
+    if (command.family === 'native.submit') this.ownedTurns.add(receipt.turnId!);
   }
   constructor(readonly identity: NativeArtifactIdentity, private readonly rpc: NativeRpc,
     readonly workspace: string, private readonly workspaceIdentity: string,
@@ -68,9 +70,14 @@ export class NativeAdoptionAdapter {
     private readonly onNativeClose?: () => void) {
     this.incarnation = incarnationOf(identity);
     activityJournal.assertRecovery(this.incarnation);
+    for (const { command, receipt } of activityJournal.recoveredEffects()) {
+      this.receipts.set(command.commandId, { digest: hash(command), receipt });
+      if (receipt.status === 'SUCCEEDED' && ['native.submit', 'native.steer'].includes(command.family) &&
+        incarnationOf(receipt.daemon) === this.incarnation) this.restoreInput(command, receipt);
+    }
     this.compatibility = { profile: 'UNSUPPORTED', observedAt: new Date().toISOString(),
       capabilities: Object.fromEntries(keys.map(key => [key, { available: false, evidence: 'NOT_OBSERVED' }])) as Compatibility['capabilities'] };
-    rpc.onEvent = message => { try { this.event(message); } catch { this.state = 'NATIVE_JOURNAL_UNPROVABLE'; this.controller = null; this.fence++; } };
+    rpc.onEvent = message => { try { this.event(message); } catch (error) { this.state = error instanceof Fault ? error.code : 'NATIVE_JOURNAL_UNPROVABLE'; this.controller = null; this.fence++; } };
     rpc.onClose = () => { this.state = 'NATIVE_CONNECTION_LOST'; this.controller = null; this.fence++; this.onNativeClose?.(); };
   }
   private serial<T>(operation: () => Promise<T>): Promise<T> {
@@ -88,30 +95,26 @@ export class NativeAdoptionAdapter {
     const list = await this.rpc.call('thread/list', { cwd: this.workspace, limit: 20 });
     requireThat(Array.isArray(list.data), 'NATIVE_THREAD_LIST_UNPROVABLE');
     this.capability('threadList', true, 'Live thread/list response; exact Workspace filter');
-    const missing = randomUUID();
-    // A nonexistent identity cannot authorize native effects. Only an explicit
-    // recognized-method, missing-thread rejection counts; arbitrary errors do not.
-    const probes: [CapabilityName, string, object][] = [
-      ['threadRead', 'thread/read', { threadId: missing }],
-      ['resume', 'thread/resume', { threadId: missing }],
-      ['turnStart', 'turn/start', { threadId: missing, input: [{ type: 'text', text: 'FleetSplice capability probe: nonexistent thread', text_elements: [] }] }],
-      ['activeTurn', 'thread/turns/list', { threadId: missing, limit: 1, itemsView: 'full' }],
-      ['interrupt', 'turn/interrupt', { threadId: missing, turnId: missing }],
-      ['steer', 'turn/steer', { threadId: missing, expectedTurnId: missing, input: [{ type: 'text', text: 'nonexistent thread probe', text_elements: [] }] }]
-    ];
-    for (const [name, method, params] of probes) {
+    const loaded = await this.loaded();
+    const candidate = list.data.find((thread: any) => loaded.has(thread.id) && thread.cwd?.toLowerCase() === this.workspace.toLowerCase());
+    if (candidate) {
       try {
-        await this.rpc.call(method, params);
-        this.state = 'NATIVE_PROBE_UNEXPECTED_SUCCESS'; throw new Fault(this.state);
+        const read = await this.rpc.call('thread/read', { threadId: candidate.id, includeTurns: false });
+        this.assertThread(read.thread, candidate.id);
+        this.capability('threadRead', true, 'Exact loaded thread/read(includeTurns=false); no subscription inferred');
+        const turns = await this.rpc.call('thread/turns/list', { threadId: candidate.id, limit: 1, itemsView: 'full' });
+        this.capability('activeTurn', Array.isArray(turns.data), 'Read-only bounded thread/turns/list');
       } catch (error) {
-        if (!(error instanceof NativeRpcError)) throw error;
-        const recognized = /(?:thread.*not found|no rollout found|thread.*does not exist|unknown thread|thread.*not loaded|conversation.*not found)/i.test(error.message)
-          && !/unknown (?:variant|method)|method not found/i.test(error.message);
-        this.capability(name, recognized, recognized ? `Live ${method}: nonexistent thread rejected before effect` : `Live ${method}: capability not proved (RPC ${error.code})`);
+        if (!(error instanceof NativeRpcError) || error.code !== -32601) throw error;
+        // A known missing observation method is compatibility evidence only.
       }
     }
     try { const models = await this.rpc.call('model/list', { limit: 1 }); this.capability('models', Array.isArray(models.data), 'Live model/list response'); } catch { /* Optional observation stays unavailable. */ }
-    this.capability('events', this.observedEvents, 'Native notification observed on this initialized connection; thread subscription still requires attach');
+    // Pinned official protocol has no independent loaded-thread subscribe or
+    // non-mutating effect-capability discovery. An unrelated notification is
+    // not proof of a thread subscription. Never probe resume/start/steer/etc.
+    for (const name of ['resume', 'events', 'turnStart', 'interrupt', 'steer'] as const)
+      this.capability(name, false, 'UNSUPPORTED_NON_MUTATING_OBSERVER: no qualified read-only subscription/control contract');
     this.revalidate();
     this.evidence.append('NATIVE_COMPATIBILITY', this.runtimeId, { identity: this.identity, compatibility: this.compatibility });
   }
@@ -178,7 +181,17 @@ export class NativeAdoptionAdapter {
     const threadId = p?.threadId ?? p?.thread?.id;
     const binding = this.threads.get(threadId);
     if (!binding || (!binding.view.attached && this.subscribingThread !== threadId)) return; // Never retain foreign thread payloads.
-    const mapped = mapCodexNotification(message, { sessionKey: this.runtimeId, revision: '0' });
+    const sourceId = typeof message.eventId === 'string' && message.eventId.length > 0 ? message.eventId : undefined;
+    if (sourceId) {
+      const key = `${threadId}:${sourceId}`; const digest = hash(message);
+      const prior = this.sourceEvents.get(key);
+      requireThat(!prior || prior === digest, 'NATIVE_EVENT_ID_CONFLICT');
+      if (prior) return;
+      this.sourceEvents.set(key, digest);
+      if (this.sourceEvents.size > 256) this.sourceEvents.delete(this.sourceEvents.keys().next().value!);
+    }
+    const mapped = mapCodexNotification(message, { sessionKey: this.runtimeId, revision: '0',
+      eventId: sourceId ? hash({ incarnation: this.incarnation, threadId, sourceId }) : undefined });
     if (mapped) {
       const published = this.realtime.publish(mapped);
       this.executionEvents.push({ ...mapped, revision: published.revision, eventId: published.eventId });
@@ -307,8 +320,23 @@ export class NativeAdoptionAdapter {
     for (const turn of [...turns].reverse()) {
       if (turn.status === 'interrupted') { interrupted.add(turn.id); this.activityJournal.interrupt(this.incarnation, threadId, turn.id); }
       const messages = turn.items.filter((item: any) => item.type === 'userMessage');
+      const owner = (message: any) => {
+        const echo = message.clientId;
+        let expected = typeof echo === 'string' ? this.ownedInputs.get(echo) : undefined;
+        // A locally admitted submit has a fresh, accepted native Turn ID. A
+        // single user item in that exact turn may be correlated without an
+        // echoed caller ID; equal text in any other turn never grants ownership.
+        if (echo == null && this.ownedTurns.has(turn.id) && messages.length === 1) {
+          const candidates = [...this.ownedInputs.values()].filter(input => input.threadId === threadId && input.turnId === turn.id);
+          if (candidates.length === 1) expected = candidates[0];
+        }
+        if (expected) requireThat(expected.threadId === threadId && expected.turnId === turn.id &&
+          message.content?.filter((item: any) => item.type === 'text').map((item: any) => item.text).join('\n') === expected.text,
+          'NATIVE_OWN_INPUT_CORRELATION_MISMATCH');
+        return expected;
+      };
       const externalMessages = messages.filter((message: any) => {
-        const expected = this.ownedInputs.get(message.clientId ?? message.id);
+        const expected = owner(message);
         if (!expected) return true;
         requireThat(expected.threadId === threadId && expected.turnId === turn.id &&
           message.content?.filter((item: any) => item.type === 'text').map((item: any) => item.text).join('\n') === expected.text,
@@ -319,7 +347,7 @@ export class NativeAdoptionAdapter {
       for (const item of turn.items) {
         if (item.type === 'userMessage' || item.type === 'agentMessage') {
           const text = item.type === 'agentMessage' ? item.text : item.content?.filter((x: any) => x.type === 'text').map((x: any) => x.text).join('\n');
-          const owned = item.type === 'userMessage' ? this.ownedInputs.get(item.clientId ?? item.id) : undefined;
+          const owned = item.type === 'userMessage' ? owner(item) : undefined;
           const source = owned ? { kind: 'FLEETSPLICE_WEB' as const, clientInstanceId: owned.clientInstanceId,
             ...(owned.clientDisplayLabel !== undefined ? { clientDisplayLabel: owned.clientDisplayLabel } : {}),
             ...(owned.deviceLabel !== undefined ? { deviceLabel: owned.deviceLabel } : {}) } : { kind: 'NATIVE_EXTERNAL' as const };
@@ -478,6 +506,7 @@ export class NativeAdoptionAdapter {
       daemon: this.identity, compatibility: this.compatibility, workspace: this.workspace,
       controller: this.controller, fence: this.fence, threads: [...this.threads.values()].map(b => b.view),
       receipts: [...this.receipts.values()].slice(-20).map(r => r.receipt), controlMode: 'COOPERATIVE', observationFailure: this.observationFailure,
+      observationContinuity: { nativeReplayCursor: null, coverage: 'INCOMPLETE', recovery: 'BOUNDED_RESNAPSHOT_REQUIRED' },
       approvals: this.approvals.views().map(view => ({ ...view, authority: this.state === 'READY' && this.controller &&
         this.controllerExpires > this.now() && this.threads.get(view.threadId)?.view.attached ? this.approvalAuthority(view.digest) : null })) }));
   }
@@ -545,7 +574,7 @@ export class NativeAdoptionAdapter {
             c.approval.authority === this.approvalAuthority(c.approval.digest), 'STALE_NATIVE_REQUEST');
           this.approvals.exact(c.approval);
         }
-        requireThat(this.compatibility.profile === 'ADOPT_FULL', 'NATIVE_ADOPT_FULL_REQUIRED');
+        requireThat(this.compatibility.profile === 'ADOPT_FULL', 'NATIVE_NON_MUTATING_OBSERVER_UNSUPPORTED');
         requireThat(this.threads.has(c.threadId) && (await this.loaded()).has(c.threadId), 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
         const isEffectFamily = c.family === 'native.submit' || c.family === 'native.steer' || c.family === 'native.interrupt';
         if (!isEffectFamily) {
@@ -557,15 +586,12 @@ export class NativeAdoptionAdapter {
           if (c.family === 'native.attach') {
             requireThat(!this.controller || this.controller === authenticatedClient, 'FLEET_CONTROLLER_ALREADY_HELD');
             requireThat(!binding.view.attached || this.controller !== authenticatedClient, 'NATIVE_ALREADY_ATTACHED_USE_REVIEW_STATE');
-            // Exact loaded ID only; no path, history, model or permission overrides.
+            requireThat(this.compatibility.capabilities.events.available, 'NATIVE_NON_MUTATING_OBSERVER_UNSUPPORTED');
             this.evidence.append('NATIVE_ATTACH_ATTEMPT', c.commandId, { command: c, daemon: this.identity, createdNativeThread: false });
-            this.subscribingThread = c.threadId;
-            const resumed = await this.rpc.call('thread/resume', { threadId: c.threadId, excludeTurns: true });
-            this.assertThread(resumed.thread, c.threadId);
             this.revalidate(); requireThat((await this.loaded()).has(c.threadId), 'NATIVE_EXACT_LOADED_THREAD_REQUIRED');
             binding.view.attached = true;
-            binding.view.permission = typeof resumed.approvalPolicy === 'string' && typeof resumed.sandbox?.type === 'string' ? `${resumed.sandbox.type} · approval=${resumed.approvalPolicy}` : null;
-            this.capability('effectiveState', !!binding.view.permission, 'Exact thread/resume response; no configuration overrides');
+            binding.view.permission = null;
+            this.capability('effectiveState', false, 'No qualified read-only effective permission source; never inferred from resume');
             await this.readThread(c.threadId, true);
             requireThat(this.state === 'READY', this.state);
             requireThat(expiresAt > this.now(), 'STALE_FLEET_CONTROLLER_FENCE');
@@ -582,7 +608,7 @@ export class NativeAdoptionAdapter {
               requireThat(this.controllerExpires > this.now() && c.expectedFence === this.fence &&
                 c.approval.authority === this.approvalAuthority(c.approval.digest), 'STALE_FLEET_CONTROLLER_FENCE');
               this.approvals.exact(c.approval);
-              this.evidence.append('NATIVE_EFFECT_ATTEMPT', c.commandId, { command: c, daemon: this.identity, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
+              this.activityJournal.attempt(c, this.identity);
               effectSent = true; this.fence++;
               await this.approvals.respond(c.approval, c.approval.decision, (id, result) => this.rpc.respond!(id, result));
               this.revalidate();
@@ -615,7 +641,7 @@ export class NativeAdoptionAdapter {
           const isSubmit = c.family === 'native.submit';
           requireThat(isSubmit ? binding.view.status === 'idle' && c.activeTurnId === null : binding.view.status === 'active' && !!c.activeTurnId, 'NATIVE_TURN_STATE_INCOMPATIBLE');
           requireThat(expiresAt > this.now() && this.controllerExpires > this.now() && this.controller === authenticatedClient && this.fence === c.expectedFence, 'STALE_FLEET_CONTROLLER_FENCE');
-          this.evidence.append('NATIVE_EFFECT_ATTEMPT', c.commandId, { command: c, daemon: this.identity, origin: 'NATIVE_ADOPTED', createdNativeThread: false });
+          this.activityJournal.attempt(c, this.identity);
           effectSent = true; this.effectPending = true; this.fence++;
           if (c.family !== 'native.interrupt') this.ownedInputs.set(c.commandId, { threadId: c.threadId, turnId: c.activeTurnId, text: c.text,
             clientInstanceId: authenticatedClient, clientDisplayLabel: c.clientDisplayLabel, deviceLabel: c.deviceLabel });
@@ -644,7 +670,7 @@ export class NativeAdoptionAdapter {
       } finally { this.effectPending = false; this.subscribingThread = null; }
       const receipt: AdoptionReceipt = { commandId: c.commandId, family: c.family, status, code, daemon: this.identity,
         threadId: c.threadId, turnId, origin: 'NATIVE_ADOPTED', createdNativeThread: false, processTerminationClaim: false };
-      try { this.evidence.append('NATIVE_ADOPTION_RECEIPT', c.commandId, receipt); }
+      try { this.activityJournal.receipt(receipt); }
       catch { this.state = 'NATIVE_JOURNAL_UNPROVABLE'; this.controller = null; this.fence++; throw new Fault(this.state); }
       this.receipts.set(c.commandId, { digest, receipt });
       // Publish controller/fence/review authority changes on the Fleet Control stream so

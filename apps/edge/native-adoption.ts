@@ -15,15 +15,10 @@ export type NativeEdgeCustodyOptions = { custody?: NativeServerCustody; executab
 export async function nativeAdoptionEdge(workspace: string, stateDirectory: string, options: NativeEdgeCustodyOptions = {}) {
   const root = rootProofNow(workspace);
   const journal = new Journal(path.join(stateDirectory, 'native-edge.sqlite'));
-  // Cold restart does not replay or forget any possibly dispatched operation.
-  const attempts = journal.db.prepare("SELECT key,value FROM evidence WHERE kind='NATIVE_EFFECT_ATTEMPT'").all();
-  const provenance: { command: any; receipt: any }[] = [];
-  for (const attempt of attempts) {
-    const receipt = journal.db.prepare("SELECT value FROM evidence WHERE kind='NATIVE_ADOPTION_RECEIPT' AND key=? ORDER BY seq DESC LIMIT 1").get(attempt.key!);
-    requireThat(receipt && JSON.parse(String(receipt.value)).status === 'SUCCEEDED', 'NATIVE_PREDECESSOR_EFFECT_UNKNOWN_NO_REPLAY');
-    const command = JSON.parse(String(attempt.value)).command;
-    if (['native.submit', 'native.steer'].includes(command?.family)) provenance.push({ command, receipt: JSON.parse(String(receipt.value)) });
-  }
+  const activity = new NativeActivityJournal(journal);
+  // Use the same ordered/identity-bound evidence before any connection, and
+  // later in the adapter's recovery. Unknown predecessors never reach transport.
+  try { activity.recoveredEffects(); } catch (error) { journal.close(); throw error; }
   const custody = options.custody ?? 'CODEX_MANAGED_DAEMON';
   requireThat(custody === 'CODEX_MANAGED_DAEMON' || custody === 'AGENT_SUPERVISED', 'NATIVE_SERVER_CUSTODY_INVALID');
   if (custody === 'AGENT_SUPERVISED') requireThat(!!options.executable, 'NATIVE_SUPERVISED_EXECUTABLE_REQUIRED');
@@ -40,10 +35,9 @@ export async function nativeAdoptionEdge(workspace: string, stateDirectory: stri
   const identityNow = supervisor ? () => supervisor.assertCurrent(identity) : discoverDaemon;
   let adapter: NativeAdoptionAdapter;
   try {
-    adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, identityNow, () => rootProofNow(root.root), journal, new NativeActivityJournal(journal), Date.now, 20_000, options.onNativeClose);
+    adapter = new NativeAdoptionAdapter(identity, rpc, root.root, root.rootIdentity, identityNow, () => rootProofNow(root.root), journal, activity, Date.now, 20_000, options.onNativeClose);
   } catch (error) { rpc.close(); await supervisor?.stop(); journal.close(); throw error; }
   try {
-    for (const input of provenance) adapter.restoreInput(input.command, input.receipt);
     const initialized = await rpc.call('initialize', { clientInfo: { name: 'fleetsplice_native_adoption', version: '0.1.0' }, capabilities: { experimentalApi: true } });
     requireThat(typeof initialized.codexHome === 'string' && initialized.codexHome.toLowerCase() ===
       (options.environment?.CODEX_HOME ? path.resolve(options.environment.CODEX_HOME) : nativeHome()).toLowerCase(), 'NATIVE_SERVER_HOME_MISMATCH');

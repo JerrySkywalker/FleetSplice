@@ -36,7 +36,16 @@ export function discoverDaemon(): NativeArtifactIdentity {
   const endpoint = path.join(home, 'app-server-control', 'app-server-control.sock');
   requireThat(path.resolve(status.socketPath).toLowerCase() === endpoint.toLowerCase(), 'NATIVE_ENDPOINT_UNQUALIFIED');
   // This Windows backend's official PID record binds PID to native FILETIME.
-  const pidState = JSON.parse(readFileSync(path.join(home, 'app-server-daemon', 'app-server.pid'), 'utf8'));
+  const installation = path.resolve(status.managedCodexPath).toLowerCase();
+  const legacyRoot = path.join(home, 'packages', 'standalone').toLowerCase() + path.sep;
+  const daemonRoot = path.join(home, 'packages', 'app-server-daemon').toLowerCase() + path.sep;
+  requireThat(installation.startsWith(legacyRoot) || installation.startsWith(daemonRoot), 'NATIVE_DAEMON_INSTALLATION_FAMILY_UNSUPPORTED');
+  const pidFile = installation.startsWith(legacyRoot) ? 'app-server.pid' : 'daemon.pid';
+  let pidState: any;
+  try { pidState = JSON.parse(readFileSync(path.join(home, 'app-server-daemon', pidFile), 'utf8')); }
+  catch { throw new Error('NATIVE_DAEMON_PID_UNPROVABLE'); }
+  // The official installation family chooses its PID namespace. Never fall
+  // back to the other file: it may belong to a previous installation.
   requireThat(Number.isSafeInteger(pidState.pid) && pidState.pid > 0 && /^\d+$/.test(pidState.processStartTime), 'NATIVE_DAEMON_PID_UNPROVABLE');
   const executable = realpathSync.native(status.managedCodexPath);
   const script = `$ErrorActionPreference='Stop'
@@ -54,8 +63,8 @@ $nativeSocket=[System.IO.FileInfo]::new(${quote(endpoint)})
 if(-not $nativeSocket.Exists -or -not ($nativeSocket.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'NATIVE_ENDPOINT_UNQUALIFIED'}
 @{pid=$nativeProcess.Id;created=$nativeProcess.StartTime.ToUniversalTime().ToFileTimeUtc().ToString();executable=$nativeCim.ExecutablePath;command=$nativeCim.CommandLine;endpointCreated=$nativeSocket.CreationTimeUtc.ToFileTimeUtc().ToString()}|ConvertTo-Json -Compress`;
   const proof = JSON.parse(execFileSync(ps, ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 12000, maxBuffer: 65536 }));
-  requireThat(proof.created === pidState.processStartTime && realpathSync.native(proof.executable).toLowerCase() === executable.toLowerCase(), 'NATIVE_SERVER_INCARCATION_CHANGED');
-  requireThat(typeof proof.command === 'string' && /\sapp-server\s+--listen\s+unix:\/\/\s*$/.test(proof.command), 'NATIVE_DAEMON_PROCESS_UNQUALIFIED');
+  requireThat(proof.pid === pidState.pid && proof.created === pidState.processStartTime && realpathSync.native(proof.executable).toLowerCase() === executable.toLowerCase(), 'NATIVE_SERVER_INCARCATION_CHANGED');
+  requireThat(typeof proof.command === 'string' && /\sapp-server\s+(?:--remote-control\s+)?--listen\s+unix:\/\/(?:\s+--managed-daemon)?\s*$/.test(proof.command), 'NATIVE_DAEMON_PROCESS_UNQUALIFIED');
   requireThat(!lstatSync(path.dirname(endpoint)).isSymbolicLink(), 'NATIVE_ENDPOINT_UNQUALIFIED');
   // Node lstat cannot open Windows AF_UNIX reparse points. Read endpoint
   // creation metadata via the Windows API without opening the socket as a file.

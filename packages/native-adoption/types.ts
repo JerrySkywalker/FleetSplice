@@ -50,6 +50,7 @@ export type AdoptionReceipt = {
 export type AdoptionSnapshot = {
   runtimeId: string; state: string; incarnation: string; daemon: NativeArtifactIdentity;
   compatibility: Compatibility; workspace: string; controller: string | null; fence: number;
+  observationContinuity?: { nativeReplayCursor: null; coverage: 'INCOMPLETE'; recovery: 'BOUNDED_RESNAPSHOT_REQUIRED' };
   threads: NativeThread[]; receipts: AdoptionReceipt[]; controlMode: 'COOPERATIVE';
   observationFailure: {
     observedAt: string; phase: string; code: string; errorClass: string;

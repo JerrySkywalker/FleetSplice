@@ -43,6 +43,7 @@ export function SessionQuickSwitcher({ threads, selected, onSelect, locale, rece
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !event.isComposing && event.keyCode !== 229) {
+        if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
         event.preventDefault(); if (!event.repeat) open();
       }
     };
@@ -51,7 +52,7 @@ export function SessionQuickSwitcher({ threads, selected, onSelect, locale, rece
   return <>
     <button type="button" ref={trigger} className="ghost-button quick-switch-trigger" data-testid="quick-switch-trigger" aria-keyshortcuts="Control+k Meta+k"
       onClick={open}><Search size={16} aria-hidden="true" /><span>{zh ? '切换会话' : 'Switch session'}</span><kbd>⌘/Ctrl K</kbd></button>
-    <dialog ref={dialog} className="session-switcher" aria-label={zh ? '切换会话' : 'Switch session'} onCancel={() => trigger.current?.focus()}>
+    <dialog ref={dialog} className="session-switcher" aria-label={zh ? '切换会话' : 'Switch session'} onCancel={event => { event.preventDefault(); close(); }}>
       <div className="switcher-heading"><strong>{zh ? '切换会话' : 'Switch session'}</strong><button type="button" className="icon-button" onClick={close} aria-label={zh ? '关闭切换器' : 'Close switcher'}><X size={18} aria-hidden="true" /></button></div>
       <input ref={search} type="search" role="combobox" aria-expanded="true" aria-controls={listId} aria-autocomplete="list"
         aria-activedescendant={matches[active] ? `${listId}-${active}` : undefined} aria-label={zh ? '搜索会话' : 'Search sessions'}

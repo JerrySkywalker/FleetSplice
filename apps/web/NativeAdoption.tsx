@@ -43,6 +43,11 @@ type SnapshotCausalityRow = {
   at: number;
   url: string;
 };
+type SessionProvisional = ProvisionalMessage & { threadId: string; incarnation: string; nativeTurnId: string | null; draftKey: string };
+function observedProvisional(provisional: SessionProvisional | null, thread: AdoptionSnapshot['threads'][number] | undefined, incarnation: string | undefined, clientId: string) {
+  return !!provisional && !!thread && provisional.threadId === thread.id && provisional.incarnation === incarnation && !!provisional.nativeTurnId &&
+    correlateProvisional(provisional, thread.history.filter(item => item.turnId === provisional.nativeTurnId), clientId);
+}
 
 type SnapshotAuditSurface = {
   networkSnapshots: SnapshotCausalityRow[];
@@ -87,11 +92,14 @@ export function NativeAdoption({ client, request, locale, preferences }: {
   const [selected, setSelected] = useState('');
   const [recentSessions, setRecentSessions] = useState<string[]>([]);
   const [navigationRevision, setNavigationRevision] = useState(0);
-  const [text, setText] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(sessionStorage.getItem('fleetsplice.native.drafts') ?? '{}'); } catch { return {}; }
+  });
   const [error, setError] = useState('');
+  const [commandErrorThread, setCommandErrorThread] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<AdoptionCommand | null>(() => { try { return JSON.parse(sessionStorage.getItem('fleetsplice.native.pending') ?? 'null'); } catch { return null; } });
-  const [provisional, setProvisional] = useState<ProvisionalMessage | null>(() => {
+  const [provisional, setProvisional] = useState<SessionProvisional | null>(() => {
     try { return JSON.parse(sessionStorage.getItem('fleetsplice.native.provisional') ?? 'null'); } catch { return null; }
   });
   const [liveTimeline, setLiveTimeline] = useState<TimelinePresentationItem[]>([]);
@@ -154,7 +162,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       setLiveTimeline(current => retireLiveWhenAuthoritative(current, history, activity));
       setProvisional(current => {
         if (!current || !['native.submit', 'native.steer'].includes(current.family)) return current;
-        const observed = (next.threads ?? []).some((item: any) => correlateProvisional(current, item.history ?? [], client.clientInstanceId));
+        const observed = observedProvisional(current, next.threads.find((item: any) => item.id === current.threadId), next.incarnation, client.clientInstanceId);
         if (!observed) return current;
         const advanced = { ...current, state: advancePresentation(current.state, { status: 'SUCCEEDED' }, true) as PresentationCommandState };
         if (advanced.state === 'OBSERVED') {
@@ -165,7 +173,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         return advanced;
       });
     }
-    catch (e) { if (requestId === observationRequest.current) { setError(e instanceof Error ? e.message : 'NATIVE_OBSERVATION_LOST'); setSnapshot(old => old ? { ...old, state: 'NATIVE_OBSERVATION_LOST' } : old); } }
+    catch (e) { if (requestId === observationRequest.current) { setCommandErrorThread(null); setError(e instanceof Error ? e.message : 'NATIVE_OBSERVATION_LOST'); setSnapshot(old => old ? { ...old, state: 'NATIVE_OBSERVATION_LOST' } : old); } }
   }
   function refresh(discover = false) {
     const scheduler = schedulerRef.current;
@@ -248,29 +256,42 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     };
   }, []);
   const thread = snapshot?.threads.find(item => item.id === selected) ?? snapshot?.threads[0];
+  const draftKey = thread ? `${snapshot!.incarnation}:${thread.workspaceIdentity}:${thread.id}` : '';
+  const text = drafts[draftKey] ?? '';
+  function setDraft(key: string, value: string) {
+    setDrafts(current => {
+      const next = { ...current, [key]: value };
+      if (!value) delete next[key];
+      try { sessionStorage.setItem('fleetsplice.native.drafts', JSON.stringify(next)); } catch { /* Draft remains usable for this page. */ }
+      return next;
+    });
+  }
   const controlled = snapshot?.controller === client.clientInstanceId;
   const available = snapshot?.state === 'READY' && snapshot.compatibility.profile === 'ADOPT_FULL' && !busy && !pending && client.expiresAt > Date.now();
   const canControl = available && controlled && thread?.attached && !thread.externalAdvance;
   const interrupt = snapshot?.compatibility.capabilities.interrupt.available;
   const steer = snapshot?.compatibility.capabilities.steer.available;
-  function persistProvisional(value: ProvisionalMessage | null) {
+  function persistProvisional(value: SessionProvisional | null) {
     setProvisional(value);
     if (value) sessionStorage.setItem('fleetsplice.native.provisional', JSON.stringify(value));
     else sessionStorage.removeItem('fleetsplice.native.provisional');
   }
-  function receiptObserved(receipt: AdoptionReceipt) {
+  function receiptObserved(receipt: AdoptionReceipt, submittedDraftKey?: string) {
     sessionStorage.removeItem('fleetsplice.native.pending'); setPending(null);
+    setCommandErrorThread(receipt.threadId);
     setError(receipt.status === 'SUCCEEDED' ? '' : `${receipt.status}: ${receipt.code}`);
     setProvisional(current => {
       if (!current || current.commandId !== receipt.commandId) return current;
-      const observed = correlateProvisional(current, thread?.history ?? [], client.clientInstanceId);
+      const correlated = { ...current, nativeTurnId: receipt.status === 'SUCCEEDED' ? receipt.turnId : current.nativeTurnId };
+      const observed = observedProvisional(correlated, snapshot?.threads.find(item => item.id === current.threadId), snapshot?.incarnation, client.clientInstanceId);
       const state = advancePresentation(current.state, receipt, observed);
       if (state === 'OBSERVED') { sessionStorage.removeItem('fleetsplice.native.provisional'); return null; }
-      const next = { ...current, state };
+      const next = { ...correlated, state };
       sessionStorage.setItem('fleetsplice.native.provisional', JSON.stringify(next));
       return next;
     });
-    if (receipt.status === 'SUCCEEDED' && ['native.submit', 'native.steer'].includes(receipt.family)) setText('');
+    const completedDraft = submittedDraftKey ?? (provisional?.commandId === receipt.commandId ? provisional.draftKey : null);
+    if (completedDraft && receipt.status === 'SUCCEEDED' && ['native.submit', 'native.steer'].includes(receipt.family)) setDraft(completedDraft, '');
   }
   async function command(family: AdoptionCommand['family'], approval?: AdoptionCommand['approval']) {
     if (!available || !snapshot || !thread) return;
@@ -278,9 +299,10 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       incarnation: snapshot.incarnation, clientInstanceId: client.clientInstanceId, expectedFence: snapshot.fence,
       threadId: thread.id, stateToken: thread.stateToken, activeTurnId: thread.activeTurnId, family, text: ['native.submit', 'native.steer'].includes(family) ? text : '' };
     if (approval) value.approval = approval;
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setCommandErrorThread(value.threadId);
     if (family === 'native.submit' || family === 'native.steer') {
-      timerRef.current.measure('local_echo', () => persistProvisional(createProvisional(value.commandId, family, value.text)));
+      timerRef.current.measure('local_echo', () => persistProvisional({ ...createProvisional(value.commandId, family, value.text),
+        threadId: value.threadId, incarnation: value.incarnation, nativeTurnId: null, draftKey }));
     }
     try {
       sessionStorage.setItem('fleetsplice.native.pending', JSON.stringify(value)); setPending(value);
@@ -288,7 +310,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
       const commandWindowStart = Date.now();
       const receipt = await timerRef.current.measureAsync('command_send', () => request('/api/native/commands', value));
       timerRef.current.record('receipt', sendStarted, performance.now());
-      receiptObserved(receipt);
+      receiptObserved(receipt, ['native.submit', 'native.steer'].includes(family) ? draftKey : undefined);
       await timerRef.current.measureAsync('final_reconciliation', async () => {
         const scheduler = schedulerRef.current;
         if (scheduler) {
@@ -328,12 +350,14 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         await scheduler.whenIdle();
       } else await applySnapshot(false, ['command']);
     }
-    catch (e) { setError(e instanceof Error ? e.message : 'COMMAND_UNKNOWN_NO_REPLAY'); }
+    catch (e) { setCommandErrorThread(pending.threadId); setError(e instanceof Error ? e.message : 'COMMAND_UNKNOWN_NO_REPLAY'); }
     finally { setBusy(false); }
   }
-  const showProvisional = provisional && provisional.state !== 'OBSERVED'
-    && !correlateProvisional(provisional, thread?.history ?? [], client.clientInstanceId);
-  const outcomeUnknown = provisional?.state === 'OUTCOME_UNKNOWN' || provisional?.state === 'AMBIGUOUS_EFFECT' || (!!pending && !!error && /Outcome unknown|结果未知/.test(error));
+  const provisionalHere = !!provisional && provisional.threadId === thread?.id && provisional.incarnation === snapshot?.incarnation;
+  const pendingHere = !!pending && pending.threadId === thread?.id && pending.incarnation === snapshot?.incarnation;
+  const showProvisional = provisionalHere && provisional && provisional.state !== 'OBSERVED'
+    && !observedProvisional(provisional, thread, snapshot?.incarnation, client.clientInstanceId);
+  const outcomeUnknown = (provisionalHere && (provisional?.state === 'OUTCOME_UNKNOWN' || provisional?.state === 'AMBIGUOUS_EFFECT')) || (pendingHere && !!error && /Outcome unknown|结果未知/.test(error));
   const mode = controlSurfaceMode({
     attached: !!thread?.attached,
     controlled,
@@ -350,8 +374,8 @@ export function NativeAdoption({ client, request, locale, preferences }: {
     node.scrollTo({ top: node.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
   }, [thread?.history.length, liveTimeline.length, showProvisional, provisional?.state]);
 
-  const liveMessages = liveTimeline.filter(item => item.kind === 'message.delta' || item.kind === 'message.final');
-  const liveTools = liveTimeline.filter(item => item.kind.startsWith('tool.'));
+  const liveMessages = liveTimeline.filter(item => item.threadId === thread?.id && (item.kind === 'message.delta' || item.kind === 'message.final'));
+  const liveTools = liveTimeline.filter(item => item.threadId === thread?.id && item.kind.startsWith('tool.'));
   const mutationHint = t(
     'Native Adoption shows observed effective configuration only. This runtime does not provide a structured model/reasoning/permission mutation API.',
     '原生会话仅显示已观察的有效配置。此运行时未提供结构化的模型/推理/权限变更接口。',
@@ -376,7 +400,11 @@ export function NativeAdoption({ client, request, locale, preferences }: {
         <h1>{thread ? t('Codex · Native session', 'Codex · 原生会话') : t('Native sessions', '原生会话')}</h1>
         <div className="subtitle">{thread?.workspace}</div>
       </div><span className="status">{thread?.activeTurnId && thread.turns.find(turn => turn.id === thread.activeTurnId) ? <TurnStatus turn={thread.turns.find(turn => turn.id === thread.activeTurnId)!} locale={locale} live={snapshot?.state === 'READY'}/> : thread?.status ?? 'WAITING'}</span></div>
-      {(error || (snapshot && snapshot.state !== 'READY')) && <div role="alert" className={`alert severity-${observationSeverity(snapshot?.state)}`} data-severity={observationSeverity(snapshot?.state)}>{error || snapshot?.state}</div>}
+      {pending && !pendingHere && <div className="alert" role="status" data-testid="other-thread-pending">
+        {t('A command for another thread awaits its receipt. Controls remain paused.', '另一个线程的命令正在等待回执，控制操作保持暂停。')}
+        <button type="button" onClick={() => selectSession(pending.threadId)}>{t('View thread', '查看线程')} {pending.threadId}</button>
+      </div>}
+      {((error && (!commandErrorThread || commandErrorThread === thread?.id)) || (snapshot && snapshot.state !== 'READY')) && <div role="alert" className={`alert severity-${observationSeverity(snapshot?.state)}`} data-severity={observationSeverity(snapshot?.state)}>{(!commandErrorThread || commandErrorThread === thread?.id ? error : '') || snapshot?.state}</div>}
       {(pending || mode === 'receipt_lookup') && <div className="pending severity-attention" data-severity="attention">{t('Pending command receipt', '等待命令回执')} <code>{pending?.commandId ?? provisional?.commandId}</code><button disabled={busy || !pending} onClick={lookup}>{t('Check receipt', '查询回执')}</button></div>}
       {thread?.externalAdvance && <ReviewCard
         title={t('Native session changed outside this Web controller.', '原生会话已在此网页控制器之外更新。')}
@@ -449,7 +477,7 @@ export function NativeAdoption({ client, request, locale, preferences }: {
           placeholder={t('Message Codex…', '发送给 Codex…')}
           maxLength={16000}
           value={text}
-          onChange={event => setText(event.target.value)}
+          onChange={event => setDraft(draftKey, event.target.value)}
           disabled={!canControl || mode === 'review' || mode === 'receipt_lookup'}
           rows={1}
         />

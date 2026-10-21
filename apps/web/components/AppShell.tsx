@@ -115,6 +115,9 @@ export function AppShell({
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
   const navCloseRef = useRef<HTMLButtonElement>(null);
   const contextCloseRef = useRef<HTMLButtonElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const navDrawerRef = useRef<HTMLDivElement>(null);
+  const contextDrawerRef = useRef<HTMLDivElement>(null);
   const desktop = breakpoint === 'desktop';
   const showDrawers = !desktop;
 
@@ -145,7 +148,32 @@ export function AppShell({
     if (contextOpen) contextCloseRef.current?.focus();
   }, [contextOpen]);
 
+  useEffect(() => {
+    const drawer = navOpen ? navDrawerRef.current : contextOpen ? contextDrawerRef.current : null;
+    const shell = shellRef.current;
+    if (!drawer || !shell) return;
+    const background = [...shell.children, ...(shell.parentElement?.children ?? [])]
+      .filter((node): node is HTMLElement => node instanceof HTMLElement && node !== shell && node !== drawer && !node.classList.contains('drawer-backdrop'));
+    const prior = background.map(node => [node, node.inert] as const);
+    for (const node of background) node.inert = true;
+    const containFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const controls = [...drawer.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]')]
+        .filter(node => node.getClientRects().length > 0);
+      const first = controls[0]; const last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    window.addEventListener('keydown', containFocus);
+    return () => {
+      window.removeEventListener('keydown', containFocus);
+      for (const [node, wasInert] of prior) node.inert = wasInert;
+      (navOpen ? navTriggerRef : contextTriggerRef).current?.focus();
+    };
+  }, [navOpen, contextOpen]);
+
   return <div
+    ref={shellRef}
     className={`shell product-shell breakpoint-${breakpoint}`}
     data-testid="app-shell"
     data-breakpoint={breakpoint}
@@ -208,7 +236,7 @@ export function AppShell({
 
     {showDrawers && navOpen && <>
       <div className="drawer-backdrop" data-testid="nav-backdrop" onClick={() => { setNavOpen(false); navTriggerRef.current?.focus(); }} />
-      <div className="drawer drawer-nav" role="dialog" aria-modal="true" aria-label={navTitle} data-testid="nav-drawer">
+      <div ref={navDrawerRef} className="drawer drawer-nav" role="dialog" aria-modal="true" aria-label={navTitle} data-testid="nav-drawer">
         <div className="drawer-toolbar"><strong>{navTitle}</strong>
           <button type="button" ref={navCloseRef} aria-label="Close sessions" onClick={() => { setNavOpen(false); navTriggerRef.current?.focus(); }}>
             <X size={16} aria-hidden="true" /> Close
@@ -218,7 +246,7 @@ export function AppShell({
     </>}
     {showDrawers && contextOpen && <>
       <div className="drawer-backdrop" data-testid="context-backdrop" onClick={() => { setContextOpen(false); contextTriggerRef.current?.focus(); }} />
-      <div className="drawer drawer-context" role="dialog" aria-modal="true" aria-label={contextTitle} data-testid="context-drawer">
+      <div ref={contextDrawerRef} className="drawer drawer-context" role="dialog" aria-modal="true" aria-label={contextTitle} data-testid="context-drawer">
         <div className="drawer-toolbar"><strong>{contextTitle}</strong>
           <button type="button" ref={contextCloseRef} aria-label="Close context" onClick={() => { setContextOpen(false); contextTriggerRef.current?.focus(); }}>
             <X size={16} aria-hidden="true" /> Close

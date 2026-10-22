@@ -18,9 +18,9 @@ export type EphemeralTlsMaterial = {
  * historical fixture expiry from changing test results. Requires OpenSSL on
  * PATH; never installs trust or creates production certificates.
  */
-export function createEphemeralTlsMaterial(hostname = 'localhost'): EphemeralTlsMaterial {
+export function createEphemeralTlsMaterial(hostname = 'localhost', temporaryRoot = tmpdir()): EphemeralTlsMaterial {
   requireThat(hostname === 'localhost', 'EPHEMERAL_TLS_HOSTNAME_FIXED_FOR_FIXTURE');
-  const directory = mkdtempSync(path.join(tmpdir(), 'fleetsplice-local-test-tls-'));
+  const directory = mkdtempSync(path.join(temporaryRoot, 'fleetsplice-local-test-tls-'));
   const key = path.join(directory, 'key.pem'), cert = path.join(directory, 'cert.pem');
   const config = path.join(directory, 'openssl.cnf');
   try {
@@ -28,7 +28,7 @@ export function createEphemeralTlsMaterial(hostname = 'localhost'): EphemeralTls
     try {
       execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2',
         '-config', config,
-        '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost',
+        '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1',
         '-keyout', key, '-out', cert], { windowsHide: true, stdio: 'pipe', timeout: 20000 });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {

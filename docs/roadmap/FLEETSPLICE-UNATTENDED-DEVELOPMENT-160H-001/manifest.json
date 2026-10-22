@@ -114,8 +114,9 @@
         "U04",
         "U05"
       ],
-      "state": "NOT_STARTED",
-      "planned_hours": 12
+      "state": "SOURCE_COMPLETE",
+      "planned_hours": 12,
+      "receipt": "docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/receipts/U07.md"
     },
     {
       "short_id": "U08",
@@ -125,8 +126,9 @@
       "deps": [
         "U07"
       ],
-      "state": "NOT_STARTED",
-      "planned_hours": 8
+      "state": "SOURCE_COMPLETE",
+      "planned_hours": 8,
+      "receipt": "docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/receipts/U08.md"
     },
     {
       "short_id": "U09",

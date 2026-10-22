@@ -1,14 +1,14 @@
 # FLEETSPLICE-U160-U07-001 — 隔离产品链路联调
 
-状态NOT_STARTED；单项计划上限12h，不要求耗尽。依赖U03, U04, U05。
+状态SOURCE_COMPLETE；单项计划上限12h，不要求耗尽。依赖U03, U04, U05。
 
 总授权/160h截止见[执行契约](../../docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/EXECUTION-CONTRACT.md)。实现依据[已接受Architecture0.1](../../docs/architecture/baseline-0.1.md)、[G04A](../../docs/architecture/amendments/g04a-visible-mvp-simplification.md)、[Owner产品边界](../../docs/product/owner-thesis.md)和[design.md](../../docs/ux/design.md)。不是IDE/ADE。
 
 ## 可见交付与清单
 
-- [ ] 复用真实Hub/Edge、认证/通信/回执代码，仅Native端明确替换为合成Port。
-- [ ] 验证登录→目标→会话→模拟操作→断线/过期→回执的完整流。
-- [ ] 保持未知不重放、Viewer不能写、身份切换不串目标；不加入生产mock开关。
+- [x] 复用真实Hub/Edge、认证/通信/回执代码，仅Native端明确替换为合成Port。
+- [x] 验证登录→目标→会话→模拟操作→断线/过期→回执的完整流。
+- [x] 保持未知不重放、Viewer不能写、身份切换不串目标；不加入生产mock开关。
 
 ## 文件所有权与最小检查
 
@@ -23,3 +23,7 @@ SOURCE_COMPLETE需要实际源码/产物与受影响检查，不能仅凭文件�
 真实Native connections/effects=0/0；不发现或连接现有Codex端点、不复用旧许可、不启动普通Desktop/现有Agent；不改Profile、全局工具链、daemon或生产，不发布部署main，不启动G07/G08，不选择最终B2/B3/C路线。
 
 每Goal写本程序receipts/U07.md，包含准确base/head/PR、范围、实际检查、证据、阻碍和下一项；私有日志/URL/token/截图只放本程序artifacts。SOURCE_COMPLETE不是H0-H4或Gate S通过。
+
+## 本次回执
+
+[U07](../../docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/receipts/U07.md)。源码状态不授予人工或Native通过。

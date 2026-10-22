@@ -1,0 +1,7 @@
+{
+  "id": "fs-contract-parity-pilot",
+  "name": "FleetSplice parity pilot — mock only",
+  "version": "0.0.1",
+  "requirements": {"paseo": "^0.12.0"},
+  "description": "Isolated research fixture; never install in a daily Paseo daemon."
+}

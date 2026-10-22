@@ -197,7 +197,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         const authenticatedSession = session(req);
         if (req.method === 'POST' && req.url === '/api/auth/logout') {
           for (const [id, client] of clients) if (client.session === authenticatedSession) clients.delete(id);
-          sessions.delete(authenticatedSession); res.setHeader('Set-Cookie', `${cookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`); json(res, 200, { loggedOut: true }); return;
+          sessions.delete(authenticatedSession); res.setHeader('Set-Cookie', `${cookieName}=; ${oidc && deployment.kind !== 'LOOPBACK' ? 'Secure; ' : ''}HttpOnly; SameSite=Strict; Path=/; Max-Age=0`); json(res, 200, { loggedOut: true }); return;
         }
         if (req.method === 'GET' && req.url === '/api/auth/principal') {
           const principal = sessions.get(authenticatedSession)!.principal; json(res, 200, { principal, mode: oidc ? 'OIDC' : 'LOOPBACK_BOOTSTRAP' }); return;

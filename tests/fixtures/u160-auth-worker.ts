@@ -51,6 +51,9 @@ const hub = await startHub({ port, target: target(), root: 'V:\\u160-synthetic',
 process.send!({ kind: 'ready', origin });
 process.on('message', async (message: { kind: string; id: number }) => {
   if (message.kind === 'expire') clock += 8 * 60 * 60_000 + 1;
-  if (message.kind === 'counters' || message.kind === 'expire') process.send!({ kind: 'reply', id: message.id, exchanges, ...fixture.counters() });
+  if (message.kind === 'idle14') clock += 14 * 60_000;
+  if (message.kind === 'idle2') clock += 2 * 60_000;
+  if (message.kind === 'unknown') fixture.setScenario('unknown');
+  if (message.kind !== 'stop') process.send!({ kind: 'reply', id: message.id, exchanges, ...fixture.counters() });
   if (message.kind === 'stop') { fixture.close(); await hub.close(); idp.closeAllConnections(); await new Promise<void>(resolve => idp.close(() => resolve())); process.exit(0); }
 });

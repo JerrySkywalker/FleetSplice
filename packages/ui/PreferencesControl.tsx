@@ -6,9 +6,10 @@ import { Settings } from 'lucide-react';
 import { translate, type Locale } from './i18n.ts';
 import type { Appearance } from './preferences.ts';
 
-export function PreferencesControl({ locale, appearance, saved, onLocale, onAppearance }: {
+export function PreferencesControl({ locale, appearance, saved, onLocale, onAppearance, sessionAction }: {
   locale: Locale; appearance: Appearance; saved: boolean;
   onLocale: (value: Locale) => void; onAppearance: (value: Appearance) => void;
+  sessionAction?: React.ReactNode;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -33,7 +34,7 @@ export function PreferencesControl({ locale, appearance, saved, onLocale, onAppe
         </label>
       </div>
       <p role="status" className="text-sm text-muted-foreground">{t(saved ? 'preferencesLocal' : 'preferencesUnavailable')}</p>
-      <DialogFooter><DialogClose render={<Button variant="outline"/>}>{t('close')}</DialogClose></DialogFooter>
+      <DialogFooter>{sessionAction}<DialogClose render={<Button variant="outline"/>}>{t('close')}</DialogClose></DialogFooter>
     </DialogContent>
   </Dialog>;
 }

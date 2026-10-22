@@ -13,7 +13,7 @@ export async function authFixture(directory: string) {
   child.stdout!.pipe(log); child.stderr!.pipe(log);
   const ready = await Promise.race([once(child, 'message').then(([value]) => value as { origin: string }), once(child, 'exit').then(([code]) => { throw Error(`AUTH_FIXTURE_EXIT_${code}`); })]);
   let id = 0;
-  return { origin: ready.origin, async control(kind: 'counters' | 'expire' | 'idle14' | 'idle2' | 'unknown' | 'otherOwner') {
+  return { origin: ready.origin, async control(kind: 'counters' | 'expire' | 'idle14' | 'idle2' | 'unknown' | 'otherOwner' | 'holdLogin') {
     const wanted = ++id;
     return await new Promise<Record<string, number>>(resolve => { const listener = (value: any) => { if (value.id === wanted) { child.off('message', listener); resolve(value); } }; child.on('message', listener); child.send({ kind, id: wanted }); });
   }, async close() { child.send({ kind: 'stop' }); await once(child, 'exit'); log.end(); } };

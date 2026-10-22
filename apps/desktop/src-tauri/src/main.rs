@@ -4,6 +4,7 @@ use std::os::windows::process::CommandExt;
 use serde_json::{json, Value};
 use tauri::{menu::{Menu, MenuItem}, tray::TrayIconBuilder, Manager};
 use tauri_plugin_autostart::ManagerExt;
+use fleetsplice_desktop::workspace::{WorkspaceWindows, open_workspace_window, close_workspace_window, show_manager as show_main};
 
 fn local_base() -> Result<PathBuf, String> {
   Ok(PathBuf::from(env::var("LOCALAPPDATA").map_err(|_| "LOCALAPPDATA_UNAVAILABLE")?).join("FleetSplice").join("G05"))
@@ -187,45 +188,17 @@ fn open_logs() -> Result<(), String> {
   Command::new("explorer.exe").arg(local_base()?).spawn().map_err(|e| e.to_string())?; Ok(())
 }
 
-fn workspace_navigation_allowed(url: &tauri::Url) -> bool {
-  url.scheme() == "https" || (url.scheme() == "http" && matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]")))
-}
-
-fn workspace_origin(input: &str) -> Result<tauri::Url, String> {
-  let url = tauri::Url::parse(input.trim()).map_err(|_| "WORKSPACE_ORIGIN_REQUIRED")?;
-  if !workspace_navigation_allowed(&url) || !url.username().is_empty() || url.password().is_some()
-    || url.query().is_some() || url.fragment().is_some() || url.path() != "/" {
-    return Err("WORKSPACE_ORIGIN_REQUIRED".into());
-  }
-  Ok(url)
-}
-
 #[tauri::command]
 async fn open_workspace(app: tauri::AppHandle, origin: String) -> Result<(), String> {
-  let url = workspace_origin(&origin)?;
-  if let Some(window) = app.get_webview_window("workspace") {
-    if window.url().map_err(|e| e.to_string())?.origin() != url.origin() {
-      return Err("WORKSPACE_OPEN_AT_ANOTHER_ORIGIN_CLOSE_IT_FIRST".into());
-    }
-    window.show().map_err(|e| e.to_string())?;
-    return window.set_focus().map_err(|e| e.to_string());
-  }
-  let manager = MenuItem::with_id(&app, "return-manager", "Agent Manager", true, None::<&str>).map_err(|e| e.to_string())?;
-  let menu = Menu::with_items(&app, &[&manager]).map_err(|e| e.to_string())?;
-  tauri::WebviewWindowBuilder::new(&app, "workspace", tauri::WebviewUrl::External(url))
-    .title("FleetSplice Workspace").inner_size(1100.0, 760.0).min_inner_size(360.0, 480.0)
-    .zoom_hotkeys_enabled(true).menu(menu)
-    .on_navigation(workspace_navigation_allowed)
-    .on_menu_event(|window, event| { if event.id.as_ref() == "return-manager" { show_main(window.app_handle()); } })
-    .build().map_err(|e| e.to_string())?;
-  Ok(())
+  open_workspace_window(&app, &origin)
 }
-
-fn show_main(app: &tauri::AppHandle) { if let Some(window) = app.get_webview_window("main") { let _ = window.show(); let _ = window.set_focus(); } }
+#[tauri::command]
+async fn close_workspace(app: tauri::AppHandle) -> Result<(), String> { close_workspace_window(&app) }
 
 fn main() {
   tauri::Builder::default()
     .manage(Arc::new(Mutex::new(())))
+    .manage(WorkspaceWindows::default())
     .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
     .plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)))
     .setup(|app| {
@@ -247,7 +220,7 @@ fn main() {
       }).build(app)?;
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![agent_status, onboard_agent, agent_runtimes, set_runtime_sharing, drain_agent, request_pairing, autostart_enabled, set_autostart, open_dashboard, open_logs, open_workspace])
+    .invoke_handler(tauri::generate_handler![agent_status, onboard_agent, agent_runtimes, set_runtime_sharing, drain_agent, request_pairing, autostart_enabled, set_autostart, open_dashboard, open_logs, open_workspace, close_workspace])
     .run(tauri::generate_context!())
     .expect("FleetSplice Desktop failed to run");
 }
@@ -261,12 +234,12 @@ mod tests {
   #[test]
   fn ux05_workspace_requires_token_free_origin_and_web_navigation() {
     for input in ["https://gateway.example.test", "http://127.0.0.1:43123", "http://[::1]:43123"] {
-      assert!(super::workspace_origin(input).is_ok(), "{input}");
+      assert!(fleetsplice_desktop::workspace::workspace_origin(input).is_ok(), "{input}");
     }
     for input in ["http://remote.example.test", "file:///C:/private", "tauri://localhost", "https://user:secret@gateway.example.test", "https://gateway.example.test/#bootstrap=synthetic", "https://gateway.example.test/?token=synthetic", "https://gateway.example.test/path"] {
-      assert_eq!(super::workspace_origin(input).unwrap_err(), "WORKSPACE_ORIGIN_REQUIRED");
+      assert_eq!(fleetsplice_desktop::workspace::workspace_origin(input).unwrap_err(), "WORKSPACE_ORIGIN_REQUIRED");
     }
-    assert!(!super::workspace_navigation_allowed(&"http://tauri.localhost".parse().unwrap()));
+    assert!(!fleetsplice_desktop::workspace::navigation_allowed(&"http://tauri.localhost".parse().unwrap()));
   }
 
   #[test]

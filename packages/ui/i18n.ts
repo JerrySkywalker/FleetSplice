@@ -2,6 +2,7 @@ export const locales = ['zh-CN', 'en-US'] as const;
 export type Locale = typeof locales[number];
 
 export const enUS = {
+  gatewayUnreachable: 'Gateway could not be reached. Check its address and your connection, then check again.',
   authExpired: 'Your session ended. Sign in again to continue. Drafts and pending receipts are kept; commands will not be resent.', authSignedOut: 'You are signed out. Signing out does not stop the Agent or resolve pending commands.', authSignOut: 'Sign out',
   authChecking: 'Checking your Gateway session…', authWelcome: 'Connect to your Workspace',
   authDescription: 'Sign in with the identity provider configured by this Gateway. Agent credentials stay on their host.',
@@ -59,6 +60,7 @@ export type MessageKey = keyof typeof enUS;
 export type Catalog = Record<MessageKey, string>;
 
 export const zhCN = {
+  gatewayUnreachable: '无法连接网关。请检查地址与网络，然后再次检查连接。',
   authExpired: '登录已过期，请重新登录。草稿与待查回执已保留，命令不会重发。', authSignedOut: '已退出登录。此操作不会停止 Agent，也不会确认待查命令的结果。', authSignOut: '退出登录',
   authChecking: '正在检查 Gateway 登录状态…', authWelcome: '连接到你的 Workspace',
   authDescription: '使用此 Gateway 配置的身份服务登录。Agent 凭据保留在所属主机。',

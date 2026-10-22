@@ -295,10 +295,10 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         if (req.method === 'POST' && req.url === '/api/commands') { const result = await kernel.execute(await body(req), grant(req)); json(res, 200, result); return; }
         throw new Fault('ROUTE_NOT_FOUND');
       }
-      requireThat(req.method === 'GET' && (req.url === '/' || /^\/assets\/[a-zA-Z0-9_-]+\.(js|css)$/.test(req.url ?? '') || ['/assets/fleetsplice.webmanifest', '/assets/fleetsplice.svg'].includes(req.url ?? '')), 'ROUTE_NOT_FOUND');
+      requireThat(req.method === 'GET' && (req.url === '/' || /^\/assets\/[a-zA-Z0-9_-]+\.(js|css|woff2)$/.test(req.url ?? '') || ['/assets/fleetsplice.webmanifest', '/assets/fleetsplice.svg'].includes(req.url ?? '')), 'ROUTE_NOT_FOUND');
       const filename = path.join(config.webDirectory, req.url === '/' ? 'index.html' : req.url!.slice(1));
       const bytes = readFileSync(filename);
-      res.writeHead(200, { 'Content-Type': filename.endsWith('.js') ? 'text/javascript' : filename.endsWith('.css') ? 'text/css' : filename.endsWith('.webmanifest') ? 'application/manifest+json' : filename.endsWith('.svg') ? 'image/svg+xml' : 'text/html' }); res.end(bytes);
+      res.writeHead(200, { 'Content-Type': filename.endsWith('.js') ? 'text/javascript' : filename.endsWith('.css') ? 'text/css' : filename.endsWith('.woff2') ? 'font/woff2' : filename.endsWith('.webmanifest') ? 'application/manifest+json' : filename.endsWith('.svg') ? 'image/svg+xml' : 'text/html' }); res.end(bytes);
     } catch (error) {
       if (res.headersSent) res.end();
       else if (error instanceof AdmissionRejected) json(res, 409, { error: error.code, admission: 'REJECTED_BEFORE_ADMISSION', commandId: error.commandId, canonicalCommandId: error.canonicalCommandId, intentDigest: error.intentDigest });

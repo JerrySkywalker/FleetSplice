@@ -1,14 +1,19 @@
-/** Disposable real Gateway + synthetic OIDC provider. Never imports a native adapter. */
+/** Disposable real Gateway + synthetic OIDC provider. No native adapter is constructed. */
 import { createServer } from 'node:https';
 import { createServer as probeServer } from 'node:net';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { startHub } from '../../apps/hub/server.ts';
 import { target } from '../helpers.ts';
 import { createFpxOwnerFixture } from './fpx-owner-preview.ts';
+import { WebSocket } from 'ws';
+import { canonical, parseJson, validate, type Hcp } from '../../packages/contracts/index.ts';
+import { agentAdoptionEndpoint, acceptAgentAdoptionHcp } from '../../packages/product-path/index.ts';
+import { resolveEdgeHcpEndpoint } from '../../apps/edge/main.ts';
 
 const directory = process.argv[2]!;
+const remote = process.argv[3] === 'remote';
 const tls = { keyPem: readFileSync(path.join(directory, 'key.pem'), 'utf8'), certPem: readFileSync(path.join(directory, 'cert.pem'), 'utf8') };
 const probe = probeServer();
 await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
@@ -45,10 +50,38 @@ await new Promise<void>(resolve => idp.listen(0, 'localhost', resolve));
 issuer = `https://localhost:${(idp.address() as { port: number }).port}`;
 mkdirSync(path.join(directory, 'state'), { recursive: true });
 const fixture = createFpxOwnerFixture();
-const hub = await startHub({ port, target: target(), root: 'V:\\u160-synthetic', sid: 'u160-synthetic', principal: 'u160-synthetic', sessionId: 1,
-  stateDirectory: path.join(directory, 'state'), webDirectory: path.resolve('dist/web'), hcpToken: randomUUID(), bootstrapToken: randomUUID(),
+const binding = target(); const hcpToken = randomUUID();
+const hub = await startHub({ port, target: binding, root: 'V:\\u160-synthetic', sid: 'u160-synthetic', principal: 'u160-synthetic', sessionId: 1,
+  stateDirectory: path.join(directory, 'state'), webDirectory: process.argv[4] ?? path.resolve('dist/web'), hcpToken, bootstrapToken: randomUUID(),
+  ...(remote ? { adoptionCarriage: { kind: 'REMOTE_ADOPTION' as const, target: binding, send: () => { throw Error('HCP_NOT_ADMITTED'); } } } : {}),
   deployment: { kind: 'PUBLIC_HTTPS', publicBaseUrl: origin }, listener: { host: '127.0.0.1', tls },
-  auth: { mode: 'OIDC', provider: { issuer, clientId: 'u160-fixture', redirectUri: `${origin}/auth/oidc/callback` } } }, fixture.port, () => clock);
+  auth: { mode: 'OIDC', provider: { issuer, clientId: 'u160-fixture', redirectUri: `${origin}/auth/oidc/callback` } } }, remote ? undefined : fixture.port, () => clock);
+const trace: { op: string; requestId: string; connectionId: string; commandId: unknown; threadId: unknown }[] = [];
+let connections = 0; let socket: WebSocket | null = null; let endpoint: ReturnType<typeof agentAdoptionEndpoint> | null = null;
+async function connectEdge() {
+  const hcp = resolveEdgeHcpEndpoint({ port, hcpUrl: `${origin.replace('https:', 'wss:')}/hcp/v1/connect`, testTlsCaPem: tls.certPem });
+  const next = new WebSocket(hcp.url, 'fleetsplice.hcp.v1', { ...hcp.options, headers: { Authorization: `Bearer ${hcpToken}` } }); socket = next;
+  const send = (message: Hcp) => next.send(canonical(message));
+  const connectedEndpoint = agentAdoptionEndpoint({ kind: 'NATIVE_ADOPTION', target: binding, port: fixture.port, send }); endpoint = connectedEndpoint;
+  await new Promise<void>((resolve, reject) => {
+    next.once('error', reject);
+    next.on('message', async data => {
+      const message = validate<Hcp>('hcp', parseJson(String(data)));
+      if (message.kind === 'ready') { connections++; connectedEndpoint.startRealtimePush(); resolve(); return; }
+      if (message.kind === 'adoption.request') {
+        const command = message.body.command as { commandId?: string; threadId?: string } | undefined;
+        trace.push({ op: message.op, requestId: message.requestId, connectionId: message.connectionId, commandId: command?.commandId ?? message.body.commandId ?? null, threadId: command?.threadId ?? null });
+        await acceptAgentAdoptionHcp(connectedEndpoint, binding, message);
+      }
+    });
+    next.once('open', () => send({ v: 1, kind: 'hello', connectionId: binding.connectionId, target: binding,
+      identity: { principal: 'u160-synthetic', sid: 'u160-synthetic', sessionId: 1, elevated: false, root: 'V:\\u160-synthetic', rootIdentity: binding.rootIdentity }, recovered: false }));
+  });
+}
+async function disconnectEdge() {
+  endpoint?.stop(); socket?.close(); await hub.waitForEdgeDetach(); socket = null; endpoint = null;
+}
+if (remote) await connectEdge();
 process.send!({ kind: 'ready', origin });
 process.on('message', async (message: { kind: string; id: number }) => {
   if (message.kind === 'expire') clock += 8 * 60 * 60_000 + 1;
@@ -57,6 +90,9 @@ process.on('message', async (message: { kind: string; id: number }) => {
   if (message.kind === 'unknown') fixture.setScenario('unknown');
   if (message.kind === 'otherOwner') subject = 'synthetic-other';
   if (message.kind === 'holdLogin') holdLogin = true;
-  if (message.kind !== 'stop') process.send!({ kind: 'reply', id: message.id, exchanges, ...fixture.counters() });
-  if (message.kind === 'stop') { fixture.close(); await hub.close(); idp.closeAllConnections(); await new Promise<void>(resolve => idp.close(() => resolve())); process.exit(0); }
+  if (message.kind === 'disconnect' && remote) await disconnectEdge();
+  if (message.kind === 'reconnect' && remote && !socket) await connectEdge();
+  writeFileSync(path.join(directory, 'HCP-TRACE.json'), JSON.stringify({ kind: remote ? 'REAL_EDGE_HCP_ENDPOINT_SYNTHETIC_NATIVE' : 'DIRECT_SYNTHETIC_PORT', binding, trace }, null, 2));
+  if (message.kind !== 'stop') process.send!({ kind: 'reply', id: message.id, exchanges, hcpConnections: connections, hcpExecutes: trace.filter(row => row.op === 'execute').length, hcpLookups: trace.filter(row => row.op === 'lookup').length, ...fixture.counters() });
+  if (message.kind === 'stop') { if (remote) await disconnectEdge(); fixture.close(); await hub.close(); idp.closeAllConnections(); await new Promise<void>(resolve => idp.close(() => resolve())); process.exit(0); }
 });

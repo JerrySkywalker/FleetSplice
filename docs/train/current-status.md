@@ -1,6 +1,6 @@
-# U160 source execution admitted —2026-10-22
+# U160 source candidate delivered —2026-10-22
 
-[Owner-approved U00–U09 program](../roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/README.md) is ACTIVE. Source-only auth/desktop/candidate work and qualified development merges proceed without Owner per-phase participation. Deadline2026-10-28T20:47:47Z; Native0/0, H0-H4/GateS remain unpassed. SUI is source-complete; its stop point does not block this later approved independent source train. Below retains dated history.
+[Owner-approved U00–U09 program](../roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/README.md) is SOURCE_COMPLETE, STOP_FOR_OWNER_160H_CANDIDATE_REVIEW. [Results and evidence](../roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/RESULTS.md) bind first-use auth, session/window continuity, actual test-only Tauri proof and the real-HCP/synthetic-Native candidate. Source delivery PR49 at5f6a6b42d23b097602bfba91c48e2fb360cf9c57; independent final source review 09f18fca64433ea5acf9ae308f9d766439ffce05. Native0/0; official observation blocker and H0-H4/GateS remain unresolved. No ordinary Agent/OS identity/production acceptance, PR23 merge, main/release/deploy or route selection. Unused160h does not admit another Goal. Below retains dated history.
 
 # SUI source delivery checkpoint —2026-10-22
 

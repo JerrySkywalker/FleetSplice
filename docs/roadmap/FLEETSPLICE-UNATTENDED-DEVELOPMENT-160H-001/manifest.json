@@ -1,7 +1,7 @@
 {
   "schema": "fleetsplice.u160.v1",
   "program_id": "FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001",
-  "status": "EXECUTION_ACTIVE",
+  "status": "STOP_FOR_OWNER_160H_CANDIDATE_REVIEW",
   "started_utc": "2026-10-22T04:47:47Z",
   "deadline_utc": "2026-10-28T20:47:47Z",
   "max_wall_hours": 160,
@@ -140,8 +140,9 @@
         "U06",
         "U08"
       ],
-      "state": "NOT_STARTED",
-      "planned_hours": 6
+      "state": "SOURCE_COMPLETE",
+      "planned_hours": 6,
+      "receipt": "docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/receipts/U09.md"
     }
   ],
   "gates": {
@@ -149,5 +150,24 @@
     "H1_H4": "NOT_PROMOTED",
     "GATE_S": "NOT_ADMITTED"
   },
-  "terminal_disposition": "STOP_FOR_OWNER_160H_CANDIDATE_REVIEW"
+  "terminal_disposition": "STOP_FOR_OWNER_160H_CANDIDATE_REVIEW",
+  "source_review_head": "09f18fca64433ea5acf9ae308f9d766439ffce05",
+  "source_delivery_head": "5f6a6b42d23b097602bfba91c48e2fb360cf9c57",
+  "source_delivery_pr": "https://github.com/JerrySkywalker/FleetSplice/pull/49",
+  "source_acceptance_utc": "2026-10-22T06:15:31.188Z",
+  "unused_budget_reusable": false,
+  "real_native": {
+    "connections": 0,
+    "effects": 0,
+    "result": "NOT_RUN",
+    "availability": "BLOCKED_NO_SUPPORTED_NON_MUTATING_SUBSCRIPTION"
+  },
+  "human_acceptance": {
+    "H0": false,
+    "H1": false,
+    "H2": false,
+    "H3": false,
+    "H4": false,
+    "GateS": false
+  }
 }

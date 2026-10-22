@@ -21,6 +21,7 @@ import './style.css';
 type Client = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; csrf: string };
 type Notice = { key: MessageKey; code?: string };
 const initialPreferences = readPreferences(browserStorage(), navigator.languages.length ? navigator.languages : [navigator.language]);
+const savedManagedView = (() => { try { return JSON.parse(sessionStorage.getItem('fleetsplice.managed.view') ?? '{}') as { prompt?: string; selected?: string | null }; } catch { return {}; } })();
 const short = (id: string | null | undefined) => id ? id.slice(0, 8) : '—';
 const errorCode = (error: unknown) => error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : 'REQUEST_FAILED';
 class RequestError extends Error {
@@ -51,15 +52,20 @@ function App() {
   const [authChecking, setAuthChecking] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authAttempt, setAuthAttempt] = useState(0);
+  const [authReason, setAuthReason] = useState<'expired' | 'signed_out' | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const authEpoch = useRef(0);
+  const managedEvents = useRef<EventSource | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [nativeMode, setNativeMode] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(savedManagedView.selected ?? null);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedReasoning, setSelectedReasoning] = useState('');
   const [selectedPermission, setSelectedPermission] = useState<PermissionPreset>('READ_ONLY');
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(savedManagedView.prompt ?? '');
+  useEffect(() => { try { sessionStorage.setItem('fleetsplice.managed.view', JSON.stringify({ prompt, selected })); } catch { /* Keep the in-memory draft. */ } }, [prompt, selected]);
   const [title, setTitle] = useState<string | null>(null);
   const sessionTitle = title ?? t('defaultTitle');
   const [busy, setBusy] = useState(false);
@@ -76,22 +82,49 @@ function App() {
   const catalogVersion = snapshot?.capabilities ? JSON.stringify(snapshot.capabilities) : '';
   const catalogSeen = useRef('');
   const sessionRef = useRef<BrowserClientSession | null>(null);
-  if (!sessionRef.current) sessionRef.current = new BrowserClientSession(identity => { clientRef.current = identity; setClient(identity); });
+  function freshClientSession() {
+    const next = new BrowserClientSession(identity => { if (sessionRef.current !== next) return; clientRef.current = identity; setClient(identity); });
+    return next;
+  }
+  if (!sessionRef.current) sessionRef.current = freshClientSession();
+  function endAuth(reason: 'expired' | 'signed_out') {
+    authEpoch.current++; managedEvents.current?.close(); managedEvents.current = null;
+    clientRef.current = null; setClient(null); setNativeMode(false); setSnapshot(null);
+    sessionRef.current = freshClientSession();
+    setAuth(previous => previous ? { ...previous, authenticated: false } : null); setAuthReason(reason); setAuthError(null);
+  }
   async function request(url: string, body?: unknown) {
-    if (sessionRef.current!.native) {
-      try { return await sessionRef.current!.request(url, body); }
-      catch (error: any) { if (error.status && error.result) throw new RequestError(error.status, error.result); throw error; }
+    const epoch = authEpoch.current;
+    try {
+      if (sessionRef.current!.native) {
+        try { return await sessionRef.current!.request(url, body); }
+        catch (error: any) { if (error.status && error.result) throw new RequestError(error.status, error.result); throw error; }
+      }
+      const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: {
+        'Content-Type': 'application/json', 'X-Fleet-Client': clientRef.current?.clientInstanceId ?? '', 'X-Fleet-Csrf': clientRef.current?.csrf ?? ''
+      }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      const result = await response.json(); if (!response.ok) throw new RequestError(response.status, result); return result;
+    } catch (error) {
+      if (epoch === authEpoch.current && ['AUTH_REQUIRED', 'CLIENT_AUTH_REQUIRED', 'CLIENT_RENEWAL_FAILED_CLOSED'].includes(errorCode(error))) endAuth('expired');
+      throw error;
     }
-    const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: {
-      'Content-Type': 'application/json', 'X-Fleet-Client': clientRef.current?.clientInstanceId ?? '', 'X-Fleet-Csrf': clientRef.current?.csrf ?? ''
-    }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-    const result = await response.json(); if (!response.ok) throw new RequestError(response.status, result); return result;
+  }
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const value = await response.json();
+      if (!response.ok && value.error !== 'AUTH_REQUIRED') throw new RequestError(response.status, value);
+      endAuth('signed_out');
+    } catch (error) { setError({ key: 'requestFailed', code: errorCode(error) }); }
+    finally { setSigningOut(false); }
   }
   async function refresh() {
     if (refreshing.current) { dirty.current = true; return; }
     refreshing.current = true;
+    const epoch = authEpoch.current;
     try {
-      do { dirty.current = false; const next: Snapshot = await request('/api/snapshot'); setSnapshot(next); }
+      do { dirty.current = false; const next: Snapshot = await request('/api/snapshot'); if (epoch !== authEpoch.current) return; setSnapshot(next); }
       while (dirty.current);
     } catch (e) { setError({ key: 'requestFailed', code: errorCode(e) }); }
     finally { refreshing.current = false; }
@@ -99,6 +132,7 @@ function App() {
   useEffect(() => {
     let events: EventSource | undefined;
     let cancelled = false;
+    const epoch = ++authEpoch.current;
     setAuthChecking(true); setAuthError(null);
     (async () => {
       const token = new URLSearchParams(location.hash.slice(1)).get('bootstrap');
@@ -110,17 +144,39 @@ function App() {
       if (cancelled) return;
       setAuth(status);
       if (!status.authenticated) return;
+      sessionRef.current = freshClientSession();
       const identity: Client = await request('/api/client', {});
+      if (cancelled || epoch !== authEpoch.current) return;
       sessionRef.current!.setClient(identity);
       const mode = await request('/api/mode');
+      if (cancelled || epoch !== authEpoch.current) return;
+      setAuthReason(null);
       if (mode.mode === 'NATIVE_ADOPTION') { sessionRef.current!.native = true; setNativeMode(true); return; }
       await refresh();
-      events = new EventSource('/api/events'); events.onmessage = () => void refresh();
+      if (cancelled || epoch !== authEpoch.current) return;
+      events = new EventSource('/api/events'); managedEvents.current = events; events.onmessage = () => void refresh();
       events.onerror = () => { setError({ key: 'observationLost', code: 'OBSERVATION_UNKNOWN' }); setSnapshot(old => old ? { ...old, status: 'OBSERVATION_UNKNOWN' } : old); };
     })().catch(e => { if (!cancelled) setAuthError(errorCode(e)); })
       .finally(() => { if (!cancelled) setAuthChecking(false); });
     return () => { cancelled = true; events?.close(); };
   }, [authAttempt]);
+  useEffect(() => {
+    if (!auth?.authenticated) return;
+    let cancelled = false; let timer: ReturnType<typeof setTimeout>;
+    const epoch = authEpoch.current;
+    const check = async () => {
+      try {
+        const response = await fetch('/api/auth/status'); const status: AuthStatus = await response.json();
+        if (!response.ok) throw new RequestError(response.status, status as unknown as Record<string, unknown>);
+        if (cancelled || epoch !== authEpoch.current) return;
+        if (!status.authenticated) endAuth('expired'); else setAuth(status);
+      } catch (error) { if (!cancelled) setError({ key: 'requestFailed', code: errorCode(error) }); }
+    };
+    const visible = () => { if (document.visibilityState === 'visible') void check(); };
+    if (auth.expiresAt) timer = setTimeout(() => void check(), Math.max(0, auth.expiresAt - Date.now()));
+    window.addEventListener('focus', visible); window.addEventListener('pageshow', visible); document.addEventListener('visibilitychange', visible);
+    return () => { cancelled = true; clearTimeout(timer); window.removeEventListener('focus', visible); window.removeEventListener('pageshow', visible); document.removeEventListener('visibilitychange', visible); };
+  }, [auth]);
   useEffect(() => { timeline.current?.scrollTo({ top: timeline.current.scrollHeight }); }, [snapshot?.cursor]);
   useLayoutEffect(() => {
     if (!catalogVersion || catalogSeen.current === catalogVersion) return;
@@ -143,7 +199,7 @@ function App() {
       const timer = setTimeout(() => setError({ key: 'grantExpired', code: 'GRANT_EXPIRED' }), Math.max(0, client.expiresAt - Date.now()));
       return () => clearTimeout(timer);
     }
-    const renew = () => { void sessionRef.current!.request().catch(e => setError({ key: 'requestFailed', code: errorCode(e) })); };
+    const renew = () => { void request('/api/native/snapshot').catch(e => setError({ key: 'requestFailed', code: errorCode(e) })); };
     const timer = setTimeout(renew, Math.max(0, client.expiresAt - Date.now() - 5 * 60_000));
     const visible = () => { if (document.visibilityState === 'visible') renew(); };
     document.addEventListener('visibilitychange', visible);
@@ -231,13 +287,13 @@ function App() {
     const model = models.find(item => item.id === value);
     setSelectedModel(value); setSelectedReasoning(model?.defaultReasoningEffort ?? '');
   }
-  const preferences = <PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>;
-  if (authChecking || authError || !auth?.authenticated) return <AuthGate locale={locale} status={auth} checking={authChecking} error={authError} preferences={preferences} retry={() => setAuthAttempt(value => value + 1)}/>;
+  const preferences = <PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance} sessionAction={auth?.authenticated ? <Button type="button" variant="ghost" disabled={signingOut} onClick={() => void signOut()}>{t('authSignOut')}</Button> : undefined}/>;
+  if (authChecking || authError || !auth?.authenticated) return <AuthGate locale={locale} status={auth} checking={authChecking} error={authError} reason={authReason} preferences={preferences} retry={() => setAuthAttempt(value => value + 1)}/>;
   if (nativeMode && client) return <div className="native-workspace"><NativeAdoption client={client} request={request} locale={locale} fleet={<GatewayDashboard locale={locale} request={request} ready={true} compact/>}
-    preferences={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}/></div>;
+    preferences={preferences}/></div>;
   return <div className="native-workspace"><AppShell
     brand={<div className="brand session-brand"><span className="mark">F</span><div><h1>{lane?.title ?? 'FleetSplice'}</h1><span className="session-target">{t('mainLane')} · {lane ? stateText(locale, lane.state) : t('noSession')}</span></div></div>}
-    headerActions={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}
+    headerActions={preferences}
     navTitle={t('sessions')} contextTitle={t('controlContext')} navigationSelection={selected ?? ''}
     navigation={<><label className="section-title" htmlFor="workspace">{t('newWorkspaceTarget')}</label>
       <NativeSelect className="w-full [&_select]:w-full" id="workspace" value={workspace?.registryId ?? ''} disabled={!available} onChange={event => setSelectedWorkspace(event.target.value)}><NativeSelectOption value="" disabled>{t('workspace')}</NativeSelectOption>{snapshot?.workspaces.map(item => <NativeSelectOption key={item.registryId} value={item.registryId} disabled={!item.valid}>{item.displayName}{item.valid ? '' : ` · ${t('workspaceInvalid')}`}</NativeSelectOption>)}</NativeSelect>

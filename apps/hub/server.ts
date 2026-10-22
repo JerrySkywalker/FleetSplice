@@ -39,7 +39,10 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
   const configurationDigest = createHash('sha256').update(canonical({ deployment: deployment.discovery, auth: config.auth ?? { mode: 'LOOPBACK_BOOTSTRAP' } })).digest('hex');
   const restoredAuthority = authorityStore.read();
   if (restoredAuthority) requireThat(restoredAuthority.configurationDigest === configurationDigest, 'DURABLE_IDENTITY_CONFIG_MISMATCH');
-  const persistAuthority = (ownerId: string | null) => authorityStore.write({ v: 1 as const, configurationDigest, ownerId });
+  let admittedOwnerId = restoredAuthority?.ownerId ?? null;
+  const persistAuthority = (ownerId: string) => {
+    authorityStore.write({ v: 1 as const, configurationDigest, ownerId }); admittedOwnerId = ownerId;
+  };
   const deviceStore = new DurableIdentityStore(path.join(config.durableStateDirectory ?? config.stateDirectory, 'device-identities.json'), value => {
     const item = value as { v?: unknown; records?: unknown }; requireThat(item?.v === 1 && Array.isArray(item.records), 'DURABLE_IDENTITY_STORE_INVALID'); return item as import('../../packages/device-enrollment/index.ts').DurableDeviceEnrollmentState;
   });
@@ -173,7 +176,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
       }
       if (req.method === 'GET' && req.url?.startsWith('/auth/oidc/callback?')) {
         requireThat(oidc, 'OIDC_NOT_CONFIGURED'); const url = new URL(req.url, origin); const principal = await oidc.complete({ state: url.searchParams.get('state') ?? '', code: url.searchParams.get('code') ?? '' });
-        const existing = restoredAuthority?.ownerId ?? [...sessions.values()][0]?.principal.id; requireThat(!existing || existing === principal.id, 'OIDC_OWNER_ADMISSION_REJECTED');
+        requireThat(!admittedOwnerId || admittedOwnerId === principal.id, 'OIDC_OWNER_ADMISSION_REJECTED');
         persistAuthority(principal.id);
         const opened = openSession(principal); res.writeHead(302, { Location: '/', 'Set-Cookie': opened.cookie }); res.end(); return;
       }
@@ -197,7 +200,7 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
         const authenticatedSession = session(req);
         if (req.method === 'POST' && req.url === '/api/auth/logout') {
           for (const [id, client] of clients) if (client.session === authenticatedSession) clients.delete(id);
-          sessions.delete(authenticatedSession); res.setHeader('Set-Cookie', `${cookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`); json(res, 200, { loggedOut: true }); return;
+          sessions.delete(authenticatedSession); res.setHeader('Set-Cookie', `${cookieName}=; ${oidc && deployment.kind !== 'LOOPBACK' ? 'Secure; ' : ''}HttpOnly; SameSite=Strict; Path=/; Max-Age=0`); json(res, 200, { loggedOut: true }); return;
         }
         if (req.method === 'GET' && req.url === '/api/auth/principal') {
           const principal = sessions.get(authenticatedSession)!.principal; json(res, 200, { principal, mode: oidc ? 'OIDC' : 'LOOPBACK_BOOTSTRAP' }); return;

@@ -2,6 +2,7 @@ export const locales = ['zh-CN', 'en-US'] as const;
 export type Locale = typeof locales[number];
 
 export const enUS = {
+  authExpired: 'Your session ended. Sign in again to continue. Drafts and pending receipts are kept; commands will not be resent.', authSignedOut: 'You are signed out. Signing out does not stop the Agent or resolve pending commands.', authSignOut: 'Sign out',
   authChecking: 'Checking your Gateway session…', authWelcome: 'Connect to your Workspace',
   authDescription: 'Sign in with the identity provider configured by this Gateway. Agent credentials stay on their host.',
   authLoopback: 'This local Gateway uses a one-time bootstrap link. Open a fresh private link from your attended local run in this window. A Gateway address alone cannot sign you in.',
@@ -58,6 +59,7 @@ export type MessageKey = keyof typeof enUS;
 export type Catalog = Record<MessageKey, string>;
 
 export const zhCN = {
+  authExpired: '登录已过期，请重新登录。草稿与待查回执已保留，命令不会重发。', authSignedOut: '已退出登录。此操作不会停止 Agent，也不会确认待查命令的结果。', authSignOut: '退出登录',
   authChecking: '正在检查 Gateway 登录状态…', authWelcome: '连接到你的 Workspace',
   authDescription: '使用此 Gateway 配置的身份服务登录。Agent 凭据保留在所属主机。',
   authLoopback: '此本地 Gateway 使用一次性启动链接。请在此窗口打开本次人工本地运行生成的私有新链接；仅有 Gateway 地址无法登录。',

@@ -1,14 +1,14 @@
 # FLEETSPLICE-U160-U01-001 — Native支持契约增量核对
 
-状态NOT_STARTED；单项计划上限4h，不要求耗尽。依赖U00。
+状态SOURCE_COMPLETE；单项计划上限4h，不要求耗尽。依赖U00。
 
 总授权/160h截止见[执行契约](../../docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/EXECUTION-CONTRACT.md)。实现依据[已接受Architecture0.1](../../docs/architecture/baseline-0.1.md)、[G04A](../../docs/architecture/amendments/g04a-visible-mvp-simplification.md)、[Owner产品边界](../../docs/product/owner-thesis.md)和[design.md](../../docs/ux/design.md)。不是IDE/ADE。
 
 ## 可见交付与清单
 
-- [ ] 只对既有固定官方源码和当前官方源码的相关差异取证，不连接真实Native。
-- [ ] 若无新的非修改loaded-thread观察契约，沿用PR23 BLOCKED；不重复旧审计。
-- [ ] 若出现新契约，输出最小可复验源码/协议依据，后续PR23仍遵循其原合同，不自动合并或选择路线。
+- [x] 只对既有固定官方源码和当前官方源码的相关差异取证，不连接真实Native。
+- [x] 若无新的非修改loaded-thread观察契约，沿用PR23 BLOCKED；不重复旧审计。
+- [x] 若出现新契约，输出最小可复验源码/协议依据，后续PR23仍遵循其原合同，不自动合并或选择路线。
 
 ## 文件所有权与最小检查
 
@@ -23,3 +23,7 @@ SOURCE_COMPLETE需要实际源码/产物与受影响检查，不能仅凭文件�
 真实Native connections/effects=0/0；不发现或连接现有Codex端点、不复用旧许可、不启动普通Desktop/现有Agent；不改Profile、全局工具链、daemon或生产，不发布部署main，不启动G07/G08，不选择最终B2/B3/C路线。
 
 每Goal写本程序receipts/U01.md，包含准确base/head/PR、范围、实际检查、证据、阻碍和下一项；私有日志/URL/token/截图只放本程序artifacts。SOURCE_COMPLETE不是H0-H4或Gate S通过。
+
+## 本次回执
+
+[U01](../../docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/receipts/U01.md)。源码状态不授予人工或Native通过。

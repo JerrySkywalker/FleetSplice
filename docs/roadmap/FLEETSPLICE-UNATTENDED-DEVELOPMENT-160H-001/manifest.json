@@ -1,0 +1,145 @@
+{
+  "schema": "fleetsplice.u160.v1",
+  "program_id": "FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001",
+  "status": "EXECUTION_ACTIVE",
+  "started_utc": "2026-10-22T04:47:47Z",
+  "deadline_utc": "2026-10-28T20:47:47Z",
+  "max_wall_hours": 160,
+  "planned_hours": 100,
+  "correction_reserve_max_hours": 60,
+  "execution_base_sha": "e61e4c5524af9e347f6f88fcbe52404c1a45ae51",
+  "target_branch": "train/pre-gate-s-development-001",
+  "authorization": {
+    "source": true,
+    "source_pr_normal_development_merge": true,
+    "real_native_connections": false,
+    "real_native_effects": false,
+    "main": false,
+    "deployment": false,
+    "release": false,
+    "pr23_auto_merge": false
+  },
+  "goals": [
+    {
+      "short_id": "U00",
+      "id": "FLEETSPLICE-U160-U00-001",
+      "title": "执行准入与基线整理",
+      "path": "goals/u160/FLEETSPLICE-U160-U00-001.md",
+      "deps": [],
+      "state": "SOURCE_COMPLETE",
+      "planned_hours": 2,
+      "receipt": "docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/receipts/U00.md"
+    },
+    {
+      "short_id": "U01",
+      "id": "FLEETSPLICE-U160-U01-001",
+      "title": "Native支持契约增量核对",
+      "path": "goals/u160/FLEETSPLICE-U160-U01-001.md",
+      "deps": [
+        "U00"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 4
+    },
+    {
+      "short_id": "U02",
+      "id": "FLEETSPLICE-U160-U02-001",
+      "title": "Desktop首次登录闭环",
+      "path": "goals/u160/FLEETSPLICE-U160-U02-001.md",
+      "deps": [
+        "U00"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 18
+    },
+    {
+      "short_id": "U03",
+      "id": "FLEETSPLICE-U160-U03-001",
+      "title": "Web与PWA会话状态体验",
+      "path": "goals/u160/FLEETSPLICE-U160-U03-001.md",
+      "deps": [
+        "U02"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 14
+    },
+    {
+      "short_id": "U04",
+      "id": "FLEETSPLICE-U160-U04-001",
+      "title": "Manager与Workspace连续性",
+      "path": "goals/u160/FLEETSPLICE-U160-U04-001.md",
+      "deps": [
+        "U02"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 12
+    },
+    {
+      "short_id": "U05",
+      "id": "FLEETSPLICE-U160-U05-001",
+      "title": "可操作的连接与错误提示",
+      "path": "goals/u160/FLEETSPLICE-U160-U05-001.md",
+      "deps": [
+        "U03",
+        "U04"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 10
+    },
+    {
+      "short_id": "U06",
+      "id": "FLEETSPLICE-U160-U06-001",
+      "title": "实际Tauri自动化",
+      "path": "goals/u160/FLEETSPLICE-U160-U06-001.md",
+      "deps": [
+        "U02",
+        "U04"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 14
+    },
+    {
+      "short_id": "U07",
+      "id": "FLEETSPLICE-U160-U07-001",
+      "title": "隔离产品链路联调",
+      "path": "goals/u160/FLEETSPLICE-U160-U07-001.md",
+      "deps": [
+        "U03",
+        "U04",
+        "U05"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 12
+    },
+    {
+      "short_id": "U08",
+      "id": "FLEETSPLICE-U160-U08-001",
+      "title": "开发候选交付包",
+      "path": "goals/u160/FLEETSPLICE-U160-U08-001.md",
+      "deps": [
+        "U07"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 8
+    },
+    {
+      "short_id": "U09",
+      "id": "FLEETSPLICE-U160-U09-001",
+      "title": "集成评审与统一交接",
+      "path": "goals/u160/FLEETSPLICE-U160-U09-001.md",
+      "deps": [
+        "U01",
+        "U06",
+        "U08"
+      ],
+      "state": "NOT_STARTED",
+      "planned_hours": 6
+    }
+  ],
+  "gates": {
+    "H0": "READY_FOR_OWNER_NOT_EXECUTED",
+    "H1_H4": "NOT_PROMOTED",
+    "GATE_S": "NOT_ADMITTED"
+  },
+  "terminal_disposition": "STOP_FOR_OWNER_160H_CANDIDATE_REVIEW"
+}

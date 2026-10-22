@@ -2,7 +2,7 @@ fn main() {
   tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
     tauri_build::AppManifest::new().commands(&[
       "agent_status", "onboard_agent", "agent_runtimes", "set_runtime_sharing", "drain_agent",
-      "request_pairing", "autostart_enabled", "set_autostart", "open_dashboard", "open_logs", "open_workspace",
+      "request_pairing", "autostart_enabled", "set_autostart", "open_dashboard", "open_logs", "open_workspace", "close_workspace",
     ]),
   )).expect("Desktop permission generation failed");
   // tauri-build links its Windows Common Controls manifest into bins only.

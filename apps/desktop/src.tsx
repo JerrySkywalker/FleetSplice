@@ -23,8 +23,8 @@ function Desktop() {
   const [saves, setSaves] = useState({ locale: true, appearance: true });
   const t = (en: string, zh: string) => locale === 'zh-CN' ? zh : en;
   const [mode, setMode] = useState<'Workspace' | 'Agent Manager'>('Agent Manager');
-  const [workspaceOrigin, setWorkspaceOrigin] = useState('');
-  const [workspaceMessage, setWorkspaceMessage] = useState(() => t('Open an authenticated Gateway in an isolated Workspace window.', '在独立工作区窗口中打开已认证的网关。'));
+  const [workspaceOrigin, setWorkspaceOrigin] = useState(() => { try { return localStorage.getItem('fleetsplice.workspace.origin') ?? ''; } catch { return ''; } });
+  const [workspaceMessage, setWorkspaceMessage] = useState(() => t('Open a Gateway in an isolated Workspace window, then sign in.', '在独立工作区窗口中打开网关，然后登录。'));
   const [openingWorkspace, setOpeningWorkspace] = useState(false);
   const [section, setSection] = useState<(typeof sections)[number]>('Overview');
   const [status, setStatus] = useState<AgentStatus>({ code: 'LOADING' });
@@ -42,7 +42,7 @@ function Desktop() {
         invoke<AgentStatus>('agent_status'), invoke<Runtime[]>('agent_runtimes'), invoke<boolean>('autostart_enabled'),
       ]);
       setStatus(nextStatus); setRuntimes(nextRuntimes); setAutostart(nextAutostart); setMessage(failure ?? t('Local Agent state refreshed.', '本机代理状态已刷新。'));
-    } catch (error) { setStatus({ code: 'SUPERVISOR_UNAVAILABLE' }); setMessage(failure ?? String(error)); }
+    } catch (error) { setStatus({ code: 'SUPERVISOR_UNAVAILABLE' }); setMessage(failure ?? t('The local Agent is unavailable. Refresh its state; starting an Agent is a separate action in Gateway.', '本机代理不可用。请刷新状态；启动代理是网关页面中的独立操作。') + ` (${String(error)})`); }
   };
   useEffect(() => { void refresh(); }, []);
   const setSharing = async (runtime: Runtime, shared: boolean) => {
@@ -61,13 +61,27 @@ function Desktop() {
     <form onSubmit={async event => {
       event.preventDefault(); if (openingWorkspace) return;
       setOpeningWorkspace(true);
-      try { await invoke('open_workspace', { origin: workspaceOrigin.trim() }); setWorkspaceMessage(t('Workspace opened. Sign in through the normal Gateway login. Return here using its Agent Manager menu.', '工作区已打开，请通过正常网关登录。可由其代理管理菜单返回此处。')); }
-      catch (error) { setWorkspaceMessage(String(error)); }
+      try { await invoke('open_workspace', { origin: workspaceOrigin.trim() }); try { localStorage.setItem('fleetsplice.workspace.origin', new URL(workspaceOrigin.trim()).origin); } catch { /* The current input remains available. */ } setWorkspaceMessage(t('Workspace opened. Sign in through the normal Gateway login. Return here using its Agent Manager menu.', '工作区已打开，请通过正常网关登录。可由其代理管理菜单返回此处。')); }
+      catch (error) {
+        const code = String(error);
+        const hint = code === 'WORKSPACE_OPEN_AT_ANOTHER_ORIGIN_CLOSE_IT_FIRST'
+          ? t('A Workspace is already bound to another Gateway. Return to that window or close it before opening a different Gateway.', '已有工作区绑定到另一网关。请返回该窗口，或先关闭它再打开其他网关。')
+          : code === 'WORKSPACE_ORIGIN_REQUIRED'
+          ? t('Enter only an HTTPS Gateway origin, or an HTTP loopback origin. Remove credentials, paths, queries and private fragments.', '请仅填写 HTTPS 网关 origin 或 HTTP 回环 origin，移除凭据、路径、查询和私有片段。')
+          : t('Could not open Workspace. Check the Gateway address and return to the existing window before trying again.', '无法打开工作区。请检查网关地址，并先返回已有窗口再重试。');
+        setWorkspaceMessage(hint + ' (' + code + ')');
+      }
       finally { setOpeningWorkspace(false); }
     }}>
       <label htmlFor="workspace-origin">{t('Gateway origin', '网关 origin')}</label><Input id="workspace-origin" type="url" required className="h-10 text-sm md:text-sm" placeholder="https://gateway.example.test" value={workspaceOrigin} onChange={event => setWorkspaceOrigin(event.target.value)}/>
       <p className="muted">{t('Enter an origin only, without credentials, path, query or bootstrap fragment. Local first-use bootstrap authentication is not available in this window.', '仅填写 origin，不含凭据、路径、查询或 bootstrap 片段。此窗口尚不支持本地首次引导认证。')}</p>
       <Button type="submit" disabled={openingWorkspace || !workspaceOrigin.trim()}><ArrowUpRight size={14}/>{openingWorkspace ? t('Opening…', '正在打开…') : t('Open / return to Workspace', '打开或返回工作区')}</Button>
+      <Button type="button" variant="outline" disabled={openingWorkspace} onClick={async () => {
+        setOpeningWorkspace(true);
+        try { await invoke('close_workspace'); setWorkspaceMessage(t('Workspace window closed. Agent work continues independently.', '工作区窗口已关闭。Agent 工作继续独立运行。')); }
+        catch (error) { setWorkspaceMessage(String(error)); }
+        finally { setOpeningWorkspace(false); }
+      }}>{t('Close Workspace window', '关闭工作区窗口')}</Button>
     </form>
     <p role="status" className="manager-notice">{workspaceMessage}</p><p className="muted">{t('Desktop does not grant control automatically. Closing Workspace does not stop native work. A login or connection failure can be retried by returning to the same window; no native command is replayed.', '桌面端不会自动授予控制权。关闭工作区不会停止原生任务。登录或连接失败时可返回同一窗口重试，不会重放原生命令。')}</p>
   </section>

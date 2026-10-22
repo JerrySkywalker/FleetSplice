@@ -24,6 +24,7 @@ const initialPreferences = readPreferences(browserStorage(), navigator.languages
 const savedManagedView = (() => { try { return JSON.parse(sessionStorage.getItem('fleetsplice.managed.view') ?? '{}') as { prompt?: string; selected?: string | null }; } catch { return {}; } })();
 const short = (id: string | null | undefined) => id ? id.slice(0, 8) : '—';
 const errorCode = (error: unknown) => error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : 'REQUEST_FAILED';
+const gatewayFetch: typeof fetch = (...args) => fetch(...args).catch(() => { throw new Error('GATEWAY_UNREACHABLE'); });
 class RequestError extends Error {
   constructor(readonly status: number, readonly result: Record<string, unknown>) { super(typeof result.error === 'string' ? result.error : 'REQUEST_FAILED'); }
 }
@@ -83,7 +84,7 @@ function App() {
   const catalogSeen = useRef('');
   const sessionRef = useRef<BrowserClientSession | null>(null);
   function freshClientSession() {
-    const next = new BrowserClientSession(identity => { if (sessionRef.current !== next) return; clientRef.current = identity; setClient(identity); });
+    const next = new BrowserClientSession(identity => { if (sessionRef.current !== next) return; clientRef.current = identity; setClient(identity); }, Date.now, gatewayFetch);
     return next;
   }
   if (!sessionRef.current) sessionRef.current = freshClientSession();
@@ -100,7 +101,7 @@ function App() {
         try { return await sessionRef.current!.request(url, body); }
         catch (error: any) { if (error.status && error.result) throw new RequestError(error.status, error.result); throw error; }
       }
-      const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: {
+      const response = await gatewayFetch(url, { method: body === undefined ? 'GET' : 'POST', headers: {
         'Content-Type': 'application/json', 'X-Fleet-Client': clientRef.current?.clientInstanceId ?? '', 'X-Fleet-Csrf': clientRef.current?.csrf ?? ''
       }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
       const result = await response.json(); if (!response.ok) throw new RequestError(response.status, result); return result;
@@ -112,7 +113,7 @@ function App() {
   async function signOut() {
     setSigningOut(true);
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const response = await gatewayFetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const value = await response.json();
       if (!response.ok && value.error !== 'AUTH_REQUIRED') throw new RequestError(response.status, value);
       endAuth('signed_out');
@@ -138,7 +139,7 @@ function App() {
       const token = new URLSearchParams(location.hash.slice(1)).get('bootstrap');
       history.replaceState(null, '', location.pathname);
       if (token) await request('/api/bootstrap', { token });
-      const response = await fetch('/api/auth/status');
+      const response = await gatewayFetch('/api/auth/status');
       const status: AuthStatus = await response.json();
       if (!response.ok) throw new RequestError(response.status, status as unknown as Record<string, unknown>);
       if (cancelled) return;
@@ -166,7 +167,7 @@ function App() {
     const epoch = authEpoch.current;
     const check = async () => {
       try {
-        const response = await fetch('/api/auth/status'); const status: AuthStatus = await response.json();
+        const response = await gatewayFetch('/api/auth/status'); const status: AuthStatus = await response.json();
         if (!response.ok) throw new RequestError(response.status, status as unknown as Record<string, unknown>);
         if (cancelled || epoch !== authEpoch.current) return;
         if (!status.authenticated) endAuth('expired'); else setAuth(status);

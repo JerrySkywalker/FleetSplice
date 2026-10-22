@@ -12,7 +12,7 @@ export function AuthGate({ locale, status, checking, error, reason, preferences,
     <section><h1>{t(checking ? 'authChecking' : 'authWelcome')}</h1>
       <p>{t(status?.mode === 'LOOPBACK_BOOTSTRAP' ? 'authLoopback' : 'authDescription')}</p>
       {reason && <p role="status">{t(reason === 'expired' ? 'authExpired' : 'authSignedOut')}</p>}
-      {error && <p role="alert">{t('authUnavailable')} <code>{error}</code></p>}
+      {error && <p role="alert">{t(error === 'GATEWAY_UNREACHABLE' ? 'gatewayUnreachable' : 'authUnavailable')} <code>{error}</code></p>}
       {!checking && status?.mode === 'OIDC' && <a className="auth-login" href="/auth/login">{t('authSignIn')}</a>}
       <Button variant="outline" disabled={checking} onClick={retry}>{t('authCheckAgain')}</Button>
     </section>

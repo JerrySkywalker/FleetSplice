@@ -55,6 +55,7 @@ test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME an
   const commands: AdoptionCommand[] = [];
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url()); const send = (value: unknown) => route.fulfill({ json: value });
+    if (url.pathname === '/api/auth/status') return send({ mode: 'OIDC', authenticated: true, principalId: 'fixture' });
     if (url.pathname === '/api/client') return send({ actorId: 'fixture', clientInstanceId: 'fixture-client', grantId: 'fixture-grant', grantRevision: '1', expiresAt: Date.now() + 3600000, csrf: 'synthetic' });
     if (url.pathname === '/api/mode') return send({ mode: 'NATIVE_ADOPTION' });
     if (url.pathname === '/api/fleet/summary') return send({ gateway: { status: 'READY', deployment: {} }, hosts: [], runtimes: [], sessions: { discovered: 2, active: 0 }, attention: [], devices: [] });
@@ -68,7 +69,7 @@ test('FPX UX02: inert rich text, native-item DOM continuity, scroll-away, IME an
     }
     throw Error(`Unexpected fixture request: ${url.pathname}`);
   });
-  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S04'); mkdirSync(artifact, { recursive: true });
+  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/execution-20261022/U02/regression/S04'); mkdirSync(artifact, { recursive: true });
   try {
     await page.goto(`http://127.0.0.1:${(server.httpServer.address() as { port: number }).port}`);
     const prompt = page.getByTestId('native-prompt'); await expect(prompt).toBeEnabled();

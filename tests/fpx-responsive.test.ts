@@ -10,7 +10,7 @@ import { startHub } from '../apps/hub/server.ts';
 import { target } from './helpers.ts';
 import type { AdoptionSnapshot, NativeThread } from '../packages/native-adoption/types.ts';
 
-const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S07/responsive');
+const artifacts = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/execution-20261022/U02/regression/S07/responsive');
 
 test('FPX UX04: PWA assets are narrowly served with explicit MIME and no-store', async () => {
   mkdirSync(artifacts, { recursive: true });
@@ -49,6 +49,7 @@ test('FPX UX04: responsive viewport matrix, keyboard viewport, focus, drafts and
   let writes = 0;
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url()); const send = (value: unknown) => route.fulfill({ json: value });
+    if (url.pathname === '/api/auth/status') return send({ mode: 'OIDC', authenticated: true, principalId: 'fixture' });
     if (url.pathname === '/api/client') return send({ actorId: 'fixture', clientInstanceId: 'fixture-client', grantId: 'fixture-grant', grantRevision: '1', expiresAt: Date.now() + 3600000, csrf: 'synthetic' });
     if (url.pathname === '/api/mode') return send({ mode: 'NATIVE_ADOPTION' });
     if (url.pathname === '/api/fleet/summary') return send({ gateway: { status: 'READY', deployment: {} }, hosts: [], runtimes: [], sessions: { discovered: 1, active: 0 }, attention: [], devices: [] });

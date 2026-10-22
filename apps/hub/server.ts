@@ -132,10 +132,13 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
     for await (const chunk of req) { size += chunk.length; requireThat(size <= 262144, 'MESSAGE_TOO_LARGE'); chunks.push(chunk); }
     return parseJson(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
   };
-  const session = (req: IncomingMessage): string => {
+  const sessionCookie = (req: IncomingMessage): string | null => {
     const cookie = new RegExp(`(?:^|;\\s*)${cookieName}=([0-9a-f]{64})(?:;|$)`).exec(req.headers.cookie ?? '')?.[1];
     const current = cookie ? sessions.get(cookie) : undefined;
-    requireThat(cookie && current && current.expiresAt > now() && current.idleExpiresAt > now(), 'AUTH_REQUIRED');
+    return cookie && current && current.expiresAt > now() && current.idleExpiresAt > now() ? cookie : null;
+  };
+  const session = (req: IncomingMessage): string => {
+    const cookie = sessionCookie(req); requireThat(cookie, 'AUTH_REQUIRED'); const current = sessions.get(cookie)!;
     if (oidc) current.idleExpiresAt = Math.min(current.expiresAt, now() + 15 * 60_000); return cookie;
   };
   const openSession = (principal: HumanPrincipal) => {
@@ -159,6 +162,12 @@ export async function startHub(config: HubConfig, adoption?: AdoptionPort, now: 
       if (req.headers.origin) requireThat(req.headers.origin === origin, 'ORIGIN_REJECTED');
       if (req.method === 'POST') requireThat(req.headers.origin === origin && req.headers['content-type'] === 'application/json', 'ORIGIN_OR_CONTENT_TYPE_REJECTED');
       if (req.method === 'GET' && req.url === '/.well-known/fleetsplice') { json(res, 200, deployment.discovery); return; }
+      if (req.method === 'GET' && req.url === '/api/auth/status') {
+        const cookie = sessionCookie(req); const current = cookie ? sessions.get(cookie)! : null;
+        // Discovery grants no client authority and does not extend the idle lease.
+        json(res, 200, { mode: oidc ? 'OIDC' : 'LOOPBACK_BOOTSTRAP', authenticated: !!current,
+          ...(current ? { principalId: current.principal.id, expiresAt: Math.min(current.expiresAt, current.idleExpiresAt) } : {}) }); return;
+      }
       if (req.method === 'GET' && req.url === '/auth/login') {
         requireThat(oidc, 'OIDC_NOT_CONFIGURED'); const started = await oidc.start(); res.writeHead(302, { Location: started.authorizationUrl }); res.end(); return;
       }

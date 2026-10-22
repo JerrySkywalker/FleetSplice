@@ -24,7 +24,7 @@ test('FPX navigation searches identity/workspace and prioritizes only observed r
 test('FPX UX01: passive navigation, modal focus and attached-thread draft/unknown isolation', async () => {
   const server = await preview({ configFile: path.resolve('apps/web/vite.config.ts'), preview: { host: '127.0.0.1', port: 0, strictPort: true } });
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
-  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/execution-60h-20261022/S03/navigation');
+  const artifact = path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/execution-20261022/U02/regression/S03/navigation');
   mkdirSync(artifact, { recursive: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'en-US' });
   const page = await context.newPage();
@@ -40,6 +40,7 @@ test('FPX UX01: passive navigation, modal focus and attached-thread draft/unknow
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     const send = (value: unknown) => route.fulfill({ json: value });
+    if (url.pathname === '/api/auth/status') return send({ mode: 'OIDC', authenticated: true, principalId: 'fixture' });
     if (url.pathname === '/api/client') return send({ actorId: 'fixture-actor', clientInstanceId: 'fixture-client', grantId: 'fixture-grant', grantRevision: '1', expiresAt: Date.now() + 3600000, csrf: 'synthetic-only' });
     if (url.pathname === '/api/mode') return send({ mode: 'NATIVE_ADOPTION' });
     if (url.pathname === '/api/auth/principal') return send({ principal: { issuer: 'synthetic', subject: 'fixture', displayName: 'Synthetic Owner', email: null }, mode: 'FIXTURE' });

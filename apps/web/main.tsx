@@ -15,6 +15,7 @@ import { Button } from '../../packages/ui/components/button.tsx';
 import { Input } from '../../packages/ui/components/input.tsx';
 import { NativeSelect, NativeSelectOption } from '../../packages/ui/components/native-select.tsx';
 import { InputGroup, InputGroupTextarea, InputGroupAddon } from '../../packages/ui/components/input-group.tsx';
+import { AuthGate, type AuthStatus } from './AuthGate.tsx';
 import './style.css';
 
 type Client = { actorId: string; clientInstanceId: string; grantId: string; grantRevision: string; expiresAt: number; csrf: string };
@@ -46,6 +47,10 @@ function App() {
   }, [locale, appearance, systemDark]);
   const changeLocale = (value: Locale) => { setLocale(value); const saved = persistPreference(browserStorage(), 'locale', value); setPreferenceSaves(previous => ({ ...previous, locale: saved })); };
   const changeAppearance = (value: Appearance) => { setAppearance(value); const saved = persistPreference(browserStorage(), 'appearance', value); setPreferenceSaves(previous => ({ ...previous, appearance: saved })); };
+  const [auth, setAuth] = useState<AuthStatus | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authAttempt, setAuthAttempt] = useState(0);
   const [client, setClient] = useState<Client | null>(null);
   const [nativeMode, setNativeMode] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -93,10 +98,18 @@ function App() {
   }
   useEffect(() => {
     let events: EventSource | undefined;
+    let cancelled = false;
+    setAuthChecking(true); setAuthError(null);
     (async () => {
       const token = new URLSearchParams(location.hash.slice(1)).get('bootstrap');
       history.replaceState(null, '', location.pathname);
       if (token) await request('/api/bootstrap', { token });
+      const response = await fetch('/api/auth/status');
+      const status: AuthStatus = await response.json();
+      if (!response.ok) throw new RequestError(response.status, status as unknown as Record<string, unknown>);
+      if (cancelled) return;
+      setAuth(status);
+      if (!status.authenticated) return;
       const identity: Client = await request('/api/client', {});
       sessionRef.current!.setClient(identity);
       const mode = await request('/api/mode');
@@ -104,9 +117,10 @@ function App() {
       await refresh();
       events = new EventSource('/api/events'); events.onmessage = () => void refresh();
       events.onerror = () => { setError({ key: 'observationLost', code: 'OBSERVATION_UNKNOWN' }); setSnapshot(old => old ? { ...old, status: 'OBSERVATION_UNKNOWN' } : old); };
-    })().catch(e => setError({ key: 'requestFailed', code: errorCode(e) }));
-    return () => events?.close();
-  }, []);
+    })().catch(e => { if (!cancelled) setAuthError(errorCode(e)); })
+      .finally(() => { if (!cancelled) setAuthChecking(false); });
+    return () => { cancelled = true; events?.close(); };
+  }, [authAttempt]);
   useEffect(() => { timeline.current?.scrollTo({ top: timeline.current.scrollHeight }); }, [snapshot?.cursor]);
   useLayoutEffect(() => {
     if (!catalogVersion || catalogSeen.current === catalogVersion) return;
@@ -217,6 +231,8 @@ function App() {
     const model = models.find(item => item.id === value);
     setSelectedModel(value); setSelectedReasoning(model?.defaultReasoningEffort ?? '');
   }
+  const preferences = <PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>;
+  if (authChecking || authError || !auth?.authenticated) return <AuthGate locale={locale} status={auth} checking={authChecking} error={authError} preferences={preferences} retry={() => setAuthAttempt(value => value + 1)}/>;
   if (nativeMode && client) return <div className="native-workspace"><NativeAdoption client={client} request={request} locale={locale} fleet={<GatewayDashboard locale={locale} request={request} ready={true} compact/>}
     preferences={<PreferencesControl locale={locale} appearance={appearance} saved={preferenceSaves.locale && preferenceSaves.appearance} onLocale={changeLocale} onAppearance={changeAppearance}/>}/></div>;
   return <div className="native-workspace"><AppShell

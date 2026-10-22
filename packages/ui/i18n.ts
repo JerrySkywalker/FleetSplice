@@ -2,6 +2,11 @@ export const locales = ['zh-CN', 'en-US'] as const;
 export type Locale = typeof locales[number];
 
 export const enUS = {
+  authChecking: 'Checking your Gateway session…', authWelcome: 'Connect to your Workspace',
+  authDescription: 'Sign in with the identity provider configured by this Gateway. Agent credentials stay on their host.',
+  authLoopback: 'This local Gateway uses a one-time bootstrap link. Open a fresh private link from your attended local run in this window. A Gateway address alone cannot sign you in.',
+  authUnavailable: 'Could not check the Gateway session.', authSignIn: 'Sign in', authCheckAgain: 'Check connection',
+
   permission: 'Permission', READ_ONLY: 'Read only', WORKSPACE_AUTO: 'Workspace Auto', YOLO: 'YOLO', requestedPermission: 'Requested permission', effectivePermission: 'Native effective permission', permissionUnavailable: 'Unavailable', permissionHint: 'New sessions only. Edge enforces the local Host ceiling. YOLO means native unrestricted filesystem and network authority, not permission to leave your task scope.',
   newWorkspaceTarget: 'Workspace for new sessions', sessionWorkspace: 'Current session Workspace', workspaceIdentity: 'Root identity', workspaceInvalid: 'Unavailable or replaced',
   pageTitle: 'FleetSplice · Local session', edition: 'LOCAL / G05C-P2B', preferences: 'Preferences',
@@ -53,6 +58,11 @@ export type MessageKey = keyof typeof enUS;
 export type Catalog = Record<MessageKey, string>;
 
 export const zhCN = {
+  authChecking: '正在检查 Gateway 登录状态…', authWelcome: '连接到你的 Workspace',
+  authDescription: '使用此 Gateway 配置的身份服务登录。Agent 凭据保留在所属主机。',
+  authLoopback: '此本地 Gateway 使用一次性启动链接。请在此窗口打开本次人工本地运行生成的私有新链接；仅有 Gateway 地址无法登录。',
+  authUnavailable: '无法检查 Gateway 登录状态。', authSignIn: '登录', authCheckAgain: '检查连接',
+
   permission: '权限', READ_ONLY: '只读', WORKSPACE_AUTO: '工作区自动', YOLO: 'YOLO', requestedPermission: '请求权限', effectivePermission: '原生有效权限', permissionUnavailable: '不可用', permissionHint: '仅用于新会话。Edge 强制执行本地主机上限。YOLO 表示原生文件系统与网络权限不受沙箱限制，不代表可以超出任务范围。',
   newWorkspaceTarget: '新会话的工作区', sessionWorkspace: '当前会话工作区', workspaceIdentity: '根目录身份', workspaceInvalid: '不可用或已替换',
   newSessionConfigurationHint: '模型、推理和权限选择仅用于启动新的原生会话。已有会话保持其记录的配置。',

@@ -50,8 +50,9 @@
       "deps": [
         "U00"
       ],
-      "state": "NOT_STARTED",
-      "planned_hours": 18
+      "state": "SOURCE_COMPLETE",
+      "planned_hours": 18,
+      "receipt": "docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/receipts/U02.md"
     },
     {
       "short_id": "U03",

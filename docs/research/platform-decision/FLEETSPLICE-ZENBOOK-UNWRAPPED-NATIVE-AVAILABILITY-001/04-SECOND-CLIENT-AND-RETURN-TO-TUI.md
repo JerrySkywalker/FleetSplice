@@ -1,0 +1,78 @@
+# R03 — One authorized native ACK and original-TUI return verified
+
+Continuation: `20261018-r03-authorized-ack`, same Goal.
+
+Status: **COMPLETE; ONE_EFFECT_AND_ORIGINAL_TUI_RETURN_VERIFIED**.
+
+## Exact admission and fresh gates
+
+The Owner explicitly authorized the previously proposed one ACK-only turn for
+the exact disposable thread T18, through existing daemon 33120. This is separate
+from the earlier ID clarification and read-only UI-return confirmation.
+Authorization is recorded privately in OWNER-AUTHORIZATION.json.
+
+Before dispatch, fresh OS and protocol checks confirmed TUI 18004 and daemon
+33120 with unchanged creation times, same-user ownership/hash, kernel socket
+peer PID 33120, exact T18/workspace, loaded membership and idle/direct-input
+eligibility. The latest prior turn was completed; no active turn was steered.
+The native turn path resolves the same existing loaded handle, with no new
+server/Writer or thread create/resume.
+
+A **create-new, write-through ledger** was flushed before send. Its existence
+blocks replay across later continuations. Remaining authorized effects: **0**.
+Only this approved prompt was submitted:
+
+> Reply exactly FS_NATIVE_20261018_ACK_01. Do not call tools, run commands, read or write files, change settings, or start additional turns.
+
+No permission, sandbox, directory, environment, model or other settings override
+was sent. No OS approval, install or daemon lifecycle operation was invoked.
+
+## Native effect receipt — 21:53:02–21:53:08 +08:00
+
+| Proof | Observation |
+| --- | --- |
+| Mutating submission | Exactly one turn/start, request/response ID 3100 |
+| Accepted native Turn ID | Different from prior completed turn; exact value private |
+| Turn-ID SHA-256 | `BB94D3E1610E78EE8CD6ED267CC685A003BC20E0F06A1EADBD0AF9DE6062BE72` |
+| Completion | Exact native turn: inProgress → completed; completion read response 3204 |
+| Reported native duration | 5,633 ms |
+| Exact-turn items | Response 3300; full page, no further cursor |
+| Item counts | userMessage=1, agentMessage=1; zero tool/unknown items |
+| Input/output | Approved prompt exactly once; exact `FS_NATIVE_20261018_ACK_01` once |
+| Correlated notifications | Two thread/status/changed notifications for T18 |
+| Post-effect OS identity | TUI 18004 and daemon 33120 retain original creation times |
+
+The native receipt, current turn identity, exact-turn complete items page and
+prompt/ACK equality establish the single admitted effect. A caller message ID
+was recorded in the local ledger; it is not claimed as idempotency protection or
+as an echoed native item ID. No effect was retried.
+
+The observer sent a close output and disposed only its own connection without
+error. A full peer close handshake was not tested. The older read-only helper's
+close limitation remains historical; neither operation shut down the daemon/TUI.
+
+## Final visible return — Owner confirmation recorded 2026-10-19
+
+The Owner answered the specific post-effect question: **the original TUI displays
+the ACK, has the same Native Thread ID, and remains interactive**. The question
+named the exact marker and test thread and required no prompt, exit, restart or
+resume. This trusted chat reply is **OWNER_REPORTED** evidence, separate from the
+earlier read-only UI report. Its original message timestamp is not exposed;
+the final continuation records receipt on October 19.
+
+At **00:24:30 +08:00**, a fresh OS-only check measured TUI 18004 and daemon 33120
+with unchanged exact creation times, same-user owners and executable hashes.
+The sealed native receipt hash and one-attempt ledger also remained unchanged.
+No native connection, prompt or effect was repeated for closeout.
+
+Native receipts prove the one exact-thread completed effect; the Owner proves
+its visibility and same-thread interactivity in original Console B; OS snapshots
+prove process-incarnation continuity. Together with the identity chain in
+[02](02-UNWRAPPED-TUI-OBSERVATION.md), these meet SAME_TUI_REMOTE_EFFECT and the
+local **SHARED_NATIVE_AVAILABLE** contract. The native protocol does not supply
+a direct TUI PID field; that relationship is corroborated by the combined chain.
+No direct OS lock-handle owner or full peer close handshake is claimed.
+
+Native effects executed: **1**. Submission attempts: **1**. Remaining: **0**.
+No replay or second effect is authorized. Phone handoff remains NOT_RUN.
+The fixed disposition is STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW.

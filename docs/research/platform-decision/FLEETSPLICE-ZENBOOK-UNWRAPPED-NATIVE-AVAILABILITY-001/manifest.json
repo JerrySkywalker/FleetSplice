@@ -1,0 +1,258 @@
+{
+  "schema": "fleetsplice.goal-train.native-availability-study.v1",
+  "goal_id": "FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
+  "purpose": "Resolve one native/OS prerequisite: can ordinary unwrapped codex --yolo on ZenBook 14 be connected by a second nonowning client without losing original process/thread or native Writer integrity?",
+  "status": "R00_R05_COMPLETE; LOCAL_SHARED_NATIVE_AVAILABLE; STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
+  "authorization": "DOCUMENTATION_AND_OWNER_ATTENDED_DISPOSABLE_LOCAL_PROBE_ONLY",
+  "base_branch": "train/pre-gate-s-development-001",
+  "base_sha": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+  "head_branch": "docs/fs-zenbook-unwrapped-native-availability-20261015",
+  "study_root": "docs/research/platform-decision/FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
+  "operator_checkout": "C:\\Dev\\src\\FleetSplice",
+  "worktree_parent": "C:\\Dev\\worktrees",
+  "artifacts_root": "C:\\Dev\\artifacts\\fleetsplice\\FLEETSPLICE-ZENBOOK-UNWRAPPED-NATIVE-AVAILABILITY-001",
+  "pinned_previous_report": {
+    "pr": 19,
+    "head_sha": "25f2bae8b39eb6222c7d2e0b8237227f53504acc",
+    "draft_unmerged": true
+  },
+  "source_guides": [
+    {
+      "repo": "openai/codex",
+      "commit": "6fbd7be1518d259e30e6fef48f05f433d2461a20",
+      "path": "codex-rs/app-server-daemon/README.md"
+    },
+    {
+      "repo": "JerrySkywalker/FleetSplice",
+      "commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "path": "docs/architecture/native-adoption-d0.md"
+    },
+    {
+      "repo": "JerrySkywalker/FleetSplice",
+      "commit": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+      "path": "docs/adr/0008-portable-shared-native-server-custody.md"
+    }
+  ],
+  "initial_native_cli": "codex --yolo",
+  "strict_actual_invocation": true,
+  "different_modes_are_not_equivalent": [
+    "codex --no-daemon --yolo",
+    "codex --remote <endpoint>",
+    "fleetsplice codex",
+    "hapi codex",
+    "paseo run"
+  ],
+  "phases": [
+    {
+      "id": "R00",
+      "title": "Readonly effective CLI/principal/process preflight",
+      "human_required": false,
+      "output": "01-PREFLIGHT-AND-RUNTIME-IDENTITY.md",
+      "execution_status": "COMPLETE_REVALIDATED"
+    },
+    {
+      "id": "R01",
+      "title": "Owner physical launch of ordinary unwrapped disposable TUI",
+      "human_required": true,
+      "output": "02-UNWRAPPED-TUI-OBSERVATION.md",
+      "execution_status": "COMPLETE_COMBINED_OS_NATIVE_OWNER_IDENTITY"
+    },
+    {
+      "id": "R02",
+      "title": "Official native shared endpoint and Writer/identity proof",
+      "human_required": false,
+      "output": "03-SHARED-ENDPOINT-AND-WRITER.md",
+      "execution_status": "COMPLETE_ENDPOINT_THREAD_COOPERATIVE_WRITER_VERIFIED"
+    },
+    {
+      "id": "R03",
+      "title": "Conditional second read-only connection; separately admitted one harmless effect",
+      "human_required": true,
+      "conditional": true,
+      "output": "04-SECOND-CLIENT-AND-RETURN-TO-TUI.md",
+      "execution_status": "COMPLETE_ONE_EFFECT_AND_ORIGINAL_TUI_RETURN"
+    },
+    {
+      "id": "R04",
+      "title": "Compare immutable native process/thread/Writer evidence and classify",
+      "human_required": false,
+      "output": "05-QUALIFICATION-AND-ROUTE-IMPLICATION.md",
+      "execution_status": "COMPLETE_LOCAL_SHARED_NATIVE_AVAILABLE"
+    },
+    {
+      "id": "R05",
+      "title": "Same Draft PR evidence; Owner handoff; no product implementation",
+      "human_required": false,
+      "output": "06-OWNER-DECISION-PACK.md",
+      "execution_status": "COMPLETE_DOCUMENTS_RECEIPTS_HANDOFF; PUBLICATION_IN_LOCAL_RECEIPT"
+    }
+  ],
+  "native_results": [
+    "SHARED_NATIVE_AVAILABLE",
+    "READ_ONLY_PROOF_ONLY",
+    "NO_REACHABLE_SHARED_ENDPOINT",
+    "UNWRAPPED_LAUNCH_IS_EMBEDDED",
+    "NATIVE_WRITER_BLOCKED",
+    "OWNER_ACTION_REQUIRED",
+    "AMBIGUOUS_STOP"
+  ],
+  "rules": [
+    "never claim full P0 mobile PASS from a local read",
+    "Owner physically launches exactly codex --yolo in separate Windows Terminal",
+    "if effective command wraps --no-daemon, document actual behavior, never change dotfiles to pass",
+    "only inspect fresh disposable native thread, never existing user sessions",
+    "second client never starts competing app-server/Writer",
+    "no native mutex or lock deletion",
+    "no unauthorized daemon start/bootstrap/update/restart/stop or system settings",
+    "no extra new model turns without exact test-specific Owner consent",
+    "never blind-retry uncertain effect",
+    "never expose native tokens, private home, process environment or full transcript in PR",
+    "do not merge Draft PR, change main, advance G08/Gate S or modify FS product source"
+  ],
+  "max_test_owned_authenticated_native_effects": 1,
+  "phone_pairing_allowed": false,
+  "test_existing_live_sessions_allowed": false,
+  "product_code_modified": false,
+  "raw_artifact_directories": [
+    "workspace",
+    "evidence",
+    "scratch"
+  ],
+  "required_local_receipts": [
+    "FINAL-RECEIPT.json",
+    "OWNER-HANDOFF.md"
+  ],
+  "pr_update": "FAST_FORWARD_ONLY_SAME_DRAFT_PR",
+  "terminal": "STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
+  "source_vs_measurement_separate": true,
+  "no_auto_product_route": true,
+  "no_auto_merge": true,
+  "current_audit": {
+    "audit_run": "20261019-owner-native-return",
+    "previous_audit_run": "20261018-r03-authorized-ack",
+    "audit_date": "2026-10-19",
+    "timezone": "Asia/Shanghai",
+    "starting_pr_head": "2f1341bcd7889845fe25b4f49f5bf55522e2792c",
+    "starting_base_head": "ee98a6282c7733ca1658547022ab55c3b61c0e1f",
+    "research_driver": "CHATGPT_DESKTOP_CODEX_LOCAL_SESSION",
+    "original_planned_driver": "CONSOLE_A_CODEX_CLI",
+    "console_b_requirements_unchanged": true,
+    "desktop_pid_server_thread_excluded": true,
+    "native_result": "SHARED_NATIVE_AVAILABLE",
+    "disposition": "STOP_FOR_OWNER_NATIVE_AVAILABILITY_REVIEW",
+    "evidence_confidence": "MEASURED_LOCAL",
+    "evidence_scope": "OS/native receipts measured; physical launch/non-elevation and post-effect original-TUI ACK/same-ID/interactivity Owner-reported; local prerequisite only",
+    "physical_test_executed": true,
+    "physical_test_evidence": "OWNER_REPORTED",
+    "authenticated_native_effect_executed": 1,
+    "exact_owner_invocation": true,
+    "exact_owner_invocation_status": "OWNER_REPORTED; candidate flags/parent/owner measured",
+    "owner_identifier_clarification": "NATIVE_THREAD_ID_CONFIRMED_NOT_SHELL_PID",
+    "candidate_shell_pid": 3944,
+    "candidate_tui_pid": 18004,
+    "candidate_tui_created": "2026-10-18T20:28:47.239692+08:00",
+    "candidate_tui_version": "0.163.0",
+    "candidate_tui_process_continuity_measured": true,
+    "tui_pid_to_native_thread_binding": "ESTABLISHED_BY_COMBINED_OS_NATIVE_OWNER_CHAIN; no direct native PID field",
+    "native_thread_id": "PRIVATE_LOCAL_RECEIPT",
+    "native_thread_id_sha256": "243106043D8B029720F5E075B9AB7465C03EFE8E17073A98EE3A935038BA6D76",
+    "native_thread_id_proven": true,
+    "native_thread_created": "2026-10-18T20:28:48+08:00",
+    "native_thread_source_metadata": "vscode",
+    "native_thread_cli_version_metadata": "0.162.1",
+    "workspace_matches_disposable": true,
+    "official_daemon_reachable": true,
+    "socket_owner_matches_current_user": true,
+    "socket_peer_pid_proven": true,
+    "socket_peer_pid": 33120,
+    "current_daemon_candidate": {
+      "pid": 33120,
+      "version": "0.163.0",
+      "created": "2026-10-18T20:32:11.867961+08:00",
+      "pid_record_creation_matches_os": true
+    },
+    "current_incarnation_stable_during_read": true,
+    "native_thread_loaded": true,
+    "native_thread_status": "idle",
+    "can_accept_direct_input": true,
+    "writer_status": "COOPERATIVE_TURN_VERIFIED_ON_EXISTING_LOADED_RUNTIME; direct OS lock holder UNOBSERVED",
+    "writer_lock_holder_directly_observed": false,
+    "second_client_observation": "EXACT_THREAD_METADATA_AND_LOADED_MEMBERSHIP_VERIFIED",
+    "observer_protocol_response_ids": [
+      3001,
+      3002,
+      3003,
+      3004,
+      3005,
+      3100,
+      3200,
+      3201,
+      3202,
+      3203,
+      3204,
+      3300
+    ],
+    "transport_attempts": 1,
+    "attempts_before_initialize_failure": 0,
+    "native_read_requests": 2,
+    "native_loaded_list_requests": 1,
+    "include_turns": false,
+    "observer_close": "CLOSE_OUTPUT_THEN_DISPOSE_WITHOUT_ERROR; full peer handshake NOT_TESTED",
+    "owner_ui_return_evidence": "OWNER_REPORTED_POST_EFFECT_EXACT_ACK_SAME_ID_INTERACTIVE; OS_INCARNATIONS_UNCHANGED",
+    "native_effect_authorized": true,
+    "effect_result": "NATIVE_COMPLETED_EXACT_ACK_ZERO_TOOLS; ORIGINAL_TUI_RETURN_CONFIRMED",
+    "historical_r02_is_current_pass": false,
+    "historical_dirty_worktree_preserved": true,
+    "r05_publication": "Exact SHA/push outcome in private FINAL-RECEIPT.json",
+    "local_receipt_schema": 1,
+    "next_step": "Owner reviews 06 and decides whether to separately admit one small Paseo B2 external-native provider vs existing FS Native Adoption comparison; no automatic route or G08",
+    "source_refs": [
+      {
+        "version": "0.162.1",
+        "sha": "092d3acd6bec3e3a14bdc7e7a2810ab628ab759d"
+      },
+      {
+        "version": "0.163.0",
+        "sha": "83086188ae0614bd882818ff1aa23f3194962012"
+      }
+    ],
+    "effect_submission_attempts": 1,
+    "effect_turn_id_sha256": "BB94D3E1610E78EE8CD6ED267CC685A003BC20E0F06A1EADBD0AF9DE6062BE72",
+    "effect_turn_response_id": 3100,
+    "effect_completion_response_id": 3204,
+    "effect_items_response_id": 3300,
+    "effect_reported_duration_ms": 5633,
+    "effect_exact_ack_count": 1,
+    "effect_exact_user_prompt_count": 1,
+    "effect_tool_or_unknown_item_count": 0,
+    "effect_item_page_complete": true,
+    "effect_receipt_verified": true,
+    "remaining_authorized_effects": 0,
+    "durable_no_replay_ledger_present": true,
+    "replay_allowed": false,
+    "owner_post_effect_visible_ack": true,
+    "owner_post_effect_same_id": true,
+    "owner_post_effect_interactive": true,
+    "owner_prior_readonly_ui_return_confirmed": true,
+    "post_effect_process_identity_unchanged": true,
+    "native_effect_authorization_state": "CONSUMED",
+    "authorized_ack_marker": "FS_NATIVE_20261018_ACK_01",
+    "exact_effect_item_type_counts": {
+      "userMessage": 1,
+      "agentMessage": 1
+    },
+    "owner_post_effect_evidence_class": "OWNER_REPORTED",
+    "owner_post_effect_recorded_date": "2026-10-19",
+    "original_tui_pid_proven": true,
+    "original_tui_return_proven": true,
+    "final_os_recheck_at": "2026-10-19T00:24:30.6774707+08:00",
+    "closeout_native_calls": 0,
+    "remaining_local_qualification_blockers": [],
+    "remaining_product_qualifications": [
+      "phone transport/authentication",
+      "multi-Host",
+      "G08 bounded complete history",
+      "integration/maintenance comparison"
+    ]
+  }
+}

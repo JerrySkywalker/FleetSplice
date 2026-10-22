@@ -90,7 +90,7 @@ test('U04/U06 actual WebView: OIDC, bound-window reuse, reopen, origin separatio
     await wait(async () => (await cmd('GET', '/window/handles')).length === 2, 'other-opened');
     workspace = (await cmd('GET', '/window/handles')).find((handle: string) => handle !== main); await switchTo(workspace);
     await wait(() => execute("return !!document.querySelector('[data-testid=auth-gate]')"), 'other-signed-out');
-    steps.push('different Gateway starts signed out, without old projections or credentials');
+    steps.push('different Gateway requires its own admitted session and starts without old projections');
     const counters = [await fixture.control('counters'), await other.control('counters')];
     for (const value of counters) { assert.equal(value.syntheticCommands, 0); assert.equal(value.realNativeConnections, 0); assert.equal(value.realNativeEffects, 0); }
     writeFileSync(path.join(directory, 'RESULT.json'), JSON.stringify({ status: 'PASS', evidence: 'ACTUAL_TAURI_WEBVIEW_SYNTHETIC_IDP_NATIVE', binarySha256: createHash('sha256').update(readFileSync(binary!)).digest('hex'), capabilities: started.capabilities, remoteIpc: denied, steps, counters, nativeMenuClick: 'NOT_RUN_WEBVIEW_DRIVER_CANNOT_CLICK_NATIVE_MENUS' }, null, 2));

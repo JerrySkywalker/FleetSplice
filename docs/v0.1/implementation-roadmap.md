@@ -1,3 +1,5 @@
+> **2026-10-22 current source status:** SUI S00–S08 source migration completed at development mergee61e4c5524af9e347f6f88fcbe52404c1a45ae51. Owner has now approved [U160 local auth/Desktop development](../roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/README.md); H0-H4/Gate S/Native and G06–G10 product acceptance are not promoted. Older pending/frozen wording below is historical.
+
 # v0.1 Implementation Roadmap
 
 > **2026-10-22 presentation update:** The [SUI roadmap](../roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/README.md) defines the next UI delivery sequence and [design.md](../ux/design.md) replaces prior presentation rules. Planning PR merge is authorized; its proposed 60h source window has not started. Product G06→G10, Native/human gates and production admission below are unchanged.

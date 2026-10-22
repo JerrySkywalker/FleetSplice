@@ -1,3 +1,7 @@
+# U160 execution admission —2026-10-22
+
+Owner explicitly approved [U00–U09 autonomous local development](./docs/roadmap/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/EXECUTION-CONTRACT.md), including source and qualified normal development-branch PR merges, maximum160 wall hours from2026-10-22T04:47:47Z to2026-10-28T20:47:47Z. This later scope covers Desktop/Gateway auth and directly necessary source seams, not only visual CSS. H0 does not block independent source work; H0-H4/Gate S are not accepted. Native0/0; no daily Agent/daemon/Profile/global toolchain, main/release/deploy or PR23 auto merge. Earlier SUI/FPX execution windows are concluded.
+
 # FleetSplice repository rules
 
 > **2026-10-22 execution admission:** Owner has now explicitly approved the [60h SUI execution](docs/roadmap/FLEETSPLICE-SHADCN-UI-MIGRATION-060H-001/EXECUTION-AUTHORIZATION.md), including S00–S08 source work, affected checks, source PR creation and qualified normal merges to the development train. Window: 2026-10-21T17:00:50Z to 2026-10-24T05:00:50Z. This later instruction supersedes PENDING_OWNER below only within this scope. Native connections/effects remain0/0; no main/deployment/publication or old research PR merge.

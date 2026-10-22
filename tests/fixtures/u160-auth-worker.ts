@@ -17,7 +17,7 @@ await new Promise<void>(resolve => probe.close(() => resolve()));
 const origin = `https://127.0.0.1:${port}`;
 const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const jwk = { ...keys.publicKey.export({ format: 'jwk' }), kid: 'u160-synthetic', alg: 'RS256', use: 'sig' };
-const codes = new Map<string, string>(); let issuer = ''; let exchanges = 0; let clock = Date.now();
+const codes = new Map<string, string>(); let issuer = ''; let exchanges = 0; let clock = Date.now(); let subject = 'synthetic-owner';
 const idp = createServer({ key: tls.keyPem, cert: tls.certPem }, async (req, res) => {
   const url = new URL(req.url!, issuer);
   const json = (value: unknown) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(value)); };
@@ -35,7 +35,7 @@ const idp = createServer({ key: tls.keyPem, cert: tls.certPem }, async (req, res
     if (!nonce) { res.statusCode = 400; return json({ error: 'invalid_grant' }); }
     exchanges++;
     const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
-    const signed = `${encode({ alg: 'RS256', kid: jwk.kid })}.${encode({ iss: issuer, aud: 'u160-fixture', sub: 'synthetic-owner', name: 'Synthetic Owner', nonce, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 })}`;
+    const signed = `${encode({ alg: 'RS256', kid: jwk.kid })}.${encode({ iss: issuer, aud: 'u160-fixture', sub: subject, name: 'Synthetic Owner', nonce, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 })}`;
     return json({ id_token: `${signed}.${sign('RSA-SHA256', Buffer.from(signed), keys.privateKey).toString('base64url')}` });
   }
   res.statusCode = 404; res.end();
@@ -54,6 +54,7 @@ process.on('message', async (message: { kind: string; id: number }) => {
   if (message.kind === 'idle14') clock += 14 * 60_000;
   if (message.kind === 'idle2') clock += 2 * 60_000;
   if (message.kind === 'unknown') fixture.setScenario('unknown');
+  if (message.kind === 'otherOwner') subject = 'synthetic-other';
   if (message.kind !== 'stop') process.send!({ kind: 'reply', id: message.id, exchanges, ...fixture.counters() });
   if (message.kind === 'stop') { fixture.close(); await hub.close(); idp.closeAllConnections(); await new Promise<void>(resolve => idp.close(() => resolve())); process.exit(0); }
 });

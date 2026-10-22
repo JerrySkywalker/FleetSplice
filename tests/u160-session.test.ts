@@ -54,3 +54,20 @@ test('U03 public status discovery does not renew the OIDC idle session', async (
     assert.equal((await context.request.get(`${fixture.origin}/api/auth/status`).then(response => response.json())).authenticated, false);
   } finally { await context.close(); await browser.close(); await fixture.close(); }
 });
+
+test('U03 a different OIDC identity cannot replace the first Owner after logout', async () => {
+  const fixture = await authFixture(path.resolve('C:/Dev/artifacts/fleetsplice/FLEETSPLICE-UNATTENDED-DEVELOPMENT-160H-001/execution-20261022/U03', `owner-${Date.now()}`));
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US' });
+  try {
+    const page = await context.newPage(); await page.goto(fixture.origin);
+    await page.getByRole('link', { name: 'Sign in', exact: true }).click(); await expect(page.getByTestId('native-prompt')).toBeVisible();
+    await page.getByTestId('preferences').click(); await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page.getByTestId('auth-gate')).toBeVisible(); await fixture.control('otherOwner');
+    const callback = page.waitForResponse(response => response.url().includes('/auth/oidc/callback?'));
+    await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+    const response = await callback; assert.equal(response.status(), 403); assert.equal((await response.json()).error, 'OIDC_OWNER_ADMISSION_REJECTED');
+    assert.equal((await context.request.get(`${fixture.origin}/api/auth/status`).then(response => response.json())).authenticated, false);
+    assert.equal((await fixture.control('counters')).syntheticCommands, 0);
+  } finally { await context.close(); await browser.close(); await fixture.close(); }
+});

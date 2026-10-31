@@ -4,6 +4,8 @@
 
 FleetSplice and Coordination Loop should remain separate systems with a narrow execution integration.
 
+The [P0 public contract](p0-interface-contract.md) and [shared acceptance design](p0-shared-acceptance.md) propose an FS-owned execution path that runs without CL/CLE/CLF. A future CL adapter belongs on the consumer side and translates into these neutral operations; it is optional, not part of FS bootstrap, authentication, resource discovery, or execution supervision. These are design requirements, not evidence of an implemented integration.
+
 Working division:
 
 - **Coordination Loop:** why/what/when — program state, DAG, Goal/WorkOrder intent, dependency and acceptance logic.

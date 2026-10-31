@@ -5,6 +5,8 @@
 - 前置阅读：[交互设计归档](resource-aware-prompt-design.md)、[接口核实报告](../research/client-completion-extension-audit-2026-10-31.md)。
 - 本方案不解除 Baseline 0.0 的架构 gate；`ARCHITECTURE_0_1_READY=false`、`IMPLEMENTATION_AUTHORIZED=false`。
 
+2026-11-01 的 P0 细化见 [最小接口契约](p0-interface-contract.md) 与 [共用验收设计](p0-shared-acceptance.md)。这两份提案细化并取代下文示意 JSON/候选接口的字段与失败语义；本路线及 L1/L3 边界继续成立。P0 仅完成设计验证，运行闭环仍待后续证据。
+
 ## 1. 本轮收敛
 
 FS 以两个独立可用的入口发展，共享资源与执行能力：

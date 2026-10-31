@@ -10,3 +10,5 @@ Owner discussion archives (proposals, not implementation authority):
 
 - [Resource-aware prompt completion and heterogeneous execution workbench](resource-aware-prompt-design.md) — GUI candidate lists, terminal ghost text, resource semantics, and FS/CLF/DSH boundaries.
 - [FS MCP and client parallel-development proposal](mcp-client-parallel-plan.md) — current synthesis: L1 formatted execution requests and L3 owned UX, optional L2, shared headless core, repository/package strategy, and CL as an optional consumer.
+- [P0 minimal public interface contract](p0-interface-contract.md) — versioned RunSpec, explicit resource references, shared operations, state/event recovery, errors, and no-CL execution ownership; proposed, not implemented.
+- [P0 shared acceptance design](p0-shared-acceptance.md) — common MCP/client vectors, failure traces, and staged evidence requirements for a runtime independent of CL.

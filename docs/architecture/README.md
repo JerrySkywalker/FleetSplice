@@ -9,3 +9,4 @@ Supporting documents separate product intent, domain semantics, authority, sessi
 Owner discussion archives (proposals, not implementation authority):
 
 - [Resource-aware prompt completion and heterogeneous execution workbench](resource-aware-prompt-design.md) — GUI candidate lists, terminal ghost text, resource semantics, and FS/CLF/DSH boundaries.
+- [FS MCP and client parallel-development proposal](mcp-client-parallel-plan.md) — current synthesis: L1 formatted execution requests and L3 owned UX, optional L2, shared headless core, repository/package strategy, and CL as an optional consumer.

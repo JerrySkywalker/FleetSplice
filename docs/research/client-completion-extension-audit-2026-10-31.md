@@ -3,6 +3,7 @@
 - 核实日期：2026-10-31（Asia/Shanghai）。
 - 类型：官方文档、固定提交源码与本机 CLI 只读检查；不是插件端到端验收报告。
 - 对应设计：[资源感知 prompt 与异构执行工作台](../architecture/resource-aware-prompt-design.md)。
+- 后续交付优先级见 [MCP 与客户端并行方案](../architecture/mcp-client-parallel-plan.md)：L2/宿主输入适配降为长期观察，L1 + L3 为主线。本文的接口证据保留，下面的适配验证顺序不再代表首批产品路线。
 - 架构 gate 不变：`ARCHITECTURE_0_1_READY=false`，`IMPLEMENTATION_AUTHORIZED=false`。
 
 ## 1. 结论
